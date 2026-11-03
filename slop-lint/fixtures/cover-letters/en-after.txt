@@ -1,0 +1,9 @@
+Dear Ms. Reyes,
+I'm applying for the remote Data Analyst role. You list SQL, Python and Looker; I've used the first two daily since 2022 at Contoso Agro, a 30-branch farm-supply retailer in Argentina.
+I built the Power BI sales dashboard our 30 branch managers review every week, on SQL Server queries I wrote, including one that matches stock against invoicing by branch. In 2023 I automated our monthly close report in Python (pandas, SQLAlchemy), cutting it from three days to four hours.
+I haven't used Looker. The dashboard work is the same modeling and metric definitions in a different tool, and I'd start with LookML in my first weeks.
+My English is B2 (Cambridge FCE). I wrote the technical documentation for the close-report pipeline in English, which is the kind of async writing your posting describes.
+Could we set up a 20-minute call next week? I can walk you through the dashboard with anonymized data.
+Best regards,
+Lucía Ferreyra
+lucia.ferreyra@example.com · GMT−3

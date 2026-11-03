@@ -1,0 +1,58 @@
+# Runs the same commands as the root README: type check, the Vitest suites, the
+# site-check unittest suite, and slop-lint over the repository's own docs. Everything is offline; the job has no secrets.
+# Actions are pinned to the commit SHA of their release tag, with the version in a
+# comment. To upgrade one, change both.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# With an explicit bash shell, steps run with -eo pipefail.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Check and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run check
+
+      - name: TypeScript tests
+        run: npm test
+
+      # site-check needs Python 3.11 or newer and nothing outside the standard library.
+      # ubuntu-latest ships Python 3; this step fails early if it is too old.
+      - name: Python version
+        run: |
+          python3 --version
+          python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "site-check needs Python 3.11 or newer")'
+
+      - name: site-check tests
+        run: npm run test:python
+
+      # The docs must pass their own linter: no tier 1 finding in any README or the case study.
+      - name: Lint the docs
+        run: npm run lint:docs

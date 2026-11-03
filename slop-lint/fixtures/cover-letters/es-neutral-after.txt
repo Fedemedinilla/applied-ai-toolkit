@@ -1,0 +1,9 @@
+Estimada Sra. Paredes:
+Me postulo al puesto de Analista de Datos. Desde 2022 trabajo con Power BI y SQL en Contoso Agro, una cadena de 30 sucursales de insumos agrícolas, que en escala y en lógica de stock por sucursal se parece al negocio de Distribuidora Fabrikam.
+El tablero de ventas que diseñé en Power BI es la herramienta semanal de los gerentes de las 30 sucursales. Las consultas de SQL Server que lo alimentan son mías, entre ellas la que cruza stock con facturación para detectar quiebres por sucursal.
+En 2023 automaticé con Python el reporte de cierre mensual: pasó de tres días de trabajo manual a cuatro horas.
+Mi inglés es B2 (Cambridge FCE) y lo uso para escribir la documentación técnica de ese proceso.
+Puedo mostrarle el tablero, con datos anonimizados, en una entrevista la semana próxima.
+Atentamente,
+Lucía Ferreyra
+lucia.ferreyra@example.com

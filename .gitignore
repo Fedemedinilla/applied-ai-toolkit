@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+__pycache__/
+*.pyc
+.env
+.env.*
+out/
+*.jsonl
+.vitest/

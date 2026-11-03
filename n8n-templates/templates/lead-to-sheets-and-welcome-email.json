@@ -1,0 +1,302 @@
+{
+  "name": "Lead to Google Sheets and welcome email",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Lead to Google Sheets and welcome email\n\nReceives a lead from your form, **saves it to Google Sheets** and sends an **automatic welcome email** from Gmail.\n\n**How it works:** the webhook receives the lead, checks the email, normalizes the fields, appends a row and sends the welcome email.\n\n**You need:** a **Google Sheets** credential and a **Gmail** credential (one Google account works for both).\n\n**Setup:** follow steps 1 to 3 below.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 1260,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        49
+      ],
+      "id": "e4e84725-a687-4160-8e0c-64ecb8870913",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-welcome",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "db04da0e-3967-46ed-a336-befebda8f4ec",
+      "name": "Receive lead (Webhook)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "841b21ab-100b-4a98-8f3b-8b07545d7f73",
+              "leftValue": "={{ String($json.body.email || '').trim() }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "ad5a0c2d-0b91-4db6-b145-cd9263939fa5",
+      "name": "Has a valid email?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5aa4cfef-f24f-4113-8299-2d647f920e5c",
+              "name": "name",
+              "value": "={{ String($json.body.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "02c45e09-8bc3-4f0d-8bbc-3ff67c303abf",
+              "name": "email",
+              "value": "={{ String($json.body.email).trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "8e133c5d-7f96-42bb-81b4-61cf2ca56c2f",
+              "name": "message",
+              "value": "={{ String($json.body.message || '').trim().slice(0, 2000) }}",
+              "type": "string"
+            },
+            {
+              "id": "185e2138-7978-4623-8b21-0a9e107d702a",
+              "name": "received_at",
+              "value": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        400
+      ],
+      "id": "6e81cbdc-eeb7-4b9e-acb8-eb00bb6eaccd",
+      "name": "Normalize fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        400
+      ],
+      "id": "27fcd9d3-e817-4cea-a498-98629d1b1bc8",
+      "name": "Save to Google Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Normalize fields').item.json.email }}",
+        "subject": "Thanks for your message",
+        "emailType": "text",
+        "message": "=Hi {{ $('Normalize fields').item.json.name }},\n\nThanks for writing to us. We got your message and will reply soon.\n\nBest regards",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        400
+      ],
+      "id": "62dfe17b-c808-42fd-9558-166d82705068",
+      "name": "Send welcome email"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        600
+      ],
+      "id": "079fa8b8-7b5c-4ecf-8184-4efce39c2b7a",
+      "name": "Discard (no valid email)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Connect your form\n\nPoint your form or landing page at this webhook URL (method **POST**, JSON body).\n\nExpected fields in the body:\n- name\n- email\n- message\n\nThe webhook has no authentication. Before going live, add Header Auth on the webhook node and send the same header from your form backend.\n\n*Tip:* click **Listen for test event** and send a test POST.",
+        "height": 438,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "3f1554d1-65a6-4f9f-b375-06be30e6729d",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "### Validation and abuse\n\nSubmissions without a well-formed email are discarded, so no row and no failed send.\n\nThe email does not quote the submitted message. Anyone who finds the webhook URL can make it send mail to any address, so the text they control stays out of it. Protect the webhook (Header Auth, a captcha on the form) before going live.",
+        "height": 333,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "a51b4d81-e9ca-44b7-af9a-09be18a471a6",
+      "name": "Validation note"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Connect Google Sheets\n\n1. *Save to Google Sheets*, Credential, connect your Google account.\n2. Pick the document and the sheet. Mapping is **Map Automatically**.\n\nHeaders: **name, email, message, received_at**",
+        "height": 249,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "580b7dcc-8e29-44b2-97b3-fb001fbab544",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Connect Gmail\n\n1. *Send welcome email*, Credential, connect your Gmail.\n2. Edit the **subject** and **body**. The body uses `name`.\n\nChange `emailType` to **html** for a designed email.",
+        "height": 249,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        800
+      ],
+      "id": "9797a15f-bbc7-4e01-aa37-3e4b47e8d826",
+      "name": "Setup 3"
+    }
+  ],
+  "connections": {
+    "Receive lead (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Has a valid email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a valid email?": {
+      "main": [
+        [
+          {
+            "node": "Normalize fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (no valid email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send welcome email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,389 @@
+{
+  "name": "MercadoPago payment to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# MercadoPago payment to Google Sheets\n\nWhen a payment notification arrives from MercadoPago, it **verifies the signature**, fetches the payment, drops repeated notifications and **appends it to a sheet**, then hands off to an alert step.\n\n**How it works:** webhook, `x-signature` HMAC check, payment fetched from the MercadoPago API, deduplicated by payment id and status, normalized, Google Sheets.\n\n**You need:** your MercadoPago **webhook secret** (step 1), a MercadoPago **access token** (Header Auth credential) and a Google Sheets credential.\n\n**Test with test credentials before production.** Check the signature against a real MercadoPago notification before you trust it.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 2222,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -51
+      ],
+      "id": "f1f1f1f1-1111-4111-8111-ffffffffffff",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mercadopago-payment",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "f2f2f2f2-2222-4222-8222-ffffffffffff",
+      "name": "Receive MercadoPago notification (Webhook)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const crypto = require('crypto');\n\n// Paste your MercadoPago webhook secret here\n// (Your integrations > Webhooks > Configure notifications > Secret key).\n// While it is the placeholder, every notification is rejected.\nconst SECRET = 'YOUR_MERCADOPAGO_WEBHOOK_SECRET';\n\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst body = item.json.body || {};\nconst query = item.json.query || {};\n\n// x-signature arrives as \"ts=...,v1=...\".\nconst parts = {};\nfor (const part of String(headers['x-signature'] || '').split(',')) {\n  const [key, value] = part.split('=');\n  if (key && value) parts[key.trim()] = value.trim();\n}\nconst ts = parts.ts || '';\nconst v1 = parts.v1 || '';\nconst requestId = String(headers['x-request-id'] || '');\n\n// data.id comes in the query string (?data.id=) or in the body.\n// Payment ids are numeric. Nothing else goes into the API path.\nconst dataId = String(query['data.id'] || (body.data && body.data.id) || '');\n\nlet signatureValid = false;\nif (SECRET !== 'YOUR_MERCADOPAGO_WEBHOOK_SECRET' && ts && v1 && /^[0-9]+$/.test(dataId)) {\n  // MercadoPago leaves out of the signed manifest any part the notification lacks.\n  const manifest = `id:${dataId};` + (requestId ? `request-id:${requestId};` : '') + `ts:${ts};`;\n  const expected = Buffer.from(crypto.createHmac('sha256', SECRET).update(manifest).digest('hex'));\n  const received = Buffer.from(v1);\n  // Constant-time comparison. timingSafeEqual throws on different byte lengths.\n  signatureValid = expected.length === received.length && crypto.timingSafeEqual(expected, received);\n}\n\nreturn [{ json: { paymentId: dataId, signatureValid } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        286,
+        400
+      ],
+      "id": "f3f3f3f3-3333-4333-8333-ffffffffffff",
+      "name": "Verify signature (x-signature)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fd4a3d35-c321-4462-8d53-efdd6b567f19",
+              "leftValue": "={{ $json.signatureValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        572,
+        400
+      ],
+      "id": "f4f4f4f4-4444-4444-8444-ffffffffffff",
+      "name": "Signature valid?"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mercadopago.com/v1/payments/{{ $json.paymentId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        858,
+        300
+      ],
+      "id": "f5f5f5f5-5555-4555-8555-ffffffffffff",
+      "name": "Fetch payment from MercadoPago",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.id }}:{{ $json.status }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1144,
+        300
+      ],
+      "id": "5b74ef28-c55d-44cb-8b75-c4a58941bb09",
+      "name": "Skip repeated notifications"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c8cd6780-b657-47f8-81d6-c402af8ff5eb",
+              "name": "payment_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "478ceea5-676b-4680-87fa-318c2e756d08",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "9dfb7506-0ef1-459d-8b91-c91521d5c7d5",
+              "name": "amount",
+              "value": "={{ $json.transaction_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "e211fe8e-b4dc-4416-8fd6-913a6b70d766",
+              "name": "email",
+              "value": "={{ $json.payer.email }}",
+              "type": "string"
+            },
+            {
+              "id": "03644586-b7d3-4359-815d-4e46ed026111",
+              "name": "description",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "75cb51cc-9f51-47b3-8f79-2bc00b7ec957",
+              "name": "approved_at",
+              "value": "={{ $json.date_approved }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1430,
+        300
+      ],
+      "id": "f6f6f6f6-6666-4666-8666-ffffffffffff",
+      "name": "Normalize payment"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1716,
+        300
+      ],
+      "id": "f7f7f7f7-7777-4777-8777-ffffffffffff",
+      "name": "Save to Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2002,
+        300
+      ],
+      "id": "f8f8f8f8-8888-4888-8888-ffffffffffff",
+      "name": "Notify (WhatsApp or email)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        858,
+        520
+      ],
+      "id": "f9f9f9f9-9999-4999-8999-ffffffffffff",
+      "name": "Invalid signature (discard)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. MercadoPago\n\n**Webhook:** in MercadoPago, *Your integrations > Webhooks*, paste the **production** URL of the webhook node and subscribe to the **payment** event.\n\n**Secret:** paste it in *Verify signature*, on the line `SECRET = '...'`. Until you do, every notification goes to the discard branch.\n\n**Access token:** in *Fetch payment from MercadoPago*, Credential > Header Auth, Name `Authorization`, Value `Bearer YOUR_ACCESS_TOKEN`.\n\nSelf-hosted: if the Code node fails on `crypto`, set `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.",
+        "height": 501,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        720
+      ],
+      "id": "e1e1e1e1-1111-4111-8111-eeeeeeeeeeee",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Why the payment is fetched\n\nThe notification only carries `data.id`. The amount, status and payer come from the API, with your token, so a forged body cannot write a fake amount to the sheet even if the signature check were misconfigured.",
+        "height": 228,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        720
+      ],
+      "id": "e2e2e2e2-2222-4222-8222-eeeeeeeeeeee",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "### Idempotency\n\nMercadoPago can send the **same** notification more than once, and sends another one when the status changes. *Skip repeated notifications* keeps the first item for each `id:status` pair across executions, so a retry does not add a row and a status change does.\n\nThe history is stored by n8n per node. Manual test runs count too: clear it from the node (*Clear Deduplication History*) after testing.",
+        "height": 375,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        720
+      ],
+      "id": "e3e3e3e3-3333-4333-8333-eeeeeeeeeeee",
+      "name": "Idempotency note"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Connect Google Sheets\n\n1. *Save to Sheets*, Credential, connect your Google account.\n2. Pick the document and the sheet. Mapping is **Map Automatically**.\n\nSuggested headers:\n**payment_id, status, amount, email, description, approved_at**",
+        "height": 270,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        720
+      ],
+      "id": "e4e4e4e4-4444-4444-8444-eeeeeeeeeeee",
+      "name": "Setup 3"
+    }
+  ],
+  "connections": {
+    "Receive MercadoPago notification (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Verify signature (x-signature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature (x-signature)": {
+      "main": [
+        [
+          {
+            "node": "Signature valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature valid?": {
+      "main": [
+        [
+          {
+            "node": "Fetch payment from MercadoPago",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid signature (discard)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch payment from MercadoPago": {
+      "main": [
+        [
+          {
+            "node": "Skip repeated notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip repeated notifications": {
+      "main": [
+        [
+          {
+            "node": "Normalize payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize payment": {
+      "main": [
+        [
+          {
+            "node": "Save to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Notify (WhatsApp or email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

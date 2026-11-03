@@ -1,0 +1,23 @@
+{
+  "name": "applied-ai-toolkit",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "check": "tsc --noEmit",
+    "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md evals/CASE-STUDY.md"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.1.0",
+    "zod": "4.6.7"
+  }
+}

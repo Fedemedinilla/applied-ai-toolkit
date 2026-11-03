@@ -1,0 +1,303 @@
+{
+  "name": "Lead to Google Sheets and Telegram alert",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Lead to Google Sheets and Telegram alert\n\nReceives a lead, **saves it to Google Sheets** and **pings you on Telegram** right away.\n\n**How it works:** the webhook receives the lead, checks the email, normalizes the fields, appends a row and sends you a Telegram message.\n\n**You need:** a **Google Sheets** credential and a **Telegram bot** (free, created with @BotFather).\n\n**Setup:** follow steps 1 to 3 below.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 1260,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        49
+      ],
+      "id": "8a482feb-a726-47a5-84cb-a446dc7e7138",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-telegram",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "b127362b-3c87-4bf3-8709-44c912c029df",
+      "name": "Receive lead (Webhook)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "464de430-37df-4778-8439-e7d8ddedcfcb",
+              "leftValue": "={{ String($json.body.email || '').trim() }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "c7feef80-f841-42d8-a6b8-b82c85c88c33",
+      "name": "Has a valid email?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8939ccb0-1c2a-4fc9-8063-a70218f33eb6",
+              "name": "name",
+              "value": "={{ String($json.body.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "2bbc79aa-1df5-4513-886d-d7a3705b63e3",
+              "name": "email",
+              "value": "={{ String($json.body.email).trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "0db4edf1-3544-4944-8d58-8b6e58110d56",
+              "name": "message",
+              "value": "={{ String($json.body.message || '').trim().slice(0, 2000) }}",
+              "type": "string"
+            },
+            {
+              "id": "5c4587a6-60df-43ea-8006-e859c2d2dcf7",
+              "name": "received_at",
+              "value": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        400
+      ],
+      "id": "51c77fcf-6ede-4704-bda2-da88422fdd0f",
+      "name": "Normalize fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        400
+      ],
+      "id": "ad346c6e-1198-4037-a296-ab81ba0f8330",
+      "name": "Save to Google Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=New lead\n\nName: {{ $('Normalize fields').item.json.name }}\nEmail: {{ $('Normalize fields').item.json.email }}\nMessage: {{ $('Normalize fields').item.json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        400
+      ],
+      "id": "63e238f7-1bf4-4e81-8044-41b374de15a2",
+      "name": "Alert on Telegram",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        600
+      ],
+      "id": "14494320-55cf-49df-8fdc-919eb373e3a2",
+      "name": "Discard (no valid email)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Connect your form\n\nPoint your form or landing page at this webhook URL (method **POST**, JSON body).\n\nExpected fields in the body:\n- name\n- email\n- message\n\nThe webhook has no authentication. Before going live, add Header Auth on the webhook node and send the same header from your form backend.\n\n*Tip:* click **Listen for test event** and send a test POST.",
+        "height": 438,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "40b387de-7935-470e-9810-f61bbe065965",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "### Validation\n\nSubmissions without a well-formed email go to the discard branch, so they never become rows. Name and message are trimmed and cut at 100 and 2,000 characters.",
+        "height": 207,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "1fd26fe4-4493-4ddb-a39c-675e2d87ab4a",
+      "name": "Validation note"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Connect Google Sheets\n\n*Save to Google Sheets*, Credential, your Google account, then the document and the sheet. Mapping is **Map Automatically**.\n\nHeaders: **name, email, message, received_at**",
+        "height": 249,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "45abb18b-6470-4d76-973c-6fa398e04130",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Connect Telegram\n\n1. Create a bot with **@BotFather**. It gives you a *token*: put it in the Telegram credential.\n2. Send any message to your bot, then open `https://api.telegram.org/bot<token>/getUpdates`. Your chat id is `message.chat.id`.\n3. Replace `YOUR_TELEGRAM_CHAT_ID` in *Alert on Telegram*.\n\nThe message is plain text (no parse mode), so names with `_` or `*` do not break it.",
+        "height": 375,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        800
+      ],
+      "id": "21d42f68-4e4c-43b1-b261-cc02934c5a8b",
+      "name": "Setup 3"
+    }
+  ],
+  "connections": {
+    "Receive lead (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Has a valid email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a valid email?": {
+      "main": [
+        [
+          {
+            "node": "Normalize fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (no valid email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Alert on Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

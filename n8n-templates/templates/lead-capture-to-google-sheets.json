@@ -1,0 +1,272 @@
+{
+  "name": "Lead capture to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Lead capture to Google Sheets\n\nReceives submissions from your form or landing page and saves each one as a row in Google Sheets.\n\n**How it works:** the webhook receives the lead, checks that it has a valid email, normalizes the fields and appends a row.\n\n**You need:** a Google Sheets credential (OAuth) and a sheet with the headers: name, email, message, received_at.\n\n**Setup:** follow steps 1 to 3 below.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 312,
+        "width": 1000,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        28
+      ],
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Receive lead (Webhook)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "155b0625-8dd8-45fd-86a7-51ce130e0d60",
+              "leftValue": "={{ String($json.body.email || '').trim() }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Has a valid email?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "732f3c39-81d6-4cf4-8926-975ddb137876",
+              "name": "name",
+              "value": "={{ String($json.body.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "b97c7e4c-023d-44dc-8669-1863d42362a8",
+              "name": "email",
+              "value": "={{ String($json.body.email).trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "5a6ea8c5-883a-44de-8d48-6109d02b21c6",
+              "name": "message",
+              "value": "={{ String($json.body.message || '').trim().slice(0, 2000) }}",
+              "type": "string"
+            },
+            {
+              "id": "edf6cb51-d5ef-4e53-8f3e-3f52d48c4b22",
+              "name": "received_at",
+              "value": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        400
+      ],
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Normalize fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        400
+      ],
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Save to Google Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        600
+      ],
+      "id": "a01d1fdf-4692-43fe-8594-75768508f535",
+      "name": "Discard (no valid email)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Connect your form\n\nPoint your form or landing page at this webhook URL (method **POST**, JSON body).\n\nExpected fields in the body:\n- name\n- email\n- message\n\nThe webhook has no authentication. Before going live, add Header Auth on the webhook node and send the same header from your form backend.\n\n*Tip:* click **Listen for test event** and send a test POST.",
+        "height": 438,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "### Validation\n\nSubmissions without a well-formed email go to the discard branch, so they never become rows. Name and message are trimmed and cut at 100 and 2,000 characters.",
+        "height": 207,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "77777777-7777-4777-8777-777777777777",
+      "name": "Validation note"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Adjust the fields\n\n*Normalize fields* decides which value goes to each column. Change or add fields to match your form.\n\nDefault: **name, email, message, received_at** (the date is filled in automatically).",
+        "height": 249,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "88888888-8888-4888-8888-888888888888",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Connect Google Sheets\n\n1. Open *Save to Google Sheets*, Credential, *Create new*, and connect your Google account.\n2. Pick the **document** and the **sheet**.\n3. Mapping is *Map Automatically*: it matches by column name.\n\nThe sheet headers must match: **name, email, message, received_at**.\n\nCell format is **RAW**, so a submitted value that starts with `=` is stored as text and never runs as a formula.",
+        "height": 417,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        800
+      ],
+      "id": "99999999-9999-4999-8999-999999999999",
+      "name": "Setup 3"
+    }
+  ],
+  "connections": {
+    "Receive lead (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Has a valid email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a valid email?": {
+      "main": [
+        [
+          {
+            "node": "Normalize fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (no valid email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

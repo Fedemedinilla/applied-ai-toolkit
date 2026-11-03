@@ -1,0 +1,329 @@
+{
+  "name": "Sale closed to Google review request",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Sale closed to Google review request\n\nWhen a sale closes or a job is done, it emails the customer **asking for a Google review** with your direct link, **once per email address**, and logs who was asked.\n\n**How it works:** webhook (sale or job completed), customer fields, email check, skip anyone already asked, review email, row in Google Sheets.\n\n**You need:** your Google Business Profile **review link**, a Gmail credential and Google Sheets.\n\nReviews feed the answers Google shows for your business. Asking right after a good experience, every time, is what gets them.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 1780,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        49
+      ],
+      "id": "93787cc3-15f8-46c7-bc0c-c31812531d0c",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sale-closed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "2909ef2a-5274-47c1-a900-64b8b55c8b63",
+      "name": "Sale closed (Webhook)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3fbe677c-cf6a-4797-8086-bfc566a710d0",
+              "name": "name",
+              "value": "={{ String($json.body.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "fbba8229-8853-45a3-8d07-7a19b22ae844",
+              "name": "email",
+              "value": "={{ String($json.body.email || '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "dabcdd29-95e4-4157-8237-99e9a7d68ea6",
+              "name": "asked_at",
+              "value": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        400
+      ],
+      "id": "ca8fb424-8775-4e46-a480-ed05e421173e",
+      "name": "Customer fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c4974a45-9fde-473b-8e48-201b4feb3db5",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        400
+      ],
+      "id": "9f0b4c29-aed0-4bb7-8407-4af0f0d32f62",
+      "name": "Has a valid email?"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.email }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        780,
+        400
+      ],
+      "id": "751bd40e-08f3-41f1-843a-80d212024766",
+      "name": "Ask each customer once"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Could you leave us a review, {{ $json.name }}?",
+        "emailType": "text",
+        "message": "=Hi {{ $json.name }},\n\nThanks for trusting us. If you had a good experience, a short Google review would help us a lot. It takes 30 seconds:\n\nYOUR_GOOGLE_REVIEW_LINK\n\nThank you. If anything went wrong, reply to this email and we will sort it out.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        400
+      ],
+      "id": "6b161ea6-879a-494a-9d15-3d361fc3fc30",
+      "name": "Ask for review (email)"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1300,
+        400
+      ],
+      "id": "20482970-a9ed-4bce-89ea-2e5f6422cb99",
+      "name": "Log request",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        400
+      ],
+      "id": "112ed6f7-0551-4b74-8dfc-d558d323fdbc",
+      "name": "Done"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        780,
+        600
+      ],
+      "id": "d1ae1f12-e508-406c-8340-a51e38897c97",
+      "name": "Discard (no valid email)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Trigger\n\nPoint whatever marks a sale as closed at this webhook: your store, your CRM, MercadoPago, or a button in your system (**POST** with `name` and `email` in the body).\n\n*Tip:* chain it after the MercadoPago or Tiendanube template.\n\nThe webhook has no authentication and sends email. Add Header Auth before going live.",
+        "height": 354,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "8bb7f7c3-34dc-4b42-a4ef-1b14d443e7fb",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Review link and Gmail\n\n1. Get your **review link** in Google Business Profile (*Ask for reviews*, copy the `g.page/r/...` link).\n2. Replace `YOUR_GOOGLE_REVIEW_LINK` in the email.\n3. *Ask for review (email)*, Credential, connect your Gmail.\n\n*Log request* writes **name, email, asked_at**: use those headers.",
+        "height": 312,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "9412978e-b960-4167-beec-f994231f7440",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "### Once per customer, and variants\n\n*Ask each customer once* remembers every email it let through, across executions. The address is recorded before the send, so a failed send is not retried: asking twice annoys more than not asking.\n\n- **Wait a bit:** add a **Wait** node (for example 1 day) before the email.\n- **WhatsApp:** replace the Gmail node with an HTTP Request to the WhatsApp Cloud API, using an approved template.",
+        "height": 396,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "a789633a-b0c1-4da0-a621-6b1b1c31df46",
+      "name": "Variants note"
+    }
+  ],
+  "connections": {
+    "Sale closed (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Customer fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer fields": {
+      "main": [
+        [
+          {
+            "node": "Has a valid email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a valid email?": {
+      "main": [
+        [
+          {
+            "node": "Ask each customer once",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (no valid email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask each customer once": {
+      "main": [
+        [
+          {
+            "node": "Ask for review (email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask for review (email)": {
+      "main": [
+        [
+          {
+            "node": "Log request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log request": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

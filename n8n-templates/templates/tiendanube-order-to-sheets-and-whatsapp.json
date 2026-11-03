@@ -1,0 +1,396 @@
+{
+  "name": "Tiendanube order to Google Sheets and WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Tiendanube order to Google Sheets and WhatsApp\n\nWhen a **new order** arrives in Tiendanube, it fetches the order, **logs it to Google Sheets** and sends the customer a **WhatsApp confirmation**.\n\n**How it works:** webhook (order/created), payload check, order fetched from the Tiendanube API, normalized, Google Sheets, WhatsApp template message to the customer.\n\n**You need:** a Tiendanube app with its **access token**, Google Sheets and the **WhatsApp Cloud API** (Meta) with an approved message template, or another WhatsApp provider.\n\nTiendanube only sends the order `id`, so the full order is fetched from the API.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 1780,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        49
+      ],
+      "id": "ab2d2792-4dfb-4cf8-b1cb-2e78672b5797",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tiendanube-order",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "2b699d2f-cbae-4788-8656-bc79d8f3bdae",
+      "name": "Receive order (Webhook)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0be03b9f-52a1-41b6-b710-44dd545332ae",
+              "leftValue": "={{ String($json.body.store_id || '') }}",
+              "rightValue": "YOUR_STORE_ID",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "6c46a376-dc70-4944-bddf-f8a322176623",
+              "leftValue": "={{ String($json.body.event || '') }}",
+              "rightValue": "order/created",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "fb304e05-78cc-4534-aa9c-103d73f8dd52",
+              "leftValue": "={{ String($json.body.id || '') }}",
+              "rightValue": "^[0-9]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "47a91a58-ab98-4bfe-8d97-49149b28b072",
+      "name": "Your store and a new order?"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.tiendanube.com/v1/{{ $json.body.store_id }}/orders/{{ $json.body.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        400
+      ],
+      "id": "76b86dec-ba04-4008-ac22-0927f4de9d06",
+      "name": "Fetch order (Tiendanube)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8c4a5155-c976-452d-8b70-3f99546a7a62",
+              "name": "order",
+              "value": "={{ $json.number }}",
+              "type": "string"
+            },
+            {
+              "id": "073dcbcd-7b35-4be4-8294-07fcda44a88b",
+              "name": "customer",
+              "value": "={{ String($json.contact_name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "9c6d2505-28d2-44fc-8176-041e1471c1b4",
+              "name": "phone",
+              "value": "={{ String($json.contact_phone || '').replace(/\\D/g, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "37a3c8b0-5c42-43c9-82b9-0568ca75fe0c",
+              "name": "total",
+              "value": "={{ $json.total }}",
+              "type": "string"
+            },
+            {
+              "id": "fc44721a-56e3-4c11-8121-64c4a434e659",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "78ca6b38-3180-4cdd-8996-758be12450b6",
+              "name": "received_at",
+              "value": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1066,
+        400
+      ],
+      "id": "e2b8d369-9cbc-4d27-9f40-2df68b1aabc6",
+      "name": "Order fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1326,
+        400
+      ],
+      "id": "fadd3cf0-ecab-40c7-bc7b-b2c0f3d2cd52",
+      "name": "Save to Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $('Order fields').item.json.phone,\n  type: 'template',\n  template: {\n    name: 'YOUR_TEMPLATE_NAME',\n    language: { code: 'en' },\n    components: [{\n      type: 'body',\n      parameters: [\n        { type: 'text', text: String($('Order fields').item.json.customer) },\n        { type: 'text', text: String($('Order fields').item.json.order) },\n        { type: 'text', text: String($('Order fields').item.json.total) }\n      ]\n    }]\n  }\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1586,
+        400
+      ],
+      "id": "f31b152b-b5c1-437d-b37a-ee5c324516cc",
+      "name": "WhatsApp to customer"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1846,
+        400
+      ],
+      "id": "4a7a2e1d-a29b-438e-ba0e-63e33a511f6d",
+      "name": "Done"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        600
+      ],
+      "id": "7617de30-d451-400d-899f-c4cf8ddc9005",
+      "name": "Discard (bad payload)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Tiendanube\n\n1. Create an app in your Tiendanube admin and get its **access token**.\n2. Subscribe the **order/created** webhook to this node's URL.\n3. In *Fetch order*, Credential, Header Auth, Name `Authentication`, Value `bearer YOUR_TOKEN`. Tiendanube uses `Authentication`, not `Authorization`. Add a `User-Agent` header with your app name and a contact address if the API asks for it.\n\n4. Replace `YOUR_STORE_ID` in *Your store and a new order?* with your numeric store id. Until you do, every request goes to the discard branch.\n\nTiendanube signs its webhooks, but this template does not check the signature (it needs the raw body). Pinning the store id and fetching the order with your token means a forged request cannot invent an order. *Confirm each order once* means a replayed one cannot message a customer twice.",
+        "height": 560,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "4097c093-26e2-4592-b600-eed02c884da4",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Google Sheets\n\n*Save to Sheets*, Credential, connect Google, pick the document and the sheet, mapping **Map Automatically**.\n\nSuggested headers:\n**order, customer, phone, total, status, received_at**",
+        "height": 249,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "00e01949-7a4d-4efa-9ae7-a438e9f7bf31",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. WhatsApp\n\nUses the **WhatsApp Cloud API** (Meta):\n1. Replace `YOUR_PHONE_NUMBER_ID` in the URL.\n2. Credential, Header Auth, Name `Authorization`, Value `Bearer YOUR_TOKEN`.\n3. Create a template with three body variables (customer, order number, total) and put its name in `YOUR_TEMPLATE_NAME`.\n\nThe phone is reduced to digits; it must include the country code. With another provider, change the URL and the body.",
+        "height": 438,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "55f901b7-000d-4db7-9bfe-427f6ffc4c97",
+      "name": "Setup 3"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        780,
+        400
+      ],
+      "id": "d1f6988f-ae27-4952-88fc-07d9139ce1a5",
+      "name": "Confirm each order once"
+    }
+  ],
+  "connections": {
+    "Receive order (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Your store and a new order?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch order (Tiendanube)": {
+      "main": [
+        [
+          {
+            "node": "Confirm each order once",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp to customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp to customer": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your store and a new order?": {
+      "main": [
+        [
+          {
+            "node": "Fetch order (Tiendanube)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (bad payload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm each order once": {
+      "main": [
+        [
+          {
+            "node": "Order fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

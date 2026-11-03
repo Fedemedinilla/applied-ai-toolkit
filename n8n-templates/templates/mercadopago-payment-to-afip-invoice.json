@@ -1,0 +1,452 @@
+{
+  "name": "MercadoPago payment to AFIP invoice",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# MercadoPago payment to AFIP invoice\n\nWhen a payment notification arrives from MercadoPago, it **verifies the signature**, fetches the payment and checks that it is **approved and not invoiced yet**. Then it **issues the invoice in AFIP** through your invoicing service and emails the receipt (CAE) to the customer.\n\n**How it works:** MercadoPago webhook, `x-signature` check, payment fetched from the API, status must be `approved`, one invoice per payment id, invoice fields, POST to your AFIP invoicing API, receipt email.\n\n**You need:** a MercadoPago secret and access token, an **AFIP invoicing service** (AFIP WSFEv1 with a certificate, or an invoicing provider that exposes a REST API) and a Gmail credential.\n\n**Advanced, Argentina only.** AFIP requires certificate authentication (WSAA). The simplest path is an invoicing provider with a REST API. Test against the homologation environment before production.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 2508,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -51
+      ],
+      "id": "bb0a05de-fd0c-4650-b239-6ed9e9dc1260",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mercadopago-invoice",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "801cb5e7-5f36-401a-b40f-da4abaa5e7b1",
+      "name": "Receive MercadoPago payment (Webhook)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const crypto = require('crypto');\n\n// Paste your MercadoPago webhook secret here\n// (Your integrations > Webhooks > Configure notifications > Secret key).\n// While it is the placeholder, every notification is rejected.\nconst SECRET = 'YOUR_MERCADOPAGO_WEBHOOK_SECRET';\n\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst body = item.json.body || {};\nconst query = item.json.query || {};\n\n// x-signature arrives as \"ts=...,v1=...\".\nconst parts = {};\nfor (const part of String(headers['x-signature'] || '').split(',')) {\n  const [key, value] = part.split('=');\n  if (key && value) parts[key.trim()] = value.trim();\n}\nconst ts = parts.ts || '';\nconst v1 = parts.v1 || '';\nconst requestId = String(headers['x-request-id'] || '');\n\n// data.id comes in the query string (?data.id=) or in the body.\n// Payment ids are numeric. Nothing else goes into the API path.\nconst dataId = String(query['data.id'] || (body.data && body.data.id) || '');\n\nlet signatureValid = false;\nif (SECRET !== 'YOUR_MERCADOPAGO_WEBHOOK_SECRET' && ts && v1 && /^[0-9]+$/.test(dataId)) {\n  // MercadoPago leaves out of the signed manifest any part the notification lacks.\n  const manifest = `id:${dataId};` + (requestId ? `request-id:${requestId};` : '') + `ts:${ts};`;\n  const expected = Buffer.from(crypto.createHmac('sha256', SECRET).update(manifest).digest('hex'));\n  const received = Buffer.from(v1);\n  // Constant-time comparison. timingSafeEqual throws on different byte lengths.\n  signatureValid = expected.length === received.length && crypto.timingSafeEqual(expected, received);\n}\n\nreturn [{ json: { paymentId: dataId, signatureValid } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        286,
+        400
+      ],
+      "id": "66e81ff0-e089-4311-86a1-b5c89531ad14",
+      "name": "Verify signature (x-signature)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6e66a768-039b-4fbb-87f1-65b0e1f610e6",
+              "leftValue": "={{ $json.signatureValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        572,
+        400
+      ],
+      "id": "2c4d6d61-e775-46dc-a7f3-befb4a88bf68",
+      "name": "Signature valid?"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mercadopago.com/v1/payments/{{ $json.paymentId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        858,
+        300
+      ],
+      "id": "fbfb2240-1225-4874-b406-bcf3767dc75e",
+      "name": "Fetch payment from MercadoPago",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5ded3a95-3a9e-4dcc-8e5b-1d0f229de0c4",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1144,
+        300
+      ],
+      "id": "991fa5a1-a217-435d-8254-1996ceac178d",
+      "name": "Payment approved?"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1430,
+        300
+      ],
+      "id": "b4e1a4ac-f150-49e0-83a6-c53f26af8f6c",
+      "name": "One invoice per payment"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f5e711e-140c-4a2a-8eab-37432e54b765",
+              "name": "payment_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "e7822e65-fa92-4360-8e17-7ae40592d154",
+              "name": "amount",
+              "value": "={{ $json.transaction_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "0bfe144f-b1b7-4a05-8bf0-ff4fe362caad",
+              "name": "currency",
+              "value": "={{ $json.currency_id }}",
+              "type": "string"
+            },
+            {
+              "id": "e952973b-4bf4-4854-8cd6-abe494edd2cd",
+              "name": "email",
+              "value": "={{ $json.payer.email }}",
+              "type": "string"
+            },
+            {
+              "id": "baa9e389-58a5-4496-898b-fb2680f8fab7",
+              "name": "name",
+              "value": "={{ [$json.payer.first_name, $json.payer.last_name].filter(Boolean).join(' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "c38b93c4-fe03-421d-8ac8-4cc680ca7f04",
+              "name": "id_type",
+              "value": "={{ $json.payer.identification.type }}",
+              "type": "string"
+            },
+            {
+              "id": "a8d97311-8e95-410f-8dd3-8c9ca6375930",
+              "name": "id_number",
+              "value": "={{ $json.payer.identification.number }}",
+              "type": "string"
+            },
+            {
+              "id": "34030d4a-1312-4561-8906-378adeec930c",
+              "name": "description",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1716,
+        300
+      ],
+      "id": "43adf798-2467-4777-bc2a-bee05875bc12",
+      "name": "Invoice fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-INVOICING-PROVIDER.example/api/v1/invoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  invoice_type: 'factura_b',\n  external_reference: $json.payment_id,\n  customer: {\n    name: $json.name,\n    email: $json.email,\n    id_type: $json.id_type,\n    id_number: $json.id_number\n  },\n  total: $json.amount,\n  currency: $json.currency,\n  concept: $json.description\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2002,
+        300
+      ],
+      "id": "7305c237-5cc6-4899-9bae-cd850b844f7b",
+      "name": "Issue invoice (AFIP)"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Invoice fields').item.json.email }}",
+        "subject": "={{ 'Your receipt: ' + ($('Invoice fields').item.json.description || 'payment ' + $('Invoice fields').item.json.payment_id) }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Invoice fields').item.json.name }},\n\nThanks for your purchase. These are the details of your tax receipt:\n\n- CAE: {{ $json.cae }}\n- CAE due date: {{ $json.cae_due_date }}\n- Total: {{ $('Invoice fields').item.json.amount }} {{ $('Invoice fields').item.json.currency }}\n\nIf you need the PDF or any other detail, reply to this email.\n\nBest regards",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2288,
+        300
+      ],
+      "id": "300dd7ea-a52a-4289-b4eb-dea4d96b71ac",
+      "name": "Send receipt"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        858,
+        520
+      ],
+      "id": "ae1cf19e-3737-4c8b-b424-ddbe7262a970",
+      "name": "Invalid signature (discard)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1430,
+        520
+      ],
+      "id": "3e7a1326-bde2-45c5-8438-e91f343ceaa0",
+      "name": "Not approved (no invoice)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. MercadoPago\n\n**Webhook:** in MercadoPago, *Your integrations > Webhooks*, paste the **production** URL of the webhook node and subscribe to the **payment** event.\n\n**Secret:** paste it in *Verify signature*, on the line `SECRET = '...'`. Until you do, every notification goes to the discard branch.\n\n**Access token:** in *Fetch payment from MercadoPago*, Credential > Header Auth, Name `Authorization`, Value `Bearer YOUR_ACCESS_TOKEN`.\n\nSelf-hosted: if the Code node fails on `crypto`, set `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.",
+        "height": 501,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        720
+      ],
+      "id": "46dcac13-a237-429e-94be-a5a99e3ba07e",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "### One invoice per payment\n\nMercadoPago sends repeated notifications and one per status change. Only `approved` payments go on, and *One invoice per payment* lets each payment id through once across executions.\n\nThe id is recorded before the invoice call, and the call has no automatic retry: a timeout after the provider accepted it would issue a second invoice. If the call fails, the payment will not be invoiced on a later notification, so issue it by hand. That is the intended trade: a missing invoice takes one manual step, a duplicate one needs a credit note.",
+        "height": 438,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        720
+      ],
+      "id": "38075660-7ae8-4b5a-8d95-4be0dce12695",
+      "name": "Idempotency note"
+    },
+    {
+      "parameters": {
+        "content": "## 2. AFIP (invoicing)\n\nAFIP requires a certificate (WSAA), so the practical route is an **invoicing provider with a REST API**.\n\nIn *Issue invoice (AFIP)*:\n1. Replace the **URL** with your provider's.\n2. Adapt the **body** (receipt type, field names) to its format. `factura_b` is the usual type for final consumers.\n3. Credential, Header Auth with your token.\n\n`external_reference` carries the payment id. If your provider deduplicates on a reference or an idempotency key, map it there too.\n\nThe email reads `cae` and `cae_due_date` from the response: rename them to your provider's fields.",
+        "height": 564,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        720
+      ],
+      "id": "5de4f763-4b94-4013-a0c4-64064640abad",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Gmail\n\n*Send receipt*, Credential, connect your Gmail.\n\nEdit the subject and body. Change `emailType` to **html** for a designed receipt.",
+        "height": 228,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        720
+      ],
+      "id": "75f44e76-7ba6-4181-b8be-dcc16ffc075b",
+      "name": "Setup 3"
+    }
+  ],
+  "connections": {
+    "Receive MercadoPago payment (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Verify signature (x-signature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature (x-signature)": {
+      "main": [
+        [
+          {
+            "node": "Signature valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature valid?": {
+      "main": [
+        [
+          {
+            "node": "Fetch payment from MercadoPago",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid signature (discard)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch payment from MercadoPago": {
+      "main": [
+        [
+          {
+            "node": "Payment approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment approved?": {
+      "main": [
+        [
+          {
+            "node": "One invoice per payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not approved (no invoice)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One invoice per payment": {
+      "main": [
+        [
+          {
+            "node": "Invoice fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice fields": {
+      "main": [
+        [
+          {
+            "node": "Issue invoice (AFIP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Issue invoice (AFIP)": {
+      "main": [
+        [
+          {
+            "node": "Send receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

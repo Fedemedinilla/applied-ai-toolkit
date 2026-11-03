@@ -1,0 +1,439 @@
+{
+  "name": "Calendly booking to Google Sheets and WhatsApp confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Calendly booking to Google Sheets and WhatsApp confirmation\n\nWhen someone **books a slot** in Calendly, the booking is **saved to Google Sheets** and the client gets a **WhatsApp confirmation**. Built for clinics, studios and other appointment-based services.\n\n**How it works:** webhook (invitee.created), a check that the body is a new booking with an email and a start time, one pass per booking, then name, email, phone and time are extracted, a row is appended, and if there is a valid phone number a WhatsApp template message is sent.\n\n**You need:** a Calendly plan with webhooks, Google Sheets and the WhatsApp Cloud API with an approved message template.\n\nFor a **reminder before the appointment**, see the purple note: it is a separate scheduled workflow that reads the saved time.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 333,
+        "width": 2100,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        7
+      ],
+      "id": "ce111551-60ec-4f07-b091-45ef89611d77",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendly-booking",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "ecbb687c-8d78-4670-a565-16d8c4a026c0",
+      "name": "Receive booking (Webhook)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b92554b2-a93d-4cb7-8082-a377a803e3a1",
+              "name": "name",
+              "value": "={{ String($json.body.payload.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "8e45ed98-179c-4a17-8dfd-63eb800753b1",
+              "name": "email",
+              "value": "={{ String($json.body.payload.email).trim().slice(0, 200) }}",
+              "type": "string"
+            },
+            {
+              "id": "cd0d5298-887c-43f9-843b-64e77b65d21c",
+              "name": "phone",
+              "value": "={{ String($json.body.payload.text_reminder_number || '').replace(/\\D/g, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "2acf324b-c440-4ad1-813d-a4e1a8a4a957",
+              "name": "start_time",
+              "value": "={{ String($json.body.payload.scheduled_event.start_time).slice(0, 40) }}",
+              "type": "string"
+            },
+            {
+              "id": "aa217401-d3db-4bb2-80e8-a6db80abdb1b",
+              "name": "event",
+              "value": "={{ String($json.body.payload.scheduled_event.name || '').trim().slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "d8d9dbe8-df04-4d08-b68a-2450a48575f8",
+              "name": "invitee_uri",
+              "value": "={{ String($json.body.payload.uri).slice(0, 300) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        400
+      ],
+      "id": "42ad6e12-6305-4068-91d1-9aa4fbf1f515",
+      "name": "Booking fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1092,
+        400
+      ],
+      "id": "27a11793-ce07-4011-8803-394cb39ed318",
+      "name": "Save to Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "78d2c693-6a4b-4fbe-861d-9d9fca4d1e0e",
+              "leftValue": "={{ $('Booking fields').item.json.phone }}",
+              "rightValue": "^[0-9]{8,15}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1352,
+        400
+      ],
+      "id": "8eb9adeb-887d-47da-8537-393c5cdacc7b",
+      "name": "Has a valid phone number?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $('Booking fields').item.json.phone,\n  type: 'template',\n  template: {\n    name: 'YOUR_TEMPLATE_NAME',\n    language: { code: 'en' },\n    components: [{\n      type: 'body',\n      parameters: [\n        { type: 'text', text: String($('Booking fields').item.json.name) },\n        { type: 'text', text: String($('Booking fields').item.json.event) },\n        { type: 'text', text: String($('Booking fields').item.json.start_time) }\n      ]\n    }]\n  }\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1612,
+        400
+      ],
+      "id": "45ccf693-14be-44cf-907a-54c8359a1b02",
+      "name": "Confirm on WhatsApp"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        400
+      ],
+      "id": "8f656c19-48ec-4e92-9ebf-2bf9f2f14031",
+      "name": "Done"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1612,
+        600
+      ],
+      "id": "c1a3bfbf-c553-4f59-8dc0-1d48a5cd0bdd",
+      "name": "No valid phone (skip WhatsApp)"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Calendly\n\n1. You need a Calendly plan with **webhooks**.\n2. Create a subscription to **invitee.created** pointing at this webhook URL.\n3. To get a **phone number**, enable the phone / SMS reminder question on your event type. It arrives in `text_reminder_number`.\n\nBookings without a valid phone (8 to 15 digits with the country code) are saved and skip WhatsApp.\n\nThis webhook does not check `Calendly-Webhook-Signature` (it needs the raw body), so anyone with the URL can post a booking. Add the check, or Header Auth, before going live: each confirmation is a WhatsApp message billed by Meta.",
+        "height": 520,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "c31a9112-239b-4e41-9d8a-9ab58c9307ae",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Sheets and WhatsApp\n\n**Sheets:** connect Google, pick the document and the sheet, automatic mapping. Headers: **name, email, phone, start_time, event, invitee_uri**. The invitee URI identifies the booking if you later handle cancellations.\n\n**WhatsApp:** Cloud API. Replace `YOUR_PHONE_NUMBER_ID`, put the token in Header Auth (`Authorization: Bearer ...`) and create a message template with three body variables (name, event, time). Put its name in `YOUR_TEMPLATE_NAME` and its language code in `language.code`.\n\nThe client never wrote to you first, so a free-form text message would be rejected outside the 24-hour window. That is why this sends a template.",
+        "height": 480,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "8fadd05a-9550-4a18-91b9-8429ab382f1a",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "### Reminder before the appointment\n\nThis workflow sends the **confirmation** at booking time. For a **reminder** (for example 24 hours before), build a separate scheduled workflow:\n\n**Schedule Trigger** (every hour), read the sheet, keep the bookings that start in about 24 hours, send the WhatsApp template.\n\nIt is kept separate so one failure does not block the other.",
+        "height": 354,
+        "width": 320,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "e51f32a9-3d22-4c30-a1b0-ff35cce5ec09",
+      "name": "Reminder note"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e7033aee-2b7a-443b-bb35-fcd0c09eeb44",
+              "leftValue": "={{ String($json.body.event || '') }}",
+              "rightValue": "invitee.created",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "0abbb4b1-b1d4-4e25-b6e5-d5663dd92fc3",
+              "leftValue": "={{ String(($json.body.payload || {}).email || '').trim() }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "bb7decd9-015a-4aa5-8e07-b55b625f940c",
+              "leftValue": "={{ String((($json.body.payload || {}).scheduled_event || {}).start_time || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2ff455ec-62b2-46e8-88f0-7ce471bea479",
+              "leftValue": "={{ String(($json.body.payload || {}).uri || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "6bd02f3a-1e5b-490f-bf04-27f2a2658e66",
+      "name": "New booking with email and time?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        600
+      ],
+      "id": "a1a13715-ee6d-437d-a30b-0f4a313d2c26",
+      "name": "Discard (not a new booking)"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.body.payload.uri }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        546,
+        400
+      ],
+      "id": "629c6caf-4a0c-4762-96f2-5d44f1b56a5e",
+      "name": "Confirm each booking once"
+    }
+  ],
+  "connections": {
+    "Receive booking (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "New booking with email and time?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Has a valid phone number?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm on WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New booking with email and time?": {
+      "main": [
+        [
+          {
+            "node": "Confirm each booking once",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard (not a new booking)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm each booking once": {
+      "main": [
+        [
+          {
+            "node": "Booking fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a valid phone number?": {
+      "main": [
+        [
+          {
+            "node": "Confirm on WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No valid phone (skip WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

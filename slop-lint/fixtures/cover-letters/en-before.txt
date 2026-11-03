@@ -1,0 +1,6 @@
+Dear Hiring Manager,
+I am writing to express my keen interest in the Data Analyst position at Northwind Analytics. With a proven track record of leveraging data to drive impactful business decisions, I am confident that my skills make me an ideal fit for your dynamic team.
+Throughout my career, I have honed my expertise in SQL, Python, and data visualization — consistently delivering actionable insights and fostering a culture of data-driven decision-making. I am passionate about turning complex data into compelling stories that resonate with stakeholders.
+I would welcome the opportunity to discuss how my skills align with your needs. Thank you for your time and consideration.
+Sincerely,
+Lucía Ferreyra

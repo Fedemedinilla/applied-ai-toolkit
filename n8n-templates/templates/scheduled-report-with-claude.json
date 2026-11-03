@@ -1,0 +1,254 @@
+{
+  "name": "Scheduled report written by Claude",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Scheduled report written by Claude\n\nEvery day (or at the frequency you pick), it fetches data from your source, **Claude** turns it into a short report, and it is emailed to you.\n\n**How it works:** the schedule fires, an HTTP request fetches the data, all items are combined into one, Claude writes the summary, Gmail sends it.\n\n**You need:** an **Anthropic (Claude)** credential and a **Gmail** credential.\n\n**Setup:** follow steps 1 to 4 below.\n\nFree template from kyndredai.com/templates. Runs on n8n 2.x, self-hosted or cloud.",
+        "height": 291,
+        "width": 1260,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        49
+      ],
+      "id": "8675ebdc-6143-47d5-abb4-30474dd0a94e",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "id": "6a860062-2311-4a24-b729-0e7a672bb7f5",
+      "name": "Every day at 8 (Schedule)"
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR-DATA-SOURCE.example/api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        400
+      ],
+      "id": "2982252f-0340-4605-8580-150806aefe5e",
+      "name": "Fetch data (HTTP)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        520,
+        400
+      ],
+      "id": "667524f4-1c3b-46d3-8a0b-3ea2e50a3406",
+      "name": "Combine items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a business analyst. Using only the data below, write a short, clear report: the 3 to 5 most important points and one conclusion someone can act on. Professional and direct. Do not add figures that are not in the data. If the data is empty or looks like an error message, say that in one line instead of writing a report.\n\n<data>\n{{ JSON.stringify($json.data).slice(0, 50000) }}\n</data>"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        400
+      ],
+      "id": "5af68f96-e2c9-4978-84f8-73c6742389c1",
+      "name": "Summarize with Claude"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.4,
+      "position": [
+        728,
+        600
+      ],
+      "id": "2506e6ba-9826-411e-a3ad-dd1403743bd4",
+      "name": "Claude model"
+    },
+    {
+      "parameters": {
+        "sendTo": "you@example.com",
+        "subject": "=Daily report: {{ $now.toFormat('yyyy-LL-dd') }}",
+        "emailType": "text",
+        "message": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        400
+      ],
+      "id": "ef0136b4-127a-425e-bba7-46484ffa77f6",
+      "name": "Send report",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## 1. Frequency\n\nIt runs **every day at 8** in the instance time zone. Change the hour or the interval in the Schedule node.",
+        "height": 165,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        800
+      ],
+      "id": "63fad43d-f6e0-4183-9aed-5e70898f7283",
+      "name": "Setup 1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Your data source\n\nIn **Fetch data (HTTP)**, set the URL of your source (an API, an endpoint, a published sheet) and a credential if it needs one.\n\n*Combine items* merges every item into one `data` list, so there is one Claude call and one email per run. The prompt cuts the data at 50,000 characters to keep the cost of a run bounded: pre-aggregate large sources.",
+        "height": 333,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        310,
+        800
+      ],
+      "id": "06f99a33-abc4-4b95-8e86-bac66cfcf767",
+      "name": "Setup 2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Connect Claude\n\n**Claude model**, Credential, your Anthropic API key. Default: **Sonnet 4.6**, because this step writes prose. Edit the prompt to taste.",
+        "height": 186,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        660,
+        800
+      ],
+      "id": "91eaba65-2b81-44e3-b820-2e8e0375865d",
+      "name": "Setup 3"
+    },
+    {
+      "parameters": {
+        "content": "## 4. Connect Gmail\n\n**Send report**, Credential, your Gmail. Replace `you@example.com` in `sendTo` with your address.",
+        "height": 165,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1010,
+        800
+      ],
+      "id": "8c316f44-3d7c-4b55-9228-c3158cd15c8e",
+      "name": "Setup 4"
+    }
+  ],
+  "connections": {
+    "Every day at 8 (Schedule)": {
+      "main": [
+        [
+          {
+            "node": "Fetch data (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch data (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Combine items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine items": {
+      "main": [
+        [
+          {
+            "node": "Summarize with Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize with Claude": {
+      "main": [
+        [
+          {
+            "node": "Send report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize with Claude",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

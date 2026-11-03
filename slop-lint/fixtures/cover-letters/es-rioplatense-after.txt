@@ -1,0 +1,7 @@
+Hola, Martina:
+Me postulo al puesto de Analista de Datos Semi Senior. Piden SQL, Python y tableros en Power BI o Looker; las tres cosas son mi trabajo diario en Contoso Agro desde 2022.
+Armé el tablero de ventas en Power BI que los gerentes de nuestras 30 sucursales revisan cada semana. Las consultas que lo alimentan corren sobre SQL Server y las escribí yo, incluida la que cruza stock con facturación por sucursal.
+El cierre mensual de ventas tardaba tres días de planillas. En 2023 lo automaticé con Python (pandas y SQLAlchemy) y hoy sale en cuatro horas.
+No trabajé con dbt ni en una fintech. Mis transformaciones viven hoy en vistas y procedimientos de SQL Server; dbt es lo primero que aprendería.
+Si querés, te muestro el tablero con datos anonimizados en una llamada de veinte minutos esta semana.
+Lucía Ferreyra · lucia.ferreyra@example.com
