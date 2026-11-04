@@ -1,6 +1,16 @@
 # Applied AI Toolkit
 
-I am Federico Medinilla, an applied AI engineer in Buenos Aires. This repository holds working parts extracted from my production work ([federicomedinilla.com](https://federicomedinilla.com), [kyndredai.com](https://kyndredai.com)). They put an LLM into an application under a spending cap and measure a prompt change on the real model before it ships. They check what the model writes before a visitor sees it, and they harden the sites and databases around it. Each library folder has its own README and tests, and uses another folder only through its public entry (`content-forge` uses `gateway`). Each app under `apps/` uses libraries only through their public entry. Every folder's README gives the design decisions with the reason for each, and its tests run offline with no API key.
+Hi, I'm Federico Medinilla, a software developer in Buenos Aires, Argentina. I spent six years building websites and front ends. Since 2024 I have run KyndredAI, a small studio where I build AI assistants, n8n automations and web apps for schools, shops and small businesses.
+
+This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and eight small apps that show the pieces working together. It is open source, so you can download any part and use it in your own projects.
+
+- **Try it in your browser:** [live demos](https://fedemedinilla.github.io/applied-ai-toolkit/). Four apps, no account, and nothing you type leaves your device.
+- **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, and [kyndredai.com](https://kyndredai.com) is my studio.
+- **Get in touch:** [LinkedIn](https://www.linkedin.com/in/federico-medinilla), or the contact form on [federicomedinilla.com](https://federicomedinilla.com).
+
+## How this repository is organized
+
+The parts put an LLM into an application under a spending cap and measure a prompt change on the real model before it ships. They check what the model writes before a visitor sees it, and they harden the sites and databases around it. Each library folder has its own README and tests, and uses another folder only through its public entry (`content-forge` uses `gateway`). Each app under `apps/` uses libraries only through their public entry. Every folder's README gives the design decisions with the reason for each, and its tests run offline with no API key. CI runs all of them on every push to `main` and every pull request.
 
 ## Where to start
 
