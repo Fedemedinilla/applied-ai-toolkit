@@ -1,0 +1,3604 @@
+{
+  "format": "site-checklist-catalogue",
+  "version": 1,
+  "id": "a8d1d0e97d35d2e7",
+  "phases": [
+    {
+      "number": 0,
+      "name": "Intake",
+      "produces": "The request, the authorization when there will be internal work, and an inventory of accounts without passwords"
+    },
+    {
+      "number": 1,
+      "name": "External diagnosis",
+      "produces": "Every EXT and VIS check in one of the seven states, and the main findings by priority"
+    },
+    {
+      "number": 2,
+      "name": "Internal diagnosis",
+      "produces": "Every INT check in a state, and the decision between ordinary work and the incident runbook"
+    },
+    {
+      "number": 3,
+      "name": "Plan",
+      "produces": "The order of changes, what will not be touched, a low-traffic window and a written way back"
+    },
+    {
+      "number": 4,
+      "name": "Execution",
+      "produces": "One change at a time, each followed by the post-change matrix, and every SEG and VEL check fixed or passed"
+    },
+    {
+      "number": 5,
+      "name": "Verification",
+      "produces": "The phase 1 and 2 measurements repeated with the same tool and conditions, as a before and after table"
+    },
+    {
+      "number": 6,
+      "name": "Handover",
+      "produces": "The before and after report, ordered access, a short manual and a record of what was delivered"
+    },
+    {
+      "number": 7,
+      "name": "Monitoring",
+      "produces": "The weekly, fortnightly and monthly tasks, and a monthly report"
+    }
+  ],
+  "items": [
+    {
+      "id": "EXT-01",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "HTTP security headers",
+      "question": "Does the site tell the browser how to protect visitors?",
+      "where": "Response headers of the home and one inner page",
+      "pass": "HSTS with a max-age of at least 15552000 and nosniff are present; Referrer-Policy and frame protection are set",
+      "ifFails": "Add them at the server or the CDN; start a Content-Security-Policy in Report-Only mode",
+      "doNotTouch": "A strict Content-Security-Policy breaks page builders that inline their scripts",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-02",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Version disclosure",
+      "question": "Can anyone see which CMS and plugin versions the site runs?",
+      "where": "HTML, the feed, readme.html and ?ver= parameters",
+      "pass": "No generator tag with a version; readme.html answers 403 or 404; no ?ver= reveals a plugin with a known flaw",
+      "ifFails": "Hide the generator tag, block readme.html and update what is exposed",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-03",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "User enumeration",
+      "question": "Can anyone list the account names?",
+      "where": "The REST users endpoint and author archives",
+      "pass": "The REST API lists no users to anonymous visitors; ?author=N does not reveal a login name",
+      "ifFails": "Block enumeration through REST and through author archives",
+      "doNotTouch": "Do not disable the whole REST API: the editor needs it",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-04",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Sensitive files exposed",
+      "question": "Are private files reachable by anyone?",
+      "where": "A fixed list at the site root: config backups, .env, .git/config, debug.log, database dumps, phpinfo pages",
+      "pass": "Every path answers 403 or 404",
+      "ifFails": "Remove or deny them; a config backup that answered 200 opens the incident runbook",
+      "doNotTouch": null,
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-05",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "SPF, DKIM, DMARC and MX",
+      "question": "Can someone send mail pretending to be the domain?",
+      "where": "TXT and MX records of the domain",
+      "pass": "SPF present without +all; DMARC present (p=none with rua to start measuring); DKIM valid",
+      "ifFails": "Publish SPF with ~all and DMARC p=none with rua, then move to quarantine",
+      "doNotTouch": "Do not change MX without knowing who receives the mail",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "own-mail"
+      ],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-06",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Dangling CNAME",
+      "question": "Are there abandoned subdomains someone could take over?",
+      "where": "DNS and certificate transparency logs",
+      "pass": "No CNAME points at an unclaimed resource",
+      "ifFails": "Delete the CNAME or claim the resource",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-07",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "TLS and certificate expiry",
+      "question": "Is the padlock valid and not about to expire?",
+      "where": "Port 443",
+      "pass": "Full chain; expires in more than 15 days; no TLS 1.0 or 1.1",
+      "ifFails": "Renew or install the full chain; require TLS 1.2 or newer",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-08",
+      "module": "EXT",
+      "phase": 1,
+      "area": "speed",
+      "title": "Field Core Web Vitals on mobile",
+      "question": "How fast do real visitors see the page on a phone?",
+      "where": "PageSpeed Insights field data (Chrome UX Report), mobile",
+      "pass": "LCP under 2.5 s, INP under 200 ms and CLS under 0.1 in field data",
+      "ifFails": "Follow the speed list (VEL)",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-09",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Server version disclosure",
+      "question": "Does the server announce its software and version?",
+      "where": "The Server and X-Powered-By headers",
+      "pass": "No exact version in either header",
+      "ifFails": "Ask the host to hide versions",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-10",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Directory listing",
+      "question": "Can folders be browsed as a list?",
+      "where": "Upload, plugin and include folders",
+      "pass": "No folder lists its contents",
+      "ifFails": "Turn directory indexes off, or add an empty index file per folder",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-11",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "XML-RPC and pingback",
+      "question": "Is the old remote publishing endpoint open?",
+      "where": "/xmlrpc.php and the X-Pingback header",
+      "pass": "xmlrpc.php answers 403 or 404, or its use is known and protected",
+      "ifFails": "Block it at the server or with the security plugin, unless something uses it",
+      "doNotTouch": "Do not block it while Jetpack or the mobile app uses it",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-12",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Cloaking and conditional redirects",
+      "question": "Does the site show something else to Google or to phones?",
+      "where": "The home fetched with a desktop, a crawler and a phone user agent",
+      "pass": "Same content for all three, with differences of layout only",
+      "ifFails": "Treat it as a sign of compromise and open the incident tab",
+      "doNotTouch": null,
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-13",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Domain expiry and registrar lock",
+      "question": "Is the domain about to expire or unlocked?",
+      "where": "RDAP, or the registry's own lookup where there is no RDAP",
+      "pass": "Expires in more than 60 days; auto-renewal on or a named person responsible",
+      "ifFails": "Renew; turn on auto-renewal and two-factor at the registrar",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-14",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Old copies and staging exposed",
+      "question": "Are forgotten old copies of the site published?",
+      "where": "/old/, /backup/ and similar paths; staging, dev and test subdomains; a site: search",
+      "pass": "No old copy answers or is indexed",
+      "ifFails": "Delete or password-protect them; add noindex; request removal",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-15",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Open redirect parameters",
+      "question": "Could a link on the site send visitors anywhere?",
+      "where": "redirect, url, next and return parameters in the HTML",
+      "pass": "No open redirect parameters, or they validate the target",
+      "ifFails": "Validate the target on the server against an allow list",
+      "doNotTouch": "Testing the redirect is active: only with authorization",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-16",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Mixed content",
+      "question": "Does any part of the page load without the padlock?",
+      "where": "HTML of the home and one inner page",
+      "pass": "Zero http:// resources on https:// pages",
+      "ifFails": "Switch them to https://; on a CMS, search and replace in the database after a backup",
+      "doNotTouch": "Search and replace without a backup",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-17",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "HTTPS and canonical host",
+      "question": "Does every address land on one host with the padlock?",
+      "where": "The http, https, apex and www responses",
+      "pass": "http redirects to https; one of apex or www redirects to the other",
+      "ifFails": "Configure the redirect at the host",
+      "doNotTouch": "No HSTS preload until every subdomain has HTTPS",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-18",
+      "module": "EXT",
+      "phase": 1,
+      "area": "speed",
+      "title": "HTTP/2 or HTTP/3 and compression",
+      "question": "Does the server use the fast protocols?",
+      "where": "Status line and headers",
+      "pass": "HTTP/2 at least, and compression on",
+      "ifFails": "Turn them on at the host or put a CDN in front",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-19",
+      "module": "EXT",
+      "phase": 1,
+      "area": "speed",
+      "title": "Cache and CDN headers",
+      "question": "Is a cache or CDN layer working?",
+      "where": "Cache-Control and cache status headers, on two loads in a row",
+      "pass": "The second load shows a cache hit, or Cache-Control has a reasonable max-age",
+      "ifFails": "Turn on page caching (VEL-05)",
+      "doNotTouch": "Do not cache pages with sessions or form tokens",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-20",
+      "module": "EXT",
+      "phase": 1,
+      "area": "speed",
+      "title": "Time to first byte from outside",
+      "question": "How long does the server take to start answering?",
+      "where": "Time to first byte of the home, three runs",
+      "pass": "Median under 0.8 s",
+      "ifFails": "Work on hosting and cache (VEL-01)",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-21",
+      "module": "EXT",
+      "phase": 1,
+      "area": "speed",
+      "title": "Page weight and third parties (lab)",
+      "question": "How heavy is the page, and how much of it comes from third parties?",
+      "where": "A Lighthouse lab run on mobile",
+      "pass": "Weight and the largest resources are measured and recorded; there is no universal threshold",
+      "ifFails": "Follow VEL-02 and VEL-10",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-22",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Visible plugins against vulnerability databases",
+      "question": "Does any visible plugin have a known flaw?",
+      "where": "Plugin and theme paths with ?ver= in the HTML",
+      "pass": "No visible plugin with an unpatched known flaw",
+      "ifFails": "Update or replace it (needs access: INT-06)",
+      "doNotTouch": "Check each vulnerability database's terms before commercial use",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-23",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Safe Browsing and blocklists",
+      "question": "Do Google or mail blocklists flag the site?",
+      "where": "Safe Browsing and domain blocklists",
+      "pass": "No warning and no listing",
+      "ifFails": "Treat it as an incident; request a review afterwards",
+      "doNotTouch": null,
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-24",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Search spam signals",
+      "question": "Does Google show pages on the site that are not the owner's?",
+      "where": "site: search results",
+      "pass": "No results foreign to the site",
+      "ifFails": "Treat it as an incident; clean up and request removal",
+      "doNotTouch": null,
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "EXT-25",
+      "module": "EXT",
+      "phase": 1,
+      "area": "security",
+      "title": "Privacy policy",
+      "question": "Does the site publish a privacy policy for the data its forms collect?",
+      "where": "Links on the home and in the footer",
+      "pass": "A privacy policy page is linked and answers 200",
+      "ifFails": "Publish one and link it next to every form",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "forms"
+      ],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-01",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Indexability",
+      "question": "Can Google show the site?",
+      "where": "meta robots, the X-Robots-Tag header and robots.txt",
+      "pass": "The home and key pages are indexable; robots.txt blocks neither the site nor its assets",
+      "ifFails": "Remove the noindex in the SEO or reading settings",
+      "doNotTouch": "A noindex on staging or on private pages is correct",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-02",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "robots.txt and sitemap",
+      "question": "Does the site give Google a map of its pages?",
+      "where": "/robots.txt and the sitemap",
+      "pass": "robots.txt declares a sitemap that answers 200 and lists real URLs",
+      "ifFails": "Turn the sitemap on and declare it in robots.txt",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-03",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Canonical URL",
+      "question": "Does each page have one official address?",
+      "where": "link rel=canonical",
+      "pass": "A self-referencing canonical on the home and an inner page, on the host of EXT-17",
+      "ifFails": "Fix it in the SEO settings; use one host",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-04",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Title and meta description",
+      "question": "Do the title and description say what the site is?",
+      "where": "The title and meta description",
+      "pass": "The title leads with the topic in 50 to 60 characters; the description has 120 to 160",
+      "ifFails": "Write them for each key page",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-05",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Heading hierarchy",
+      "question": "Does the page have one main heading?",
+      "where": "h1 to h3",
+      "pass": "One h1 per page and no skipped levels",
+      "ifFails": "Fix it in the page builder (sliders often add extra h1 elements)",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-06",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Open Graph and Twitter card",
+      "question": "Does a shared link show an image and a title?",
+      "where": "og:title, og:description, og:image, og:locale and twitter:card",
+      "pass": "All five present; an og:image of 1200 by 630 that answers 200",
+      "ifFails": "Set a default share image in the SEO settings",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-07",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Structured data",
+      "question": "Is the organisation marked up for search engines without errors?",
+      "where": "JSON-LD in the HTML",
+      "pass": "No errors and one Organization entity",
+      "ifFails": "Fix or remove inaccurate markup",
+      "doNotTouch": "Do not add markup for content the page does not show",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-08",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "hreflang reciprocity",
+      "question": "If the site has two languages, does Google know which version to show?",
+      "where": "link rel=alternate hreflang",
+      "pass": "Each version lists every version including itself, with x-default; the URLs answer 200 and are indexable",
+      "ifFails": "Fix it in the SEO plugin or the template",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "bilingual"
+      ],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-09",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Internal 404s and redirect chains",
+      "question": "Are there broken links, or links that take detours?",
+      "where": "Internal links of the home and key pages",
+      "pass": "Zero internal 404s on key pages; redirects take one hop",
+      "ifFails": "Fix the link or the redirect",
+      "doNotTouch": "Changing permalinks without a redirect plan",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-10",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Contrast and focus visibility",
+      "question": "Is the text readable, and is the keyboard focus visible?",
+      "where": "Lighthouse accessibility and a keyboard pass through the home",
+      "pass": "No contrast failures; focus visible on every link and button",
+      "ifFails": "Adjust colours and :focus-visible in a child theme",
+      "doNotTouch": "Editing theme CSS without a child theme",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-11",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Image alt text",
+      "question": "Do images have a description for people who cannot see them?",
+      "where": "alt attributes",
+      "pass": "Zero content images without alt on the home",
+      "ifFails": "Fill them in from the media library",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-12",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Reflow and zoom",
+      "question": "Can the site be used on a narrow phone and at 200% zoom?",
+      "where": "A 320 px wide window and 200% zoom",
+      "pass": "No horizontal scroll and no lost content",
+      "ifFails": "Fix fixed widths and sliders",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-13",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Form labels and target size",
+      "question": "Are forms understandable, and are buttons easy to tap?",
+      "where": "Public forms",
+      "pass": "Every field has a label; targets are 24 px or larger",
+      "ifFails": "Fix the form",
+      "doNotTouch": "Forms wired to a CRM: read the pre-change list first",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "forms"
+      ],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-14",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Language and title",
+      "question": "Does the page declare its language and have its own title?",
+      "where": "html lang and the title",
+      "pass": "lang matches the content; the title is descriptive",
+      "ifFails": "Set the language in the general settings and the theme",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-15",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Direct contact",
+      "question": "Can a visitor call or message in one tap from a phone?",
+      "where": "The home: phone, mail and chat links",
+      "pass": "A tel: or chat link on the home and in the footer",
+      "ifFails": "Add a tap-to-call or chat link to the header and footer",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-16",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Neglect signals",
+      "question": "Does the site look abandoned?",
+      "where": "The footer year, the period the home names and the date of the latest news in the feed",
+      "pass": "The footer year and the latest news are current",
+      "ifFails": "Update the footer, and publish news or hide the section",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-17",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Main enquiry path",
+      "question": "Can a visitor reach the main enquiry page from the home?",
+      "where": "Links on the home (admissions, bookings or quotes)",
+      "pass": "The home links to the main enquiry page",
+      "ifFails": "Add it to the menu and the home",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-18",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Messaging link number format",
+      "question": "Do the chat buttons open the chat?",
+      "where": "Messaging links on the home",
+      "pass": "Numbers in international format with no extra characters",
+      "ifFails": "Rewrite the number in international format",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-19",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Template leftovers",
+      "question": "Are defaults from the theme or the CMS still published?",
+      "where": "Sample pages, the default tagline and demo content",
+      "pass": "No default content is published",
+      "ifFails": "Remove or replace it",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-20",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Legacy browser code",
+      "question": "Is the code written for browsers nobody uses any more?",
+      "where": "The home HTML",
+      "pass": "No Internet Explorer conditional comments, old polyfills or Flash",
+      "ifFails": "Remove them from the theme",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "VIS-21",
+      "module": "VIS",
+      "phase": 1,
+      "area": "visibility",
+      "title": "Published mail domains receive mail",
+      "question": "Can the published mail addresses receive mail?",
+      "where": "mailto: links on the home and the contact page",
+      "pass": "Every published domain has MX, or A or AAAA as the fallback, and no null MX",
+      "ifFails": "Fix the address or the domain's mail records",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "INT-01",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Core integrity",
+      "question": "Do the core files match the official release?",
+      "where": "Core checksums",
+      "pass": "No differences and no extra files",
+      "ifFails": "Take a snapshot, then reinstall the core from the official package; unknown code opens the incident tab",
+      "doNotTouch": "Do not delete anything before the snapshot",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-02",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Malware patterns",
+      "question": "Is there malicious code in the files?",
+      "where": "Themes, plugins and uploads",
+      "pass": "Zero matches beyond known legitimate plugins; zero PHP files in uploads",
+      "ifFails": "Take a snapshot and open the incident tab",
+      "doNotTouch": "Do not hand-clean a file that rewrites itself",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-03",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "mu-plugins and drop-ins",
+      "question": "Is there code that runs silently on every request?",
+      "where": "The must-use plugin folder and drop-in files",
+      "pass": "Only legitimate ones from a known cache or object cache plugin, with headers",
+      "ifFails": "Treat unknown ones as an incident",
+      "doNotTouch": "Do not delete the drop-in of a real cache plugin",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-04",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Autoloaded options",
+      "question": "Does the database load hidden code or bulk on every page?",
+      "where": "The options table, autoloaded rows",
+      "pass": "Under 800 KB in total; no option holds code",
+      "ifFails": "Inspect the largest options; code in an option opens the incident tab",
+      "doNotTouch": "Do not delete core or active plugin options",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-05",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Administrators and second factor",
+      "question": "Who can administer the site?",
+      "where": "The users list",
+      "pass": "Only legitimate administrators, one per person, all with a second factor",
+      "ifFails": "Note unknown administrators and treat them as an incident; do not delete them yet",
+      "doNotTouch": "Do not delete users who author content: reassign it",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-06",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Vulnerable and abandoned components",
+      "question": "Is any plugin or theme flawed or abandoned?",
+      "where": "Installed plugins and themes",
+      "pass": "No component with an open known flaw; every one maintained",
+      "ifFails": "Update or replace",
+      "doNotTouch": "Deleting instead of deactivating; major updates without a backup",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-07",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Backups include the database and restore",
+      "question": "Is there a backup, and has anyone restored it?",
+      "where": "The backup plugin or the host's backups",
+      "pass": "Files and database included; a test restore worked this month; one copy off the host",
+      "ifFails": "Make one before any other change",
+      "doNotTouch": "Restoring over production as a test",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-08",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Site Health",
+      "question": "Does the CMS report critical problems?",
+      "where": "The Site Health screen",
+      "pass": "No critical items; recommendations noted",
+      "ifFails": "Fix the critical items",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-09",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Core, PHP and database versions",
+      "question": "Are core, PHP and the database on supported versions?",
+      "where": "Site Health information",
+      "pass": "Core on the latest release; PHP with active support",
+      "ifFails": "Plan the upgrades (VEL-04)",
+      "doNotTouch": "Upgrading PHP without testing",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-10",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Inactive plugins and unused themes",
+      "question": "Are components installed but unused?",
+      "where": "Plugins and themes",
+      "pass": "No inactive plugin without a reason; at most three themes",
+      "ifFails": "Deactivate first, then remove with a backup",
+      "doNotTouch": "Deleting a plugin that stores data (forms, orders)",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-11",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Dangerous settings",
+      "question": "Are risky settings on?",
+      "where": "General and discussion settings; config constants",
+      "pass": "Open registration off; file editing disabled; debug off; comments moderated or closed",
+      "ifFails": "Change the settings",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-12",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Permalinks and outgoing mail",
+      "question": "Do links and outgoing mail work properly?",
+      "where": "Permalink settings and mail sending",
+      "pass": "Post-name permalinks; mail sent through the domain's authenticated SMTP",
+      "ifFails": "Configure SMTP",
+      "doNotTouch": "Changing permalinks without a redirect plan",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-13",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Application passwords and sessions",
+      "question": "Are there hidden ways to sign in?",
+      "where": "Application passwords and sessions of each user",
+      "pass": "Only application passwords with a known use; sessions closed at the end",
+      "ifFails": "Revoke unknown ones",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-14",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Recently modified files",
+      "question": "Is every recent file change explained?",
+      "where": "Files modified in the last 30 days",
+      "pass": "Every change is explained by an update or a logged change",
+      "ifFails": "Investigate; an unexplained change opens the incident tab",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-15",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Server rewrite rules",
+      "question": "Do the .htaccess files hold only known rules?",
+      "where": ".htaccess in the root and subfolders",
+      "pass": "Only CMS, cache plugin and known custom rules",
+      "ifFails": "Remove unknown rules after copying the file",
+      "doNotTouch": "A syntax error returns 500 on the whole site",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-16",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Config file hardening",
+      "question": "Is the config file hardened and clean?",
+      "where": "wp-config.php",
+      "pass": "Hardening constants present; fresh salts; no foreign code",
+      "ifFails": "Add the constants with a copy of the file",
+      "doNotTouch": "A syntax error gives a blank page",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-17",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "File permissions",
+      "question": "Are file permissions neither open nor too tight?",
+      "where": "The file system",
+      "pass": "Folders 755, files 644, the config file 640 or 600, no 777",
+      "ifFails": "Fix them with a backup",
+      "doNotTouch": "Bulk changes without a backup",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-18",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Child theme",
+      "question": "Are theme customisations safe from updates?",
+      "where": "The active theme",
+      "pass": "A child theme is active and the parent is unmodified",
+      "ifFails": "Move the changes into a child theme",
+      "doNotTouch": "Editing the parent theme",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-19",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Third-party code snippets",
+      "question": "Does every code snippet have an owner and a purpose?",
+      "where": "Snippet plugins",
+      "pass": "Every snippet has an owner and purpose; none with auto-login, eval or redirects; no non-breaking spaces",
+      "ifFails": "Deactivate, do not delete",
+      "doNotTouch": "Deactivating snippets marked as required without reading them; saving an HTML snippet as PHP",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-20",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Cron hooks",
+      "question": "Are all scheduled tasks known?",
+      "where": "The cron option",
+      "pass": "Only hooks from the core and recognised active plugins",
+      "ifFails": "An unknown hook opens the incident tab",
+      "doNotTouch": "Deleting core hooks",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-21",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Injected content in posts",
+      "question": "Do posts or post meta hold injected scripts?",
+      "where": "Posts and post meta",
+      "pass": "No results beyond legitimate embeds",
+      "ifFails": "Clean with a backup; an injection opens the incident tab",
+      "doNotTouch": "Bulk database replacements without a backup",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-22",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Transients and revisions",
+      "question": "How much stale data is in the database?",
+      "where": "Options and posts",
+      "pass": "Counts measured and recorded",
+      "ifFails": "Clean up during execution (VEL-11)",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-23",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Orphan tables",
+      "question": "Does every table belong to an active plugin?",
+      "where": "Database tables",
+      "pass": "Every table is used by an active plugin",
+      "ifFails": "Export, then drop with the owner's consent",
+      "doNotTouch": "Dropping tables without knowing what they hold",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-24",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Spam comments and pingbacks",
+      "question": "Is the comment queue under control?",
+      "where": "Comments",
+      "pass": "Queue empty or moderated; pingbacks closed when unused",
+      "ifFails": "Moderate the queue and close pingbacks",
+      "doNotTouch": null,
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-25",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "PHP version, OPcache and memory",
+      "question": "Is the PHP setup current and tuned?",
+      "where": "The hosting panel",
+      "pass": "Supported PHP; OPcache on; 256 MB of memory or more",
+      "ifFails": "Change it in the panel and run the post-change matrix",
+      "doNotTouch": "Upgrading PHP without the post-change matrix",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-26",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Access log analysis",
+      "question": "Do the access logs show successful requests to paths that should not exist?",
+      "where": "Raw access logs",
+      "pass": "No successful hits on paths that should not exist; brute force answered with 401 or 403",
+      "ifFails": "Investigate; an odd successful access opens the incident tab",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-27",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Error log",
+      "question": "Does the error log show repeated fatal errors?",
+      "where": "The error log",
+      "pass": "No repeated fatal errors",
+      "ifFails": "Fix the cause",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-28",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Server cron jobs",
+      "question": "Are all the server's scheduled jobs known?",
+      "where": "Cron jobs in the hosting panel",
+      "pass": "Only your own jobs (the CMS cron, backups)",
+      "ifFails": "A job that fetches remote code opens the incident tab",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-29",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "FTP, SSH and API tokens",
+      "question": "Does every access account have a current owner?",
+      "where": "Hosting accounts and tokens",
+      "pass": "Only accounts and tokens with a current owner",
+      "ifFails": "Remove or rotate them",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-30",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Mail accounts and forwarders",
+      "question": "Are there unknown mailboxes or forwarders?",
+      "where": "Mail in the hosting panel",
+      "pass": "Only known accounts and forwarders",
+      "ifFails": "Remove them; an unknown forwarder opens the incident tab",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel",
+        "own-mail"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-31",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Disk usage",
+      "question": "Is there room left on the disk?",
+      "where": "Hosting quotas",
+      "pass": "Under 80% used; old backups outside the web root",
+      "ifFails": "Move or delete old copies once the last good one is known",
+      "doNotTouch": "Deleting copies without knowing which is the last good one",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [
+        "hosting-panel"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-32",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Staging",
+      "question": "Is there somewhere to test before production?",
+      "where": "Hosting tools",
+      "pass": "A staging copy, or a subdomain to clone into",
+      "ifFails": "Set one up",
+      "doNotTouch": "Testing major updates in production",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-33",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Elementor inventory",
+      "question": "Is the page builder current and inventoried?",
+      "where": "Builder settings",
+      "pass": "Current version, valid licence, pages and templates listed",
+      "ifFails": "Update with a backup",
+      "doNotTouch": "Regenerating CSS or switching experiments without a backup",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [
+        "elementor"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-34",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Avada inventory",
+      "question": "Is the theme builder current and inventoried?",
+      "where": "Theme options",
+      "pass": "Current licensed version; a child theme; shortcode and custom code inventory",
+      "ifFails": "Update with a backup",
+      "doNotTouch": "The classic editor adds paragraph tags inside raw HTML blocks: edit in text mode",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [
+        "avada"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-35",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Sliders and heavy premium plugins",
+      "question": "Are premium plugins licensed and current?",
+      "where": "The plugins list",
+      "pass": "Current version with an active licence; sliders inventoried",
+      "ifFails": "Renew the licence or replace the plugin",
+      "doNotTouch": "Updating without a backup (sliders can come back empty)",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-36",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Forms and CRM integrations",
+      "question": "Does every form reach its destination?",
+      "where": "Form plugins and their integrations",
+      "pass": "Every form has a known destination and a successful test send; personal data is kept for a set time",
+      "ifFails": "Fix the destination",
+      "doNotTouch": "Forms wired to a CRM: test with the action neutralised or in the CRM sandbox, never with real data",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "forms"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-37",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "Caching plugins",
+      "question": "Is there exactly one page cache layer?",
+      "where": "Plugins and the host's cache",
+      "pass": "One page cache layer, with exclusions for pages with sessions or tokens",
+      "ifFails": "Keep one and configure the exclusions",
+      "doNotTouch": "Two layers that overwrite each other",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "INT-38",
+      "module": "INT",
+      "phase": 2,
+      "area": "security",
+      "title": "External account ownership",
+      "question": "Does the owner control every external account?",
+      "where": "Analytics, tag manager, search console, social and mail workspace accounts",
+      "pass": "Each account has a current owner, no former contractor keeps access, recovery and second factor are current",
+      "ifFails": "Transfer ownership and remove old access",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-01",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Account second factor and collaborators",
+      "question": "Who can sign in to the platform account?",
+      "where": "Account, collaborators or members settings",
+      "pass": "Second factor on for the owner and every collaborator; only current people; the owner is the client",
+      "ifFails": "Turn it on; remove old access; transfer ownership to the client",
+      "doNotTouch": "Removing the only owner before transferring",
+      "priority": "High",
+      "platforms": [
+        "hosted",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-02",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "External basics on a hosted platform",
+      "question": "Are the external basics right?",
+      "where": "The external list",
+      "pass": "Same as EXT-01, EXT-04, EXT-05, EXT-06 and EXT-07",
+      "ifFails": "Adjust what the platform allows (headers rarely)",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "hosted",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "PLA-03",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Installed apps and injected scripts",
+      "question": "Which apps and scripts load on the site?",
+      "where": "The apps panel and the head of the HTML",
+      "pass": "Only apps in use, each with an owner; no unknown injected code",
+      "ifFails": "Uninstall with the owner; remove unknown code after saving its text",
+      "doNotTouch": "Removing a pixel or chat the owner uses to sell",
+      "priority": "Medium",
+      "platforms": [
+        "hosted",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-04",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Platform-managed domain and TLS",
+      "question": "Is the domain connected the way the platform documents?",
+      "where": "The domains panel",
+      "pass": "Domain connected as documented; TLS on; one version of the URL",
+      "ifFails": "Reconnect following the platform's guide",
+      "doNotTouch": "Changing DNS without the guide",
+      "priority": "High",
+      "platforms": [
+        "hosted",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-05",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Platform export",
+      "question": "What happens if the platform closes the account?",
+      "where": "Export tools",
+      "pass": "An export made, with its date",
+      "ifFails": "Schedule a quarterly export to storage the owner controls",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "hosted",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-06",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Static site deploy surface",
+      "question": "Where is the risk on a static site?",
+      "where": "The repository, the deploy provider and its environment variables",
+      "pass": "Current collaborators; second factor on Git and the provider; headers configured; secrets in variables marked sensitive",
+      "ifFails": "Rotate tokens; configure headers",
+      "doNotTouch": "Production secrets in the repository",
+      "priority": "Medium",
+      "platforms": [
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "PLA-07",
+      "module": "PLA",
+      "phase": 2,
+      "area": "security",
+      "title": "Self-hosted CMS other than WordPress",
+      "question": "Does Joomla or Drupal follow the same model?",
+      "where": "The CMS admin and the server",
+      "pass": "Supported version, current extensions, tested backup",
+      "ifFails": "Update with a backup",
+      "doNotTouch": "Skipping major versions without the migration guide",
+      "priority": "High",
+      "platforms": [
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-01",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Payment integration mode",
+      "question": "Do card details pass through the site?",
+      "where": "Payment settings and the gateway configuration",
+      "pass": "Cards are entered in the gateway's iframe or after a redirect; test and live keys are separate",
+      "ifFails": "Switch to the hosted or redirect mode",
+      "doNotTouch": "Changing the gateway during sales hours",
+      "priority": "High",
+      "platforms": [
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-02",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Checkout skimmer check",
+      "question": "Is there code stealing cards at checkout?",
+      "where": "Checkout HTML, payment plugin files and options",
+      "pass": "No unknown scripts or card-capturing functions; payment plugin checksums match the release",
+      "ifFails": "Open the incident tab at top priority and notify the gateway",
+      "doNotTouch": "Do not clean anything before the snapshot",
+      "priority": "Critical",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-03",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Cart and checkout cache exclusion",
+      "question": "Are the cart and checkout excluded from the cache?",
+      "where": "Cache plugin and CDN",
+      "pass": "Cart, checkout and account pages are always dynamic",
+      "ifFails": "Exclude those routes and the store's session cookies",
+      "doNotTouch": "Turning on page caching without exclusions",
+      "priority": "High",
+      "platforms": [
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-04",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Customer data exposure",
+      "question": "Is customer data protected?",
+      "where": "Customer accounts, exports and orders",
+      "pass": "No export reachable by URL; sign-in attempts limited; order data visible by role only",
+      "ifFails": "Block the files and limit attempts",
+      "doNotTouch": "Deleting orders or customers",
+      "priority": "High",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-05",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Orders and stock after a change",
+      "question": "Do orders and stock still work after a change?",
+      "where": "A test order",
+      "pass": "A full test order in the gateway's sandbox, then the gateway back in live mode",
+      "ifFails": "Fix it before publishing",
+      "doNotTouch": "A test order with a real card; leaving the gateway in test mode",
+      "priority": "High",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-06",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Store updates in staging",
+      "question": "Are store updates tested first?",
+      "where": "Staging",
+      "pass": "Major store and gateway updates tested in staging with a test order",
+      "ifFails": "Roll back with the backup",
+      "doNotTouch": "A store database upgrade in production without a backup",
+      "priority": "High",
+      "platforms": [
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-07",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Store account hygiene",
+      "question": "Is the store account in the owner's hands?",
+      "where": "Store users and apps with permissions",
+      "pass": "The owner is the client; second factor on; apps reviewed",
+      "ifFails": "Transfer ownership; remove old access",
+      "doNotTouch": "Removing the only owner before transferring",
+      "priority": "High",
+      "platforms": [
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-08",
+      "module": "COM",
+      "phase": 2,
+      "area": "speed",
+      "title": "Checkout performance",
+      "question": "Does checkout load fast on a phone?",
+      "where": "PageSpeed on the checkout URL, when it is public",
+      "pass": "Measured on the first case; no threshold yet",
+      "ifFails": "Defer third parties on the checkout",
+      "doNotTouch": "Removing the gateway's script",
+      "priority": "Medium",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "COM-09",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Fraud and abuse controls",
+      "question": "Is there a brake on fake orders and coupon abuse?",
+      "where": "Gateway, coupons and sign-up forms",
+      "pass": "Measured on the first case; no threshold yet",
+      "ifFails": "Add limits and a challenge",
+      "doNotTouch": "Blocking real customers",
+      "priority": "Medium",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "COM-10",
+      "module": "COM",
+      "phase": 2,
+      "area": "security",
+      "title": "Legal pages",
+      "question": "Does the store publish the minimum legal pages?",
+      "where": "Terms, returns and seller details",
+      "pass": "The pages the trade requires are present, checked with the owner",
+      "ifFails": "Treat it as a separate project",
+      "doNotTouch": "Giving tax advice",
+      "priority": "Low",
+      "platforms": [
+        "woocommerce",
+        "hosted-store"
+      ],
+      "needs": [],
+      "access": "passive"
+    },
+    {
+      "id": "SEG-01",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Incident response",
+      "question": "What happens if the site is compromised?",
+      "where": "Every layer",
+      "pass": "Zero indicators in a second full pass; external and internal scanners clean",
+      "ifFails": "Iterate, or hand over to a cleanup service",
+      "doNotTouch": "The credential rotation order (SEG-02)",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-02",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Credential rotation order",
+      "question": "In what order are the credentials changed?",
+      "where": "CMS, hosting, database, tokens and integrations",
+      "pass": "Everything rotated with the environment inert, and logged with dates",
+      "ifFails": "Repeat with the site isolated",
+      "doNotTouch": "Rotating salts live without notice; rotating before isolating the site",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-03",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Firewall layer",
+      "question": "Is there a filter in front of the site?",
+      "where": "CDN firewall, security plugin or the host's web firewall",
+      "pass": "One layer active for the site's risk",
+      "ifFails": "Turn on a CDN firewall or the plugin firewall",
+      "doNotTouch": "CDN script rewriting and auto-minify break builder scripts; a plugin firewall starts in learning mode",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-04",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Named accounts and least privilege",
+      "question": "Does every person have their own account with the role they need?",
+      "where": "Users",
+      "pass": "One user per person; administrators only for those who administer; no former contractor keeps access",
+      "ifFails": "Create accounts, reassign content, lower roles",
+      "doNotTouch": "Do not delete a shared account that authors content: change its password and reassign",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-05",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Second factor for administrators",
+      "question": "Do administrators need more than a password?",
+      "where": "The security plugin's sign-in settings",
+      "pass": "Every administrator enrolled with an authenticator app and recovery codes stored; then required for the role",
+      "ifFails": "Enrol people one at a time",
+      "doNotTouch": "Making it required before everyone is enrolled",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-06",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Disable file editing",
+      "question": "Can code be edited from the dashboard?",
+      "where": "wp-config.php",
+      "pass": "The theme and plugin editors are gone from the dashboard",
+      "ifFails": "Add DISALLOW_FILE_EDIT with a copy of the file",
+      "doNotTouch": "A syntax error gives a blank page",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-07",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "XML-RPC blocked when unused",
+      "question": "Is XML-RPC closed?",
+      "where": ".htaccess or the security plugin",
+      "pass": "xmlrpc.php answers 403 from outside (EXT-11)",
+      "ifFails": "Block it",
+      "doNotTouch": "Jetpack and the mobile app use it: confirm first",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-08",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "REST user enumeration limited",
+      "question": "Can the API list users?",
+      "where": "The REST users endpoint",
+      "pass": "EXT-03 passes from outside",
+      "ifFails": "Turn on the security plugin's option or add a small filter",
+      "doNotTouch": "Do not disable the whole REST API",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-09",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Security headers",
+      "question": "Does the browser get the security instructions?",
+      "where": "Server config, CDN or security plugin",
+      "pass": "EXT-01 passes; the Content-Security-Policy ran in Report-Only with no console errors first",
+      "ifFails": "Add one header at a time and verify",
+      "doNotTouch": "HSTS preload before every subdomain has HTTPS; a strict policy with page builders",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-10",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Update policy",
+      "question": "How and when are updates applied?",
+      "where": "The updates screen and auto-update settings",
+      "pass": "Security and minor updates current; major updates tested in staging",
+      "ifFails": "Apply them with a backup",
+      "doNotTouch": "Major updates in production",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-11",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "3-2-1 backups with a tested restore",
+      "question": "Are there copies in three places, and has a restore been tested?",
+      "where": "The backup plugin and the host's backups",
+      "pass": "A copy with the database on the host and off it; a test restore recorded",
+      "ifFails": "Configure and test",
+      "doNotTouch": "Restoring over production as a test",
+      "priority": "Critical",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-12",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Minimum monitoring",
+      "question": "Will anyone notice if something happens?",
+      "where": "Uptime monitor, security alerts, search console, Safe Browsing, DMARC reports and expiry dates",
+      "pass": "All six signals configured to a mailbox someone reads",
+      "ifFails": "Configure them",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-13",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Former contractors and migration plugins",
+      "question": "Does a former contractor still have access?",
+      "where": "Users, hosting, external accounts and plugins",
+      "pass": "No out-of-date third-party access; no export or migration plugin installed",
+      "ifFails": "Remove access; uninstall the plugins",
+      "doNotTouch": "Do not delete the user who authors the content: reassign it",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-14",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Mail authentication hardening",
+      "question": "Is the domain's mail protected against spoofing?",
+      "where": "DNS",
+      "pass": "SPF without +all; DKIM verified; DMARC p=none with rua, then quarantine after a month of clean reports",
+      "ifFails": "Publish or correct the records",
+      "doNotTouch": "Do not change MX; no p=reject without a month of reports",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "own-mail"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-15",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Sign-in brute force protection",
+      "question": "Can passwords be guessed without limit?",
+      "where": "The security plugin or the host's firewall",
+      "pass": "An attempt limit is on; logged attempts get 403 or 429",
+      "ifFails": "Turn it on",
+      "doNotTouch": "Locking out your own address: add the exception",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-16",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Salt rotation with notice",
+      "question": "Were the internal keys changed after the incident?",
+      "where": "The salts in wp-config.php",
+      "pass": "New salts, with a date; users told they must sign in again",
+      "ifFails": "Rotate them",
+      "doNotTouch": "Rotating without notice signs everyone out at once",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-17",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "No PHP execution in uploads",
+      "question": "Could an uploaded file run as code?",
+      "where": "uploads/.htaccess",
+      "pass": "A .php file placed in uploads answers 403 (tested in staging)",
+      "ifFails": "Add the rule",
+      "doNotTouch": "On Nginx the rule goes in the server config",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-18",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Directory listing off",
+      "question": "Can folders no longer be listed?",
+      "where": "The root .htaccess",
+      "pass": "EXT-10 passes from outside",
+      "ifFails": "Add Options -Indexes",
+      "doNotTouch": "A syntax error returns 500",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "SEG-19",
+      "module": "SEG",
+      "phase": 4,
+      "area": "security",
+      "title": "Hidden version and readme",
+      "question": "Is the version no longer visible from outside?",
+      "where": "Child theme or security plugin; readme.html",
+      "pass": "EXT-02 passes",
+      "ifFails": "Remove the generator tag and block readme.html",
+      "doNotTouch": "Editing the parent theme",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-01",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Server response, PHP and server cache",
+      "question": "Does the server answer fast?",
+      "where": "Hosting, PHP and the server cache",
+      "pass": "Supported PHP, OPcache on, cache on, median time to first byte under 0.6 s with the cache",
+      "ifFails": "Work through VEL-04, VEL-05 and VEL-06",
+      "doNotTouch": "Changing PHP without testing",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-02",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Images: format, dimensions, lazy loading",
+      "question": "Do the images weigh too much?",
+      "where": "Uploads and pages",
+      "pass": "WebP or AVIF with declared dimensions; the main image preloaded (VEL-08)",
+      "ifFails": "Convert with a backup; resize the oversized ones",
+      "doNotTouch": "Lazy-loading the main image; converting without a backup",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-03",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Render-blocking CSS and JS",
+      "question": "Do files block the first paint?",
+      "where": "The Lighthouse render-blocking audit",
+      "pass": "No critical blocking; design intact after the post-change matrix",
+      "ifFails": "Defer or load conditionally",
+      "doNotTouch": "Minifying and combining blind",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-04",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "PHP upgrade with a compatibility test",
+      "question": "Can PHP be upgraded without breaking anything?",
+      "where": "The hosting PHP selector and each plugin's tested-up-to version",
+      "pass": "Supported PHP with no fatal errors",
+      "ifFails": "Upgrade in staging first; replace the incompatible plugin",
+      "doNotTouch": "Upgrading in production without staging",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-05",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Page cache",
+      "question": "Are pages stored ready to serve?",
+      "where": "The cache plugin",
+      "pass": "EXT-19 shows a hit; forms and session pages excluded; one page cache layer",
+      "ifFails": "Install and configure it; purge after each change",
+      "doNotTouch": "Caching pages with tokens; two cache plugins together",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-06",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Object cache",
+      "question": "Are repeated queries kept in memory?",
+      "where": "Redis or Memcached at the host",
+      "pass": "Object cache on and verified in Site Health",
+      "ifFails": "Turn it on if the host allows it",
+      "doNotTouch": "A foreign object cache drop-in (INT-03)",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-07",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "CDN",
+      "question": "Does a network serve the site closer to the visitor?",
+      "where": "CDN settings",
+      "pass": "EXT-18 shows HTTP/2 or 3 and Brotli; static files hit the CDN cache",
+      "ifFails": "Configure it and test forms and menus",
+      "doNotTouch": "Script rewriting; auto-minify; caching HTML with sessions",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-08",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Main image preload",
+      "question": "Does the main image load first?",
+      "where": "The home HTML",
+      "pass": "LCP improves and the main image is not lazy-loaded",
+      "ifFails": "Preload it with fetchpriority high",
+      "doNotTouch": "Lazy-loading the main image",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-09",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Fonts and icon fonts",
+      "question": "Do fonts and icons add weight and block the page?",
+      "where": "The head and the theme CSS",
+      "pass": "Two families at most, preloaded, with font-display swap; icon fonts subset",
+      "ifFails": "Self-host, subset and preload",
+      "doNotTouch": "Removing a font the design uses",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-10",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Third-party scripts",
+      "question": "How much do chats, maps, videos and tag managers load?",
+      "where": "The Lighthouse third-party audit",
+      "pass": "Third parties under 200 ms of blocking (measured per site)",
+      "ifFails": "Defer to interaction; use facades for videos; keep one tag manager",
+      "doNotTouch": "Removing a script the owner uses to measure",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-11",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Database cleanup",
+      "question": "Does the database keep data nobody needs?",
+      "where": "Options and posts",
+      "pass": "Autoload under 800 KB; expired transients at zero; revisions capped",
+      "ifFails": "Clean up with a backup",
+      "doNotTouch": "Deleting core options or unknown tables",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-12",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Heartbeat and cron tuning",
+      "question": "Do the dashboard and internal tasks waste resources?",
+      "where": "Cache plugin or heartbeat settings",
+      "pass": "Configured, and the tasks still run",
+      "ifFails": "Heartbeat at 60 s; a real server cron every 5 minutes",
+      "doNotTouch": "Disabling the CMS cron without a server cron",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-13",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Protocols and compression",
+      "question": "Does the server use HTTP/2 or 3 and compress?",
+      "where": "Headers (EXT-18)",
+      "pass": "EXT-18 passes",
+      "ifFails": "Ask the host, or use a CDN",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-14",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Redirect chains and internal 404s",
+      "question": "Do pages take detours or get lost?",
+      "where": "VIS-09",
+      "pass": "VIS-09 passes",
+      "ifFails": "Make each redirect one hop; replace broken links",
+      "doNotTouch": "Changing permalinks without a plan",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-15",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "DOM size and sliders",
+      "question": "Does the page have too many elements or a heavy slider?",
+      "where": "The Lighthouse DOM size audit",
+      "pass": "DOM under the Lighthouse warning; a slider with one or two slides",
+      "ifFails": "Simplify it in the builder with the owner",
+      "doNotTouch": "Removing the slider without a replacement",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-16",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Elementor performance settings",
+      "question": "Is Elementor set to load the minimum?",
+      "where": "Elementor performance settings",
+      "pass": "The four performance options on, with no visual change; local fonts",
+      "ifFails": "Turn on one at a time, with the post-change matrix after each",
+      "doNotTouch": "Turning them all on at once",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [
+        "elementor"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-17",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Avada performance settings",
+      "question": "Is Avada set to load the minimum?",
+      "where": "Avada performance options",
+      "pass": "Settings applied with no visual change",
+      "ifFails": "Apply one at a time",
+      "doNotTouch": "Two lazy-loading systems at once",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [
+        "avada"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-18",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Slow queries and outgoing calls",
+      "question": "Do queries or outgoing HTTP calls slow the server?",
+      "where": "Query Monitor, installed temporarily",
+      "pass": "No repeated query over 0.05 s; no outgoing HTTP call on every load",
+      "ifFails": "Replace or configure the responsible plugin; add an object cache",
+      "doNotTouch": "Leaving Query Monitor installed",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-19",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Emojis, embeds, dashicons, jQuery Migrate",
+      "question": "Does the page load things nobody uses?",
+      "where": "The head",
+      "pass": "None of those in the public HTML; no console errors",
+      "ifFails": "Disable them and test",
+      "doNotTouch": "Removing jQuery Migrate while an old plugin needs it",
+      "priority": "Low",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "VEL-20",
+      "module": "VEL",
+      "phase": 4,
+      "area": "speed",
+      "title": "Before and after measurement",
+      "question": "How much did it improve, measured the same way?",
+      "where": "The verification protocol: same tools, three runs, median, mobile and desktop apart",
+      "pass": "The before and after table is complete",
+      "ifFails": "Measure again",
+      "doNotTouch": "Comparing lab numbers with field numbers",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-01",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Uptime monitor",
+      "question": "Will anyone know if the site goes down?",
+      "where": "An uptime monitor",
+      "pass": "Monitor on; the month's availability recorded",
+      "ifFails": "Configure it; when the site went down, write the cause and fix in the report",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-02",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Update cadence",
+      "question": "Are updates applied on time without breaking anything?",
+      "where": "The updates screen",
+      "pass": "Security and minor updates current; major updates tested",
+      "ifFails": "Apply them; roll back with the backup if something breaks",
+      "doNotTouch": "Major updates in production",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-03",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Monthly restore test",
+      "question": "Does this month's backup restore?",
+      "where": "The backup tool and a test subdomain",
+      "pass": "A successful restore, with its date",
+      "ifFails": "Reconfigure the backup",
+      "doNotTouch": "Restoring over production",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-04",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Breach notification readiness",
+      "question": "Does everyone know whom to tell about a data leak?",
+      "where": "The written agreement with the owner",
+      "pass": "A written, signed procedure: who tells whom, and by when",
+      "ifFails": "Write it",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "forms"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-05",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Weekly malware scan",
+      "question": "Is the site scanned every week?",
+      "where": "A security plugin scan and an external scanner",
+      "pass": "Clean scan, or findings resolved",
+      "ifFails": "Assess; an indicator of compromise opens the incident tab",
+      "doNotTouch": "Deleting a finding without understanding it",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-06",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Monthly users and second factor review",
+      "question": "Did anyone join or leave the dashboard this month?",
+      "where": "Users and the sign-in log",
+      "pass": "No unauthorised changes; every administrator has a second factor",
+      "ifFails": "Remove or correct; an unknown administrator is an incident",
+      "doNotTouch": "Deleting authors",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-07",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Weekly logs and alerts review",
+      "question": "Does anyone read the alerts?",
+      "where": "Alert mail; the access log once a month",
+      "pass": "Alerts read and noted; no unknown sign-ins",
+      "ifFails": "Investigate and block addresses; an odd successful access is an incident",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-08",
+      "module": "OPE",
+      "phase": 7,
+      "area": "speed",
+      "title": "Monthly Core Web Vitals",
+      "question": "Is the site still fast?",
+      "where": "PageSpeed on mobile (EXT-08) and time to first byte (EXT-20)",
+      "pass": "Values equal to or better than the baseline, or the cause found",
+      "ifFails": "Find the cause (a new plugin, new images, a cache turned off)",
+      "doNotTouch": null,
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-09",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Domain, certificate and reputation",
+      "question": "Is anything about to expire, or is the site flagged?",
+      "where": "Registry, TLS, Safe Browsing and a site: search",
+      "pass": "Nothing expires within 60 days; no warnings",
+      "ifFails": "Renew; a warning or spam opens the incident tab",
+      "doNotTouch": null,
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-10",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Monthly report",
+      "question": "Does the owner see what was done this month?",
+      "where": "The monthly report",
+      "pass": "Sent on the agreed date, with availability, updates, scans, the restore test and speed",
+      "ifFails": "Send it",
+      "doNotTouch": "Promising what was not measured",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-11",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "DMARC reports",
+      "question": "Is anyone sending mail in the domain's name?",
+      "where": "The DMARC aggregate reports",
+      "pass": "Reports read; the policy matches what they show",
+      "ifFails": "Adjust the records",
+      "doNotTouch": "Moving to reject without a clean month",
+      "priority": "Medium",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "own-mail"
+      ],
+      "access": "authorized"
+    },
+    {
+      "id": "OPE-12",
+      "module": "OPE",
+      "phase": 7,
+      "area": "security",
+      "title": "Monthly forms test",
+      "question": "Do the forms still deliver?",
+      "where": "Public forms",
+      "pass": "A marked test send arrives",
+      "ifFails": "Fix it (INT-12, INT-36)",
+      "doNotTouch": "Sending real data to a live CRM",
+      "priority": "High",
+      "platforms": [
+        "wordpress",
+        "woocommerce",
+        "joomla-drupal",
+        "hosted",
+        "hosted-store",
+        "static"
+      ],
+      "needs": [
+        "forms"
+      ],
+      "access": "authorized"
+    }
+  ],
+  "preChange": [
+    {
+      "id": "backup-restored",
+      "text": "A full backup of files and database, restored as a test on a subdomain or locally. A backup nobody restored does not count."
+    },
+    {
+      "id": "staging",
+      "text": "Staging if it exists; otherwise one change at a time with the way back written down."
+    },
+    {
+      "id": "window",
+      "text": "A low-traffic window agreed with the owner."
+    },
+    {
+      "id": "rollback-plan",
+      "text": "A written way back: which file or setting is put back, and how."
+    },
+    {
+      "id": "owner-notice",
+      "text": "The owner told what will be touched, and when."
+    },
+    {
+      "id": "test-inventory",
+      "text": "The list of what will be tested afterwards (the post-change matrix)."
+    }
+  ],
+  "postChange": [
+    {
+      "id": "forms",
+      "what": "Forms",
+      "how": "A real send from each public form, marked as a test; for forms wired to a CRM, with the action neutralised or in the CRM sandbox",
+      "pass": "It reaches its destination and shows in the form's panel",
+      "needs": [
+        "forms"
+      ]
+    },
+    {
+      "id": "payments",
+      "what": "Payments",
+      "how": "A test order with the gateway in test mode",
+      "pass": "The whole checkout completes",
+      "needs": [
+        "store"
+      ]
+    },
+    {
+      "id": "admin-sign-in",
+      "what": "Admin sign-in",
+      "how": "Sign in with a test account and its second factor",
+      "pass": "It signs in",
+      "needs": []
+    },
+    {
+      "id": "key-pages",
+      "what": "Key pages",
+      "how": "The home, the main enquiry page, a news item and a page with a slider",
+      "pass": "They look as before, with no raw shortcodes",
+      "needs": []
+    },
+    {
+      "id": "phone",
+      "what": "Phone",
+      "how": "A real phone, or developer tools at 375 px",
+      "pass": "No horizontal scroll; the menu works",
+      "needs": []
+    },
+    {
+      "id": "cache-purged",
+      "what": "Cache purged",
+      "how": "Purge the plugin, server and CDN caches",
+      "pass": "The changes show",
+      "needs": []
+    },
+    {
+      "id": "anonymous",
+      "what": "As an anonymous visitor",
+      "how": "A private window, on the www host when the site uses it",
+      "pass": "It looks the same as when signed in",
+      "needs": []
+    },
+    {
+      "id": "console",
+      "what": "Browser console",
+      "how": "The developer tools console on the home",
+      "pass": "No new errors (policy or script)",
+      "needs": []
+    },
+    {
+      "id": "outgoing-mail",
+      "what": "Outgoing mail",
+      "how": "Reset the password of the test account",
+      "pass": "The mail arrives",
+      "needs": []
+    }
+  ],
+  "incident": {
+    "phases": [
+      {
+        "number": 1,
+        "name": "Contain"
+      },
+      {
+        "number": 2,
+        "name": "Preserve evidence"
+      },
+      {
+        "number": 3,
+        "name": "Eradicate in every layer"
+      },
+      {
+        "number": 4,
+        "name": "Recover"
+      },
+      {
+        "number": 5,
+        "name": "Harden before republishing"
+      },
+      {
+        "number": 6,
+        "name": "Verify, republish and report"
+      }
+    ],
+    "steps": [
+      {
+        "id": "site-isolated",
+        "phase": 1,
+        "text": "Site isolated: public access blocked (maintenance mode, or deny all except your own address)",
+        "requires": []
+      },
+      {
+        "id": "host-ticket",
+        "phase": 1,
+        "text": "Written ticket to the host: isolate without deleting, preserve logs and a snapshot, and keep the site offline until you confirm",
+        "requires": []
+      },
+      {
+        "id": "owner-told",
+        "phase": 1,
+        "text": "Owner told what happened and what you are doing, and asked not to change passwords yet",
+        "requires": []
+      },
+      {
+        "id": "snapshot",
+        "phase": 2,
+        "text": "Full snapshot of files, database and access and error logs, stored apart from the site",
+        "requires": []
+      },
+      {
+        "id": "indicators-recorded",
+        "phase": 2,
+        "text": "Indicators recorded with path, date and hash (INT-01 to INT-05, INT-14, INT-15, INT-19 to INT-21, INT-26, INT-28 to INT-30)",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "evidence-local",
+        "phase": 2,
+        "text": "Evidence that holds the attacker's live secrets kept in an encrypted local folder, out of any cloud or repository",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-files",
+        "phase": 3,
+        "text": "Files: PHP in uploads, unknown mu-plugins and drop-ins, modified core, recently changed files, rewrite rules",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-database",
+        "phase": 3,
+        "text": "Database: autoloaded options with encoded code, fake administrators, foreign cron hooks, posts with scripts",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-users",
+        "phase": 3,
+        "text": "Users: unknown administrators, application passwords, sessions",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-hosting",
+        "phase": 3,
+        "text": "Hosting: server cron jobs that fetch remote code, FTP and SSH accounts, API tokens, mail forwarders",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-dns-mail",
+        "phase": 3,
+        "text": "DNS and mail: changed MX, odd TXT records, new subdomains",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "layer-plugins",
+        "phase": 3,
+        "text": "Plugins disguised as legitimate ones, and migration or export plugins",
+        "requires": [
+          "snapshot"
+        ]
+      },
+      {
+        "id": "path-decided",
+        "phase": 3,
+        "text": "Path decided: restore a clean backup from before the infection, or clean in place",
+        "requires": [
+          "layer-files",
+          "layer-database"
+        ]
+      },
+      {
+        "id": "content-inventory",
+        "phase": 3,
+        "text": "Inventory of legitimate content created after the backup date, to put back by hand",
+        "requires": [
+          "path-decided"
+        ]
+      },
+      {
+        "id": "admin-lockout",
+        "phase": 4,
+        "text": "Admin lockout applied: every administrator password replaced by a random hash and every session cleared",
+        "requires": [
+          "site-isolated",
+          "snapshot"
+        ]
+      },
+      {
+        "id": "restored-or-cleaned",
+        "phase": 4,
+        "text": "Clean backup restored (files and database), or the site cleaned in place",
+        "requires": [
+          "admin-lockout",
+          "path-decided",
+          "content-inventory"
+        ]
+      },
+      {
+        "id": "second-pass-zero",
+        "phase": 4,
+        "text": "Second full pass over the six layers counts zero indicators",
+        "requires": [
+          "restored-or-cleaned",
+          "layer-files",
+          "layer-database",
+          "layer-users",
+          "layer-hosting",
+          "layer-dns-mail",
+          "layer-plugins"
+        ]
+      },
+      {
+        "id": "content-restored",
+        "phase": 4,
+        "text": "Legitimate content created after the backup put back from the inventory",
+        "requires": [
+          "second-pass-zero"
+        ]
+      },
+      {
+        "id": "rotate-passwords",
+        "phase": 4,
+        "text": "Real passwords rotated with the environment inert, in order: salts, administrators, hosting panel, FTP and SSH, database, API tokens, application passwords, integrations",
+        "requires": [
+          "site-isolated",
+          "admin-lockout",
+          "second-pass-zero"
+        ]
+      },
+      {
+        "id": "export-plugins-removed",
+        "phase": 4,
+        "text": "Migration and export plugins uninstalled",
+        "requires": [
+          "second-pass-zero"
+        ]
+      },
+      {
+        "id": "hardening-applied",
+        "phase": 5,
+        "text": "Hardening list applied, starting with named accounts, second factor, file editing, XML-RPC, sign-in limits, uploads and access left by former contractors",
+        "requires": [
+          "rotate-passwords"
+        ]
+      },
+      {
+        "id": "updates-applied",
+        "phase": 5,
+        "text": "Core, plugins and themes updated",
+        "requires": [
+          "rotate-passwords"
+        ]
+      },
+      {
+        "id": "attacker-blocked",
+        "phase": 5,
+        "text": "Attacker addresses blocked, and what the restore does not touch rotated (hosting panel, SSH, system cron, FTP, forwarders)",
+        "requires": [
+          "rotate-passwords"
+        ]
+      },
+      {
+        "id": "final-pass-clean",
+        "phase": 6,
+        "text": "Second full pass of the internal and external lists: zero indicators, scanners clean, no Safe Browsing warning, no spam in a site: search",
+        "requires": [
+          "hardening-applied",
+          "updates-applied",
+          "attacker-blocked"
+        ]
+      },
+      {
+        "id": "matrix-passed",
+        "phase": 6,
+        "text": "Post-change matrix passed (forms, sign-in, key pages, phone, anonymous)",
+        "requires": [
+          "final-pass-clean"
+        ]
+      },
+      {
+        "id": "republished",
+        "phase": 6,
+        "text": "Site republished, and the host asked to lift any network block",
+        "requires": [
+          "final-pass-clean",
+          "matrix-passed",
+          "content-restored",
+          "export-plugins-removed"
+        ]
+      },
+      {
+        "id": "review-requested",
+        "phase": 6,
+        "text": "Review requested from the search engine if there was a warning",
+        "requires": [
+          "republished"
+        ]
+      },
+      {
+        "id": "reports-written",
+        "phase": 6,
+        "text": "Two reports written: a technical one with the timeline and a one-page plain one",
+        "requires": [
+          "republished"
+        ]
+      },
+      {
+        "id": "first-week-watch",
+        "phase": 6,
+        "text": "Daily scan and sign-in review during the first week after republishing",
+        "requires": [
+          "republished"
+        ]
+      }
+    ]
+  }
+}

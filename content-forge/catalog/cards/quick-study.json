@@ -1,0 +1,25 @@
+{
+  "id": "quick-study",
+  "name": "Quick Study",
+  "set": "core",
+  "faction": null,
+  "rarity": "common",
+  "cost": 1,
+  "keywords": [],
+  "text": "Draw a card.",
+  "body": {
+    "type": "spell",
+    "target": "none",
+    "effects": [
+      {
+        "kind": "draw",
+        "count": 1
+      }
+    ]
+  },
+  "limits": {
+    "maxCopies": 3,
+    "banned": false
+  },
+  "handwritten": false
+}

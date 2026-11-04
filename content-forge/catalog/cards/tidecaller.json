@@ -1,0 +1,21 @@
+{
+  "id": "tidecaller",
+  "name": "Tidecaller",
+  "set": "core",
+  "faction": "tide",
+  "rarity": "uncommon",
+  "cost": 3,
+  "keywords": [
+    {
+      "keyword": "echo",
+      "value": 1
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 2,
+    "health": 3
+  },
+  "handwritten": true
+}

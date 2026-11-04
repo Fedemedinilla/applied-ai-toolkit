@@ -2,6 +2,8 @@
 
 A page with an editable order that renders its delivery note as a PDF in the browser, built on [`pdf-receipt`](../../pdf-receipt/). There is no server. The PDF is built in the tab and offered through a normal download link, so the order never leaves the device. It makes the same `buildReceipt` call a serverless function would, which works because the library uses no Node APIs. The interface is in Spanish, and the shop is a fictional plant nursery.
 
+Live demo: <https://fedemedinilla.github.io/applied-ai-toolkit/receipt/>
+
 ## The flow
 
 1. The page opens with a sample order already built. The status line reads "Listo: remito-R-0042.pdf, 1 página, 4,1 kB." and Descargar saves that file.

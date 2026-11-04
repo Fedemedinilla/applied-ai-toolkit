@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "dominio": "workshop.test",
+    "institucion": "Example Workshop",
+    "url_canonica": "https://www.workshop.test/",
+    "inicio_utc": "2026-10-20T12:00:00+00:00",
+    "inicio_local": "2026-10-20T09:00:00-03:00"
+  },
+  "checks": [
+    {
+      "id": "EXT-01",
+      "estado": "APROBADO_CON_OBSERVACION",
+      "prioridad": "Alta",
+      "color_final": "amarillo",
+      "evidencia": ["headers-home.txt"],
+      "frase_informe_llena": { "que_se_encontro": "The site sets 4 of the 6 browser protections" },
+      "motivo_no_verificado": null
+    },
+    {
+      "id": "EXT-05",
+      "estado": "FALLA",
+      "prioridad": "Alta",
+      "color_final": "rojo",
+      "evidencia": ["dns-txt.json"],
+      "frase_informe_llena": { "que_se_encontro": "The domain publishes no DMARC record." },
+      "motivo_no_verificado": null
+    },
+    {
+      "id": "EXT-07",
+      "estado": "APROBADO",
+      "prioridad": "Alta",
+      "color_final": "verde",
+      "evidencia": ["tls.json"],
+      "frase_informe_llena": { "que_se_encontro": "The certificate is valid for 80 more days" },
+      "motivo_no_verificado": null
+    },
+    {
+      "id": "VIS-08",
+      "estado": "NO_APLICA",
+      "prioridad": "Baja",
+      "color_final": "oculto",
+      "evidencia": [],
+      "frase_informe_llena": null,
+      "motivo_no_verificado": "single-language site"
+    },
+    {
+      "id": "VIS-12",
+      "estado": "NO_VERIFICADO",
+      "prioridad": "Media",
+      "color_final": "gris",
+      "evidencia": [],
+      "frase_informe_llena": null,
+      "motivo_no_verificado": "needs a test in a browser"
+    },
+    {
+      "id": "EXT-25",
+      "estado": "APROBADO",
+      "prioridad": "Media",
+      "color_final": "verde",
+      "evidencia": ["home.html"],
+      "frase_informe_llena": { "que_se_encontro": "A privacy policy is linked from the footer" },
+      "motivo_no_verificado": null
+    },
+    { "id": "XYZ-99", "estado": "APROBADO", "evidencia": [] },
+    { "id": "VIS-01", "estado": "PASSED", "evidencia": [] },
+    "not an object",
+    { "estado": "FALLA" }
+  ]
+}

@@ -87,7 +87,7 @@ The keys are yours: generate a pair once per deployment and keep both halves tog
 | `test/app.dom.test.ts` | jsdom against the real `index.html` and the real handler: install steps on an iPhone tab with the button disabled, the Android install prompt used once; enabling with the server's key, re-registration on load, a subscription made with a replaced key dropped on both sides and Activar offered, one with no reported key kept, `InvalidStateError` retried, browser errors explained, a blocked permission, the browser unsubscribed when the server cannot store; disabling; a test with kind and badge, a store failure that leaves the subscription, a lost device registered again, a 410 that offers Activar; the badge counter, no badge API, a worker message setting the badge; the diagnosis count and "could not count"; arrival notes; labels, live regions, the log not live, the badge number named by a label, and no live region computing to `display: none` with the real stylesheet |
 | `test/build.test.ts` | Runs the production build into a temporary folder: the manifest and its icons, relative URLs only, no inline script, `sw.js` with its version set and no `import` or `export` |
 
-153 tests, all offline.
+154 tests, all offline.
 
 ## Limits
 

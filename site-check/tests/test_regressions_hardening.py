@@ -402,7 +402,7 @@ class ExclusionReadingTest(unittest.TestCase):
     def test_unreadable_lines_are_problems_with_their_number(self) -> None:
         # Line 3 must be a free mail service, so the domain stays gmail.com. Gmail usernames
         # cannot contain a hyphen, so this address cannot belong to anyone.
-        text = "colegio.test\npidió la baja el colegio de la esquina\nRectoría <rectoria-ficticia@gmail.com>\n\n# nota\n"
+        text = "colegio.test\nesta línea no es un dominio\nRectoría <rectoria-ficticia@gmail.com>\n\n# nota\n"
         lst = self.load_bytes(text.encode("utf-8"))
         self.assertEqual(lst.entries, ["colegio.test"])
         self.assertEqual([(n, p) for _, n, p in lst.problems], [(2, "not-a-domain"), (3, "free-mail")])
@@ -415,7 +415,7 @@ class ExclusionReadingTest(unittest.TestCase):
 
 class ExclusionRunTest(unittest.TestCase):
     def test_an_unreadable_line_stops_the_run_before_any_request(self) -> None:
-        r = run_e2e(school_scenario(), default_apis(), exclude="# bajas\notro.test\npidió la baja el colegio de la esquina\n")
+        r = run_e2e(school_scenario(), default_apis(), exclude="# bajas\notro.test\nesta línea no es un dominio\n")
         self.assertEqual(r.code, 2)
         self.assertEqual((r.site_urls, r.api_paths, r.folder), ([], [], None))
         self.assertIn("line 3", r.err)
@@ -1026,8 +1026,8 @@ class MaskingTest(unittest.TestCase):
     def test_control_phones_are_still_masked(self) -> None:
         from sitecheck import artifacts
 
-        self.assertEqual(artifacts.mask_personal_data("Tel: 11 4555-1234"), "Tel: [numero]")
-        self.assertEqual(artifacts.mask_personal_data("Tel: 11.4555.1234"), "Tel: [numero]")
+        self.assertEqual(artifacts.mask_personal_data("Tel: 11 0000-1234"), "Tel: [numero]")
+        self.assertEqual(artifacts.mask_personal_data("Tel: 11.0000.1234"), "Tel: [numero]")
 
     def test_e2e_dbl_evidence_keeps_the_code(self) -> None:
         r = run_e2e(school_scenario(), default_apis(dbl_codes=["127.0.1.102"]))

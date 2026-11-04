@@ -1,0 +1,32 @@
+{
+  "id": "tide-starter",
+  "name": "Rising Tide",
+  "faction": "tide",
+  "cards": [
+    {
+      "card": "reef-sentinel",
+      "copies": 3
+    },
+    {
+      "card": "tidecaller",
+      "copies": 2
+    },
+    {
+      "card": "undertow",
+      "copies": 3
+    },
+    {
+      "card": "tidal-surge",
+      "copies": 2
+    },
+    {
+      "card": "wandering-tinker",
+      "copies": 1
+    },
+    {
+      "card": "quick-study",
+      "copies": 1
+    }
+  ],
+  "handwritten": true
+}

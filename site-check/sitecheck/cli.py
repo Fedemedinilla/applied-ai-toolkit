@@ -17,6 +17,8 @@ Options:
   --max-requests N        site request budget, 1 to 90 (default 90); never above 90
   --overrides FILE        colour overrides {ID: {"color", "motivo"}}, each with its reason
   --rerender DATOS_JSON   rebuild the report of an earlier run from its datos.json, no requests
+  --compare BEFORE AFTER  compare two stored runs (folders or datos.json files), no requests;
+                          writes comparacion.md and comparacion.json into the AFTER folder
   --out DIR               output root (default $SITE_CHECK_OUT, else ./site-check-runs)
   --exclude FILE          an exclusion list (default $SITE_CHECK_EXCLUDE); <out>/exclude.txt is read too
   --version               print the version
@@ -76,6 +78,10 @@ _BASELINE_MODULES: frozenset[str] = frozenset(name.partition(".")[0] for name in
 
 TEST_SUFFIX = ".test"
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
+# Options that only shape a measurement; --compare refuses them instead of ignoring them.
+_MEASURE_ONLY_OPTIONS = (
+    "--no-pagespeed", "--observatory", "--psi-runs", "--max-requests", "--inner-page", "--form-page", "--pause",
+)
 
 
 class _Parser(argparse.ArgumentParser):
@@ -122,6 +128,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"color", "motivo"}}')
     p.add_argument("--rerender", metavar="DATOS_JSON", help="rebuild the report from a datos.json, without requests")
+    p.add_argument(
+        "--compare", nargs=2, metavar=("BEFORE", "AFTER"),
+        help="compare two stored runs (folders or datos.json files) without requests; writes into the AFTER folder",
+    )
     p.add_argument("--out", metavar="DIR", help="output root (default: $SITE_CHECK_OUT, else ./site-check-runs)")
     p.add_argument("--exclude", metavar="FILE", help=f"exclusion list, one domain per line (default: ${EXCLUDE_ENV_VAR})")
     p.add_argument("--version", action="version", version=f"site-check {__version__}")
@@ -289,6 +299,32 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         if problem:
             parser.error(problem)
 
+    if args.compare:
+        given = [
+            option
+            for option, value in (
+                ("a URL", args.url), ("--rerender", args.rerender), ("--overrides", args.overrides),
+                ("--name", args.name), ("--kind", args.kind), ("--to", args.para), ("--out", args.out),
+                ("--exclude", args.exclude),
+            )
+            if value
+        ]
+        # Options with a default value: only argv tells whether they were typed.
+        given += [
+            option
+            for option in _MEASURE_ONLY_OPTIONS
+            if any(token == option or token.startswith(option + "=") for token in argv)
+        ]
+        if test_hooks:
+            given.append("the test options")
+        if given:
+            parser.error(f"--compare reads two stored runs and takes no other options (got {', '.join(given)})")
+        before, after = (Path(value).absolute() for value in args.compare)
+        for label, path in (("BEFORE", before), ("AFTER", after)):
+            if not (path.is_dir() or path.is_file()):
+                parser.error(f"the --compare {label} run does not exist: {path}")
+        return RunConfig(url="", compare=(before, after), out_root=out_root)
+
     if args.rerender:
         if args.url:
             parser.error("--rerender takes no URL: it is read from datos.json")
@@ -413,6 +449,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = parse_args(sys.argv[1:] if argv is None else argv)
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else int(ExitCode.USAGE))
+
+    if config.compare is not None:
+        from .compare import run_compare
+
+        return int(run_compare(config.compare[0], config.compare[1], stdout=sys.stdout, stderr=sys.stderr))
 
     from . import pipeline
 

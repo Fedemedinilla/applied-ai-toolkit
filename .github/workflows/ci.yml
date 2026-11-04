@@ -1,11 +1,16 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
-# the app builds and their CSP guard, the site-check unittest suite, and slop-lint over the repository's own docs. Everything is offline; the job has no secrets.
+# the app builds and their CSP guard, the site-check unittest suite, slop-lint over the
+# repository's own docs, and the wp-hardening PHPUnit suite in a job of its own. Tests make no
+# network call; the only downloads are the locked npm and Composer packages. No job has secrets.
 # Actions are pinned to the commit SHA of their release tag, with the version in a
 # comment. To upgrade one, change both.
 name: CI
 
+# Pushes to main, and pull requests. A push to a PR branch runs once, through pull_request.
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -57,6 +62,7 @@ jobs:
           CHAT_WIDGET_SESSION_SECRET: ci-placeholder-session-secret-0001-0123456789
           CHAT_WIDGET_ADMIN_PASSWORD: ci-placeholder-admin-0001
           PUSH_LAB_VAPID_PRIVATE_KEY: ci-placeholder-vapid-0001
+          ASSISTANT_HISTORY_SECRET: ci-placeholder-history-secret-0001-0123456789
 
       - name: Guard the app builds
         run: npm run guard:apps
@@ -65,6 +71,7 @@ jobs:
           CHAT_WIDGET_SESSION_SECRET: ci-placeholder-session-secret-0001-0123456789
           CHAT_WIDGET_ADMIN_PASSWORD: ci-placeholder-admin-0001
           PUSH_LAB_VAPID_PRIVATE_KEY: ci-placeholder-vapid-0001
+          ASSISTANT_HISTORY_SECRET: ci-placeholder-history-secret-0001-0123456789
 
       # site-check needs Python 3.11 or newer and nothing outside the standard library.
       # ubuntu-latest ships Python 3; this step fails early if it is too old.
@@ -79,3 +86,36 @@ jobs:
       # The docs must pass their own linter: no tier 1 finding in any README or the case study.
       - name: Lint the docs
         run: npm run lint:docs
+
+  php:
+    name: wp-hardening (PHP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: wp-hardening
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ubuntu-latest ships PHP and Composer. The plugin needs PHP 8.1 or newer (composer.json
+      # pins the platform to 8.1.0); this step fails early if the runner's PHP is older.
+      - name: PHP version
+        run: |
+          php --version
+          composer --version
+          php -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' || { echo "wp-hardening needs PHP 8.1 or newer"; exit 1; }
+
+      # composer.lock is committed; validate fails if it is out of date with composer.json.
+      - name: Validate composer.json and the lock
+        run: composer validate --strict --no-check-publish
+
+      - name: Install the locked dev dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Syntax check
+        run: find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit

@@ -1,0 +1,17 @@
+{
+  "id": "shell-spawn",
+  "name": "Shell Spawn",
+  "set": "driftwood",
+  "faction": "tide",
+  "rarity": "common",
+  "cost": 0,
+  "keywords": [],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 1,
+    "health": 1,
+    "token": true
+  },
+  "handwritten": true
+}

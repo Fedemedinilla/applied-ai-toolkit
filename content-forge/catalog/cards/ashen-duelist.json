@@ -1,0 +1,21 @@
+{
+  "id": "ashen-duelist",
+  "name": "Ashen Duelist",
+  "set": "driftwood",
+  "faction": "ember",
+  "rarity": "uncommon",
+  "cost": 4,
+  "keywords": [
+    {
+      "keyword": "swift",
+      "value": null
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 5,
+    "health": 3
+  },
+  "handwritten": true
+}

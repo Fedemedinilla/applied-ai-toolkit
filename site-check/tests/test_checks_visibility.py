@@ -194,9 +194,9 @@ class ContactTest(unittest.TestCase):
             "54111523456789": NumberVerdict.FAIL,
             "549111523456789": NumberVerdict.FAIL,
             "1123456789": NumberVerdict.FAIL,
-            "541143219876": NumberVerdict.REVIEW,
+            "541100000000": NumberVerdict.REVIEW,
             "+54 9 11 2345-6789": NumberVerdict.REVIEW,
-            "34612345678": NumberVerdict.FOREIGN,
+            "34600000000": NumberVerdict.FOREIGN,
         }
         for raw, verdict in cases.items():
             self.assertEqual(classify_whatsapp_number(raw).verdict, verdict, raw)
@@ -247,7 +247,7 @@ class ContentTest(unittest.TestCase):
     def test_vis19_factory_leftovers(self) -> None:
         tagline = '<meta property="og:description" content="Otro sitio realizado con WordPress">'
         self.assertEqual(run(content.evaluate_vis19, tagline).state, State.FALLA)
-        self.assertEqual(run(content.evaluate_vis19, "", '<script>var t="lorem ipsum";</script><p>Tel 4555-1234</p>').state, State.APROBADO)
+        self.assertEqual(run(content.evaluate_vis19, "", '<script>var t="lorem ipsum";</script><p>Tel 0000-1234</p>').state, State.APROBADO)
         icon = '<footer><a class="fusion-social-network-icon fusion-facebook" href="#" aria-label="Facebook"></a></footer>'
         self.assertEqual(run(content.evaluate_vis19, "", icon).state, State.FALLA)
 

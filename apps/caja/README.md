@@ -2,7 +2,7 @@
 
 Caja is an installable, offline cash book for a small shop, built on [`amount-parser`](../../amount-parser/). The owner types or dictates a sentence in Rioplatense Spanish, such as "vendí 3 docenas a 12 mil la docena". The app turns it into a row with the amount, income or expense, a category, and the words each came from. When the sentence has two readings, the app asks which one and saves only after the answer. It shows the parser where it is meant to run: in the browser, on every entry, with no model call. Typing works offline; dictation depends on the browser. An optional model mode sends the sentence to a small server that asks Claude, through [`gateway`](../../gateway/), for the kind, the category and the date. In that mode the model reads and the code decides. The amount still comes from the parser, a reading that disagrees with it becomes a question, and spending has a monthly cap. Without the server, the app is the offline one.
 
-Live demo: (link added when deployed)
+Live demo: <https://fedemedinilla.github.io/applied-ai-toolkit/caja/>
 
 ## The flow
 
@@ -42,7 +42,7 @@ The output uses relative URLs only (`base: './'`), so `dist/apps/caja` works at 
 
 The build (Vite 8.3.4) writes 51.79 kB of JavaScript, 18.74 kB gzipped, and 8.02 kB of CSS. The service worker is 2.32 kB. Model mode's browser side accounts for 12.59 kB of that JavaScript, 3.79 kB gzipped (the build before it wrote 39.20 kB and 14.95 kB). The server is not part of the build. The 63.20 kB corpus is fetched only when the phrases tab opens.
 
-After the build, CI runs [`csp-build-guard`](../../csp-build-guard/) over `dist/apps/caja` with [`csp-guard.config.json`](csp-guard.config.json). The app ships no Content-Security-Policy of its own yet, since it has no deploy config, so the config holds the strict policy a host should send (`'self'` only, `data:` images, no plugins) as a `literal`. The run checks that the build works under it with no inline script, has no regex lookbehind, and keeps the JavaScript of `index.html` under 20 kB gzipped. Its own measure of the current build is 18.6 kB gzipped and 16.9 kB brotli.
+After the build, CI runs [`csp-build-guard`](../../csp-build-guard/) over `dist/apps/caja` with [`csp-guard.config.json`](csp-guard.config.json). It is published on GitHub Pages, which cannot send response headers, so the config holds the strict policy a host should send (`'self'` only, `data:` images, no plugins) as a `literal`. The run checks that the build works under it with no inline script, has no regex lookbehind, and keeps the JavaScript of `index.html` under 20 kB gzipped. Its own measure of the current build is 18.6 kB gzipped and 16.9 kB brotli.
 
 ## Model mode
 

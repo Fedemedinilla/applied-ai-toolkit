@@ -61,7 +61,8 @@ FACTORY_TEXT_PATTERNS: tuple[str, ...] = (
     "info@yourdomain.com",
     "yourdomain.com",
 )
-# Anchored: "4555-0123" and "15-5555-0199" are real Argentine numbers.
+# Anchored: in a longer number, 555-01 followed by two digits is part of an ordinary
+# Argentine line, not a demo number.
 DEMO_PHONE_REGEXES: tuple[str, ...] = (r"\(555\)", r"(?<![\d-])555-01\d\d(?!\d)")
 SOCIAL_HOSTS: tuple[str, ...] = ("facebook.com", "instagram.com", "twitter.com", "x.com", "youtube.com", "linkedin.com", "tiktok.com")
 THEME_VENDOR_HOSTS: tuple[str, ...] = ("theme-fusion.com", "themeforest.net", "elementor.com", "envato.com")

@@ -1,8 +1,8 @@
 # site-check
 
-site-check reads a public website the way a visitor's browser does and writes a plain-language report on its security, speed, search visibility and contact paths. It is built around two constraints. It has to stay legal without the owner's permission, so a scope guard in the network layer refuses any request a visitor would not make. Every sentence of the report has to be reproducible, so 37 fixed rules turn measurements into pre-written text, and `--rerender` rebuilds a report byte for byte from its `datos.json`. There is no language model in the loop, on purpose. The reader acts on these sentences without being able to check them, so each one has to come from a measurement that someone else can check.
+site-check reads a public website the way a visitor's browser does and writes a plain-language report on its security, speed, search visibility and contact paths. It is built around two constraints. It has to stay legal without the owner's permission, so a scope guard in the network layer refuses any request a visitor would not make. Every sentence of the report has to be reproducible, so 37 fixed rules turn measurements into pre-written text, and `--rerender` rebuilds a report byte for byte from its `datos.json`. There is no language model in the loop, on purpose. The reader acts on these sentences without being able to check them, so each one has to come from a measurement that someone else can check. `--compare` turns two stored runs into a before/after report (see Before and after).
 
-Python standard library only: about 21,000 lines in `sitecheck/` and 591 tests that run offline against a fake site and fake APIs on 127.0.0.1.
+Python standard library only: about 22,000 lines in `sitecheck/` and 639 tests that run offline against a fake site and fake APIs on 127.0.0.1.
 
 The report text is Spanish (Argentina, formal "usted"), because the tool was built for small Argentine organisations such as schools and SMEs. Code, comments, console messages and this README are in English. The exception is the operator notes that the console repeats from `datos.json`, which are in Spanish. The keys of `datos.json` are Spanish, like the report they feed.
 
@@ -103,6 +103,12 @@ python3 -I -S site_check.py https://www.example.org/ --name "Example School" --k
 
 # Rebuild the report of an earlier run, with zero requests
 python3 site_check.py --rerender ./runs/example.org/2026-10-14/datos.json
+
+# Compare two stored runs (folders or datos.json files), with zero requests
+python3 site_check.py --compare ./runs/example.org/2026-10-14 ./runs/example.org/2026-11-18
+
+# Offline: rebuild examples/after/ (the improved school) and its comparison
+python3 examples/make_compare_example.py
 ```
 
 From the repository root, `npm run test:python` runs the same test command.
@@ -124,7 +130,7 @@ A run leaves `<out>/<domain>/<date>/` with these files:
 - `00-tiempo.txt`, the start and end time of the run (Buenos Aires time);
 - `evidencia/`, every response and API answer the states rest on, plus `requests.log` with one JSON line per request.
 
-`examples/` holds the report, the annex and `datos.json` of a run against the fictional school.
+`examples/` holds the report, the annex and `datos.json` of a run against the fictional school on 14/10/2026. `examples/after/` holds the same school on 18/11/2026, after the fixes listed in `tests/comparefixtures.py`, and `comparacion.md` between the two.
 
 | Exit | Meaning |
 |---|---|
@@ -133,9 +139,55 @@ A run leaves `<out>/<domain>/<date>/` with these files:
 | 2 | invalid options, a missing control domain, or a missing or unreadable exclusion list |
 | 3 | the home did not answer, or an anti-bot check blocked it from the first request |
 | 4 | the report text failed the control (the report is written; the problems are listed) |
+| 5 | `--compare`: the two runs were taken with different tools or conditions (nothing written; the reasons are listed) |
 | 10 | the domain is on the exclusion list (no request made) |
 | 30 | signs that the site was compromised |
 | 50 | the scope guard refused a request the tool itself built (a bug; the run aborts) |
+
+## Before and after
+
+`--compare BEFORE AFTER` reads two stored runs of the same site and writes a before/after report, `comparacion.md`, with its numbers in `comparacion.json`, into the AFTER folder. It makes no request and reads no clock, so the same two `datos.json` files always give the same bytes. Both runs must come from the same site-check and Lighthouse versions and the same options, with three or more valid mobile PageSpeed runs, so the lab rows are medians. Mobile and desktop rows stay separate. Real-user rows never take a lab value, and each table names its cache condition. Time to first byte is compared only when the control site answered on both dates. The report has these rows.
+
+- real-user LCP, INP and CLS on mobile from Chrome UX Report, with a heading that says whether Google gave data for the home page or for the whole site;
+- the lab mobile score and lab LCP, both from the median run, and the desktop score, labelled as one run;
+- time to first byte, with the control site's median next to it;
+- page weight and the third-party share;
+- how many of the six browser protection headers are set, and the MDN Observatory grade when both runs asked for it;
+- the three mail authentication rows (SPF, DKIM, DMARC), each marked as added, removed, better, worse or changed;
+- checks passed over applicable, per module and in total;
+- every check that changed colour, grouped as improved, worse, or other (to or from grey);
+- what is still not green on the AFTER date, by colour.
+
+Each value in `comparacion.json` names where it lives in its own run, in the trace notation of `model.py`. `checks[EXT-08].measured.lcp_ms` is the `mediciones.lcp_ms` of the check whose id is EXT-08. `tablas.correo.filas[2].valor` is the third mail row of that run. A cell without a value has no trace.
+
+**Runs taken with different tools or conditions are refused.** Any difference refuses the comparison with exit 5 and writes nothing, and every reason is listed. A key that one run does not record is a reason of its own, so a truncated or hand-made `datos.json` cannot pass because two missing values look equal.
+
+| Condition | `datos.json` key | Why a difference moves a number |
+|---|---|---|
+| domain and measured page | `meta.dominio`, `meta.url_canonica` | another site |
+| inner page read | `meta.url_interna` | other content checks read another page |
+| site-check version | `meta.version_script` | other rules, other colours |
+| Lighthouse major version | `meta.version_lighthouse` | other scoring |
+| PageSpeed on or off | `meta.sin_pagespeed` | speed checks grey on one date only |
+| mobile runs asked and valid | `meta.corridas_psi.pedidas`, `.validas` | another median; fewer than three, or an even count, has no middle run and is refused even when both dates match |
+| desktop run valid | `meta.corridas_psi.computadora_valida` | a desktop score on one date only |
+| MDN Observatory asked | `meta.alcance.observatory` | a grade on one date only |
+| request budget | `meta.max_pedidos` | fewer links read |
+| kind of organisation | `meta.tipo` | other checks apply (admissions for schools) |
+| test mode | `meta.modo_prueba` | a fake site compared with a real one |
+| run cut or home down | `meta.sitio_cortado`, `meta.portada_no_respondio` | checks that did not see the site |
+| order of the runs | `meta.inicio_utc` | AFTER must be later than BEFORE |
+
+The other errors it guards against, and how.
+
+- **Lab data shown as field data.** A run without Chrome UX Report data stores its lab LCP in the same `lcp_ms` key with `scope: "laboratorio"`. The field rows read that key only when the scope is `pagina` or `origen`; otherwise the cell says "sin datos de campo" and the row is not compared. Page-level and origin-level field data are not compared with each other either.
+- **A change column that contradicts its cells.** The change is the difference of the two printed numbers, not of the raw values. 2949 ms and 2951 ms print as "2,9" and "3,0" seconds (decimal comma), so the change is 0.1 seconds more. 2860 ms and 2940 ms both print "2,9", so the change column says "sin cambio".
+- **A change in the instrument read as a change in the site.** Time to first byte is compared only when EXT-20 had a valid control on both dates, and the control medians are printed in the next row.
+- **A grey check counted as passed.** `NO_APLICA` leaves the denominator; `NO_VERIFICADO` stays in it and never counts as passed. A check that turns grey is listed under other changes, never as improved or worse.
+- **Field data that still holds the old site.** Chrome UX Report covers the 28 days before each run. When the two runs are fewer than 28 days apart, the report says that the AFTER numbers still include visits from before the change.
+- **An option that looks like it did something.** `--compare` takes no other option. A URL, a measurement option such as `--observatory` or `--psi-runs`, or an output option is a usage error (exit 2).
+
+The report goes through the same text control as `informe.md` (exit 4 on a problem, files written). Its shape follows the before/after version of the report template the tool was built with. It leaves out the two parts only a person can write, what was done on the site and what to do next.
 
 ## How the tests work
 
@@ -150,7 +202,8 @@ What the tests cover:
 - every check against hand-made pages, with expected sentences typed by hand, never computed with the code under test, and a control case for each rule;
 - the evidence gate, the colour table and its exceptions, the text control;
 - the full CLI against the fake site: the report, the annex, `datos.json`, exit codes, the exclusion list, `--rerender`, no personal data and no key in any output file;
-- determinism: byte-identical output for the same observations and clock, every printed number traced to its measurement on the fake-school run, and `examples/` equal to a fresh build.
+- determinism: byte-identical output for the same observations and clock, every printed number traced to its measurement on the fake-school run, and `examples/` equal to a fresh build;
+- `--compare` on the fake school before and after its fixes: the rows, counts and colour changes typed by hand, every stored value resolved through its trace (also with the mail rows reordered), each refusal case including one, two and four valid runs and missing keys, a lab-only run that must not reach the field rows, origin-level field data, both rounding cases of the change column, a control that failed on one date, the 28-day overlap note, the text control, and `examples/after/` equal to a fresh build.
 
 ## Limits
 
@@ -160,5 +213,6 @@ What the tests cover:
 - Accessibility checks are the automatic subset Lighthouse can see. Zoom at 200 % and keyboard navigation need a browser and a person.
 - The WordPress release table (`wpversions.py`) is maintained by hand. A branch missing from it gives no age, and the run warns on the console and in `datos.json`.
 - Nothing behind a login is seen: users, backups, installed plugins, files and database. The report says so in its own section.
+- `--compare` cannot check that both runs used the same control site, because `datos.json` does not record its name; it prints both control medians instead. The tool makes one desktop PageSpeed run, not three, and the desktop row says so. A lab number that moves within its usual run-to-run spread is still printed as a change; the tool has no noise threshold.
 
 Not included: anything that needs authorization (logins, plugin enumeration, directory or path guessing, port scans) and batch runs over lists of sites.

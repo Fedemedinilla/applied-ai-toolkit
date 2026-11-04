@@ -1,0 +1,137 @@
+{
+  "candidates": [
+    {
+      "keywords": [
+        {
+          "keyword": "swift",
+          "value": null
+        }
+      ],
+      "text": "",
+      "id": "brine-scout",
+      "name": "Brine Scout",
+      "set": "core",
+      "faction": "tide",
+      "rarity": "common",
+      "cost": 2,
+      "body": {
+        "type": "unit",
+        "power": 2,
+        "health": 2
+      }
+    },
+    {
+      "keywords": [],
+      "text": "",
+      "id": "storm-colossus",
+      "name": "Storm Colossus",
+      "set": "core",
+      "faction": "tide",
+      "rarity": "rare",
+      "cost": 14,
+      "flavor": "It rose with the spring tide.",
+      "body": {
+        "type": "unit",
+        "power": 9,
+        "health": 9
+      }
+    },
+    {
+      "keywords": [],
+      "text": "",
+      "id": "ember-tyrant",
+      "name": "Ember Tyrant",
+      "set": "driftwood",
+      "faction": "ember",
+      "rarity": "legendary",
+      "cost": 1,
+      "body": {
+        "type": "unit",
+        "power": 4,
+        "health": 3
+      },
+      "limits": {
+        "maxCopies": 1
+      }
+    },
+    {
+      "keywords": [
+        {
+          "keyword": "frenzy",
+          "value": null
+        },
+        {
+          "keyword": "echo",
+          "value": null
+        }
+      ],
+      "text": "",
+      "id": "moon-oracle",
+      "name": "Moon Oracle",
+      "set": "moonfall",
+      "faction": "grove",
+      "rarity": "uncommon",
+      "cost": 3,
+      "body": {
+        "type": "unit",
+        "power": 2,
+        "health": 2
+      }
+    },
+    {
+      "keywords": [],
+      "text": "Summon a Brine Scout.",
+      "id": "scout-call",
+      "name": "Scout Call",
+      "set": "driftwood",
+      "faction": "tide",
+      "rarity": "common",
+      "cost": 2,
+      "body": {
+        "type": "spell",
+        "target": "none",
+        "effects": [
+          {
+            "kind": "summon",
+            "card": "brine-scout",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "keywords": [],
+      "text": "Deal 2 damage to anything.",
+      "id": "second-flare",
+      "name": "FLARE",
+      "set": "core",
+      "faction": "ember",
+      "rarity": "common",
+      "cost": 1,
+      "body": {
+        "type": "spell",
+        "target": "any",
+        "effects": [
+          {
+            "kind": "damage",
+            "amount": 2
+          }
+        ]
+      }
+    },
+    {
+      "keywords": [],
+      "text": "Spend a charge: heal 2 damage from a unit.",
+      "id": "moss-lantern",
+      "name": "Moss Lantern",
+      "set": "core",
+      "faction": "grove",
+      "rarity": "uncommon",
+      "cost": 2,
+      "body": {
+        "type": "relic",
+        "charges": 1
+      }
+    }
+  ]
+}

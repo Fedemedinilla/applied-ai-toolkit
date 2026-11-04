@@ -1,8 +1,8 @@
 # slop-lint
 
-slop-lint flags the patterns that make a cover letter read as generated, in English and Spanish. Among them are template phrases, overused vocabulary, negative parallelism, participle tails, throat-clearing openers, summary closers, Markdown in a plain-text field and flat sentence rhythm. It is a pure TypeScript function and a CLI with no runtime dependencies. I built it as the deterministic first pass for the cover-letter step of an app I am building that drafts a letter from a CV and a job posting. It catches the mechanical failures for free, before a second model scores the letter against a rubric.
+slop-lint flags the patterns that make a cover letter read as generated, in English and Spanish. Among them are template phrases, overused vocabulary, negative parallelism, participle tails, throat-clearing openers, summary closers, Markdown in a plain-text field and flat sentence rhythm. It is a pure TypeScript function and a CLI with no runtime dependencies. It is meant as the deterministic first pass in a writing pipeline: it catches the mechanical failures for free, before a second model scores the letter against a rubric.
 
-The 52 rules come from a deep-research report I commissioned and curated (the brief is in [research/PROMPT.md](research/PROMPT.md)). Each keeps the report's id, evidence tag and source. Three checks the report gives without an id got one here (LEX-07, LEX-08, MED-01); OFI-01 applies the report's rule of that name with the section 8.2 threshold.
+The 52 rules come from a deep-research report I commissioned and curated (what it covers is in [research/PROMPT.md](research/PROMPT.md)). Each keeps the report's id, evidence tag and source. Three checks the report gives without an id got one here (LEX-07, LEX-08, MED-01); OFI-01 applies the report's rule of that name with the section 8.2 threshold.
 
 Porting the report's regexes to JavaScript turned up bugs in them. `\b` is ASCII-only, so its Spanish participle-tail pattern could never match "Lideré". Its placeholder pattern, compiled with `i`, read `<div>` as an unfilled placeholder and disqualified any text in brackets, "[sic]" included. Each fix is recorded in the rule's `deviation` field; see Design decisions.
 
@@ -91,7 +91,7 @@ The Tier 2 budget, the colon budget and the em dash budget stay at their cover-l
 | `src/regex.ts` | Unicode-aware word boundaries |
 | `cli.ts` | command-line entry point |
 | `fixtures/cover-letters/` | the six letters of the report's section 15, all fictional |
-| `research/PROMPT.md` | the research brief, in Spanish, with an English summary |
+| `research/PROMPT.md` | what the research report covers and where its rules live |
 | `test/` | offline tests |
 
 ## Levels

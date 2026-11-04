@@ -1,6 +1,6 @@
 # Case study: a writer that invented facts to fill space
 
-The tools in this folder are a generic version of scripts I wrote for the AI demos on federicomedinilla.com. This is the record of what they found and how the fix was measured. The numbers are copied from my project notes for that work (October 2026). The demo businesses were fictional, and they are renamed here as well; the two that come up below are "the school" and "the bakery".
+The tools in this folder are a generic version of scripts I wrote for the AI demos on federicomedinilla.com. This is the record of what they found and how the fix was measured. The numbers are copied from my project notes for that work (October 2026). The demo businesses were fictional, and they are renamed here as well; the two that come up below are "the school" and "the bakery". The production defects described here were in my own demo pages, not in any client's system.
 
 ## The product
 

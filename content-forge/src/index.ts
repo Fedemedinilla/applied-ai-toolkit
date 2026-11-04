@@ -1,0 +1,11 @@
+export { checkCatalog, crossReferences, formatProblem, type CatalogIndex, type CatalogResult, type Problem, type RawCatalog, type RawEntry } from './catalog.ts';
+export { DEFAULT_DIR, runCli, USAGE, type CliIo } from './commands.ts';
+export { ForgeError, type ForgeErrorCode } from './errors.ts';
+export { loadCandidates, loadCatalog, occupant, type Loaded, type Occupant } from './files.ts';
+export { generate, judge, validCatalog, type GenerateDeps, type GenerateOptions, type Verdict } from './generate.ts';
+export { createForgeModel, type ForgeModel, type ModelOptions } from './model.ts';
+export { batchSchema, catalogueBlock, instructions, MAX_COUNT, PROMPT_VERSIONS, userMessage } from './prompt.ts';
+export { promote, type PromoteOptions, type PromoteResult } from './promote.ts';
+export { formatRun, formatStats, loadReports, RunReport, summarize, wilson, type Rejection, type VersionStats } from './report.ts';
+export { cardSpend, checkRules, curveBudget, RULES, type Rule, type RuleContext } from './rules.ts';
+export * from './schemas.ts';

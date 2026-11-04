@@ -1,0 +1,80 @@
+# Builds the apps that work as static files and deploys them to GitHub Pages, at
+# https://fedemedinilla.github.io/applied-ai-toolkit/ (Caja, Receipt, Replay Lab, Site checklist,
+# and a landing page that lists them). The apps that need a server are not published.
+# Pages has to be enabled once in the repository: Settings > Pages > Source: GitHub Actions.
+#
+# No secret is read. The build job can only read the repository. The deploy job holds the two
+# write permissions a Pages deploy needs (pages, id-token) and no other, and it only publishes the
+# artifact the build job uploaded. agent-playbook/test/workflow-secrets.test.ts checks this file
+# with that policy and every other workflow with none.
+# Actions are pinned to the commit SHA of their release tag, with the version in a comment.
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a deploy in progress finishes before the next one starts.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build the static demos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      # Builds the four apps into dist/apps/ and assembles dist/pages/ (apps/pages.ts). The variable
+      # is a placeholder, not a secret. The build sees it, so if a build inlined it, the guard below
+      # would find it.
+      - name: Build the site
+        run: npm run build:pages
+        env:
+          ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
+
+      # The same guard CI runs, over the builds that are about to be published, with the same
+      # placeholder: the secrets check searches Caja's build for it.
+      - name: Guard the published builds
+        run: npm run guard:pages
+        env:
+          ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: dist/pages
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

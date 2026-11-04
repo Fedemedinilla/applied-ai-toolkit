@@ -134,7 +134,7 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 | `test/guards.test.ts` | IP keys, the limiter, the byte-limited reader, Origin and Referer matching, deadlines, static paths |
 | `test/build.test.ts` | The production build: the loader adds no globals, has no HTML-parsing call, and uses relative URLs |
 
-126 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
+127 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
 
 ## Layout
 

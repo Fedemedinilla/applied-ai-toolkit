@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Site checklist</title>
+    <meta name="description" content="A website audit method as an offline checklist: seven states, colours from a fixed table, change control, an incident runbook and Markdown reports.">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#141619" media="(prefers-color-scheme: dark)">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <a class="skip" href="#items">Skip to the checks</a>
+    <header class="top">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect x="4" y="4" width="56" height="56" rx="12" fill="currentColor"/>
+        <path d="M16 22h8M16 34h8M16 46h8" stroke="var(--card)" stroke-width="5" stroke-linecap="round"/>
+        <path d="M31 22l4 4 9-9M31 34l4 4 9-9" stroke="var(--card)" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="38" cy="46" r="4.5" fill="none" stroke="var(--card)" stroke-width="3.5"/>
+      </svg>
+      <div>
+        <h1>Site checklist</h1>
+        <p class="sub" id="site-line">A website audit, check by check. Works offline.</p>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" id="tab-checks" aria-controls="panel-checks" aria-selected="true">Checklist</button>
+      <button type="button" role="tab" id="tab-control" aria-controls="panel-control" aria-selected="false" tabindex="-1">Change control</button>
+      <button type="button" role="tab" id="tab-incident" aria-controls="panel-incident" aria-selected="false" tabindex="-1">Incident</button>
+      <button type="button" role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false" tabindex="-1">Reports and data</button>
+    </nav>
+
+    <p id="storage-warning" class="warning" hidden></p>
+    <p id="closed-banner" class="notice" hidden>This run is closed. Reopen it from Change control to change anything.</p>
+
+    <main>
+      <section id="panel-checks" role="tabpanel" aria-labelledby="tab-checks" class="panel">
+        <details class="card setup" id="setup" open>
+          <summary>Site and profile</summary>
+          <div class="grid">
+            <div class="field">
+              <label for="site-name">Site name</label>
+              <input id="site-name" type="text" autocomplete="off" placeholder="Example Workshop">
+            </div>
+            <div class="field">
+              <label for="site-url">Address</label>
+              <input id="site-url" type="url" autocomplete="off" inputmode="url" placeholder="https://www.example.test/">
+            </div>
+            <div class="field">
+              <label for="platform">Platform</label>
+              <select id="platform"></select>
+            </div>
+          </div>
+          <fieldset class="features">
+            <legend>The site has</legend>
+            <div id="features"></div>
+          </fieldset>
+          <div class="check">
+            <input id="authorized" type="checkbox" aria-describedby="authorized-hint">
+            <label for="authorized">Written authorization signed</label>
+            <p class="hint" id="authorized-hint">Without it only the passive checks apply: what any visitor's browser can see. Testing a system without permission is a crime in many countries.</p>
+          </div>
+        </details>
+
+        <section class="card status-card" aria-labelledby="summary-title">
+          <h2 id="summary-title">Status</h2>
+          <p id="summary-scope" class="scope"></p>
+          <div id="summary-bar" class="bar" aria-hidden="true"></div>
+          <ul id="summary" class="summary" aria-live="polite"></ul>
+        </section>
+
+        <form id="filters" class="filters" role="search" aria-label="Filter the checks">
+          <div class="field">
+            <label for="filter-phase">Phase</label>
+            <select id="filter-phase"></select>
+          </div>
+          <div class="field">
+            <label for="filter-colour">Show</label>
+            <select id="filter-colour">
+              <option value="">Every colour</option>
+              <option value="red">Fix now</option>
+              <option value="yellow">Review</option>
+              <option value="blue">Optional improvement</option>
+              <option value="green">Good</option>
+              <option value="grey">Could not check</option>
+              <option value="unmarked">Not marked yet</option>
+              <option value="na">Not applicable</option>
+            </select>
+          </div>
+          <div class="field grow">
+            <label for="filter-q">Search</label>
+            <input id="filter-q" type="search" placeholder="headers, backup, VEL-05">
+          </div>
+        </form>
+        <p id="list-count" class="count" aria-live="polite"></p>
+        <ol id="items" class="items" tabindex="-1"></ol>
+      </section>
+
+      <section id="panel-control" role="tabpanel" aria-labelledby="tab-control" class="panel" hidden>
+        <h2>Change control</h2>
+        <p class="lead">A check can be marked Fixed only after the pre-change list is acknowledged, and the run closes only after the post-change matrix is. Record "before" once the diagnosis is done, so the report can compare.</p>
+
+        <section class="card" aria-labelledby="pre-title">
+          <h3 id="pre-title">Pre-change list</h3>
+          <p class="hint">Read with the owner before the first change.</p>
+          <ul id="pre-change" class="ticks"></ul>
+          <p id="pre-status" class="gate" aria-live="polite"></p>
+        </section>
+
+        <section class="card" aria-labelledby="baseline-title">
+          <h3 id="baseline-title">Before</h3>
+          <p id="baseline-status"></p>
+          <button type="button" id="record-baseline" class="secondary">Record "before" now</button>
+        </section>
+
+        <section class="card" aria-labelledby="post-title">
+          <h3 id="post-title">Post-change matrix</h3>
+          <p class="hint">After each change that touches forms, cache, PHP, the theme or the database, and always at the end.</p>
+          <ul id="post-change" class="ticks"></ul>
+          <p id="post-status" class="gate" aria-live="polite"></p>
+        </section>
+
+        <section class="card" aria-labelledby="close-title">
+          <h3 id="close-title">Close the run</h3>
+          <p id="close-status"></p>
+          <div class="actions">
+            <button type="button" id="close-run" class="primary">Close the run</button>
+            <button type="button" id="reopen-run" class="secondary" hidden>Reopen the run</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="panel-incident" role="tabpanel" aria-labelledby="tab-incident" class="panel" hidden>
+        <h2>Incident runbook</h2>
+        <p class="lead">For a compromised site. Six phases in order; a step can be ticked only after the steps it needs, and each tick keeps its time. Real passwords are rotated only once the site is isolated and every administrator is locked out, so a collector still running on the site cannot take the new ones.</p>
+        <div id="incident"></div>
+        <section class="card" aria-labelledby="timeline-title">
+          <h3 id="timeline-title">Timeline</h3>
+          <ol id="timeline" class="timeline"></ol>
+          <button type="button" id="export-incident" class="secondary">Download the timeline (Markdown)</button>
+        </section>
+      </section>
+
+      <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" class="panel" hidden>
+        <h2>Reports and data</h2>
+        <section class="card" aria-labelledby="export-title">
+          <h3 id="export-title">Export</h3>
+          <div class="actions">
+            <button type="button" id="export-check" class="primary">Report: the check (Markdown)</button>
+            <button type="button" id="export-before-after" class="secondary" aria-describedby="before-after-hint">Report: before and after (Markdown)</button>
+            <button type="button" id="export-run" class="secondary">Run (JSON)</button>
+          </div>
+          <p class="hint" id="before-after-hint">The before and after report needs "before" recorded in Change control.</p>
+        </section>
+
+        <section class="card" aria-labelledby="import-title">
+          <h3 id="import-title">Import</h3>
+          <div class="field">
+            <label for="import-sitecheck">A site-check datos.json, to pre-fill the external checks</label>
+            <input id="import-sitecheck" type="file" accept=".json,application/json">
+          </div>
+          <div class="field">
+            <label for="import-run">A run JSON exported from this app, to continue it here</label>
+            <input id="import-run" type="file" accept=".json,application/json" aria-describedby="import-run-hint">
+            <p class="hint" id="import-run-hint">It replaces the run open now. Export that one first if you need it.</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="reset-title">
+          <h3 id="reset-title">Start over</h3>
+          <p id="storage-status" class="hint"></p>
+          <button type="button" id="reset-run" class="danger">Start a new run</button>
+        </section>
+
+        <section class="card prose" aria-labelledby="legend-title">
+          <h3 id="legend-title">States and colours</h3>
+          <p>Each check is in one of seven states. The colour is derived from the state, the check's priority and its area, never chosen. A pass with no evidence note counts as not checked.</p>
+          <dl id="states-legend" class="legend"></dl>
+          <ul id="colours-legend" class="summary"></ul>
+          <p>The code and the method's tables are in <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/apps/checklist">github.com/Fedemedinilla/applied-ai-toolkit</a>.</p>
+        </section>
+      </section>
+    </main>
+
+    <p id="status" class="status" role="status"></p>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

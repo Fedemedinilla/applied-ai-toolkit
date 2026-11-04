@@ -1,0 +1,23 @@
+{
+  "candidates": [
+    {
+      "id": "gearwright",
+      "name": "Gearwrights",
+      "motto": "Every part has a purpose.",
+      "rival": null
+    },
+    {
+      "id": "frost",
+      "name": "Frostborn",
+      "motto": "Patience is a blade.",
+      "rival": "grove"
+    },
+    {
+      "id": "ashfall",
+      "name": "Emberkin Exiles",
+      "motto": "Exiled, never extinguished.",
+      "rival": null,
+      "handwritten": true
+    }
+  ]
+}

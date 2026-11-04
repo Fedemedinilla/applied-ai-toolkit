@@ -43,7 +43,7 @@ class ExitCodeValuesTest(unittest.TestCase):
     def test_values(self) -> None:
         self.assertEqual(
             {c.name: c.value for c in ExitCode},
-            {"OK": 0, "UNEXPECTED": 1, "USAGE": 2, "HOME_UNREACHABLE": 3, "TEXT_CONTROL": 4, "HACK_GATE": 30, "EXCLUDED": 10, "SCOPE_VIOLATION": 50},
+            {"OK": 0, "UNEXPECTED": 1, "USAGE": 2, "HOME_UNREACHABLE": 3, "TEXT_CONTROL": 4, "NOT_COMPARABLE": 5, "HACK_GATE": 30, "EXCLUDED": 10, "SCOPE_VIOLATION": 50},
         )
 
 
@@ -84,20 +84,20 @@ class TextLintTest(unittest.TestCase):
 
 class ExclusionListTest(unittest.TestCase):
     def test_entries_and_matching(self) -> None:
-        self.assertEqual(exclusions.parse_line("https://www.Colegio-Ejemplo.edu.ar/inicio"), (["colegio-ejemplo.edu.ar"], None))
+        self.assertEqual(exclusions.parse_line("https://www.Colegio-Ejemplo.TEST/inicio"), (["colegio-ejemplo.test"], None))
         self.assertEqual(exclusions.parse_line("  colegio.test  pidió no ser medido"), (["colegio.test"], None))
-        self.assertEqual(exclusions.parse_line("*.red.edu.ar"), (["red.edu.ar"], None))
+        self.assertEqual(exclusions.parse_line("*.red-escuelas.test"), (["red-escuelas.test"], None))
         self.assertEqual(exclusions.parse_line("# a comment"), ([], None))
         self.assertEqual(exclusions.parse_line(""), ([], None))
         self.assertEqual(exclusions.parse_line("not a domain"), ([], exclusions.PROBLEM_NOT_A_DOMAIN))
         with temp_dir() as out:
-            (out / "exclude.txt").write_text("# opted out\nred.edu.ar\na.otra.edu.ar\n", encoding="utf-8")
+            (out / "exclude.txt").write_text("# opted out\nred-escuelas.test\na.otra-red.test\n", encoding="utf-8")
             lst = exclusions.load([out / "exclude.txt"])
-            self.assertEqual(lst.match("https://www.red.edu.ar/"), "red.edu.ar")
-            self.assertEqual(lst.match("escuela1.red.edu.ar"), "red.edu.ar")
-            self.assertEqual(lst.match("a.otra.edu.ar"), "a.otra.edu.ar")
-            self.assertIsNone(lst.match("b.otra.edu.ar"))
-            self.assertIsNone(lst.match("micolegio.edu.ar"))
+            self.assertEqual(lst.match("https://www.red-escuelas.test/"), "red-escuelas.test")
+            self.assertEqual(lst.match("escuela1.red-escuelas.test"), "red-escuelas.test")
+            self.assertEqual(lst.match("a.otra-red.test"), "a.otra-red.test")
+            self.assertIsNone(lst.match("b.otra-red.test"))
+            self.assertIsNone(lst.match("micolegio.test"))
         with temp_dir() as empty:
             self.assertEqual(exclusions.load([empty / "exclude.txt", None]).entries, [])
 

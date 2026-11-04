@@ -1,0 +1,21 @@
+{
+  "id": "undertow",
+  "name": "Undertow",
+  "set": "core",
+  "faction": "tide",
+  "rarity": "common",
+  "cost": 2,
+  "keywords": [],
+  "text": "Deal 3 damage to a unit.",
+  "body": {
+    "type": "spell",
+    "target": "unit",
+    "effects": [
+      {
+        "kind": "damage",
+        "amount": 3
+      }
+    ]
+  },
+  "handwritten": true
+}

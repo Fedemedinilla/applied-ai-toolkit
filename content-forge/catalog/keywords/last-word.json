@@ -1,0 +1,8 @@
+{
+  "id": "last-word",
+  "name": "Last Word",
+  "timing": "on-death",
+  "takesValue": true,
+  "reminder": "When this unit dies, deal X damage to the enemy player.",
+  "handwritten": true
+}

@@ -1,0 +1,28 @@
+{
+  "id": "drowned-queen",
+  "name": "The Drowned Queen",
+  "set": "driftwood",
+  "faction": "tide",
+  "rarity": "legendary",
+  "cost": 7,
+  "keywords": [
+    {
+      "keyword": "guard",
+      "value": null
+    },
+    {
+      "keyword": "last-word",
+      "value": 2
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 6,
+    "health": 7
+  },
+  "limits": {
+    "maxCopies": 1
+  },
+  "handwritten": true
+}

@@ -1,0 +1,28 @@
+{
+  "id": "ember-starter",
+  "name": "First Spark",
+  "faction": "ember",
+  "cards": [
+    {
+      "card": "cinder-hound",
+      "copies": 3
+    },
+    {
+      "card": "flare",
+      "copies": 3
+    },
+    {
+      "card": "forge-heart",
+      "copies": 2
+    },
+    {
+      "card": "ashen-duelist",
+      "copies": 2
+    },
+    {
+      "card": "wandering-tinker",
+      "copies": 2
+    }
+  ],
+  "handwritten": true
+}

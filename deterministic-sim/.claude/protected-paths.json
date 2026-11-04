@@ -1,0 +1,10 @@
+{
+  "why": "Published rulesets, golden runs and the purity test define what the core is. A change to any of them needs a person's approval; the guard blocks an agent's edit until the session is started with DSIM_ALLOW_PROTECTED=1.",
+  "patterns": [
+    "src/**/rules-v*.ts",
+    "test/golden/**",
+    "test/purity.test.ts",
+    ".claude/**"
+  ],
+  "markerKey": "handwritten"
+}

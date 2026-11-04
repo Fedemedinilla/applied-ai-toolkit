@@ -2,7 +2,8 @@
 
 Precedence when several apply (first wins): USAGE, EXCLUDED (before any
 request), SCOPE_VIOLATION, HOME_UNREACHABLE, TEXT_CONTROL, HACK_GATE, OK.
-UNEXPECTED (1) is any uncaught exception, anywhere. The values never change
+UNEXPECTED (1) is any uncaught exception, anywhere. NOT_COMPARABLE (5) belongs
+to --compare only, which makes no run and resolves no flags. The values never change
 without a note in the README.
 """
 
@@ -18,6 +19,7 @@ class ExitCode(IntEnum):
     USAGE = 2  # invalid arguments or configuration (argparse uses 2 too)
     HOME_UNREACHABLE = 3  # home did not answer or was challenged from the first request
     TEXT_CONTROL = 4  # report text failed the control (forbidden word, dash, placeholder, key, e-mail)
+    NOT_COMPARABLE = 5  # --compare: the two runs differ in tool or conditions; nothing written
     EXCLUDED = 10  # domain on the exclusion list: no request made, no folder created
     HACK_GATE = 30  # signs of compromise: the report leads with them, nothing else is wrong with the run
     SCOPE_VIOLATION = 50  # the scope guard refused a request the tool itself built: a bug, run aborted
@@ -62,6 +64,7 @@ DESCRIPTION: dict[ExitCode, str] = {
     ExitCode.USAGE: "invalid options or configuration",
     ExitCode.HOME_UNREACHABLE: "the home page did not answer or stayed behind an anti-bot check",
     ExitCode.TEXT_CONTROL: "the text control found a problem in the report; see datos.json salida.control_texto",
+    ExitCode.NOT_COMPARABLE: "the two runs were taken with different tools or conditions; nothing was compared",
     ExitCode.EXCLUDED: "the domain is on the exclusion list",
     ExitCode.HACK_GATE: "signs that the site was compromised; the report leads with them",
     ExitCode.SCOPE_VIOLATION: "the scope guard refused a request (a bug); run aborted",

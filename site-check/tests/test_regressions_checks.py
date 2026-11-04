@@ -208,8 +208,8 @@ class KindTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
             parse_args(["https://www.colegio-ejemplo.edu.ar/", "--kind", "ferreteria"])
         self.assertEqual(cm.exception.code, 2)
-        self.assertEqual(parse_args(["https://www.x.com.ar/", "--kind", "Empresa"]).kind, "empresa")
-        self.assertEqual(parse_args(["https://www.x.com.ar/", "--kind", "jardin"]).kind, "jardín")
+        self.assertEqual(parse_args(["https://www.colegio-ejemplo.edu.ar/", "--kind", "Empresa"]).kind, "empresa")
+        self.assertEqual(parse_args(["https://www.colegio-ejemplo.edu.ar/", "--kind", "jardin"]).kind, "jardín")
 
     def test_e2e_company_report_has_no_school_words(self) -> None:
         options = SchoolOptions(name="Ferretería Ejemplo", title="Ferretería Ejemplo | Herramientas y materiales en Buenos Aires")
@@ -322,7 +322,7 @@ class ContentTextsTest(unittest.TestCase):
         self.assertIsNone(g.measured["anio_pie"])
 
     def test_real_phone_is_not_a_demo_phone(self) -> None:
-        f = ev(content.evaluate_vis19, make_obs(html_page(body="<footer><p>Administración: 4555-0123</p></footer>")))
+        f = ev(content.evaluate_vis19, make_obs(html_page(body="<footer><p>Administración: 0555-0123</p></footer>")))
         self.assertNotIn("demo-phone", f.measured["signals"])
         g = ev(content.evaluate_vis19, make_obs(html_page(body="<footer><p>Tel: 555-0123</p></footer>")))
         self.assertIn("demo-phone", g.measured["signals"])

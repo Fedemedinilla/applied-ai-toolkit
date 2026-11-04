@@ -34,8 +34,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "tests"))
 
 import support  # noqa: E402,F401  (path setup and the network guard)
-from fakeapis import FakeApis  # noqa: E402
-from fakesite import FakeSite  # noqa: E402
+from fakeapis import FakeApis, FakeApisConfig  # noqa: E402
+from fakesite import FakeSite, Scenario  # noqa: E402
 from sitefixtures import default_apis, school_scenario  # noqa: E402
 from support import TEST_KEY, patched_env, run_cli, temp_dir  # noqa: E402
 
@@ -57,19 +57,29 @@ def _pinned_ttfb_sample(url: str, resp: collect.Response) -> collect.TtfbSample:
     return dataclasses.replace(sample, ttfb_ms=PINNED_TTFB_MS)
 
 
-def build(dest: Path) -> tuple[int, str, str]:
+def build(
+    dest: Path,
+    *,
+    scenario: Scenario | None = None,
+    apis_config: FakeApisConfig | None = None,
+    now: dt.datetime = FIXED,
+) -> tuple[int, str, str]:
     """Run the CLI against the fake school and copy FILES into ``dest``.
 
+    ``scenario``, ``apis_config`` and ``now`` default to the school as it is in
+    examples/; examples/make_compare_example.py passes the improved school.
     Returns (exit code, stdout, stderr). On a non-zero exit nothing is copied.
     """
-    with temp_dir() as out, FakeSite(school_scenario()) as site, FakeApis(default_apis(now=FIXED)) as apis:
+    scenario = scenario if scenario is not None else school_scenario()
+    apis_config = apis_config if apis_config is not None else default_apis(now=now)
+    with temp_dir() as out, FakeSite(scenario) as site, FakeApis(apis_config) as apis:
         argv = [
             "https://www.colegio.test/", "--name", "Colegio Ejemplo", "--kind", "colegio", "--out", str(out),
             "--test-loopback", site.loopback, "--test-services", apis.base,
         ]
         with (
             patched_env(SITE_CHECK_TEST_API_KEY=TEST_KEY),
-            mock.patch.object(fmt, "now_utc", lambda: FIXED),
+            mock.patch.object(fmt, "now_utc", lambda: now),
             mock.patch.object(collect, "_ttfb_sample", _pinned_ttfb_sample),
             mock.patch.object(pipeline, "_runtime_versions", lambda: dict(PINNED_VERSIONS)),
         ):

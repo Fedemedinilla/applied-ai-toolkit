@@ -1,0 +1,21 @@
+{
+  "id": "reef-sentinel",
+  "name": "Reef Sentinel",
+  "set": "core",
+  "faction": "tide",
+  "rarity": "common",
+  "cost": 2,
+  "keywords": [
+    {
+      "keyword": "guard",
+      "value": null
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 1,
+    "health": 4
+  },
+  "handwritten": true
+}

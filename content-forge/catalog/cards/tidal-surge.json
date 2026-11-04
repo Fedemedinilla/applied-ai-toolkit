@@ -1,0 +1,22 @@
+{
+  "id": "tidal-surge",
+  "name": "Tidal Surge",
+  "set": "driftwood",
+  "faction": "tide",
+  "rarity": "uncommon",
+  "cost": 3,
+  "keywords": [],
+  "text": "Summon two Shell Spawns.",
+  "body": {
+    "type": "spell",
+    "target": "none",
+    "effects": [
+      {
+        "kind": "summon",
+        "card": "shell-spawn",
+        "count": 2
+      }
+    ]
+  },
+  "handwritten": true
+}

@@ -1,0 +1,25 @@
+{
+  "id": "sapling-guard",
+  "name": "Sapling Guard",
+  "set": "core",
+  "faction": "grove",
+  "rarity": "common",
+  "cost": 2,
+  "keywords": [
+    {
+      "keyword": "guard",
+      "value": null
+    },
+    {
+      "keyword": "bloom",
+      "value": 1
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 0,
+    "health": 5
+  },
+  "handwritten": true
+}

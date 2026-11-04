@@ -121,4 +121,22 @@ describe('folder fences', () => {
     expect(() => folderFences({ ...layout, uses: { caja: ['site/src/index.ts'] } })).toThrow(/which is not in a library folder/);
     expect(() => folderFences({ ...layout, uses: { till: ['amount-parser/src/index.ts'] } })).toThrow(/apps\/till, which does not exist/);
   });
+
+  it('lets a library named in LIBRARY_USES use another library through its public entry, and nothing more', () => {
+    const { groups, rules } = folderFences({ ...layout, libraryUses: { 'slop-lint': ['gateway/src/index.ts'] } });
+    const v = check(
+      parseConfig({ groups, rules }),
+      memorySource({
+        ...library,
+        ...allowed,
+        'slop-lint/src/judge.ts': "import { call } from '../../gateway/src/index.ts';",
+        'slop-lint/src/inside.ts': "import { call } from '../../gateway/src/gateway.ts';",
+        'slop-lint/src/amounts.ts': "import { parseAmount } from '../../amount-parser/src/index.ts';",
+      }),
+      'repo.config.ts',
+    ).violations;
+    expect(places(v)).toEqual(['slop-lint/src/amounts.ts:1 forbidden-import', 'slop-lint/src/inside.ts:1 forbidden-import']);
+    expect(() => folderFences({ ...layout, libraryUses: { 'slop-lint': ['gateway/src/gateway.ts'] } })).toThrow(/slop-lint\/ uses gateway\/src\/gateway.ts, which gateway does not publish/);
+    expect(() => folderFences({ ...layout, libraryUses: { site: ['gateway/src/index.ts'] } })).toThrow(/LIBRARY_USES names site\/, which is not a library folder/);
+  });
 });

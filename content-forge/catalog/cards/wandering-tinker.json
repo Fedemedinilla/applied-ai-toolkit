@@ -1,0 +1,16 @@
+{
+  "id": "wandering-tinker",
+  "name": "Wandering Tinker",
+  "set": "core",
+  "faction": null,
+  "rarity": "common",
+  "cost": 2,
+  "keywords": [],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 2,
+    "health": 2
+  },
+  "handwritten": true
+}

@@ -439,20 +439,68 @@ describe('caps: a reached cap does not call the API', () => {
       expect(harness.openReservations).toHaveLength(1);
     });
 
-    it('parallel calls near a cap overrun it by at most one worst case', async () => {
-      // US$8 spent of the US$10 daily cap, each reservation just over US$0.80: called one after
-      // another, three calls start (8, 8.8 and 9.6 are below the cap) and the fourth is refused.
+    it('a burst near a cap that reserves before any call reads again is refused whole', async () => {
+      // US$8 spent of the US$10 daily cap, each reservation just over US$0.80. Without the second
+      // check all six would start. In this store all six reserve before any of them reads again,
+      // so each one sees the other five and all six are refused: near a cap, a burst errs toward
+      // refusing.
       const { gateway, harness, requests } = setup(Array.from({ length: 6 }, () => () => jsonResponse(triageResponse())));
       harness.ledger.push(earlierRow({ costUsd: 8 }));
       const results = await Promise.allSettled(Array.from({ length: 6 }, () => gateway.structured(Triage, REQUEST)));
 
       const passed = results.filter((r) => r.status === 'fulfilled');
       const refused = results.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
-      // Without the second check all six would start. With it, at most the three of the sequential
-      // case can. In this store all six reserve before any of them reads again, so all six are
-      // refused: near a cap, a burst errs toward refusing.
-      expect(passed.length).toBeLessThanOrEqual(3);
-      expect(requests).toHaveLength(passed.length);
+      expect(passed).toHaveLength(0);
+      expect(requests).toHaveLength(0);
+      expect(refused).toHaveLength(6);
+      for (const reason of refused) expect(reason).toMatchObject({ code: 'cap_daily_user' });
+      expect(harness.openReservations).toEqual([]);
+    });
+
+    it('calls that read again before the next one reserves overrun the cap by at most one worst case', async () => {
+      // Same cap and spend. Each call starts only after the one before it finished its second
+      // check or settled, and no answer arrives until all six are past that point, so every
+      // reservation that passed is still open. As in the sequential case, three calls start (8,
+      // 8.8 and 9.6 are below the cap) and the rest are refused.
+      let releaseAnswers = (): void => {};
+      const answersHeld = new Promise<void>((resolve) => {
+        releaseAnswers = resolve;
+      });
+      const api = fakeApi(Array.from({ length: 6 }, () => async () => {
+        await answersHeld;
+        return jsonResponse(triageResponse());
+      }));
+      const { deps, harness } = fakeDeps(api.client);
+      harness.ledger.push(earlierRow({ costUsd: 8 }));
+      let secondCheckDone = (): void => {};
+      const gateway = createGateway({
+        ...deps,
+        usage: {
+          ...deps.usage,
+          totalsForCaps: async (windows, signal) => {
+            const totals = await deps.usage.totalsForCaps(windows, signal);
+            if (windows.excludeId !== undefined) secondCheckDone();
+            return totals;
+          },
+        },
+      });
+
+      const calls: Promise<unknown>[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const pastSecondCheck = new Promise<void>((resolve) => {
+          secondCheckDone = resolve;
+        });
+        const call = gateway.structured(Triage, REQUEST);
+        calls.push(call);
+        await Promise.race([pastSecondCheck, call.then(() => undefined, () => undefined)]);
+      }
+      releaseAnswers();
+      const results = await Promise.allSettled(calls);
+
+      const passed = results.filter((r) => r.status === 'fulfilled');
+      const refused = results.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
+      expect(passed).toHaveLength(3);
+      expect(api.requests).toHaveLength(passed.length);
       for (const reason of refused) expect(reason).toMatchObject({ code: 'cap_daily_user' });
       expect(harness.openReservations).toEqual([]);
     });

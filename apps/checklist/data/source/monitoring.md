@@ -1,0 +1,18 @@
+# Monitoring (OPE)
+
+The weekly, fortnightly and monthly tasks once a site is in shape. Active. Rewritten in English from the audit method's monitoring runbook.
+
+| ID | Title | Question | Where | Pass when | If it fails | Do not touch | Priority | Area | Platforms | Needs | Access |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| OPE-01 | Uptime monitor | Will anyone know if the site goes down? | An uptime monitor | Monitor on; the month's availability recorded | Configure it; when the site went down, write the cause and fix in the report | - | High | security | all | - | authorized |
+| OPE-02 | Update cadence | Are updates applied on time without breaking anything? | The updates screen | Security and minor updates current; major updates tested | Apply them; roll back with the backup if something breaks | Major updates in production | High | security | cms | - | authorized |
+| OPE-03 | Monthly restore test | Does this month's backup restore? | The backup tool and a test subdomain | A successful restore, with its date | Reconfigure the backup | Restoring over production | High | security | cms | - | authorized |
+| OPE-04 | Breach notification readiness | Does everyone know whom to tell about a data leak? | The written agreement with the owner | A written, signed procedure: who tells whom, and by when | Write it | - | Medium | security | all | forms | authorized |
+| OPE-05 | Weekly malware scan | Is the site scanned every week? | A security plugin scan and an external scanner | Clean scan, or findings resolved | Assess; an indicator of compromise opens the incident tab | Deleting a finding without understanding it | High | security | wp | - | authorized |
+| OPE-06 | Monthly users and second factor review | Did anyone join or leave the dashboard this month? | Users and the sign-in log | No unauthorised changes; every administrator has a second factor | Remove or correct; an unknown administrator is an incident | Deleting authors | High | security | wp | - | authorized |
+| OPE-07 | Weekly logs and alerts review | Does anyone read the alerts? | Alert mail; the access log once a month | Alerts read and noted; no unknown sign-ins | Investigate and block addresses; an odd successful access is an incident | - | High | security | all | - | authorized |
+| OPE-08 | Monthly Core Web Vitals | Is the site still fast? | PageSpeed on mobile (EXT-08) and time to first byte (EXT-20) | Values equal to or better than the baseline, or the cause found | Find the cause (a new plugin, new images, a cache turned off) | - | Medium | speed | all | - | authorized |
+| OPE-09 | Domain, certificate and reputation | Is anything about to expire, or is the site flagged? | Registry, TLS, Safe Browsing and a site: search | Nothing expires within 60 days; no warnings | Renew; a warning or spam opens the incident tab | - | High | security | all | - | authorized |
+| OPE-10 | Monthly report | Does the owner see what was done this month? | The monthly report | Sent on the agreed date, with availability, updates, scans, the restore test and speed | Send it | Promising what was not measured | High | security | all | - | authorized |
+| OPE-11 | DMARC reports | Is anyone sending mail in the domain's name? | The DMARC aggregate reports | Reports read; the policy matches what they show | Adjust the records | Moving to reject without a clean month | Medium | security | all | own-mail | authorized |
+| OPE-12 | Monthly forms test | Do the forms still deliver? | Public forms | A marked test send arrives | Fix it (INT-12, INT-36) | Sending real data to a live CRM | High | security | all | forms | authorized |

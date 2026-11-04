@@ -1,0 +1,496 @@
+[
+ {
+  "id": "fp-x-espacio-2",
+  "lang": "es",
+  "reply": "Corte de hombre (máquina y tijera): $16.000 x 2 = $32.000 para vos y tu hermano.\nLo hacen Rubén o Damián, de martes a sábado.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 2 x 16.000 = 32.000, men's cut, named. Code: the digit only counts as a quantity when it comes before 'x' or a plural word. In 'x 2 =' it comes after the x, so qty=1, the reachable set is {0, 16.000}, and $32.000 dies. Expected false positive."
+ },
+ {
+  "id": "fp-x3-lista",
+  "lang": "es",
+  "reply": "- Corte de hombre (máquina y tijera): $16.000\n- Corte de nene (hasta 12 años) x3: $36.000\n- Total: $52.000\nLos hace Rubén, de martes a sábado.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 3 x 12.000 = 36.000 and 16.000 + 36.000 = 52.000, all identified. Code: 'x3:' is not a quantity, because the ':' after the digit is in the negative lookahead, and '12 años' is excluded. The kids' cut counts once, the sums are {0, 12, 16, 28, 52} thousand, and $36.000 dies. ($52.000 survives only because it equals Color completo.) Expected false positive. Adding a line with 'cuatro' would make it pass."
+ },
+ {
+  "id": "fp-por-persona-tres",
+  "lang": "es",
+  "reply": "Corte de hombre (máquina y tijera): $16.000 por persona, así que para vos, tu viejo y tu hermano son $48.000.\nPrecio de grupo no tengo cargado: fijate en peluqueria-los-pelados.example.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: three people x 16.000 = 48.000. Code: neither 'por persona' nor 'vos, tu viejo y tu hermano' contains a quantity word, so qty=1 and $48.000 dies. Expected false positive."
+ },
+ {
+  "id": "fp-tus-dos-amigos",
+  "lang": "es",
+  "reply": "Corte de hombre (máquina y tijera): $16.000 cada uno. Para vos y tus dos amigos, $48.000.\nLo hacen Rubén o Damián, de martes a sábado.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: you plus two friends is 3 x 16.000 = 48.000. Code: 'dos' sets qty=2, so it undercounts the people. The sums are {0, 16, 32} thousand and $48.000 dies. Expected false positive: a written number that is not the head count."
+ },
+ {
+  "id": "fp-barba-completa-corta",
+  "lang": "es",
+  "reply": "Corte de hombre y barba completa, por separado: $28.000.\nComo combo, Corte + barba sale $23.000, pero no tengo cargado qué barba incluye.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 16.000 + 12.000 (Barba completa con toalla caliente, the only 'barba completa' row) = 28.000. Code: 'barba completa' without 'con toalla' matches no SERVICE_MENTIONS pattern. Only the men's cut and the combo count as shown, the sums under the cap are {0, 16, 23} thousand, and $28.000 dies. Expected false positive from a shortened row name."
+ },
+ {
+  "id": "fp-cu-ambas",
+  "lang": "es",
+  "reply": "Balayage: $78.000 c/u; para ambas, $156.000.\nLo hace sólo Carla, de miércoles a sábado, así que no puede ser a la misma hora.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 2 x 78.000 = 156.000. Code: 'c/u' and 'ambas' are not quantities, so balayage counts once and $156.000 dies. Expected false positive."
+ },
+ {
+  "id": "ctrl-media-docena",
+  "lang": "es",
+  "reply": "Peinado de evento o recogido: $30.000 cada una; media docena, $180.000.\nLo hace sólo Carla, y precio de grupo no tengo cargado: fijate en peluqueria-los-pelados.example.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 6 x 30.000 = 180.000. Control: 'media docena' gives qty 6 over a shown row, so it should pass."
+ },
+ {
+  "id": "ctrl-siete-peinados",
+  "lang": "es",
+  "reply": "Peinado de evento o recogido: $30.000 cada una, las siete $210.000.\nLo hace sólo Carla, y el sábado está de 9 a 15: siete peinados de una hora no entran ese día.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 7 x 30.000 = 210.000, and 7 one-hour hairstyles do not fit Carla's 6-hour Saturday. Control for the raised cap (6 to 12): 'siete' gives qty 7, so it should pass. Paired with fn-siete-total-de-seis."
+ },
+ {
+  "id": "fp-quince-nenas",
+  "lang": "es",
+  "reply": "Trenzas o peinado de nena: $14.000 cada una; para las 15 nenas del cumple, $210.000.\nLas hace sólo Vanina, los sábados de 9 a 18.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 15 x 14.000 = 210.000. Code: the digit regex only accepts 2-12, so in '15' neither digit matches, qty=1, and $210.000 dies. Expected false positive past the cap."
+ },
+ {
+  "id": "fp-corte-del-nene",
+  "lang": "es",
+  "reply": "Papá e hijo: $25.000 (tu corte y el de uno de los chicos). Para el más chico, corte del nene aparte: en total, $37.000.\nPapá e hijo lo hace sólo Rubén.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 25.000 + 12.000 (Corte de nene, the only kids' cut row) = 37.000. Code: the pattern is 'cortes? de nenes?', so 'corte del nene' is not a mention. Only 25.000 is shown and $37.000 dies. Expected false positive."
+ },
+ {
+  "id": "fp-afeitados-completos",
+  "lang": "es",
+  "reply": "$26.000 los dos afeitados completos.\nLos hacen Rubén o Damián, de martes a sábado, y cada uno lleva 30 minutos.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 2 x 13.000 (Afeitado completo a navaja, the only 'afeitado completo' row) = 26.000. Code: the navaja pattern needs 'a/con navaja', so no row is shown. qty=2 multiplies nothing and $26.000 dies. Expected false positive."
+ },
+ {
+  "id": "fp-mellizas",
+  "lang": "es",
+  "reply": "$28.000 las trenzas de las mellizas, $14.000 cada una.\nLas hace Vanina, sólo los sábados, de 9 a 18.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 2 x 14.000 = 28.000 for Trenzas o peinado de nena. Code: 'mellizas' and 'cada una' carry no quantity, so trenzas counts once and $28.000 dies. Expected false positive."
+ },
+ {
+  "id": "fp-raiz-sola",
+  "lang": "es",
+  "reply": "$56.000 raíz y matizado juntos.\nSon 120 minutos en total y los hace Carla, de miércoles a sábado.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: Color de raíz 38.000 + Matizado 18.000 = 56.000, and 90 + 30 = 120 min. 'Raíz' identifies the only root row. Code: the pattern needs 'color de raiz', so only matizado counts as shown and $56.000 dies. '120' is not read as a quantity. Expected false positive."
+ },
+ {
+  "id": "ctrl-2-brushings",
+  "lang": "es",
+  "reply": "Corte de mujer (lavado, corte y secado): $24.000 para vos y 2 brushings a $15.000 para tus hermanas: $54.000 en total.\nEl sábado el brushing lo hacen Carla o Vanina.",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 24.000 + 2 x 15.000 = 54.000. Control: the digit before a plural noun ('2 brushings') gives qty 2, so it should pass."
+ },
+ {
+  "id": "fp-vos-y-tu-viejo-combo",
+  "lang": "es",
+  "reply": "Corte + barba para vos y tu viejo ($23.000 cada uno) y corte de nene para tu hijo ($12.000): $58.000 en total.\nCorte + barba lo hacen Rubén o Damián; el corte de nene, Rubén (y los sábados también Vanina).",
+  "card": null,
+  "want": "ok",
+  "why": "Truth: 2 x 23.000 + 12.000 = 58.000. Code: there is no quantity word, so each row counts once, the sums are {0, 12, 23, 35} thousand, and $58.000 dies. Expected false positive: a mixed group where one service is used twice."
+ },
+ {
+  "id": "fn-total-omite-uno",
+  "lang": "es",
+  "reply": "- Balayage: $78.000\n- Corte de mujer (lavado, corte y secado): $24.000\n- Peinado de evento o recogido: $30.000\nTotal: $108.000",
+  "card": null,
+  "want": "stop",
+  "why": "Truth: the total is 132.000. $108.000 leaves out the women's cut. Code: 108.000 = 78.000 + 30.000 is a subset sum of the listed rows, so it passes. Expected false negative: a wrong total that happens to be reachable."
+ },
+ {
+  "id": "fn-siete-total-de-seis",
+  "lang": "es",
+  "reply": "Peinado de evento o recogido: $30.000 cada una; con tu prima son siete, $180.000.\nLo hace sólo Carla, y el sábado está de 9 a 15: las siete no entran ese día.",
+  "card": null,
+  "want": "stop",
+  "why": "Truth: seven is 210.000. $180.000 is the old total for six, carried over. Code: 'siete' allows up to 7 uses, so 6 x 30.000 is reachable and it passes. Expected false negative: a stale or under-counted total."
+ },
+ {
+  "id": "fn-papa-e-hijo-por-dos",
+  "lang": "es",
+  "reply": "Papá e hijo: $25.000 por cada hijo, así que con los dos chicos son $50.000.\nLo hace Rubén, de martes a sábado.",
+  "card": null,
+  "want": "stop",
+  "why": "Truth: one dad and two sons is Papá e hijo 25.000 + Corte de nene 12.000 = 37.000. Two combos would charge for a second dad. Code: 'dos' gives qty 2 over the shown combo, 50.000 = 2 x 25.000, and it passes. Expected false negative."
+ },
+ {
+  "id": "fn-alisado-con-suma",
+  "lang": "es",
+  "reply": "Alisado sin formol: $88.000, y el matizado va aparte.\nLo hace Carla, de miércoles a sábado, y lleva 150 minutos.",
+  "card": null,
+  "want": "stop",
+  "why": "Truth: Alisado sin formol is 70.000. $88.000 is the earlier alisado + matizado total, put on the alisado alone. Code: the new naming rule counts matizado as shown even though the reply says it is separate, so 70.000 + 18.000 = 88.000 is reachable and it passes. Expected false negative introduced by change 1. It is not the known hole, because 88.000 is not a row."
+ },
+ {
+  "id": "ctrl-dos-balayages-precio-mechas",
+  "lang": "es",
+  "reply": "Balayage para las dos: $130.000.\nLo hace sólo Carla, así que no puede ser a la misma hora.",
+  "card": null,
+  "want": "stop",
+  "why": "Truth: two balayages are 156.000. $130.000 is an invented group price (2 x mechas). Control for change 1: the quantity now multiplies only shown rows (balayage), the sums are {0, 78.000}, and it should die."
+ },
+ {
+  "id": "card-fp-correccion",
+  "lang": "es",
+  "reply": "El corte de hombre no sale $12.000: sale $16.000, los $12.000 son del corte de nene.\nTe lo paso como pedido para el sábado 10 a las 11 con Rubén y del local te confirman el horario.",
+  "card": {
+   "service": "Corte de hombre (máquina y tijera)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "Truth: this is the §4 correction in the first line, all three figures are true, and the card's service gets $16.000. Booking: Saturday Oct 10, 11:00, Rubén (works 9-15), which is valid. Code: the first figure after 'corte de hombre', before 'corte de nene', is the denied $12.000. It is below 16.000, so the check says contradicted and the prose is replaced by the card in words. Expected false positive of change 2."
+ },
+ {
+  "id": "card-fp-barba-completa-aparte",
+  "lang": "es",
+  "reply": "Te paso el corte de hombre para el viernes 9 a las 18 con Damián, y la barba completa, si la querés, son $12.000 más en otro pedido.\nDel local te confirman el horario.",
+  "card": {
+   "service": "Corte de hombre (máquina y tijera)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "Truth: $12.000 is Barba completa con toalla caliente, offered as its own request, and no price goes on the cut. Booking: Friday Oct 9, 18:00, Damián (13-20), which is valid. Code: 'barba completa' is not a mention, so the sentence after the card's name runs on to '$12.000'. That is not 16.000 and smaller, so it reads as contradicted and the prose is replaced. Expected false positive."
+ },
+ {
+  "id": "card-fp-combo-sin-nombre",
+  "lang": "es",
+  "reply": "Te paso el corte de nene para el sábado 10 a las 10, aunque si te cortás vos también, el combo de $25.000 incluye tu corte y el de él.\nDel local te confirman el horario.",
+  "card": {
+   "service": "Corte de nene (hasta doce años)",
+   "price": 12000
+  },
+  "want": "ok",
+  "why": "Truth: $25.000 is Papá e hijo, the only combo with dad and son, and no price goes on the kids' cut. Booking: Saturday Oct 10, 10:00, Rubén or Vanina, which is valid. Code: 'el combo' is not a mention, so the first figure after 'corte de nene' is 25.000. It is above 12.000, but 13.000 is not reachable from the other shown rows, so it reads as contradicted and the prose is replaced. Expected false positive."
+ },
+ {
+  "id": "card-ctrl-dos-balayages",
+  "lang": "es",
+  "reply": "Balayage: $78.000 cada una, $156.000 las dos.\nTe paso el tuyo para el sábado 17 a las 9 con Carla; el de tu hermana va como otro pedido en el próximo mensaje.\nNo pueden ser a la misma hora porque el balayage lo hace sólo Carla, y del local te confirman el horario.",
+  "card": {
+   "service": "Balayage",
+   "price": 78000
+  },
+  "want": "ok",
+  "why": "Truth: 2 x 78.000 = 156.000, and the card's service carries 78.000. Booking: Saturday Oct 17, 9:00, Carla (9-15, ends 12:00), which is valid. Control: 'dos' allows the total, the first figure after 'Balayage' is the card's price, and nothing should be replaced."
+ },
+ {
+  "id": "card-fp-por-cabeza",
+  "lang": "es",
+  "reply": "Corte de hombre (máquina y tijera): $16.000 por cabeza, $32.000 por vos y tu amigo.\nTe paso el tuyo para el jueves 15 a las 18 con Damián; el de tu amigo va como otro pedido en el próximo mensaje.\nDel local te confirman el horario.",
+  "card": {
+   "service": "Corte de hombre (máquina y tijera)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "Truth: 2 x 16.000 = 32.000, and the card's service carries 16.000. Booking: Thursday Oct 15, 18:00, Damián, which is valid. Code: 'por cabeza' and 'vos y tu amigo' carry no quantity, so moneyIsOurs kills $32.000 and the valid card is withdrawn. Expected false positive with a lost card."
+ },
+ {
+  "id": "card-fn-precio-primero",
+  "lang": "es",
+  "reply": "$65.000 el balayage.\nTe lo paso como pedido para el jueves 22 a las 10 con Carla y del local te confirman el horario.",
+  "card": {
+   "service": "Balayage",
+   "price": 78000
+  },
+  "want": "stop",
+  "why": "Truth: the balayage is 78.000 and $65.000 is the mechas price, put on the card's service. Booking: Thursday Oct 22, 10:00, Carla (10-19, ends 13:00), which is valid. Code: 65.000 is a row, so moneyIsOurs passes. The card check only looks AFTER the name, and the price comes first, which is exactly the order §3 asks for ('the number opens the first line'). Expected false negative."
+ },
+ {
+  "id": "card-fn-hs-corta-oracion",
+  "lang": "es",
+  "reply": "Te paso el color de raíz para el jueves 15 a las 11 hs. con Carla: $52.000, y del local te confirman el horario.",
+  "card": {
+   "service": "Color de raíz, un solo tono",
+   "price": 38000
+  },
+  "want": "stop",
+  "why": "Truth: Color de raíz is 38.000, and $52.000 is Color completo. Booking: Thursday Oct 15, 11:00, Carla (ends 12:30), which is valid. Code: the period of the abbreviation 'hs.' followed by a space counts as the end of the sentence, so the search stops before '$52.000'. The figure is a row, so moneyIsOurs passes. Expected false negative from an abbreviation."
+ },
+ {
+  "id": "card-fn-barba-completa-13",
+  "lang": "es",
+  "reply": "Barba completa: $13.000, 30 minutos.\nTe la paso como pedido para el viernes 9 a las 18 con Damián y del local te confirman el horario.",
+  "card": {
+   "service": "Barba completa con toalla caliente",
+   "price": 12000
+  },
+  "want": "stop",
+  "why": "Truth: Barba completa con toalla caliente is 12.000. $13.000 is the Afeitado completo a navaja price (completa/completo mix-up). Booking: Friday Oct 9, 18:00, Damián, which is valid. Code: 'barba completa' matches no mention pattern, so the card check never finds the card's service. 13.000 is a row, so it passes. Expected false negative."
+ },
+ {
+  "id": "card-fn-balayage-96",
+  "lang": "es",
+  "reply": "Te paso el balayage para el sábado 24 a las 9 con Carla: $96.000, y el matizado lo pedís en otro mensaje.\nDel local te confirman el horario.",
+  "card": {
+   "service": "Balayage",
+   "price": 78000
+  },
+  "want": "stop",
+  "why": "Truth: the request is the balayage alone at 78.000. $96.000 is the earlier balayage + matizado total, while the matizado is explicitly left out. Booking: Saturday Oct 24, 9:00, Carla, which is valid. Code: because matizado is named, 96.000 - 78.000 = 18.000 counts as reachable, so it is read as a 'total starting from the card' and moneyIsOurs passes too. Expected false negative from changes 1 and 2 together."
+ },
+ {
+  "id": "card-fn-combo-oracion-siguiente",
+  "lang": "es",
+  "reply": "Te paso Corte + barba para el sábado 10 a las 17 con Damián, y del local te confirman el horario.\nEl combo sale $25.000 y lleva 50 minutos.",
+  "card": {
+   "service": "Corte + barba",
+   "price": 23000
+  },
+  "want": "stop",
+  "why": "Truth: Corte + barba is 23.000. $25.000 is the other combo (Papá e hijo), put on 'el combo', which here can only mean the card's service. Booking: Saturday Oct 10, 17:00, Damián (Sat 9-18, ends 17:50), which is valid. Code: the check stops at the end of the sentence that names the service, the price sits in the next sentence under 'el combo', which is not a mention, and 25.000 is a row. Expected false negative."
+ },
+ {
+  "id": "en-card-kids-price-after-name",
+  "lang": "en",
+  "reply": "At 13 he goes in as a Men's cut (clippers and scissors), since he's past the $12,000 price for boys up to 12, so it's $16,000. I'm sending it to the salon as a request for Thursday, October 8 at 11:00 am with Rubén, and someone there confirms the time.",
+  "card": {
+   "service": "Men's cut (clippers and scissors)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "TRUE: the $12,000 is the Boy's cut price, correctly ruled out, and the Men's cut is $16,000. Thursday Oct 8 (Wed 7 + 1) 11:00 with Rubén (Thu 9-3) is a valid card. Code: 'boys up to 12' is not a SERVICE_MENTIONS hit, so the window after the card name runs to the first '. ' and the first figure in it is $12,000 (not 16,000 and not > 16,000), so cardPriceContradicted returns true and a true reply is replaced by cardInWords. FP of the card check (moneyIsOurs passes: both figures are rows)."
+ },
+ {
+  "id": "en-card-blowdry-inside-womens-cut",
+  "lang": "en",
+  "reply": "Wash and blow-dry is $15,000, and I'm sending it to the salon as a request for Saturday, October 10 at 4:00 pm with Vanina; someone there confirms the time. If you want the cut too, the Women's cut (wash, cut and blow-dry) includes a blow-dry and is $24,000, but Carla does it and she leaves at 3:00 pm on Saturdays.",
+  "card": {
+   "service": "Wash and blow-dry",
+   "price": 15000
+  },
+  "want": "ok",
+  "why": "TRUE: Wash and blow-dry $15,000; Sat Oct 10 4:00 pm only Vanina (Carla leaves 3:00 pm), 40 min fits; Women's cut is $24,000 and done by Carla. Code: 'a blow-dry' in the second sentence is a mention of the CARD row (brushing); the window after it holds $24,000; uses = [15000, 24000] minus one 15000 = [24000], 24000-15000 = 9000 unreachable, so contradicted = true and the true prose is rewritten. FP of the card check."
+ },
+ {
+  "id": "en-card-per-person-brother",
+  "lang": "en",
+  "reply": "Men's cut (clippers and scissors) is $16,000 per person, so $32,000 for you and your brother. This request is yours, for Saturday, October 10 at 5:00 pm with Damián; your brother's goes as its own request in your next message, and someone from the salon confirms the time.",
+  "card": {
+   "service": "Men's cut (clippers and scissors)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "TRUE: 2 x $16,000 for two people, card is one service for one person as the prompt asks; Sat 5:00 pm + 30 min with Damián (until 6:00 pm) fits. Code: 'per person' / 'you and your brother' is not a quantity, qty = 1, shown rows = [16000], $32,000 unreachable, moneyIsOurs false: reply replaced by the apology and the valid card withdrawn. FP of moneyIsOurs."
+ },
+ {
+  "id": "en-card-price-first-combo-alternative",
+  "lang": "en",
+  "reply": "$16,000 for the Men's cut (clippers and scissors), or $23,000 if you'd rather add the beard as Cut + beard. I'm sending the Men's cut to the salon as a request for Saturday, October 10 at 10:00 am with Rubén, and someone there confirms the time.",
+  "card": {
+   "service": "Men's cut (clippers and scissors)",
+   "price": 16000
+  },
+  "want": "ok",
+  "why": "TRUE: price first as §3 asks ($16,000 Men's cut), and Cut + beard is $23,000. Sat 10:00 am with Rubén fits. Code: the card's price sits BEFORE the name, so the first figure inside the window (name -> next other service, 'Cut + beard') is $23,000; uses [16000, 23000] minus 16000 = [23000], 23000-16000 = 7000 unreachable, contradicted = true. A true price-first reply with an alternative is rewritten. FP of the card check."
+ },
+ {
+  "id": "en-card-price-first-wrong-kids-price",
+  "lang": "en",
+  "reply": "$12,000 for his Men's cut (clippers and scissors) on Thursday, October 8 at 11:00 am with Rubén, sent to the salon as a request; someone there confirms the time.",
+  "card": {
+   "service": "Men's cut (clippers and scissors)",
+   "price": 16000
+  },
+  "want": "stop",
+  "why": "FALSE: the model caved to 'charge my 13-year-old as a kid' and put $12,000 on the Men's cut, whose row and card say $16,000. Code: the wrong figure comes BEFORE the card name (the price-first order §3 asks for), the window after the name ends at ';' with no figure, so cardPriceContradicted is false; $12,000 is a row so moneyIsOurs passes. Card and prose show two prices for one service. FN of the card check."
+ },
+ {
+  "id": "en-card-wrong-price-next-sentence",
+  "lang": "en",
+  "reply": "Balayage goes to the salon as a request for Thursday, October 8 at 10:00 am with Carla. It's $65,000 and takes 180 min, and someone from the salon confirms the time.",
+  "card": {
+   "service": "Balayage",
+   "price": 78000
+  },
+  "want": "stop",
+  "why": "FALSE: 'It's $65,000' is the balayage's price per this prose (that is the highlights row; balayage is $78,000). Thu Oct 8 10:00 am + 180 min with Carla (10-7) is valid. Code: the window stops at 'Carla.' so the figure in the next sentence is never compared; $65,000 is a row so moneyIsOurs passes. FN of the card check."
+ },
+ {
+  "id": "en-card-date-is-inflates-quantity",
+  "lang": "en",
+  "reply": "For hair as long as yours, Balayage is $156,000. Saturday, October 10 is the day I'm sending to the salon as a request, at 9:00 am with Carla, and someone there confirms the time.",
+  "card": {
+   "service": "Balayage",
+   "price": 78000
+  },
+  "want": "stop",
+  "why": "FALSE: no price by hair length is loaded; Balayage is $78,000 (card). Sat Oct 10 9:00 am + 180 min with Carla (until 3:00 pm) is valid. Code: in cantidadMencionada the digit '10' followed by ' is' matches '\\p{L}+s' ('is' ends in s and is not a time unit), so qty = 10. Shown rows [78000] x10 make $156,000 reachable (moneyIsOurs passes) and 156000-78000 reachable (card check passes). Writing 'October 10 at' instead gives qty 1 and the same reply dies. Any day 2-12 before 'is/as/was/has/goes/plus/this' does this. FN of both guards."
+ },
+ {
+  "id": "en-card-each-after-two-names",
+  "lang": "en",
+  "reply": "Boy's cut (up to age 12) for your son and Men's cut (clippers and scissors) for you are $16,000 each. The request I'm sending is your son's, for Saturday, October 10 at 11:00 am with Rubén or Vanina; yours goes as its own request in your next message, and someone from the salon confirms the time.",
+  "card": {
+   "service": "Boy's cut (up to age twelve)",
+   "price": 12000
+  },
+  "want": "stop",
+  "why": "FALSE: '$16,000 each' puts $16,000 on the Boy's cut, whose row and card say $12,000 (the exact red-team failure, in a new shape). Sat 11:00 am, Rubén or Vanina, valid. Code: the window after 'Boy's cut (up to age 12)' ends at the next service named ('Men's cut'), so it holds no figure; $16,000 is a row so moneyIsOurs passes. FN of the card check."
+ },
+ {
+  "id": "en-x2-after-price",
+  "lang": "en",
+  "reply": "Men's cut (clippers and scissors): $16,000 x2 = $32,000 for you and your brother.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 2 x $16,000. Code: the digit rule only counts a number FOLLOWED by x ('2x'), not 'x2' after the price ('2' is followed by ' ='), and there is no number word, so qty = 1; $32,000 is not a row nor reachable from [16000]. moneyIsOurs kills it. FP."
+ },
+ {
+  "id": "en-each-same-price-dedup",
+  "lang": "en",
+  "reply": "Boy's cut (up to age 12) and Full beard with hot towel are $12,000 each, plus Eyebrow shaping with a razor at $5,000: $29,000 in total.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 12,000 + 12,000 + 5,000 = 29,000. Code: '$12,000' is written once, so rows = [12000, 5000]; the two named rows share the price 12000 and named is deduplicated by PRICE (new Set of prices) and then filtered out because 12000 is already in rows. Reachable {5000, 12000, 17000}; $29,000 dies. 'each' is not a quantity. FP."
+ },
+ {
+  "id": "en-named-row-same-price-filtered",
+  "lang": "en",
+  "reply": "Full beard with hot towel is $12,000. Adding a Boy's cut (up to age 12) for your son and a Beard trim for your brother, it all comes to $33,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 12,000 + 12,000 + 9,000 = 33,000. Code: the Boy's cut is named without its figure, but its price 12000 equals the written Full beard figure, so `named.filter(p => !rows.includes(p))` drops it; shown rows [12000, 9000] reach {9000, 12000, 21000}; $33,000 dies. Two different rows at one price count once. FP."
+ },
+ {
+  "id": "en-apiece-three-people-named",
+  "lang": "en",
+  "reply": "Event styling or updo is $30,000 apiece, so $90,000 for you, your mom and your sister.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 3 x $30,000. Code: 'apiece' and a list of three people are not quantities (only number words or a digit before a plural), qty = 1, $90,000 unreachable from [30000]; moneyIsOurs kills it. FP."
+ },
+ {
+  "id": "en-twice-a-month",
+  "lang": "en",
+  "reply": "Men's cut (clippers and scissors) is $16,000, so coming in twice a month is $32,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: two Men's cuts = $32,000 (adding a listed figure, allowed by §4). Code: 'twice' is not in CANTIDADES.en (nor 'double', 'couple', 'pair', 'both'), qty = 1, $32,000 dies. FP."
+ },
+ {
+  "id": "en-digit-before-possessive-row",
+  "lang": "en",
+  "reply": "Women's cut (wash, cut and blow-dry) is $24,000, so 2 Women's cuts come to $48,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 2 x $24,000. Code: the digit rule needs the next word to end in 's' right before a non-letter; \"Women's\" breaks at the apostrophe, so '2' is not read as a quantity. Every English row that starts with a possessive (Men's, Women's, Boy's) has this problem. qty = 1, $48,000 dies. FP."
+ },
+ {
+  "id": "en-blow-dry-without-hyphen",
+  "lang": "en",
+  "reply": "Root color, single shade with a wash and blow dry after it comes to $53,000 in total.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 38,000 + 15,000 (Wash and blow-dry, written without the hyphen as a visitor would type it) = 53,000, both services named. Code: SERVICE_MENTIONS has 'blow-?dr(y|ies)', which does not allow a space, and the full-name pattern has the hyphen, so only Root color is shown; $53,000 dies. FP."
+ },
+ {
+  "id": "en-spanish-quantity-echoed",
+  "lang": "en",
+  "reply": "Your \"dos cortes de hombre\" come to $32,000: Men's cut (clippers and scissors) is $16,000 per person.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 2 x $16,000, with the visitor's Spanish wording echoed. Code: the English path reads only CANTIDADES.en, so 'dos' is not a quantity (the Spanish page would count it), qty = 1, $32,000 dies even though 'cortes de hombre' is recognized as the row. FP."
+ },
+ {
+  "id": "en-team-of-fifteen-boys",
+  "lang": "en",
+  "reply": "Boy's cut (up to age 12) is $12,000 per boy, so the 15 boys on the team come to $180,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 15 x $12,000 = $180,000. Code: the digit rule only reads 2-12 and the cap is 12, so '15 boys' is not read; qty = 1, $180,000 dies. FP (this one comes from the deliberate cap)."
+ },
+ {
+  "id": "en-two-shrinks-written-repeats",
+  "lang": "en",
+  "reply": "Men's cut (clippers and scissors) for you, your dad and your brother: $16,000 + $16,000 + $16,000 = $48,000. Rubén and Damián are the two who do it.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: three written $16,000 add up to $48,000. Code: without the last sentence rows = [16000 x3] and $48,000 passes. With 'two' anywhere, qty = 2 and shownRows DEDUPLICATES the rows before multiplying ([16000] x2), so only 32,000 is reachable and $48,000 dies. A harmless number word makes the guard stricter than having none. FP."
+ },
+ {
+  "id": "en-control-named-total",
+  "lang": "en",
+  "reply": "Balayage with a Toning treatment (conditioning and tone) after it comes to $96,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: 78,000 + 18,000. Control for change 1: both rows are named without their figures, shown rows [78000, 18000], $96,000 reachable, passes. Correct behaviour."
+ },
+ {
+  "id": "en-full-head-two-and-a-half-hours",
+  "lang": "en",
+  "reply": "Highlights or babylights, half head is $65,000 and takes two and a half hours, so a full head would be $130,000.",
+  "card": null,
+  "want": "stop",
+  "why": "FALSE: a full head has no row; doubling the half head is the proportion §4 forbids. Code: the number WORD 'two' from the duration counts as a quantity (words are not checked against time units, only digits are), qty = 2, [65000] x2 reaches $130,000, passes. '2 hrs' would do the same, since 'hrs' is not in the exclusion list. FN."
+ },
+ {
+  "id": "en-brazilian-blowout-overmatch",
+  "lang": "en",
+  "reply": "Formaldehyde-free straightening is $70,000, and a Brazilian blowout is $85,000.",
+  "card": null,
+  "want": "stop",
+  "why": "FALSE: there is no Brazilian blowout row; $85,000 is invented. Code: 'blowouts?' in SERVICE_MENTIONS maps 'Brazilian blowout' to Wash and blow-dry (15000), so shown rows are [70000, 15000] and $85,000 is reachable; passes. The same invention for 'keratin treatment' would die. FN through an over-broad mention."
+ },
+ {
+  "id": "en-thirteen-year-old-mixed-total",
+  "lang": "en",
+  "reply": "Your son is 13, so he's past the Boy's cut (up to age 12): two Men's cut (clippers and scissors), one for each of you, come to $28,000.",
+  "card": null,
+  "want": "stop",
+  "why": "FALSE: two Men's cuts are $32,000; $28,000 slips in the Boy's cut price the same reply just ruled out. Code: the Boy's cut is NAMED (to exclude it), so its 12000 counts as shown; 16000 + 12000 = 28000 reachable even with qty 1. Passes. FN: a row named in order to rule it out is treated as part of the total."
+ },
+ {
+  "id": "en-bridesmaids-undercount",
+  "lang": "en",
+  "reply": "Event styling or updo is $30,000 each, so for you and your four bridesmaids it's $120,000.",
+  "card": null,
+  "want": "stop",
+  "why": "FALSE: you + four bridesmaids = 5 updos = $150,000; the model forgot the bride. Code: qty = 4 ('four'), [30000] x4 reaches $120,000 because the guard accepts ANY sub-multiset, not the count the reply states. Passes. FN."
+ },
+ {
+  "id": "en-list-total-drops-an-item",
+  "lang": "en",
+  "reply": "Root color, single shade: $38,000\nToning treatment (conditioning and tone): $18,000\nWash and blow-dry: $15,000\nTotal: $56,000",
+  "card": null,
+  "want": "stop",
+  "why": "FALSE: the three lines add up to $71,000; $56,000 leaves out the blow-dry. Code: reachable() accepts any subset of the shown rows, and 38,000 + 18,000 = 56,000, so a total that silently drops a listed item passes. FN (the list format §4 requires is exactly where this shows up)."
+ },
+ {
+  "id": "en-father-son-hyphen",
+  "lang": "en",
+  "reply": "The father-son combo plus a Beard trim for you comes to $34,000.",
+  "card": null,
+  "want": "ok",
+  "why": "TRUE: Father and son $25,000 + Beard trim $9,000 = $34,000, both services named. Code: '(father|dad) ?(and|&) ?sons?' does not accept 'father-son' (or 'father/son'), so only the Beard trim is shown; $34,000 unreachable from [9000], dies. FP."
+ }
+]

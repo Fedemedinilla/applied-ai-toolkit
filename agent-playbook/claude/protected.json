@@ -1,0 +1,12 @@
+{
+  "paths": [
+    "test/golden/**",
+    ".github/workflows/**",
+    ".claude/protected.json",
+    ".claude/settings*.json",
+    ".claude/hooks/**",
+    ".claude/agents/**",
+    "scripts/session-start.sh"
+  ],
+  "jsonFlag": "handwritten"
+}

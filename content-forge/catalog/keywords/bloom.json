@@ -1,0 +1,8 @@
+{
+  "id": "bloom",
+  "name": "Bloom",
+  "timing": "start-of-turn",
+  "takesValue": true,
+  "reminder": "At the start of your turn, heal X damage from this unit.",
+  "handwritten": true
+}

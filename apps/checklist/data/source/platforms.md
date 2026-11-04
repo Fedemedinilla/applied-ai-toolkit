@@ -1,0 +1,13 @@
+# Platform checks (PLA)
+
+What changes when the site is not a CMS on its own hosting. On a hosted builder or store there are no files or database to inspect; the work is mostly the external list plus the account settings. Rewritten in English from the audit method's platform list.
+
+| ID | Title | Question | Where | Pass when | If it fails | Do not touch | Priority | Area | Platforms | Needs | Access |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| PLA-01 | Account second factor and collaborators | Who can sign in to the platform account? | Account, collaborators or members settings | Second factor on for the owner and every collaborator; only current people; the owner is the client | Turn it on; remove old access; transfer ownership to the client | Removing the only owner before transferring | High | security | hosted-any | - | authorized |
+| PLA-02 | External basics on a hosted platform | Are the external basics right? | The external list | Same as EXT-01, EXT-04, EXT-05, EXT-06 and EXT-07 | Adjust what the platform allows (headers rarely) | - | Medium | security | hosted-any | - | passive |
+| PLA-03 | Installed apps and injected scripts | Which apps and scripts load on the site? | The apps panel and the head of the HTML | Only apps in use, each with an owner; no unknown injected code | Uninstall with the owner; remove unknown code after saving its text | Removing a pixel or chat the owner uses to sell | Medium | security | hosted-any | - | authorized |
+| PLA-04 | Platform-managed domain and TLS | Is the domain connected the way the platform documents? | The domains panel | Domain connected as documented; TLS on; one version of the URL | Reconnect following the platform's guide | Changing DNS without the guide | High | security | hosted-any | - | authorized |
+| PLA-05 | Platform export | What happens if the platform closes the account? | Export tools | An export made, with its date | Schedule a quarterly export to storage the owner controls | - | Medium | security | hosted-any | - | authorized |
+| PLA-06 | Static site deploy surface | Where is the risk on a static site? | The repository, the deploy provider and its environment variables | Current collaborators; second factor on Git and the provider; headers configured; secrets in variables marked sensitive | Rotate tokens; configure headers | Production secrets in the repository | Medium | security | static | - | authorized |
+| PLA-07 | Self-hosted CMS other than WordPress | Does Joomla or Drupal follow the same model? | The CMS admin and the server | Supported version, current extensions, tested backup | Update with a backup | Skipping major versions without the migration guide | High | security | joomla-drupal | - | authorized |

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Asistente de la peluquería</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Peluquería Los Pelados</h1>
+      <p class="hint">Asistente de turnos de una peluquería inventada. Los precios, horarios y turnos los revisa el código, no el modelo.</p>
+    </header>
+    <p id="unavailable" class="notice" hidden>El asistente no está disponible en este servidor: falta la clave de la API.</p>
+    <section aria-label="Conversación">
+      <ol id="log" class="log"></ol>
+    </section>
+    <p id="announce" class="visually-hidden" aria-live="polite"></p>
+    <form id="form" class="composer">
+      <label for="text">Tu mensaje</label>
+      <div class="row">
+        <textarea id="text" name="text" rows="2" maxlength="600" required placeholder="¿Cuánto sale corte y barba?"></textarea>
+        <button type="submit">Enviar</button>
+      </div>
+      <p id="status" class="status" role="status"></p>
+      <button type="button" id="reset" class="link">Empezar de nuevo</button>
+    </form>
+  </main>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

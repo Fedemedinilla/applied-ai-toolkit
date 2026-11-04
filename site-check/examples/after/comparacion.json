@@ -1,0 +1,487 @@
+{
+  "antes": {
+    "condiciones": "celular, tres corridas con el valor del medio, y computadora, una corrida; tiempo del servidor medido tres veces, con un sitio de control en el mismo momento",
+    "corridas_psi": {
+      "computadora_valida": true,
+      "estado": "ok",
+      "pedidas": 3,
+      "validas": 3
+    },
+    "dominio": "colegio.test",
+    "herramientas": [
+      "la herramienta de velocidad de Google (PageSpeed)",
+      "la lectura de las respuestas del servidor",
+      "la consulta del DNS del dominio",
+      "la consulta pública del registro del dominio",
+      "la lista de bloqueo de Spamhaus",
+      "la lista pública de versiones de WordPress"
+    ],
+    "inicio_utc": "2026-10-14T13:00:00+00:00",
+    "por_modulo": {
+      "EXT": {
+        "aplicables": 16,
+        "aprobados": 7,
+        "con_observacion": 1,
+        "sin_verificar": 2
+      },
+      "TOTAL": {
+        "aplicables": 36,
+        "aprobados": 19,
+        "con_observacion": 3,
+        "sin_verificar": 4
+      },
+      "VIS": {
+        "aplicables": 20,
+        "aprobados": 12,
+        "con_observacion": 2,
+        "sin_verificar": 2
+      }
+    },
+    "url_canonica": "https://www.colegio.test/",
+    "version_lighthouse": "13.5.0",
+    "version_script": "1.0.0"
+  },
+  "despues": {
+    "condiciones": "celular, tres corridas con el valor del medio, y computadora, una corrida; tiempo del servidor medido tres veces, con un sitio de control en el mismo momento",
+    "corridas_psi": {
+      "computadora_valida": true,
+      "estado": "ok",
+      "pedidas": 3,
+      "validas": 3
+    },
+    "dominio": "colegio.test",
+    "herramientas": [
+      "la herramienta de velocidad de Google (PageSpeed)",
+      "la lectura de las respuestas del servidor",
+      "la consulta del DNS del dominio",
+      "la consulta pública del registro del dominio",
+      "la lista de bloqueo de Spamhaus"
+    ],
+    "inicio_utc": "2026-11-18T13:00:00+00:00",
+    "por_modulo": {
+      "EXT": {
+        "aplicables": 16,
+        "aprobados": 12,
+        "con_observacion": 2,
+        "sin_verificar": 2
+      },
+      "TOTAL": {
+        "aplicables": 36,
+        "aprobados": 25,
+        "con_observacion": 5,
+        "sin_verificar": 4
+      },
+      "VIS": {
+        "aplicables": 20,
+        "aprobados": 13,
+        "con_observacion": 3,
+        "sin_verificar": 2
+      }
+    },
+    "url_canonica": "https://www.colegio.test/",
+    "version_lighthouse": "13.5.0",
+    "version_script": "1.0.0"
+  },
+  "dias_entre_mediciones": 35,
+  "filas": [
+    {
+      "antes": {
+        "texto": "4,8 segundos",
+        "traza": "checks[EXT-08].measured.lcp_ms",
+        "valor": 4830
+      },
+      "cambio": "2,5 segundos menos",
+      "clave": "campo_lcp",
+      "comparada": true,
+      "despues": {
+        "texto": "2,3 segundos",
+        "traza": "checks[EXT-08].measured.lcp_ms",
+        "valor": 2300
+      },
+      "grupo": "campo",
+      "motivo": null,
+      "que": "Cuánto tarda en aparecer lo principal de la página",
+      "significa": "Google considera bien hasta 2,5 segundos"
+    },
+    {
+      "antes": {
+        "texto": "0,18 segundos",
+        "traza": "checks[EXT-08].measured.inp_ms",
+        "valor": 180
+      },
+      "cambio": "0,03 segundos menos",
+      "clave": "campo_inp",
+      "comparada": true,
+      "despues": {
+        "texto": "0,15 segundos",
+        "traza": "checks[EXT-08].measured.inp_ms",
+        "valor": 150
+      },
+      "grupo": "campo",
+      "motivo": null,
+      "que": "Cuánto tarda en responder cuando se toca algo",
+      "significa": "Bien hasta 0,2 segundos"
+    },
+    {
+      "antes": {
+        "texto": "0,05",
+        "traza": "checks[EXT-08].measured.cls",
+        "valor": 0.05
+      },
+      "cambio": "0,02 menos",
+      "clave": "campo_cls",
+      "comparada": true,
+      "despues": {
+        "texto": "0,03",
+        "traza": "checks[EXT-08].measured.cls",
+        "valor": 0.03
+      },
+      "grupo": "campo",
+      "motivo": null,
+      "que": "Cuánto se mueve la página mientras carga",
+      "significa": "Bien hasta 0,1"
+    },
+    {
+      "antes": {
+        "texto": "▲ 45 (Bajo)",
+        "traza": "encabezado.celular.performance.puntaje",
+        "valor": 45
+      },
+      "cambio": "41 puntos más",
+      "clave": "lab_puntaje_celular",
+      "comparada": true,
+      "despues": {
+        "texto": "■ 86 (A mejorar)",
+        "traza": "encabezado.celular.performance.puntaje",
+        "valor": 86
+      },
+      "grupo": "laboratorio",
+      "motivo": null,
+      "que": "Puntaje de rendimiento en celular (corrida del medio de tres)",
+      "significa": "De 0 a 100; Google considera bien desde 90"
+    },
+    {
+      "antes": {
+        "texto": "4,8 segundos",
+        "traza": "checks[EXT-08].measured.lab_lcp_ms_median",
+        "valor": 4830
+      },
+      "cambio": "2,6 segundos menos",
+      "clave": "lab_lcp_celular",
+      "comparada": true,
+      "despues": {
+        "texto": "2,2 segundos",
+        "traza": "checks[EXT-08].measured.lab_lcp_ms_median",
+        "valor": 2210
+      },
+      "grupo": "laboratorio",
+      "motivo": null,
+      "que": "Cuánto tarda en aparecer lo principal, en celular (valor del medio de tres)",
+      "significa": "Google considera bien hasta 2,5 segundos"
+    },
+    {
+      "antes": {
+        "texto": "■ 78 (A mejorar)",
+        "traza": "encabezado.computadora.performance.puntaje",
+        "valor": 78
+      },
+      "cambio": "18 puntos más",
+      "clave": "lab_puntaje_computadora",
+      "comparada": true,
+      "despues": {
+        "texto": "● 96 (Bien)",
+        "traza": "encabezado.computadora.performance.puntaje",
+        "valor": 96
+      },
+      "grupo": "laboratorio",
+      "motivo": null,
+      "que": "Puntaje de rendimiento en computadora (una corrida)",
+      "significa": "De 0 a 100; Google considera bien desde 90"
+    },
+    {
+      "antes": {
+        "texto": "2,9 MB",
+        "traza": "checks[EXT-21].measured.total_bytes",
+        "valor": 3000000
+      },
+      "cambio": "1,7 MB menos",
+      "clave": "peso_total",
+      "comparada": true,
+      "despues": {
+        "texto": "1,2 MB",
+        "traza": "checks[EXT-21].measured.total_bytes",
+        "valor": 1250000
+      },
+      "grupo": "laboratorio",
+      "motivo": null,
+      "que": "Cuánto pesa la página principal",
+      "significa": "Google aconseja no pasar de 1,6 MB"
+    },
+    {
+      "antes": {
+        "texto": "0,3 MB",
+        "traza": "checks[EXT-21].measured.third_party_bytes",
+        "valor": 300000
+      },
+      "cambio": "sin cambio",
+      "clave": "peso_terceros",
+      "comparada": true,
+      "despues": {
+        "texto": "0,3 MB",
+        "traza": "checks[EXT-21].measured.third_party_bytes",
+        "valor": 300000
+      },
+      "grupo": "laboratorio",
+      "motivo": null,
+      "que": "Cuánto de ese peso llega de servicios externos",
+      "significa": "Lo que cargan videos, mapas, chats y estadísticas de otras empresas"
+    },
+    {
+      "antes": {
+        "texto": "menos de una décima de segundo",
+        "traza": "checks[EXT-20].measured.ttfb_ms_median",
+        "valor": 1
+      },
+      "cambio": "sin cambio",
+      "clave": "ttfb",
+      "comparada": true,
+      "despues": {
+        "texto": "menos de una décima de segundo",
+        "traza": "checks[EXT-20].measured.ttfb_ms_median",
+        "valor": 1
+      },
+      "grupo": "servidor",
+      "motivo": null,
+      "que": "Cuánto tarda el servidor en empezar a responder (valor del medio de tres)",
+      "significa": "Bien hasta 0,8 segundos"
+    },
+    {
+      "antes": {
+        "texto": "menos de una décima de segundo",
+        "traza": "checks[EXT-20].measured.control_ms_median",
+        "valor": 1
+      },
+      "cambio": "sin cambio",
+      "clave": "ttfb_control",
+      "comparada": true,
+      "despues": {
+        "texto": "menos de una décima de segundo",
+        "traza": "checks[EXT-20].measured.control_ms_median",
+        "valor": 1
+      },
+      "grupo": "servidor",
+      "motivo": null,
+      "que": "Sitio de control medido en el mismo momento (valor del medio de tres)",
+      "significa": "Si cambia mucho, cambió la conexión y no el sitio"
+    },
+    {
+      "antes": {
+        "texto": "2 de 6",
+        "traza": "checks[EXT-01].measured.n_protections",
+        "valor": 2
+      },
+      "cambio": "4 más",
+      "clave": "protecciones",
+      "comparada": true,
+      "despues": {
+        "texto": "6 de 6",
+        "traza": "checks[EXT-01].measured.n_protections",
+        "valor": 6
+      },
+      "grupo": "seguridad",
+      "motivo": null,
+      "que": "Protecciones que el servidor le pide al navegador",
+      "significa": "Seis protecciones que ofrecen los navegadores"
+    },
+    {
+      "antes": {
+        "texto": "configurada",
+        "traza": "tablas.correo.filas[0].valor",
+        "valor": "configurada"
+      },
+      "cambio": "sin cambio",
+      "clave": "correo_0",
+      "comparada": true,
+      "despues": {
+        "texto": "configurada",
+        "traza": "tablas.correo.filas[0].valor",
+        "valor": "configurada"
+      },
+      "grupo": "correo",
+      "motivo": null,
+      "que": "Quién puede enviar en nombre del dominio",
+      "significa": ""
+    },
+    {
+      "antes": {
+        "texto": "no se pudo confirmar desde afuera",
+        "traza": "tablas.correo.filas[1].valor",
+        "valor": "no se pudo confirmar desde afuera"
+      },
+      "cambio": "sin cambio",
+      "clave": "correo_1",
+      "comparada": true,
+      "despues": {
+        "texto": "no se pudo confirmar desde afuera",
+        "traza": "tablas.correo.filas[1].valor",
+        "valor": "no se pudo confirmar desde afuera"
+      },
+      "grupo": "correo",
+      "motivo": null,
+      "que": "Firma de los mensajes",
+      "significa": ""
+    },
+    {
+      "antes": {
+        "texto": "falta",
+        "traza": "tablas.correo.filas[2].valor",
+        "valor": "falta"
+      },
+      "cambio": "se agregó",
+      "clave": "correo_2",
+      "comparada": true,
+      "despues": {
+        "texto": "configurada: los manda a spam",
+        "traza": "tablas.correo.filas[2].valor",
+        "valor": "configurada: los manda a spam"
+      },
+      "grupo": "correo",
+      "motivo": null,
+      "que": "Qué hacer con los mensajes falsos",
+      "significa": ""
+    }
+  ],
+  "quedan": [
+    {
+      "color": "amarillo",
+      "id": "EXT-05",
+      "nombre": "¿Pueden mandar mails falsos con el nombre del dominio?",
+      "que_se_encontro": "El correo del dominio tiene la lista de quién puede enviar y la regla para los mails falsos; la firma de los mensajes no se pudo confirmar desde afuera"
+    },
+    {
+      "color": "azul",
+      "id": "VIS-04",
+      "nombre": "¿El título y la descripción dicen qué es el sitio?",
+      "que_se_encontro": "El título tiene 48 caracteres y la descripción 153; lo recomendado es 50 a 60 y 120 a 160"
+    },
+    {
+      "color": "azul",
+      "id": "VIS-07",
+      "nombre": "¿El sitio le da a Google sus datos de contacto y ubicación en el formato que Google lee?",
+      "que_se_encontro": "Los datos del colegio están escritos una sola vez en el formato que lee Google; falta comprobar que Google los acepte"
+    },
+    {
+      "color": "azul",
+      "id": "VIS-09",
+      "nombre": "¿Hay links rotos o que dan vueltas antes de llegar?",
+      "que_se_encontro": "Uno de los 8 enlaces revisados de la página principal da más de una vuelta antes de llegar"
+    },
+    {
+      "color": "azul",
+      "id": "VIS-10",
+      "nombre": "¿Se lee bien y se ve dónde está el foco al navegar con teclado?",
+      "que_se_encontro": "2 textos de la página principal tienen poco contraste con su fondo"
+    },
+    {
+      "color": "azul",
+      "id": "VIS-11",
+      "nombre": "¿Las imágenes tienen descripción para quien no las ve?",
+      "que_se_encontro": "1 de las 3 imágenes de la página principal no tiene descripción"
+    },
+    {
+      "color": "azul",
+      "id": "EXT-09",
+      "nombre": "¿El servidor cuenta qué software y versión corre?",
+      "que_se_encontro": "El servidor muestra un número de versión en su identificación (FakeSite/1.0)"
+    },
+    {
+      "color": "gris",
+      "id": "VIS-12",
+      "nombre": "¿Se puede usar en un celular angosto y con zoom al 200 %?",
+      "que_se_encontro": "el ajuste a 320 píxeles y el zoom al 200 % requieren una prueba en navegador"
+    },
+    {
+      "color": "gris",
+      "id": "VIS-13",
+      "nombre": "¿Los formularios se entienden y los botones se pueden tocar?",
+      "que_se_encontro": "la página principal no tiene formularios para revisar; los de otras páginas se revisan en navegador"
+    },
+    {
+      "color": "gris",
+      "id": "EXT-23",
+      "nombre": "¿Google o las listas de correo marcan al sitio como peligroso?",
+      "que_se_encontro": "la consulta de Google se revisa a mano; la lista de Spamhaus no marca el dominio"
+    },
+    {
+      "color": "gris",
+      "id": "EXT-24",
+      "nombre": "¿Google muestra páginas ajenas dentro del sitio?",
+      "que_se_encontro": "la búsqueda en Google se corre a mano: site:colegio.test viagra OR casino OR replica"
+    }
+  ],
+  "salida": {
+    "codigo": 0,
+    "control_texto": [],
+    "nombre": "OK"
+  },
+  "schema_version": 1,
+  "transiciones": [
+    {
+      "antes": "rojo",
+      "despues": "amarillo",
+      "id": "EXT-05",
+      "nombre": "¿Pueden mandar mails falsos con el nombre del dominio?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "verde",
+      "id": "EXT-08",
+      "nombre": "¿Qué tan rápido lo ven los usuarios reales en el celular?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "verde",
+      "id": "EXT-21",
+      "nombre": "¿Cuánto pesa la página y cuánto es de terceros?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "verde",
+      "id": "EXT-19",
+      "nombre": "¿Hay una capa de caché o CDN funcionando?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "verde",
+      "id": "EXT-01",
+      "nombre": "¿El sitio le dice al navegador cómo protegerse?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "verde",
+      "id": "EXT-02",
+      "nombre": "¿Se ve qué versión de WordPress usa?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "amarillo",
+      "despues": "azul",
+      "id": "EXT-09",
+      "nombre": "¿El servidor cuenta qué software y versión corre?",
+      "tipo": "mejoro"
+    },
+    {
+      "antes": "azul",
+      "despues": "verde",
+      "id": "VIS-16",
+      "nombre": "Señales de desactualización",
+      "tipo": "mejoro"
+    }
+  ],
+  "version_script": "1.0.0"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "swift",
+  "name": "Swift",
+  "timing": "static",
+  "takesValue": false,
+  "reminder": "This unit can attack on the turn it enters play.",
+  "handwritten": true
+}

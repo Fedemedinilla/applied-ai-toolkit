@@ -1,0 +1,54 @@
+{
+  "candidates": [
+    {
+      "id": "deep-current",
+      "name": "Deep Current",
+      "faction": "tide",
+      "cards": [
+        {
+          "card": "reef-sentinel",
+          "copies": 3
+        },
+        {
+          "card": "undertow",
+          "copies": 3
+        },
+        {
+          "card": "tidecaller",
+          "copies": 3
+        },
+        {
+          "card": "tidal-surge",
+          "copies": 3
+        }
+      ]
+    },
+    {
+      "id": "royal-flood",
+      "name": "Royal Flood",
+      "faction": "tide",
+      "cards": [
+        {
+          "card": "shell-spawn",
+          "copies": 3
+        },
+        {
+          "card": "drowned-queen",
+          "copies": 2
+        },
+        {
+          "card": "cinder-hound",
+          "copies": 3
+        },
+        {
+          "card": "reef-sentinel",
+          "copies": 3
+        },
+        {
+          "card": "undertow",
+          "copies": 1
+        }
+      ]
+    }
+  ]
+}

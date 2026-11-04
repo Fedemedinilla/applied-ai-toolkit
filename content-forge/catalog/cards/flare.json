@@ -1,0 +1,21 @@
+{
+  "id": "flare",
+  "name": "Flare",
+  "set": "core",
+  "faction": "ember",
+  "rarity": "common",
+  "cost": 1,
+  "keywords": [],
+  "text": "Deal 2 damage to anything.",
+  "body": {
+    "type": "spell",
+    "target": "any",
+    "effects": [
+      {
+        "kind": "damage",
+        "amount": 2
+      }
+    ]
+  },
+  "handwritten": true
+}

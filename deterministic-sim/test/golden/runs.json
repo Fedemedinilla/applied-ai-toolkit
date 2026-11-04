@@ -1,0 +1,355 @@
+{
+  "why": "Sealed runs under ruleset dice-1. If a change makes one of these fail, the change altered what an existing saved run replays to. Rules changes go into a new ruleset version instead; these files change only with a stated reason.",
+  "runs": [
+    {
+      "name": "empty run: only the start",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "golden-empty",
+      "inputs": [],
+      "inputsHash": "a70a085e76db58c4489e24e6de5286415cde395b270791732162b95b2aada5d1",
+      "finalStateHash": "2cdeda841e6cc8f96a376837f145682ed9c0717b837eaf030d57e9e332c0a612"
+    },
+    {
+      "name": "all rests",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "golden-rest",
+      "inputs": [
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        }
+      ],
+      "inputsHash": "26bc8202c3d414fa33c4c71885ee37a686db5d95c1d88387ad72dd9877e5c0cc",
+      "finalStateHash": "d111404e231ad1baec2ce2c3798590b31acffa5fd373acfea99b45744c693b80"
+    },
+    {
+      "name": "full run, policy roll-1",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "golden-roll-1",
+      "inputs": [
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        },
+        {
+          "kind": "roll",
+          "dice": 1
+        }
+      ],
+      "inputsHash": "2670eb4b088159197c389304f9b9feb1f707f9a4ab69af030aa9c877ffdfcd35",
+      "finalStateHash": "30b6b4d340e2cff3864caf796bbd08ea654c349869961f4af2e9db38cfe169db"
+    },
+    {
+      "name": "full run, policy roll-3",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "golden-roll-3",
+      "inputs": [
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 3
+        },
+        {
+          "kind": "rest"
+        }
+      ],
+      "inputsHash": "e2c7427968cd54afe67d6266c9ea170dd3f71bf7bc57bed7e0496a562841d2cf",
+      "finalStateHash": "54860a36c454766c07cc1883dad094475550f0df68411ac421b012891fd1b7b4"
+    },
+    {
+      "name": "full run, policy roll-5",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "golden-roll-5",
+      "inputs": [
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        },
+        {
+          "kind": "rest"
+        },
+        {
+          "kind": "roll",
+          "dice": 5
+        }
+      ],
+      "inputsHash": "7b24289fa318601f14bc43ac3f88ba4b98a83351c0b291b117e6d5c77d0d8c9b",
+      "finalStateHash": "fd060d6430187df0e706bf2ae252214631122dab4843a9cc0e701244b1d2baa0"
+    },
+    {
+      "name": "unicode seed, partial run",
+      "format": "dsim-run/1",
+      "rulesetVersion": "dice-1",
+      "seed": "sémilla 🎲 7",
+      "inputs": [
+        {
+          "kind": "roll",
+          "dice": 2
+        },
+        {
+          "kind": "roll",
+          "dice": 4
+        },
+        {
+          "kind": "rest"
+        }
+      ],
+      "inputsHash": "fc860ebda87f78c17f354262de1494fb197b09735f37bd4f76ce4ca8ec1da124",
+      "finalStateHash": "debfc49973aecd360afbc462ec54b2148915a928668deb6132708c421f51206b"
+    }
+  ]
+}

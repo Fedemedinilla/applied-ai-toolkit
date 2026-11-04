@@ -1,0 +1,8 @@
+{
+  "id": "guard",
+  "name": "Guard",
+  "timing": "static",
+  "takesValue": false,
+  "reminder": "Enemy units must attack this unit before any other target.",
+  "handwritten": true
+}

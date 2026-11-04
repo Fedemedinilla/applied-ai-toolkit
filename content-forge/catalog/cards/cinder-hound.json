@@ -1,0 +1,21 @@
+{
+  "id": "cinder-hound",
+  "name": "Cinder Hound",
+  "set": "core",
+  "faction": "ember",
+  "rarity": "common",
+  "cost": 1,
+  "keywords": [
+    {
+      "keyword": "swift",
+      "value": null
+    }
+  ],
+  "text": "",
+  "body": {
+    "type": "unit",
+    "power": 2,
+    "health": 1
+  },
+  "handwritten": true
+}

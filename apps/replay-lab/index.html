@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Replay Lab</title>
+    <meta name="description" content="A deterministic dice tournament. Play a seed, export the run, replay it and compare hashes, or run a batch of 1,000 in a worker.">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1513" media="(prefers-color-scheme: dark)">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <a class="skip" href="#seed">Skip to the seed</a>
+    <header class="top">
+      <svg class="mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+        <rect width="512" height="512" rx="96" fill="currentColor"/>
+        <rect x="112" y="112" width="288" height="288" rx="56" fill="var(--paper)"/>
+        <circle cx="190" cy="190" r="30" fill="currentColor"/>
+        <circle cx="322" cy="190" r="30" fill="currentColor"/>
+        <circle cx="256" cy="256" r="30" fill="var(--accent)"/>
+        <circle cx="190" cy="322" r="30" fill="currentColor"/>
+        <circle cx="322" cy="322" r="30" fill="currentColor"/>
+      </svg>
+      <div>
+        <h1>Replay Lab</h1>
+        <p class="sub">A twenty-round dice tournament where the same seed and inputs always give the same game.</p>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" id="tab-play" aria-controls="panel-play" aria-selected="true">Play</button>
+      <button type="button" role="tab" id="tab-batch" aria-controls="panel-batch" aria-selected="false" tabindex="-1">Batch</button>
+      <button type="button" role="tab" id="tab-about" aria-controls="panel-about" aria-selected="false" tabindex="-1">How it works</button>
+    </nav>
+
+    <main>
+      <section id="panel-play" role="tabpanel" aria-labelledby="tab-play" class="panel">
+        <form id="seed-form" class="seed-form" autocomplete="off">
+          <label for="seed">Seed</label>
+          <div class="row">
+            <input id="seed" name="seed" type="text" value="lab-1" spellcheck="false" aria-describedby="seed-hint">
+            <button type="submit" class="primary">Start</button>
+            <button type="button" id="random-seed" class="secondary">Random seed</button>
+          </div>
+          <p class="hint" id="seed-hint">Any text up to 128 characters. Starting again with the same seed gives the same first house mood and the same dice for the same choices.</p>
+        </form>
+
+        <p id="status" class="status" role="status"></p>
+
+        <div id="play" hidden>
+          <section class="card" aria-labelledby="state-title">
+            <h2 id="state-title">State</h2>
+            <dl class="state">
+              <div><dt>Round</dt><dd id="st-round"></dd></div>
+              <div><dt>Chips</dt><dd id="st-chips"></dd></div>
+              <div><dt>Score</dt><dd id="st-score"></dd></div>
+              <div><dt>Streak</dt><dd id="st-streak"></dd></div>
+              <div><dt>Next house</dt><dd id="st-house"></dd></div>
+              <div><dt>Busts</dt><dd id="st-busts"></dd></div>
+            </dl>
+            <p class="hint">Seed <span id="st-seed" class="mono"></span></p>
+          </section>
+
+          <section class="card" aria-labelledby="actions-title">
+            <h2 id="actions-title">Your move</h2>
+            <div id="actions" class="actions" role="group" aria-labelledby="actions-title" aria-describedby="actions-hint">
+              <button type="button" data-dice="1" class="primary">Roll 1</button>
+              <button type="button" data-dice="2" class="primary">Roll 2</button>
+              <button type="button" data-dice="3" class="primary">Roll 3</button>
+              <button type="button" data-dice="4" class="primary">Roll 4</button>
+              <button type="button" data-dice="5" class="primary">Roll 5</button>
+              <button type="button" id="rest" class="secondary">Rest</button>
+              <button type="button" id="undo" class="secondary">Undo</button>
+            </div>
+            <p class="hint" id="actions-hint">Each die costs one chip. Resting wins four chips back and resets the streak. Two or more ones in a roll of two or more dice is a bust. Keys: 1 to 5 roll, R rests, U undoes.</p>
+            <div id="last-roll" class="last-roll"></div>
+          </section>
+
+          <section class="card" aria-labelledby="file-title">
+            <h2 id="file-title">Run file</h2>
+            <dl class="hashes">
+              <div><dt>Inputs hash</dt><dd><code id="hash-inputs"></code></dd></div>
+              <div><dt>State hash</dt><dd><code id="hash-state"></code></dd></div>
+            </dl>
+            <div class="row">
+              <button type="button" id="export" class="secondary">Export run</button>
+              <a id="download" class="download" hidden>Download</a>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="log-title">
+            <h2 id="log-title">Log</h2>
+            <ol id="log" class="log" reversed></ol>
+          </section>
+        </div>
+
+        <section class="card import" aria-labelledby="import-title">
+          <h2 id="import-title">Replay a run file</h2>
+          <label for="import-file">Choose a run file exported from this app</label>
+          <input id="import-file" type="file" accept="application/json,.json">
+          <div id="import-result" class="import-result" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <section id="panel-batch" role="tabpanel" aria-labelledby="tab-batch" class="panel" hidden>
+        <h2>Batch</h2>
+        <p class="lead">Plays many runs with one fixed policy, in a Web Worker, and shows how the final scores spread. The policy rolls the chosen number of dice whenever the chips allow and rests otherwise.</p>
+        <form id="batch-form" class="batch-form" autocomplete="off" novalidate>
+          <div class="field">
+            <label for="runs">Runs</label>
+            <input id="runs" type="number" inputmode="numeric" min="1" step="1" value="1000">
+          </div>
+          <div class="field">
+            <label for="dice">Dice per roll</label>
+            <select id="dice">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3 (reference)</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="prefix">Seed prefix</label>
+            <input id="prefix" type="text" value="batch" spellcheck="false" aria-describedby="prefix-hint">
+          </div>
+          <p class="hint" id="prefix-hint">Run i uses the seed prefix-i, so the same form always plays the same runs.</p>
+          <div class="row">
+            <button type="submit" id="run-batch" class="primary">Run batch</button>
+            <button type="button" id="cancel-batch" class="secondary" hidden>Cancel</button>
+          </div>
+        </form>
+        <progress id="batch-progress" max="1000" value="0" hidden aria-label="Batch progress"></progress>
+        <p id="batch-status" class="status" role="status"></p>
+        <div id="batch-result" class="batch-result"></div>
+      </section>
+
+      <section id="panel-about" role="tabpanel" aria-labelledby="tab-about" class="panel prose" hidden>
+        <h2>How it works</h2>
+        <p>Every rule lives in a small TypeScript core with no dependencies. The core takes a state and one input and returns the next state. The randomness for that step is derived from the seed and the step number, so the state holds no random generator, and replaying the same seed and inputs rebuilds the same state, byte for byte.</p>
+        <p>The dice and the house mood draw from separate streams. Rolling five dice instead of one does not change the next house mood. Points are an integer formula with one rounding at the end: the sum of the dice, times the combination, times the streak, times the house.</p>
+        <p>Export run saves the seed, the ruleset version and the inputs, with two SHA-256 hashes: one of the record and one of the final state. Replaying a file recomputes both. If someone edits an input, the inputs hash no longer matches; if the rules changed since the file was saved, the state hash no longer matches.</p>
+        <p>The batch tab plays up to 10,000 runs in a Web Worker and reports integer statistics. The same form gives the same report hash on any machine.</p>
+        <p>Everything runs in this tab, offline once the page has loaded. The code is at <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/apps/replay-lab">github.com/Fedemedinilla/applied-ai-toolkit</a>, next to the <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/deterministic-sim">core library</a>.</p>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

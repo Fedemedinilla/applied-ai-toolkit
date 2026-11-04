@@ -4,6 +4,7 @@
  */
 import { readdirSync } from 'node:fs';
 import { defineConfig, NODE_BUILTINS, type FencesConfigInput } from './src/config.ts';
+import { DEFAULT_IGNORE } from './src/files.ts';
 
 const ROOT = new URL('..', import.meta.url);
 const TESTS = ['**/test/**', '**/tests/**', '**/*.test.ts', '**/fixtures/**'];
@@ -14,7 +15,9 @@ const SELF = 'import-fences/repo.config.ts';
  * Folder fences. The repository has two kinds of folder:
  *
  * - Library folders (every top-level folder except apps/) are self-contained: none imports
- *   another folder's files, so each one can be copied out of the repository alone.
+ *   another folder's files, so each one can be copied out of the repository alone. The one
+ *   exception is a library built on another library's public entry, listed in LIBRARY_USES and
+ *   checked against PUBLIC_SURFACE the same way as an app.
  * - Apps (apps/<name>/) are built on libraries, as a reader of the repository would build on them.
  *   An app may reach a library only through what the library publishes: its public entry and its
  *   published data, listed in PUBLIC_SURFACE, and only the entries named for it in APP_USES. A
@@ -31,10 +34,15 @@ type Rules = FencesConfigInput['rules'];
 /** What each library publishes to apps. A library that is not here publishes nothing. */
 export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'amount-parser': ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json'],
+  'deterministic-sim': ['deterministic-sim/src/index.ts'],
   evals: ['evals/src/index.ts'],
   gateway: ['gateway/src/index.ts'],
+  'grounded-assistant': ['grounded-assistant/src/index.ts'],
   'idempotent-orders': ['idempotent-orders/src/index.ts'],
   'pdf-receipt': ['pdf-receipt/src/index.ts'],
+  'safe-markdown': ['safe-markdown/src/index.ts'],
+  // The example run that the report and the checklist app agree on; read by the checklist's tests.
+  'site-check': ['site-check/examples/datos.json'],
 };
 
 /**
@@ -46,8 +54,20 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
 export const APP_USES: Readonly<Record<string, readonly string[]>> = {
   caja: ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json', 'gateway/src/index.ts'],
   'chat-widget': ['gateway/src/index.ts'],
+  checklist: ['site-check/examples/datos.json'],
   receipt: ['pdf-receipt/src/index.ts'],
+  'replay-lab': ['deterministic-sim/src/index.ts'],
+  'salon-assistant': ['gateway/src/index.ts', 'grounded-assistant/src/index.ts', 'safe-markdown/src/index.ts'],
   writer: ['evals/src/index.ts', 'gateway/src/index.ts'],
+};
+
+/**
+ * The few libraries built on another library, with the published entries each one uses. The same
+ * rules as APP_USES apply: only entries from PUBLIC_SURFACE, and an unused entry is stale-allow.
+ * Such a library is copied out together with the library it names.
+ */
+export const LIBRARY_USES: Readonly<Record<string, readonly string[]>> = {
+  'content-forge': ['gateway/src/index.ts'],
 };
 
 export interface Layout {
@@ -55,6 +75,7 @@ export interface Layout {
   readonly apps: readonly string[];
   readonly surface: Readonly<Record<string, readonly string[]>>;
   readonly uses: Readonly<Record<string, readonly string[]>>;
+  readonly libraryUses?: Readonly<Record<string, readonly string[]>>;
 }
 
 const SELF_CONTAINED = 'each library folder is self-contained and can be copied out of the repository alone';
@@ -62,19 +83,27 @@ const THROUGH_THE_ENTRY =
   "an app uses a library only through its public entry and published data; another folder's internals and test/ are not an interface";
 
 /** One group and one forbidden-import rule per library folder and per app. */
-export function folderFences({ libraries, apps, surface, uses }: Layout): { groups: Groups; rules: Rules } {
-  for (const [app, used] of Object.entries(uses)) {
-    if (!apps.includes(app)) throw new Error(`APP_USES names apps/${app}, which does not exist`);
+export function folderFences({ libraries, apps, surface, uses, libraryUses = {} }: Layout): { groups: Groups; rules: Rules } {
+  const checkUses = (user: string, used: readonly string[], own?: string) => {
     for (const entry of used) {
       const library = entry.split('/')[0] ?? '';
-      if (!libraries.includes(library)) throw new Error(`apps/${app} uses ${entry}, which is not in a library folder`);
+      if (!libraries.includes(library)) throw new Error(`${user} uses ${entry}, which is not in a library folder`);
+      if (library === own) throw new Error(`${user} uses ${entry}, which is its own file`);
       if (!(surface[library] ?? []).includes(entry)) {
         const published = surface[library] ?? [];
         throw new Error(
-          `apps/${app} uses ${entry}, which ${library} does not publish in PUBLIC_SURFACE${published.length ? ` (it publishes ${published.join(', ')})` : ' (it publishes nothing)'}`,
+          `${user} uses ${entry}, which ${library} does not publish in PUBLIC_SURFACE${published.length ? ` (it publishes ${published.join(', ')})` : ' (it publishes nothing)'}`,
         );
       }
     }
+  };
+  for (const [app, used] of Object.entries(uses)) {
+    if (!apps.includes(app)) throw new Error(`APP_USES names apps/${app}, which does not exist`);
+    checkUses(`apps/${app}`, used);
+  }
+  for (const [library, used] of Object.entries(libraryUses)) {
+    if (!libraries.includes(library)) throw new Error(`LIBRARY_USES names ${library}/, which is not a library folder`);
+    checkUses(`${library}/`, used, library);
   }
   const everyLibrary = libraries.map((f) => `${f}/**`);
   const groups: Groups = {
@@ -90,6 +119,7 @@ export function folderFences({ libraries, apps, surface, uses }: Layout): { grou
       rule: 'forbidden-import',
       group: `folder:${library}`,
       paths: [...everyLibrary.filter((p) => p !== `${library}/**`), 'apps/**'],
+      except: [...(libraryUses[library] ?? [])],
       transitive: false,
       why: SELF_CONTAINED,
     });
@@ -120,16 +150,26 @@ const fences = folderFences({
   apps: subfolders(new URL('apps/', ROOT)),
   surface: PUBLIC_SURFACE,
   uses: APP_USES,
+  libraryUses: LIBRARY_USES,
 });
 
 export default defineConfig({
   root: '..',
+  // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },
-    // amount-parser, idempotent-orders and pdf-receipt document that a browser app can import their src/.
+    // These libraries document that a browser app can import their src/; deterministic-sim also runs in a Web Worker.
     browser: {
-      include: ['amount-parser/src/**', 'idempotent-orders/src/**', 'pdf-receipt/src/**', 'apps/*/src/**'],
+      include: [
+        'amount-parser/src/**',
+        'deterministic-sim/src/**',
+        'idempotent-orders/src/**',
+        'pdf-receipt/src/**',
+        'safe-markdown/src/**',
+        'apps/*/src/**',
+      ],
       exclude: TESTS,
     },
     ...fences.groups,
@@ -154,11 +194,13 @@ export default defineConfig({
       allow: [
         'gateway/examples/live-call.ts',
         'evals/scripts/cli.ts',
+        'content-forge/cli.ts',
         'apps/caja/server/env.ts',
         'apps/chat-widget/server/env.ts',
+        'apps/salon-assistant/server/env.ts',
         'apps/writer/server/env.ts',
       ],
-      why: 'the key is read by the opt-in live scripts and by one env module per app server, and passed in explicitly; library code never reads it',
+      why: 'the key is read by the opt-in live scripts and CLIs and by one env module per app server, and passed in explicitly; library code never reads it',
     },
     {
       rule: 'single-string',

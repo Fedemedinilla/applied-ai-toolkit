@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Contacto · Example Studio</title>
+  <style>
+    :root { --bg: #fff; --fg: #161616; --muted: #4a4a4a; --line: #8a8a8a; --focus: #0b57d0; --err: #a50e0e; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #121212; --fg: #f2f2f2; --muted: #c4c4c4; --line: #777; --focus: #8ab4f8; --err: #f28b82; }
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--fg); font: 17px/1.5 system-ui, sans-serif; margin: 0; padding: 32px 16px; }
+    main { max-width: 34rem; margin: 0 auto; }
+    label { display: block; font-weight: 600; margin: 16px 0 4px; }
+    input, textarea { width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+    textarea { min-height: 9rem; }
+    button { margin-top: 20px; font: inherit; padding: 10px 20px; border-radius: 6px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); cursor: pointer; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .hint { color: var(--muted); font-size: 15px; margin: 0; }
+    /* The trap: off screen for people and screen readers, still in the form for naive bots. */
+    .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    #status { min-height: 1.5em; margin-top: 16px; }
+    #status.error { color: var(--err); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Escríbenos</h1>
+    <p class="hint">Respondemos al correo que dejes. No guardamos el mensaje.</p>
+    <form method="post" action="/api/contact" data-contact>
+      <input type="hidden" name="lang" value="es">
+      <input type="hidden" name="page" value="contacto">
+      <label for="full_name">Nombre</label>
+      <input id="full_name" name="full_name" autocomplete="name" required maxlength="100">
+      <label for="reply_email">Correo</label>
+      <input id="reply_email" name="reply_email" type="email" autocomplete="email" required maxlength="160">
+      <label for="topic">Asunto <span class="hint">(opcional)</span></label>
+      <input id="topic" name="topic" maxlength="90">
+      <label for="body">Mensaje</label>
+      <textarea id="body" name="body" required minlength="2" maxlength="5000"></textarea>
+      <div class="trap" aria-hidden="true">
+        <label for="fax_number">No completes este campo</label>
+        <input id="fax_number" name="fax_number" tabindex="-1" autocomplete="off">
+      </div>
+      <button type="submit">Enviar</button>
+      <p id="status" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+  <script src="./form.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "id": "echo",
+  "name": "Echo",
+  "timing": "on-play",
+  "takesValue": true,
+  "reminder": "When you play this, draw X cards at the start of your next turn.",
+  "handwritten": true
+}

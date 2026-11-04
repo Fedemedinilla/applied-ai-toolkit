@@ -1,0 +1,15 @@
+{
+  "id": "forge-heart",
+  "name": "Forge Heart",
+  "set": "core",
+  "faction": "ember",
+  "rarity": "rare",
+  "cost": 3,
+  "keywords": [],
+  "text": "Spend a charge: your next unit this turn costs 1 less.",
+  "body": {
+    "type": "relic",
+    "charges": 2
+  },
+  "handwritten": true
+}
