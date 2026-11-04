@@ -85,7 +85,7 @@ Each folder has its own README, tests and public entry.
 These are production projects I built for clients and for my own sites. Their repositories are private; each line links the public case study and names the folder here that shows the same engineering.
 
 - **B2B wholesale ordering app for Teia Bakery** ([case study](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/)). The same engineering is in [`idempotent-orders/`](idempotent-orders/) and [`pdf-receipt/`](pdf-receipt/).
-- **Bayard Writer for Colegio Bayard** ([case study](https://federicomedinilla.com/work/ai-writing-assistant-school/), [Kyndred AI case study](https://www.kyndredai.com/resources/bayard-writer-case-study/)). The same engineering is in [`apps/writer/`](apps/writer/). The eval method in [`evals/`](evals/) comes from my own site's demos, not from this project.
+- **Bayard Writer for Colegio Bayard** ([case study](https://federicomedinilla.com/work/ai-writing-assistant-school/), [Kyndred AI case study](https://kyndredai.com/resources/bayard-writer-case-study/)). The same engineering is in [`apps/writer/`](apps/writer/). The eval method in [`evals/`](evals/) comes from my own site's demos, not from this project.
 - **The Kyn assistant and the multi-tenant chatbot platform** at [kyndredai.com](https://kyndredai.com). The same engineering is in [`apps/chat-widget/`](apps/chat-widget/), [`gateway/`](gateway/) and [`safe-markdown/`](safe-markdown/).
 - **[federicomedinilla.com](https://federicomedinilla.com) and [kyndredai.com](https://kyndredai.com)**, the two sites. The same engineering is in [`csp-build-guard/`](csp-build-guard/), [`safe-contact-form/`](safe-contact-form/) and [`grounded-assistant/`](grounded-assistant/).
 
