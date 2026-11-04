@@ -43,7 +43,9 @@ describe('production build', () => {
   it('uses relative URLs only', () => {
     const html = readFileSync(join(out, 'index.html'), 'utf8');
     const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/gu)].map((m) => m[1] ?? '');
-    const local = urls.filter((u) => !u.startsWith('https://') && !u.startsWith('#'));
+    // '../' is the bar's link back to the list of demos, one level up on the Pages site.
+    expect(urls).toContain('../');
+    const local = urls.filter((u) => !u.startsWith('https://') && !u.startsWith('#') && u !== '../');
     expect(local.length).toBeGreaterThan(4);
     for (const u of local) expect(u.startsWith('./')).toBe(true);
   });

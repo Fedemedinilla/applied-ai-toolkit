@@ -1,39 +1,24 @@
-/* A till book: warm paper, dark ink, figures in tabular digits, a highlighter for what the
-   parser read. Income and expense differ by more than colour: a sign, a label and a side rule. */
+/* A till book in the toolkit's look (../../shared/brand.css): white paper, dark ink, figures in
+   Plex Mono, the lime highlighter for what the parser read. Income and expense differ by more than colour: a sign, a label and a side rule. */
+
+@import '../../shared/brand.css';
 
 :root {
-  --paper: #f6f2e8;
-  --surface: #fffdf7;
-  --ink: #1c1b17;
-  --muted: #5f5a4f;
-  --line: #d9d1bf;
-  --hl: #f2c14e;
-  --hl-soft: #fbe7a8;
-  --income: #1d6a43;
-  --expense: #a1352b;
-  --focus: #1f5f99;
-  --button: #1c1b17;
-  --button-ink: #fffdf7;
-  --radius: 10px;
-  --figures: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+  --paper: var(--m-paper);
+  --surface: var(--m-paper-2);
+  --ink: var(--m-ink);
+  --muted: var(--m-ink-2);
+  --line: var(--m-line);
+  --hl: var(--m-lime);
+  --hl-ink: var(--m-lime-ink);
+  --income: var(--m-good);
+  --expense: var(--m-error);
+  --focus: var(--m-ink);
+  --button: var(--m-lime);
+  --button-ink: var(--m-lime-ink);
+  --radius: var(--m-r-md);
+  --figures: var(--m-mono);
   color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #16150f;
-    --surface: #201f18;
-    --ink: #ece7da;
-    --muted: #aaa392;
-    --line: #3a382e;
-    --hl: #d9a62b;
-    --hl-soft: #4d3f14;
-    --income: #6cc595;
-    --expense: #f0907f;
-    --focus: #8cc4ff;
-    --button: #ece7da;
-    --button-ink: #16150f;
-  }
 }
 
 *,
@@ -52,7 +37,8 @@ body {
   padding: 0 16px 48px;
   background: var(--paper);
   color: var(--ink);
-  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 h1, h2, h3 {
@@ -61,7 +47,8 @@ h1, h2, h3 {
 }
 
 a {
-  color: var(--focus);
+  color: var(--ink);
+  text-underline-offset: 3px;
 }
 
 :focus-visible {
@@ -117,8 +104,8 @@ a {
 }
 
 .top h1 {
-  font-size: 1.5rem;
-  letter-spacing: 0.02em;
+  font-size: 1.75rem;
+  line-height: 1.1;
 }
 
 .sub,
@@ -154,8 +141,8 @@ a {
 }
 
 .tabs [role='tab'][aria-selected='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--hl);
+  color: var(--hl-ink);
 }
 
 /* Buttons */
@@ -179,12 +166,13 @@ button:disabled {
   min-height: 44px;
   padding: 8px 14px;
   border-radius: var(--radius);
-  border: 2px solid var(--button);
+  border: 2px solid var(--ink);
 }
 
 .primary,
 .options button {
   background: var(--button);
+  border-color: var(--button);
   color: var(--button-ink);
   font-weight: 600;
 }
@@ -197,14 +185,15 @@ button:disabled {
 }
 
 .secondary[aria-pressed='true'] {
-  background: var(--hl-soft);
+  background: var(--hl);
+  color: var(--hl-ink);
 }
 
 .link {
   border: 0;
   padding: 0;
   background: none;
-  color: var(--focus);
+  color: var(--ink);
   text-decoration: underline;
 }
 
@@ -300,11 +289,12 @@ button:disabled {
 }
 
 mark {
-  background: var(--hl-soft);
-  color: inherit;
-  border-bottom: 3px solid var(--hl);
-  padding: 0 2px;
+  background: var(--hl);
+  color: var(--hl-ink);
+  padding: 0 3px;
   border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .facts {
@@ -316,6 +306,7 @@ mark {
 
 .facts dt,
 .case-facts dt {
+  font-family: var(--m-mono);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -342,7 +333,8 @@ mark {
 .question {
   /* A fieldset defaults to min-content width; a long legend would push the card past 360 px. */
   min-inline-size: 0;
-  border: 2px solid var(--hl);
+  border: 2px solid var(--ink);
+  border-left: 8px solid var(--hl);
   border-radius: var(--radius);
   padding: 12px;
   margin: 0 0 12px;

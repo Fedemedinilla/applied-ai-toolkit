@@ -1,0 +1,134 @@
+/* The look shared by the published demos and their landing page, taken from federicomedinilla.com:
+   white paper, near-black ink, one lime accent and the IBM Plex family. Each app imports this file
+   first and maps its own tokens onto these.
+
+   Rules that come from contrast, not taste:
+   - Lime (#c8ff2e) is never text on a light background (1.18:1). It is a fill under dark ink
+     (16.8:1): the primary button, a selected tab, a highlighted word, a number chip.
+   - Focus rings and lines that carry meaning use the ink, which passes in both themes.
+   - The dark theme is a warm near-black, not a blue-grey. Lime keeps the same hex there.
+
+   The fonts are the latin subsets the site serves, under the SIL Open Font License (fonts/OFL.txt).
+   Plex Sans is one variable file for weights 400 to 600; serif and mono come in one weight each, and
+   font-synthesis is off so a bold mono figure stays the real face instead of a smeared copy. */
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/plex-sans-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Serif';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/plex-serif-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/plex-mono-400.woff2') format('woff2');
+}
+
+:root {
+  --m-paper: #ffffff;
+  --m-paper-2: #fafaf9;
+  --m-ink: #111111;
+  --m-ink-2: #4a4a4a;
+  --m-ink-3: #707070;
+  --m-line: #e6e6e4;
+  --m-line-strong: #cfcfcb;
+  /* Field outlines: 3.45:1 on --m-paper-2 and 3.61:1 on --m-paper (WCAG 1.4.11). */
+  --m-control: #878783;
+  --m-lime: #c8ff2e;
+  --m-lime-ink: #0a0a0a;
+  --m-error: #b3261e;
+  --m-good: #007a33;
+
+  --m-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --m-serif: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --m-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  --m-r-md: 10px;
+  --m-r-lg: 18px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --m-paper: #151312;
+    --m-paper-2: #1c1917;
+    --m-ink: #f0ede8;
+    --m-ink-2: #cfc9c2;
+    --m-ink-3: #9c948b;
+    --m-line: #2b2724;
+    --m-line-strong: #3a3531;
+    --m-control: #7b7269;
+    --m-error: #f2b8b5;
+    --m-good: #00cc66;
+  }
+}
+
+/* An element with the hidden attribute stays hidden even when a class gives it a display value.
+   Without this, Caja's model-mode toggle (.check sets display: flex) showed on GitHub Pages, where
+   there is no server behind it. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  font-family: var(--m-sans);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The site's voice: Plex Serif at 500, never bold. h3 and below stay in the sans. */
+h1,
+h2 {
+  font-family: var(--m-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* The way back to the list of demos, above each app's own header. */
+.toolkit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  max-width: var(--toolkit-width, none);
+  margin: 0 auto;
+  padding: 8px var(--toolkit-pad, 0);
+  border-bottom: 1px solid var(--m-line);
+  font-family: var(--m-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+}
+
+.toolkit-bar a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--m-ink);
+  text-decoration: none;
+  font-weight: 400;
+}
+
+.toolkit-bar a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.toolkit-bar .toolkit-name {
+  color: var(--m-ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+}

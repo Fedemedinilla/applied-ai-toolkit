@@ -39,7 +39,9 @@ describe('production build', () => {
 
   it('uses relative URLs only, so it works under any subpath', () => {
     const html = readFileSync(join(out, 'index.html'), 'utf8');
-    const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/gu)].map((m) => m[1] ?? '').filter((u) => !u.startsWith('#') && !u.startsWith('https://github.com/'));
+    // '../' is the bar's link back to the list of demos, one level up on the Pages site.
+    expect(html).toContain('<a href="../">');
+    const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/gu)].map((m) => m[1] ?? '').filter((u) => !u.startsWith('#') && !u.startsWith('https://github.com/') && u !== '../');
     expect(urls.length).toBeGreaterThanOrEqual(5);
     for (const u of urls) expect(u.startsWith('./'), u).toBe(true);
   });

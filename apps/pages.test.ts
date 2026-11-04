@@ -18,14 +18,23 @@ describe('the landing page', () => {
 
   it('has a language, a strict policy, and no inline script or style', () => {
     expect(landing).toMatch(/<html lang="en">/);
-    expect(landing).toContain(`content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'"`);
+    expect(landing).toContain(`content="default-src 'none'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"`);
     expect(landing).not.toMatch(/<script|<style|style="/);
   });
 
-  it('has a dark scheme and a visible focus ring', () => {
-    const css = read('./index.css');
-    expect(css).toMatch(/@media \(prefers-color-scheme: dark\)/);
-    expect(css).toMatch(/:focus-visible \{\s*outline: 3px solid/);
+  it('loads the shared look first, which has a dark scheme, and has a visible focus ring', () => {
+    expect(landing.indexOf('href="./shared/brand.css"')).toBeGreaterThan(-1);
+    expect(landing.indexOf('href="./shared/brand.css"')).toBeLessThan(landing.indexOf('href="./index.css"'));
+    expect(read('./shared/brand.css')).toMatch(/@media \(prefers-color-scheme: dark\)/);
+    expect(read('./index.css')).toMatch(/:focus-visible \{\s*outline: 3px solid/);
+  });
+
+  it('serves every font the shared look names, with its licence', () => {
+    const css = read('./shared/brand.css');
+    const fonts = [...css.matchAll(/url\('\.\/(fonts\/[a-z0-9-]+\.woff2)'\)/g)].map((m) => m[1] ?? '');
+    expect(fonts.length).toBe(3);
+    for (const font of fonts) expect(readFileSync(new URL(`./shared/${font}`, import.meta.url)).byteLength).toBeGreaterThan(1000);
+    expect(read('./shared/fonts/OFL.txt')).toContain('SIL Open Font License, Version 1.1');
   });
 });
 
@@ -52,6 +61,9 @@ describe('assemblePages', () => {
     mkdirSync(join(root, 'apps'));
     writeFileSync(join(root, 'apps/index.html'), landing);
     writeFileSync(join(root, 'apps/index.css'), 'body {}');
+    mkdirSync(join(root, 'apps/shared/fonts'), { recursive: true });
+    writeFileSync(join(root, 'apps/shared/brand.css'), 'body {}');
+    writeFileSync(join(root, 'apps/shared/fonts/a.woff2'), '');
     for (const app of apps) {
       mkdirSync(join(root, 'dist/apps', app, 'assets'), { recursive: true });
       writeFileSync(join(root, 'dist/apps', app, 'index.html'), `<title>${app}</title>`);
@@ -60,9 +72,10 @@ describe('assemblePages', () => {
     return pathToFileURL(`${root}/`);
   };
 
-  it('copies the landing page and each published build, and nothing else', () => {
+  it('copies the landing page, the shared look and each published build, and nothing else', () => {
     const out = assemblePages(tree([...PAGES_APPS, 'chat-widget']));
-    expect(readdirSync(out).sort()).toEqual([...PAGES_APPS, 'index.css', 'index.html'].sort());
+    expect(readdirSync(out).sort()).toEqual([...PAGES_APPS, 'index.css', 'index.html', 'shared'].sort());
+    expect(readdirSync(join(out, 'shared/fonts'))).toEqual(['a.woff2']);
     expect(readFileSync(join(out, 'replay-lab/index.html'), 'utf8')).toBe('<title>replay-lab</title>');
     expect(readdirSync(join(out, 'caja/assets'))).toEqual(['a.js']);
   });

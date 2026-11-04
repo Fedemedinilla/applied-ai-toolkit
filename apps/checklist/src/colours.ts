@@ -143,22 +143,22 @@ export interface Theme {
 
 export const PALETTE: Readonly<Record<'light' | 'dark', Theme>> = {
   light: {
-    page: '#f7f7f5',
+    page: '#ffffff',
     card: '#ffffff',
-    text: '#1d1f22',
-    muted: '#4a4e55',
-    accent: '#1f3a5f',
-    accentText: '#ffffff',
-    colours: { red: '#b42318', yellow: '#8a4b00', blue: '#1d4ed8', green: '#18733a', grey: '#5d6168' },
+    text: '#111111',
+    muted: '#4a4a4a',
+    accent: '#c8ff2e',
+    accentText: '#0a0a0a',
+    colours: { red: '#cc0000', yellow: '#c33300', blue: '#0d47a1', green: '#008800', grey: '#707070' },
   },
   dark: {
-    page: '#141619',
-    card: '#1d2024',
-    text: '#eceef1',
-    muted: '#b6bbc2',
-    accent: '#c9d7ea',
-    accentText: '#141619',
-    colours: { red: '#ff8a7a', yellow: '#f2b34a', blue: '#8fb4ff', green: '#6fd08f', grey: '#a3a9b1' },
+    page: '#151312',
+    card: '#1c1917',
+    text: '#f0ede8',
+    muted: '#cfc9c2',
+    accent: '#c8ff2e',
+    accentText: '#0a0a0a',
+    colours: { red: '#ff3333', yellow: '#ffaa33', blue: '#90caf9', green: '#00cc66', grey: '#9e9e9e' },
   },
 };
 

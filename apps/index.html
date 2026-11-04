@@ -3,48 +3,55 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
     <title>Applied AI Toolkit demos</title>
     <meta name="description" content="Browser demos from the Applied AI Toolkit repository. Each one runs in the page, with no server and no account.">
     <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="./shared/brand.css">
     <link rel="stylesheet" href="./index.css">
   </head>
   <body>
     <a class="skip" href="#demos">Skip to the demos</a>
     <header class="top">
-      <h1>Applied AI Toolkit demos</h1>
-      <p class="sub">Each demo is an app from the repository, built from its own folder and served as static files. Nothing you type leaves your device.</p>
+      <p class="eyebrow">Applied AI Toolkit · Live demos</p>
+      <h1>Four apps from the repository, running <span class="marked">in your browser</span>.</h1>
+      <p class="sub">Each demo is built from its own folder and served as static files. Nothing you type leaves your device, and every demo works offline once it has loaded.</p>
     </header>
 
     <main>
       <h2 id="demos-title" class="visually-hidden">Demos</h2>
-      <ul id="demos" class="demos" aria-labelledby="demos-title">
+      <ol id="demos" class="demos" aria-labelledby="demos-title">
         <li class="demo">
+          <span class="num" aria-hidden="true">01</span>
           <h3><a href="./caja/">Caja</a></h3>
           <p>An offline cash book that reads a Spanish sentence such as "vendí 5 tortas a 8000" and asks when the amount has two readings.</p>
           <p class="meta"><span lang="es">Interfaz en español</span> · builds on <code>amount-parser</code></p>
         </li>
         <li class="demo">
+          <span class="num" aria-hidden="true">02</span>
           <h3><a href="./receipt/">Receipt</a></h3>
           <p>Edit an order, including names with emoji and right-to-left text, and download its delivery note as a PDF built in the tab.</p>
           <p class="meta"><span lang="es">Interfaz en español</span> · builds on <code>pdf-receipt</code></p>
         </li>
         <li class="demo">
+          <span class="num" aria-hidden="true">03</span>
           <h3><a href="./replay-lab/">Replay Lab</a></h3>
           <p>Play a seeded dice tournament, export the run, edit the file and watch its hash fail on import, or run 1,000 seeds in a worker.</p>
           <p class="meta">English · builds on <code>deterministic-sim</code></p>
         </li>
         <li class="demo">
+          <span class="num" aria-hidden="true">04</span>
           <h3><a href="./checklist/">Site checklist</a></h3>
           <p>Work through a website audit check by check, with the order of the steps enforced, and export the before and after report.</p>
           <p class="meta">English · reads the run format of <code>site-check</code></p>
         </li>
-      </ul>
+      </ol>
       <p class="note">The apps that need a server (the chat widget, the writer, the salon assistant and push-lab) are not published here. Their READMEs explain how to run them.</p>
+      <p class="cta-row"><a class="cta" href="https://github.com/Fedemedinilla/applied-ai-toolkit">Source, tests and design notes on GitHub</a></p>
     </main>
 
     <footer class="foot">
-      <p>Source, tests and design notes: <a href="https://github.com/Fedemedinilla/applied-ai-toolkit">github.com/Fedemedinilla/applied-ai-toolkit</a>. All data in the demos is fictional.</p>
+      <p>Built by <a href="https://federicomedinilla.com">Federico Medinilla</a>. All data in the demos is fictional.</p>
     </footer>
   </body>
 </html>

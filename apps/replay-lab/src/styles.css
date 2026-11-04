@@ -1,39 +1,26 @@
-/* A lab notebook: cool paper, dark ink, one teal accent, figures in tabular digits. A bust differs
+/* A lab notebook in the toolkit's look (../../shared/brand.css): white paper, dark ink, the lime
+   accent on the primary action, figures in Plex Mono. A bust differs
    from a scored round by its label and a side rule as well as its colour. */
 
-:root {
-  --paper: #f3f5f4;
-  --surface: #ffffff;
-  --ink: #14201d;
-  --muted: #4f5d59;
-  --line: #cfd8d5;
-  --accent: #0f6b5c;
-  --accent-soft: #d5ece6;
-  --bad: #a1352b;
-  --good: #1d6a43;
-  --focus: #1f5f99;
-  --button: #14201d;
-  --button-ink: #ffffff;
-  --radius: 10px;
-  --mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
-  color-scheme: light dark;
-}
+@import '../../shared/brand.css';
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0f1513;
-    --surface: #17201d;
-    --ink: #e3ebe8;
-    --muted: #a3b2ad;
-    --line: #2e3a36;
-    --accent: #5fc4ae;
-    --accent-soft: #173a33;
-    --bad: #f0907f;
-    --good: #6cc595;
-    --focus: #8cc4ff;
-    --button: #e3ebe8;
-    --button-ink: #0f1513;
-  }
+:root {
+  --paper: var(--m-paper);
+  --surface: var(--m-paper-2);
+  --ink: var(--m-ink);
+  --muted: var(--m-ink-2);
+  --line: var(--m-line);
+  --accent: var(--m-ink);
+  --hl: var(--m-lime);
+  --hl-ink: var(--m-lime-ink);
+  --bad: var(--m-error);
+  --good: var(--m-good);
+  --focus: var(--m-ink);
+  --button: var(--m-lime);
+  --button-ink: var(--m-lime-ink);
+  --radius: var(--m-r-md);
+  --mono: var(--m-mono);
+  color-scheme: light dark;
 }
 
 *,
@@ -52,7 +39,8 @@ body {
   padding: 0 16px 48px;
   background: var(--paper);
   color: var(--ink);
-  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 h1, h2 {
@@ -60,13 +48,19 @@ h1, h2 {
   margin: 0;
 }
 
+h1 {
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
 h2 {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   margin-bottom: 0.5rem;
 }
 
 a {
-  color: var(--focus);
+  color: var(--ink);
+  text-underline-offset: 3px;
 }
 
 :focus-visible {
@@ -136,8 +130,10 @@ a {
 }
 
 .tabs [role='tab'][aria-selected='true'] {
-  color: var(--ink);
-  border-bottom-color: var(--accent);
+  color: var(--hl-ink);
+  background: var(--hl);
+  border-bottom-color: var(--ink);
+  border-radius: 8px 8px 0 0;
   font-weight: 600;
 }
 
@@ -165,7 +161,7 @@ select {
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--muted);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 8px 10px;
   min-height: 44px;
   width: 100%;
@@ -193,7 +189,7 @@ button {
   font: inherit;
   min-height: 44px;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
@@ -438,7 +434,7 @@ figcaption {
 }
 
 .histogram .axes .axis-label {
-  font-family: system-ui, sans-serif;
+  font-family: var(--m-sans);
 }
 
 .hash-line {

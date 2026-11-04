@@ -1,6 +1,8 @@
 /**
  * Assembles the GitHub Pages site in dist/pages/ from the app builds in dist/apps/: the landing
- * page (apps/index.html and apps/index.css) at the root and each published app in its own folder.
+ * page (apps/index.html and apps/index.css) at the root, the shared look it loads (apps/shared/:
+ * brand.css and the fonts) in shared/, and each published app in its own folder. The apps bundle
+ * their own copy of the shared look at build time.
  * Run it after the builds (npm run build:pages does both). .github/workflows/pages.yml deploys the
  * result.
  *
@@ -38,6 +40,7 @@ export function assemblePages(root: URL = ROOT): string {
   mkdirSync(out, { recursive: true });
   cpSync(new URL('apps/index.html', root), join(out, 'index.html'));
   cpSync(new URL('apps/index.css', root), join(out, 'index.css'));
+  cpSync(new URL('apps/shared/', root), join(out, 'shared'), { recursive: true });
   for (const app of PAGES_APPS) {
     cpSync(new URL(`dist/apps/${app}/`, root), join(out, app), { recursive: true });
   }
