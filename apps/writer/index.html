@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Redactor institucional</title>
+    <meta name="description" content="Asistente de redacción para las comunicaciones de un colegio ficticio, configurado por rol y por categoría.">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="./src/styles.css">
+    <script type="module" src="./src/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#brief">Ir al pedido</a>
+    <header class="top">
+      <h1>Redactor institucional</h1>
+      <p class="sub"><span id="school-name"></span>. Colegio ficticio: los datos, roles y ejemplos son inventados.</p>
+    </header>
+
+    <p id="service" class="banner" hidden></p>
+
+    <main id="main">
+      <form id="setup" novalidate>
+        <fieldset id="roles">
+          <legend>¿Quién escribe?</legend>
+          <div class="chips" id="role-list"></div>
+        </fieldset>
+
+        <fieldset id="categories">
+          <legend>Tipo de comunicado</legend>
+          <div class="chips" id="category-list"></div>
+          <p id="category-info" class="info" aria-live="polite"></p>
+        </fieldset>
+
+        <div class="field">
+          <label for="brief">¿Qué hay que comunicar?</label>
+          <textarea id="brief" name="brief" rows="5" maxlength="4000" aria-describedby="brief-hint" required></textarea>
+          <p id="brief-hint" class="hint">Incluir fechas, horarios, lugares y plazos. Lo que falte aparece en el borrador como [COMPLETAR: ...] para completarlo antes de enviar.</p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="ask-titles">Proponer títulos</button>
+        </div>
+      </form>
+
+      <section id="titles" aria-labelledby="titles-heading" hidden>
+        <h2 id="titles-heading" tabindex="-1">Títulos propuestos</h2>
+        <form id="titles-form" novalidate>
+          <fieldset>
+            <legend>Elegir un título</legend>
+            <div id="title-list" class="options"></div>
+          </fieldset>
+          <div class="actions">
+            <button type="submit" id="write-draft">Redactar con este título</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="draft" aria-labelledby="draft-title" hidden>
+        <h2 id="draft-title" tabindex="-1"></h2>
+        <div id="draft-es" class="draft-text" lang="es"></div>
+        <div id="draft-en-wrap" hidden>
+          <h3>Versión en inglés</h3>
+          <div id="draft-en" class="draft-text" lang="en"></div>
+        </div>
+
+        <h3>Revisión automática</h3>
+        <ul id="lengths" class="lengths"></ul>
+        <ul id="notes" class="notes"></ul>
+
+        <div class="actions">
+          <button type="button" id="copy">Copiar</button>
+          <button type="button" id="fix-length" class="secondary" hidden>Ajustar la extensión</button>
+        </div>
+
+        <form id="revise-form" novalidate>
+          <div class="field">
+            <label for="revise">Pedir un cambio</label>
+            <input id="revise" name="revise" type="text" maxlength="1000" autocomplete="off" aria-describedby="revise-hint">
+            <p id="revise-hint" class="hint">Por ejemplo: «más breve» o «agregar que la entrada es por la calle lateral».</p>
+          </div>
+          <div class="actions">
+            <button type="submit" id="send-revision" class="secondary">Enviar el cambio</button>
+          </div>
+        </form>
+      </section>
+
+      <div class="actions end">
+        <button type="button" id="restart" class="secondary" hidden>Empezar de nuevo</button>
+      </div>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

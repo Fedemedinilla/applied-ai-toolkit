@@ -9,10 +9,14 @@
     "test": "vitest run",
     "check": "tsc --noEmit",
     "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
-    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md apps/*/README.md evals/CASE-STUDY.md",
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md apps/*/README.md */CASE-STUDY.md",
     "build:caja": "vite build apps/caja",
-    "build:apps": "npm run build:caja",
-    "guard:apps": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json"
+    "build:chat-widget": "vite build --config apps/chat-widget/vite.config.ts",
+    "build:push-lab": "vite build --config apps/push-lab/vite.config.ts",
+    "build:receipt": "vite build --config apps/receipt/vite.config.ts",
+    "build:writer": "vite build --config apps/writer/vite.config.ts",
+    "build:apps": "npm run build:caja && npm run build:chat-widget && npm run build:push-lab && npm run build:receipt && npm run build:writer",
+    "guard:apps": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/chat-widget --config apps/chat-widget/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/push-lab --config apps/push-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/writer --config apps/writer/csp-guard.config.json"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",

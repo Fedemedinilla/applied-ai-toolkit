@@ -31,6 +31,10 @@ type Rules = FencesConfigInput['rules'];
 /** What each library publishes to apps. A library that is not here publishes nothing. */
 export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'amount-parser': ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json'],
+  evals: ['evals/src/index.ts'],
+  gateway: ['gateway/src/index.ts'],
+  'idempotent-orders': ['idempotent-orders/src/index.ts'],
+  'pdf-receipt': ['pdf-receipt/src/index.ts'],
 };
 
 /**
@@ -40,7 +44,10 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
  * its data to pass.
  */
 export const APP_USES: Readonly<Record<string, readonly string[]>> = {
-  caja: ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json'],
+  caja: ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json', 'gateway/src/index.ts'],
+  'chat-widget': ['gateway/src/index.ts'],
+  receipt: ['pdf-receipt/src/index.ts'],
+  writer: ['evals/src/index.ts', 'gateway/src/index.ts'],
 };
 
 export interface Layout {
@@ -120,8 +127,11 @@ export default defineConfig({
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },
-    // amount-parser documents that a browser app can import its src/.
-    browser: { include: ['amount-parser/src/**', 'apps/*/src/**'], exclude: TESTS },
+    // amount-parser, idempotent-orders and pdf-receipt document that a browser app can import their src/.
+    browser: {
+      include: ['amount-parser/src/**', 'idempotent-orders/src/**', 'pdf-receipt/src/**', 'apps/*/src/**'],
+      exclude: TESTS,
+    },
     ...fences.groups,
   },
   rules: [
@@ -141,8 +151,14 @@ export default defineConfig({
       rule: 'single-reader',
       group: 'source',
       variable: 'ANTHROPIC_API_KEY',
-      allow: ['gateway/examples/live-call.ts', 'evals/scripts/cli.ts'],
-      why: 'the key is read by the opt-in live scripts and passed in explicitly; library code never reads it',
+      allow: [
+        'gateway/examples/live-call.ts',
+        'evals/scripts/cli.ts',
+        'apps/caja/server/env.ts',
+        'apps/chat-widget/server/env.ts',
+        'apps/writer/server/env.ts',
+      ],
+      why: 'the key is read by the opt-in live scripts and by one env module per app server, and passed in explicitly; library code never reads it',
     },
     {
       rule: 'single-string',

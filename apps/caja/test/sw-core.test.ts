@@ -33,6 +33,9 @@ describe('strategyFor', () => {
     [{ url: url('index.html'), method: 'GET', mode: 'same-origin' }, 'network-first'],
     [{ url: url('corpus.json'), method: 'GET', mode: 'cors' }, 'network-first'],
     [{ url: url('assets/x.js'), method: 'POST', mode: 'cors' }, 'passthrough'],
+    // Model mode's endpoint: a cached health check would show the toggle offline.
+    [{ url: url('api/health'), method: 'GET', mode: 'cors' }, 'passthrough'],
+    [{ url: url('api/extract'), method: 'POST', mode: 'cors' }, 'passthrough'],
     [{ url: 'https://other.example/apps/caja/assets/x.js', method: 'GET', mode: 'cors' }, 'passthrough'],
     [{ url: 'https://app.example/other-app/index.html', method: 'GET', mode: 'navigate' }, 'passthrough'],
   ] as const)('%j -> %s', (req, strategy) => {

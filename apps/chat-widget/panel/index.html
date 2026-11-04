@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Panel del asistente</title>
+    <link rel="stylesheet" href="../src/site.css" />
+  </head>
+  <body>
+    <main class="page panel">
+      <h1>Panel del asistente</h1>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section id="view-loading" aria-label="Cargando">
+        <p>Cargando…</p>
+      </section>
+
+      <section id="view-invite" hidden aria-labelledby="invite-title">
+        <h2 id="invite-title">Crea tu contraseña</h2>
+        <p id="invite-for"></p>
+        <form id="invite-form" class="form" novalidate>
+          <label for="invite-password">Contraseña (mínimo 10 caracteres)</label>
+          <input id="invite-password" type="password" autocomplete="new-password" minlength="10" maxlength="200" required />
+          <label for="invite-repeat">Repite la contraseña</label>
+          <input id="invite-repeat" type="password" autocomplete="new-password" minlength="10" maxlength="200" required />
+          <button type="submit">Crear contraseña y entrar</button>
+        </form>
+      </section>
+
+      <section id="view-login" hidden aria-labelledby="login-title">
+        <h2 id="login-title">Ingresar</h2>
+        <form id="login-form" class="form" novalidate>
+          <label for="login-email">Correo</label>
+          <input id="login-email" type="email" autocomplete="username" maxlength="254" required />
+          <label for="login-password">Contraseña</label>
+          <input id="login-password" type="password" autocomplete="current-password" maxlength="200" required />
+          <button type="submit">Ingresar</button>
+        </form>
+      </section>
+
+      <section id="view-editor" hidden aria-labelledby="editor-title">
+        <div class="row">
+          <h2 id="editor-title">Tu asistente</h2>
+          <button id="logout" type="button" class="secondary">Salir</button>
+        </div>
+        <form id="content-form" class="form" novalidate>
+          <label for="f-botName">Nombre del negocio</label>
+          <input id="f-botName" name="botName" maxlength="60" required />
+
+          <label for="f-welcome">Mensaje de bienvenida</label>
+          <input id="f-welcome" name="welcome" maxlength="300" required />
+
+          <label for="f-tonePreset">Tono</label>
+          <select id="f-tonePreset" name="tonePreset">
+            <option value="friendly">Cercano</option>
+            <option value="formal">Formal</option>
+            <option value="direct">Directo</option>
+          </select>
+
+          <label for="f-tone">Indicaciones de tono (opcional)</label>
+          <textarea id="f-tone" name="tone" rows="3" maxlength="1000" aria-describedby="h-tone"></textarea>
+          <p id="h-tone" class="hint">Por ejemplo: trata al cliente de tú, no prometas plazos de entrega.</p>
+
+          <label for="f-context">Información del negocio</label>
+          <textarea id="f-context" name="context" rows="10" maxlength="20000" aria-describedby="h-context"></textarea>
+          <p id="h-context" class="hint">Horarios, servicios, formas de pago, envíos. El asistente responde solo con esto y con las preguntas frecuentes.</p>
+
+          <label for="f-faq">Preguntas frecuentes</label>
+          <textarea id="f-faq" name="faq" rows="6" maxlength="10000"></textarea>
+
+          <label for="f-suggested">Preguntas sugeridas (una por línea, hasta 4)</label>
+          <textarea id="f-suggested" name="suggestedQuestions" rows="4" aria-describedby="h-suggested"></textarea>
+          <p id="h-suggested" class="hint">Aparecen como botones al abrir el chat. Hasta 80 caracteres cada una.</p>
+
+          <button type="submit">Guardar</button>
+          <p id="save-status" class="status" role="status" aria-live="polite"></p>
+        </form>
+
+        <h2 id="install-title">Instalar en tu sitio</h2>
+        <p>Pega esta línea antes de <code>&lt;/body&gt;</code>. El asistente responde solo en los dominios que tiene habilitados.</p>
+        <pre class="snippet"><code id="snippet"></code></pre>
+        <button id="copy" type="button" class="secondary">Copiar código</button>
+        <p id="copy-status" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module" src="../src/panel.ts"></script>
+  </body>
+</html>

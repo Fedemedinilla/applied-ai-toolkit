@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex" />
+    <title>Vivero Hoja Clara (demostración)</title>
+    <link rel="stylesheet" href="./src/site.css" />
+  </head>
+  <body>
+    <header class="site-head">
+      <p class="brand">Vivero Hoja Clara</p>
+      <p class="tag">Un negocio ficticio, creado para mostrar el asistente de chat.</p>
+    </header>
+    <main class="page">
+      <section aria-labelledby="hola">
+        <h1 id="hola">Plantas de interior y exterior, en tu barrio</h1>
+        <p>Abrimos de martes a domingo, de 9 a 18 h. Hacemos envíos dentro de la ciudad los jueves y los sábados.</p>
+        <p>El botón redondo de abajo a la derecha abre el asistente. Responde solo con la información que el vivero cargó en su panel; si algo no está ahí, lo dice.</p>
+      </section>
+      <section aria-labelledby="como">
+        <h2 id="como">Cómo está armada esta página</h2>
+        <p>El asistente entra con una sola etiqueta, la misma que copia el dueño desde su panel:</p>
+        <pre><code>&lt;script src="…/embed/chat.js" data-tenant="vivero-demo" async&gt;&lt;/script&gt;</code></pre>
+        <p>Si el servidor de la demostración no está corriendo, el botón no aparece: el asistente se monta solo cuando puede cargar su configuración.</p>
+        <p><a href="./panel/">Ir al panel del negocio</a></p>
+      </section>
+    </main>
+    <script src="./embed/chat.js" data-tenant="vivero-demo" async></script>
+  </body>
+</html>

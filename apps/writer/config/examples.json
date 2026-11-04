@@ -1,0 +1,29 @@
+[
+  {
+    "category": "cambio-horario",
+    "role": "direccion",
+    "title": "Salida anticipada el viernes 6 de noviembre",
+    "es": "Estimadas familias:\n\nEl **viernes 6 de noviembre** las clases terminan a las **12:00** en todos los niveles, por una jornada de capacitación docente.\n\nEse día no hay comedor ni actividades de la tarde. El transporte escolar sale a las 12:15.\n\nEl lunes 9 las clases siguen en su horario habitual.\n\nDirección General",
+    "en": "Dear families,\n\nOn **Friday, 6 November**, classes end at **12:00** at every level because of a staff training day.\n\nThere is no lunch service and no afternoon activity that day. The school bus leaves at 12:15.\n\nClasses return to the usual timetable on Monday 9.\n\nDirección General"
+  },
+  {
+    "category": "salida-educativa",
+    "role": "docente",
+    "title": "Salida educativa de 4.º grado al Museo de Ciencias",
+    "es": "Estimadas familias:\n\nEl **martes 17 de noviembre** 4.º grado visita el Museo de Ciencias, como cierre de la unidad sobre el sistema solar.\n\n- Salida: 8:30 desde el colegio.\n- Regreso: 13:00, al colegio.\n- Traslado: micro contratado por el colegio.\n- Qué llevar: uniforme de educación física, una botella de agua y una vianda.\n- Si llueve: la salida se hace igual, porque la visita es en salas cubiertas.\n\nPara participar, cada estudiante necesita la autorización firmada. La encuentran en la plataforma escolar, en la sección Formularios. El plazo es el **viernes 13 de noviembre**.\n\nAnte cualquier consulta, pueden escribir a secretaria@montelirio.example.\n\nEquipo docente de 4.º grado"
+  },
+  {
+    "category": "salud",
+    "role": "coordinacion",
+    "title": "Casos de pediculosis en Nivel Inicial",
+    "es": "Estimadas familias:\n\nEn las últimas dos semanas se registraron casos de pediculosis en salas de Nivel Inicial. Es una situación frecuente en esta época y no representa un riesgo para la salud.\n\nLes pedimos revisar la cabeza de cada estudiante dos veces por semana durante noviembre. Si encuentran piojos o liendres, el tratamiento se hace en casa y el estudiante puede volver a clase al día siguiente.\n\nEn el colegio reforzamos el uso de cabello recogido y evitamos compartir gorros.\n\nCoordinación de Nivel Inicial",
+    "en": "Dear families,\n\nOver the last two weeks there have been cases of head lice in Kindergarten classes. It is common at this time of year and is not a health risk.\n\nPlease check each student's hair twice a week during November. If you find lice or nits, treatment is done at home and the student can return to class the next day.\n\nAt school we are asking for long hair to be tied back and for hats not to be shared.\n\nCoordinación de Nivel Inicial"
+  },
+  {
+    "category": "evento",
+    "role": "coordinacion",
+    "title": "Muestra anual de Secundaria",
+    "es": "Estimadas familias:\n\nLas invitamos a la **Muestra anual de Secundaria**, el **sábado 28 de noviembre de 10:00 a 13:00**, en el patio central del colegio.\n\nCada curso presenta los proyectos del año en español y en inglés: ciencias, arte, tecnología y un ciclo de lecturas. Los estudiantes guían a los visitantes en cada espacio.\n\nPara organizar los espacios, les pedimos confirmar la asistencia con el formulario de la plataforma escolar hasta el **miércoles 25 de noviembre**.\n\nLos esperamos.\n\nCoordinación de Nivel Secundario",
+    "en": "Dear families,\n\nYou are invited to the **Secondary Annual Exhibition** on **Saturday, 28 November, from 10:00 to 13:00**, in the main courtyard.\n\nEach year group presents its projects in Spanish and English: science, art, technology and a reading series. Students will guide visitors through each stand.\n\nTo plan the space, please confirm your attendance with the form on the school platform by **Wednesday, 25 November**.\n\nWe look forward to seeing you.\n\nCoordinación de Nivel Secundario"
+  }
+]

@@ -6,8 +6,11 @@
 // `invalid` explain why there is nothing to save.
 
 import { parseAmount, type ParsedAmount, type Span } from '../../../amount-parser/src/index.ts';
-import { categorise, kindOf, type Category, type Kind } from './categories.ts';
+import { categorise, INCOME_CATEGORIES, kindOf, type Category, type CategoryGuess, type Kind } from './categories.ts';
 import { questionFor, type Question } from './questions.ts';
+
+const INCOME: ReadonlySet<string> = new Set(INCOME_CATEGORIES);
+const sideOf = (category: Category): Kind => (INCOME.has(category) ? 'income' : 'expense');
 
 /** A saved movement. Amounts are always positive; the direction is `kind`, never a sign. */
 export interface Row {
@@ -25,6 +28,10 @@ export interface Row {
   literal: string;
   /** "30 lucas y pico": the amount is a floor. */
   approximate: boolean;
+  /** YYYY-MM-DD of the movement, when the owner said it happened on another day than it was saved ("ayer"). */
+  day?: string;
+  /** Set when model mode read the kind, category and date (verdict.ts). The amount is the parser's either way. */
+  via?: 'model';
 }
 
 interface Guess {
@@ -112,6 +119,11 @@ export interface RowContext {
   id: string;
   /** Overrides the guessed kind, when the owner flipped it on the preview. */
   kind?: Kind;
+  /** Model mode: the category the verdict or the owner picked. Ignored if it is not on the kind's side. */
+  category?: CategoryGuess;
+  /** Model mode: the day of the movement, when it is not the day of `now`. */
+  day?: string;
+  via?: 'model';
 }
 
 /**
@@ -156,19 +168,21 @@ export function resolve(draft: Draft, answer: Answer, ctx: RowContext): Resoluti
   const kind = ctx.kind ?? draft.kind;
   // Flipping the kind re-picks the category from the other side's table, so an income never ends
   // up under an expense category.
-  const category = kind === draft.kind ? { category: draft.category, keyword: draft.keyword } : categorise(draft.text, kind);
-  return {
-    ok: true,
-    row: {
-      id: ctx.id,
-      at: ctx.now.toISOString(),
-      kind,
-      amount,
-      category: category.category,
-      keyword: category.keyword,
-      sentence: draft.text,
-      literal,
-      approximate,
-    },
+  // A category passed in must still sit on the kind's side: the same rule, checked once more here.
+  const picked = ctx.category && sideOf(ctx.category.category) === kind ? ctx.category : null;
+  const category = picked ?? (kind === draft.kind ? { category: draft.category, keyword: draft.keyword } : categorise(draft.text, kind));
+  const row: Row = {
+    id: ctx.id,
+    at: ctx.now.toISOString(),
+    kind,
+    amount,
+    category: category.category,
+    keyword: category.keyword,
+    sentence: draft.text,
+    literal,
+    approximate,
   };
+  if (ctx.day !== undefined) row.day = ctx.day;
+  if (ctx.via !== undefined) row.via = ctx.via;
+  return { ok: true, row };
 }

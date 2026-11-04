@@ -57,7 +57,7 @@ class DomainsTest(unittest.TestCase):
         self.assertNotEqual(domains.compare_key("https://colegio.test/?a=1"), domains.compare_key("https://colegio.test/"))
         self.assertEqual(domains.resolve_url("https://www.colegio.test/a/", " /b/ "), "https://www.colegio.test/b/")
         self.assertEqual(domains.resolve_url("https://www.colegio.test/a/", "c/#top"), "https://www.colegio.test/a/c/")
-        for href in ("mailto:info@colegio.test", "tel:+541145678900", "javascript:void(0)", "#", "", "whatsapp://send?phone=1"):
+        for href in ("mailto:info@colegio.test", "tel:+541100000000", "javascript:void(0)", "#", "", "whatsapp://send?phone=1"):
             self.assertIsNone(domains.resolve_url("https://www.colegio.test/", href), href)
 
     def test_same_site(self) -> None:

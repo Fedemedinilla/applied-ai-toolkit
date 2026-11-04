@@ -19,7 +19,8 @@ const toCents = (n: number): number => Math.round(n * 100);
 export function byDay(rows: readonly Row[]): DayTotals[] {
   const groups = new Map<string, { income: number; expense: number; rows: Row[] }>();
   for (const row of rows) {
-    const day = localDay(new Date(row.at));
+    // A row the owner dated ("ayer") counts on that day, not on the day it was typed.
+    const day = row.day ?? localDay(new Date(row.at));
     let group = groups.get(day);
     if (!group) {
       group = { income: 0, expense: 0, rows: [] };

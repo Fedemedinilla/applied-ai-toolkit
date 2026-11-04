@@ -270,7 +270,7 @@ class HtmlExtractTest(unittest.TestCase):
             body='<h1>A</h1><script>document.write("<h1>no</h1>")</script><template><h2>no</h2></template><h3>B</h3>'
             '<img src="a.jpg" alt=""><img src="b.jpg" data-alt="x"><noscript><img src="b.jpg"></noscript>'
             '<a href="/inscripciones/" aria-label="Inscripción ABIERTA">Ir</a>'
-            '<div class="fusion-footer"><a href="tel:+541145678900">Llamar</a> &copy; 2019</div>',
+            '<div class="fusion-footer"><a href="tel:+541100000000">Llamar</a> &copy; 2019</div>',
         )
         p = htmlextract.extract_page(html, HOME)
         self.assertEqual(p.lang, "es-ar")

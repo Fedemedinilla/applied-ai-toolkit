@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Push Lab</title>
+    <meta name="description" content="Prueba de notificaciones web y del número sobre el ícono de la app, en iPhone, Android y escritorio.">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f4f5f2" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+    <meta name="apple-mobile-web-app-title" content="Push Lab">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <header class="top">
+      <img class="mark" src="./icon.svg" alt="" width="40" height="40">
+      <div>
+        <h1>Push Lab</h1>
+        <p class="sub">Notificaciones web y el número sobre el ícono, probados en tu propio teléfono.</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="card" aria-labelledby="device-title">
+        <h2 id="device-title">Este dispositivo</h2>
+        <dl class="facts" id="facts"></dl>
+        <p class="note" id="arrival" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="install-title">
+        <h2 id="install-title"><span class="step" aria-hidden="true">1</span> Instalar</h2>
+        <div id="install-body"></div>
+        <button type="button" id="install-button" class="primary" hidden>Instalar</button>
+        <p class="status" id="install-status" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="enable-title">
+        <h2 id="enable-title"><span class="step" aria-hidden="true">2</span> Activar avisos</h2>
+        <p id="enable-text">Revisando…</p>
+        <button type="button" id="enable-button" class="primary" disabled>Activar</button>
+        <p class="status" id="enable-status" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="test-title">
+        <h2 id="test-title"><span class="step" aria-hidden="true">3</span> Enviar una prueba</h2>
+        <form id="test-form">
+          <fieldset>
+            <legend>Tipo de aviso</legend>
+            <label class="choice"><input type="radio" name="kind" value="test" checked> Prueba: el servicio de push la guarda hasta 1 hora</label>
+            <label class="choice"><input type="radio" name="kind" value="reminder"> Recordatorio: lo guarda hasta 24 horas</label>
+          </fieldset>
+          <label class="choice"><input type="checkbox" id="test-badge"> Enviar el número del globo con el aviso</label>
+          <label class="choice"><input type="checkbox" id="test-delay"> Esperar 5 segundos, para salir de la app o bloquear la pantalla</label>
+          <button type="submit" id="test-button" class="primary" disabled>Enviar prueba</button>
+        </form>
+        <p class="status" id="test-status" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="badge-title">
+        <h2 id="badge-title">Globo del ícono</h2>
+        <p>El número que la app instalada muestra sobre su ícono. En iPhone hace falta la app instalada y el permiso de avisos.</p>
+        <div class="counter">
+          <button type="button" id="badge-minus" class="secondary" aria-label="Restar uno">−</button>
+          <label for="badge-count" class="visually-hidden">Número del globo</label>
+          <output id="badge-count" aria-live="polite">0</output>
+          <button type="button" id="badge-plus" class="secondary" aria-label="Sumar uno">+</button>
+          <button type="button" id="badge-apply" class="secondary">Poner en el ícono</button>
+          <button type="button" id="badge-clear" class="secondary">Borrar</button>
+        </div>
+        <p class="status" id="badge-status" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="server-title">
+        <h2 id="server-title">Servidor</h2>
+        <button type="button" id="diagnose-button" class="secondary">Ver diagnóstico</button>
+        <div id="diagnose-body" aria-live="polite"></div>
+        <p>
+          <a href="./api/redirect-check">Probar una redirección</a>: el servidor responde un 302 sin cuerpo. Si el
+          service worker interceptara las navegaciones, Safari en iPhone podría ofrecer descargar un archivo en lugar de
+          volver acá.
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="log-title">
+        <h2 id="log-title">Registro</h2>
+        <!-- Not live: most entries repeat what a status paragraph above has just announced. -->
+        <ol class="log" id="log" role="log" aria-live="off"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

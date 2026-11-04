@@ -65,7 +65,7 @@
       "id": "EXT-21",
       "mediciones": {
         "html_decoded_bytes": 5836,
-        "html_raw_bytes": 2001,
+        "html_raw_bytes": 2003,
         "image_bytes": 2000000,
         "image_savings_bytes": null,
         "lighthouse_huge": false,
@@ -163,7 +163,7 @@
         "content_encoding": "gzip",
         "decoded_bytes": 5836,
         "h3_announced": false,
-        "raw_bytes": 2001
+        "raw_bytes": 2003
       },
       "modulo": "EXT",
       "motivo": null,

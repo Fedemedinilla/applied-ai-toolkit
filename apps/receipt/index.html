@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Remito en PDF</title>
+    <meta name="description" content="Arma un pedido y descarga su remito en PDF. El PDF se genera en este navegador, sin servidor.">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="./logo-ejemplo.png" type="image/png">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <a class="skip" href="#result">Ir al PDF</a>
+    <header class="top">
+      <h1>Remito en PDF</h1>
+      <p class="sub">Un pedido de un vivero de ejemplo. El PDF se genera en este navegador: nada sale del dispositivo.</p>
+    </header>
+
+    <main>
+      <div class="examples" role="group" aria-label="Pedidos de ejemplo">
+        <button type="button" class="secondary" data-sample="simple">Pedido simple</button>
+        <button type="button" class="secondary" data-sample="hostile">Textos difíciles</button>
+        <button type="button" class="secondary" data-sample="long">120 productos</button>
+      </div>
+
+      <form id="order" novalidate>
+        <fieldset>
+          <legend>Documento</legend>
+          <div class="grid">
+            <div class="field">
+              <label for="number">Número</label>
+              <input id="number" name="number" type="text" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="issued-on">Fecha</label>
+              <input id="issued-on" name="issued-on" type="date" required>
+            </div>
+            <div class="field">
+              <label for="delivery-on">Entrega <span class="optional">(opcional)</span></label>
+              <input id="delivery-on" name="delivery-on" type="date">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Negocio</legend>
+          <div class="field">
+            <label for="shop-name">Nombre</label>
+            <input id="shop-name" name="shop-name" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="shop-lines">Datos <span class="optional">(un renglón por línea, hasta 4)</span></label>
+            <textarea id="shop-lines" name="shop-lines" rows="2"></textarea>
+          </div>
+          <fieldset class="field logo">
+            <legend class="label">Logo</legend>
+            <div class="choices">
+              <label class="choice"><input type="radio" id="logo-sample" name="logo" value="sample" checked> El del vivero de ejemplo</label>
+              <label class="choice"><input type="radio" id="logo-none" name="logo" value="none"> Sin logo</label>
+              <label class="choice"><input type="radio" id="logo-upload" name="logo" value="file"> Subir uno</label>
+            </div>
+            <label for="logo-file" class="visually-hidden">Archivo del logo (PNG o JPG)</label>
+            <input id="logo-file" name="logo-file" type="file" accept="image/png,image/jpeg" hidden aria-describedby="logo-hint">
+            <p class="hint" id="logo-hint">PNG o JPG. El archivo no se sube a ningún lado: se lee en el navegador.</p>
+          </fieldset>
+        </fieldset>
+
+        <fieldset>
+          <legend>Cliente</legend>
+          <div class="field">
+            <label for="customer-name">Nombre</label>
+            <input id="customer-name" name="customer-name" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="customer-lines">Datos <span class="optional">(un renglón por línea, hasta 4)</span></label>
+            <textarea id="customer-lines" name="customer-lines" rows="2"></textarea>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Productos</legend>
+          <p class="hint" id="amount-hint">Los montos van como 8000, 8.000 o 8.000,50; las cantidades, como 3 o 1,25.</p>
+          <ol id="items" class="items"></ol>
+          <button type="button" id="add-item" class="secondary">Agregar producto</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Totales y notas</legend>
+          <div class="grid">
+            <div class="field">
+              <label for="shipping">Envío <span class="optional">(vacío: no se imprime)</span></label>
+              <input id="shipping" name="shipping" type="text" inputmode="decimal" autocomplete="off" aria-describedby="amount-hint">
+            </div>
+            <div class="field">
+              <label for="balance">Saldo anterior <span class="optional">(negativo: a favor del cliente)</span></label>
+              <input id="balance" name="balance" type="text" inputmode="text" autocomplete="off" aria-describedby="balance-hint">
+              <p class="hint" id="balance-hint">Se imprime debajo del total y no se suma.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="notes">Aclaraciones</label>
+            <textarea id="notes" name="notes" rows="3"></textarea>
+          </div>
+          <div class="field">
+            <label for="footer">Pie de página</label>
+            <input id="footer" name="footer" type="text" autocomplete="off">
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="submit" class="primary">Generar PDF</button>
+          <p class="hint">También se actualiza solo al editar.</p>
+        </div>
+      </form>
+
+      <section id="result" class="result" aria-labelledby="result-title" tabindex="-1">
+        <h2 id="result-title">El PDF</h2>
+        <p id="status" class="status"></p>
+        <p id="announce" class="visually-hidden" role="status" aria-live="polite"></p>
+        <p class="links">
+          <a id="download" class="button primary" role="link" aria-disabled="true">Descargar<span class="visually-hidden pending"> (se está actualizando)</span></a>
+          <a id="open" class="button secondary" role="link" target="_blank" rel="noopener" aria-disabled="true">Abrir en otra pestaña<span class="visually-hidden pending"> (se está actualizando)</span></a>
+        </p>
+        <div id="notices" class="notices" hidden>
+          <h3>Qué cambió para que entre en el PDF</h3>
+          <ul id="notice-list"></ul>
+        </div>
+        <iframe id="preview" class="preview" title="Vista previa del remito"></iframe>
+        <p class="hint preview-hint">En pantallas angostas la vista previa no se muestra: usa Abrir o Descargar.</p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>Hecho con la biblioteca <code>pdf-receipt</code> del repositorio Applied AI Toolkit. Los datos son ficticios.</p>
+    </footer>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

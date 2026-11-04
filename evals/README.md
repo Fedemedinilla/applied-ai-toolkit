@@ -38,6 +38,7 @@ Every script refuses to write over an existing file. Node 24 runs the `.ts` file
 
 | path | what |
 |---|---|
+| `src/index.ts` | the public entry for apps: the runner, variants, the model seam, JSONL files and `wilson` |
 | `src/variants.ts` | `applyEdits`: exact-text edits on system blocks, exactly one match each |
 | `src/runner.ts` | job planning, preflight, `--dump`, the concurrent runner |
 | `src/blind.ts` | anonymize and shuffle, key kept apart, withheld rows |

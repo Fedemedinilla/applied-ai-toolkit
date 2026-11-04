@@ -53,16 +53,24 @@ describe('this repository', () => {
 // The folder fences of repo.config.ts on a small tree shaped like this repository, with the real
 // PUBLIC_SURFACE and APP_USES: what an app may use of a library, and what stays closed.
 describe('folder fences', () => {
-  const layout = { libraries: ['amount-parser', 'gateway'], apps: ['caja', 'other'], surface: PUBLIC_SURFACE, uses: APP_USES };
+  // caja's real entry; the other apps of APP_USES are not part of this small tree.
+  const layout = {
+    libraries: ['amount-parser', 'gateway', 'slop-lint'],
+    apps: ['caja', 'other'],
+    surface: PUBLIC_SURFACE,
+    uses: { caja: APP_USES['caja'] ?? [] },
+  };
   const library = {
     'amount-parser/src/index.ts': "export { parseAmount } from './money.ts';",
     'amount-parser/src/money.ts': 'export const parseAmount = (s: string) => s;',
     'amount-parser/test/corpus-data.ts': 'export const corpus = [];',
-    'gateway/src/index.ts': 'export const call = 1;',
+    'gateway/src/index.ts': "export { call } from './gateway.ts';",
+    'gateway/src/gateway.ts': 'export const call = 1;',
   };
   const allowed = {
     'apps/caja/src/entry.ts': "import { parseAmount } from '../../../amount-parser/src/index.ts';",
     'apps/caja/test/corpus-json.ts': "const raw = new URL('../../../amount-parser/corpus/corpus.json', import.meta.url);",
+    'apps/caja/server/model.ts': "import { call } from '../../../gateway/src/index.ts';",
   };
   const fenced = (files: Record<string, string>) => {
     const { groups, rules } = folderFences(layout);
@@ -79,7 +87,7 @@ describe('folder fences', () => {
       ...allowed,
       'apps/caja/src/money-view.ts': "import { parseAmount } from '../../../amount-parser/src/money.ts';",
       'apps/caja/test/questions.test.ts': "import { corpus } from '../../../amount-parser/test/corpus-data.ts';",
-      'apps/caja/src/call.ts': "import { call } from '../../../gateway/src/index.ts';",
+      'apps/caja/src/call.ts': "import { call } from '../../../gateway/src/gateway.ts';",
       'apps/caja/src/share.ts': "import '../../other/src/main.ts';",
       'apps/other/src/main.ts': "import { parseAmount } from '../../../amount-parser/src/index.ts';",
       'gateway/src/amounts.ts': "import { parseAmount } from '../../amount-parser/src/index.ts';",
@@ -103,8 +111,12 @@ describe('folder fences', () => {
   });
 
   it('reports a published entry an app no longer uses, and refuses an entry the library does not publish', () => {
-    expect(places(fenced({ ...library, 'apps/caja/src/entry.ts': allowed['apps/caja/src/entry.ts'] }))).toEqual(['repo.config.ts:0 stale-allow']);
-    expect(() => folderFences({ ...layout, uses: { caja: ['gateway/src/index.ts'] } })).toThrow(/which gateway does not publish in PUBLIC_SURFACE \(it publishes nothing\)/);
+    expect(places(fenced({ ...library, 'apps/caja/src/entry.ts': allowed['apps/caja/src/entry.ts'] }))).toEqual([
+      'repo.config.ts:0 stale-allow',
+      'repo.config.ts:0 stale-allow',
+    ]);
+    expect(() => folderFences({ ...layout, uses: { caja: ['slop-lint/src/index.ts'] } })).toThrow(/which slop-lint does not publish in PUBLIC_SURFACE \(it publishes nothing\)/);
+    expect(() => folderFences({ ...layout, uses: { caja: ['gateway/src/gateway.ts'] } })).toThrow(/which gateway does not publish in PUBLIC_SURFACE \(it publishes gateway\/src\/index.ts\)/);
     expect(() => folderFences({ ...layout, uses: { caja: ['amount-parser/src/money.ts'] } })).toThrow(/which amount-parser does not publish/);
     expect(() => folderFences({ ...layout, uses: { caja: ['site/src/index.ts'] } })).toThrow(/which is not in a library folder/);
     expect(() => folderFences({ ...layout, uses: { till: ['amount-parser/src/index.ts'] } })).toThrow(/apps\/till, which does not exist/);

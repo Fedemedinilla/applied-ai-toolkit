@@ -131,7 +131,7 @@ $generator_meta
 $whatsapp_block
 <footer class="fusion-footer">
 <div class="fusion-footer-widget-area">
-<p>Tel: <a href="tel:+541145678900">4567-8900</a></p>
+<p>Tel: <a href="tel:+541100000000">0000-0000</a></p>
 <p><a href="$base/politica-de-privacidad/">Política de privacidad</a></p>
 <ul class="fusion-social-links">
 <li><a class="fusion-social-network-icon fusion-facebook" href="https://www.facebook.com/colegioejemplo" aria-label="Facebook"></a></li>

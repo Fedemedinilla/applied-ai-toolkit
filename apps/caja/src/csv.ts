@@ -26,7 +26,8 @@ export function toCsv(rows: readonly Row[]): string {
     const at = new Date(row.at);
     lines.push(
       [
-        localDay(at),
+        // fecha is the day of the movement; hora is when it was written down.
+        row.day ?? localDay(at),
         localTime(at),
         row.kind === 'income' ? 'ingreso' : 'gasto',
         String(row.amount),

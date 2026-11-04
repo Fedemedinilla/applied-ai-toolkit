@@ -17,11 +17,11 @@ FIXTURE_SECRET=fixture-secret-value-0001 node csp-build-guard/cli.ts \
   --dir csp-build-guard/fixtures/stale-hash/site --config csp-build-guard/fixtures/stale-hash/csp-guard.config.json --json
 ```
 
-In this repository's CI it runs after the build of [`apps/caja`](../apps/caja/), with the config in [`apps/caja/csp-guard.config.json`](../apps/caja/csp-guard.config.json):
+In this repository's CI it runs after the build of each app under [`apps/`](../apps/), with each app's own config. For [`apps/caja`](../apps/caja/), with [`apps/caja/csp-guard.config.json`](../apps/caja/csp-guard.config.json):
 
 ```sh
 npm run build:apps
-node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json   # npm run guard:apps
+node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json   # part of npm run guard:apps
 ```
 
 ```
@@ -29,14 +29,14 @@ csp-build-guard: dist/apps/caja (1 HTML page)
 PASS inline-hashes  0 inline scripts and styles on 1 page, 0 distinct, all allowed by hash; no stale hash
 PASS policy         1 page sends exactly the expected policy (9 directives)
 SKIP headers        no headers in the config
-SKIP secrets        no secrets in the config
+PASS secrets        11 files searched, no value of ANTHROPIC_API_KEY
 PASS lookbehind     2 browser files and 0 inline scripts, no regex lookbehind
-PASS js-budget      1 page within budget, heaviest index.html at 14.8 kB gzip, 13.5 kB brotli
-         14.8 kB gzip   13.5 kB brotli  index.html  (gzip <= 20, brotli <= 18 kB)
-OK: 4 checks passed, 2 skipped
+PASS js-budget      1 page within budget, heaviest index.html at 18.6 kB gzip, 16.9 kB brotli
+         18.6 kB gzip   16.9 kB brotli  index.html  (gzip <= 20, brotli <= 18 kB)
+OK: 5 checks passed, 1 skipped
 ```
 
-Caja is a static PWA with no deploy config yet, so it sends no policy of its own. Its config holds, as a `literal` policy, the strict one a host should send for it (`'self'` for scripts, styles, the manifest, the worker and the corpus fetch, `data:` images, no plugins). The run shows that the build works under that policy with no inline script to hash. No module uses a regex lookbehind that older Safari cannot parse, and the JavaScript of `index.html` stays within its budget. Caja reads no secret at build time, so `secrets` is skipped. In a project with secrets, run the guard with the same environment the build had.
+Caja has no deploy config yet, so it sends no policy of its own. Its config holds, as a `literal` policy, the strict one a host should send for it (`'self'` for scripts, styles, the manifest, the worker, the corpus fetch and the model-mode API, `data:` images, no plugins). The run shows that the build works under that policy with no inline script to hash. No module uses a regex lookbehind that older Safari cannot parse, and the JavaScript of `index.html` stays within its budget. Caja's optional server reads `ANTHROPIC_API_KEY`, so the config lists it under `secrets` with `missing: "skip"`. CI sets a placeholder value for it and for each other app's secret variables, so the search runs there; a local run without them skips it. In a project with real secrets, run the guard with the same environment the build had.
 
 Without `--config` it looks for `csp-guard.config.json`, then `csp-guard.config.ts`, in the current folder. Exit codes: 0 when every check passed or was skipped, 1 when a check failed, 2 for bad usage, an invalid config or a missing input file. `--json` prints the full report, with per-page sizes and the files behind them.
 

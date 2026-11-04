@@ -35,6 +35,8 @@ mountApp(document, {
   },
   recognition: findRecognition(),
   download,
+  // Model mode: the page asks ./api/health and shows the switch only on {"ok": true}.
+  api: (input, init) => fetch(input, init),
 });
 
 if (!__CAJA_DEV__ && 'serviceWorker' in navigator) {

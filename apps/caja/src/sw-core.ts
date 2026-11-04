@@ -52,8 +52,11 @@ export function strategyFor(req: RequestInfo, scope: string): Strategy {
   const url = new URL(req.url);
   const base = new URL(scope);
   if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) return 'passthrough';
-  if (req.mode === 'navigate') return 'network-first';
   const path = url.pathname.slice(base.pathname.length);
+  // Model mode's endpoint (server/) is never cached: a cached health check would show the toggle
+  // offline, and a cached reading would answer for another sentence.
+  if (path.startsWith('api/')) return 'passthrough';
+  if (req.mode === 'navigate') return 'network-first';
   return path.startsWith('assets/') ? 'cache-first' : 'network-first';
 }
 

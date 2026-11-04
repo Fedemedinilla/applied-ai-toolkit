@@ -340,10 +340,16 @@ mark {
 }
 
 .question {
+  /* A fieldset defaults to min-content width; a long legend would push the card past 360 px. */
+  min-inline-size: 0;
   border: 2px solid var(--hl);
   border-radius: var(--radius);
   padding: 12px;
   margin: 0 0 12px;
+}
+
+.question select {
+  max-inline-size: 100%;
 }
 
 .question legend {
@@ -535,6 +541,58 @@ mark {
 
 .empty {
   color: var(--muted);
+}
+
+/* Model mode */
+
+.model-toggle {
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.model-toggle label {
+  display: inline;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.model-toggle .hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.choices {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+}
+
+.choice input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.card.model .note {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.reason {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
 /* Phrases tab */

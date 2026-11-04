@@ -73,6 +73,17 @@ describe('CSV', () => {
   });
 });
 
+describe('rows dated by the owner (model mode)', () => {
+  it('count on the stated day, and the CSV writes that day with the time it was noted', () => {
+    const dated: Row = { ...row('m', 'expense', 45000, at(4, 10), 'ayer pagué la luz'), day: '2026-11-03', via: 'model' };
+    expect(byDay([dated, row('a', 'income', 1000, at(4, 9))]).map((d) => [d.day, d.expense])).toEqual([
+      ['2026-11-04', 0],
+      ['2026-11-03', 45000],
+    ]);
+    expect(toCsv([dated]).split('\r\n')[1]).toBe('2026-11-03,10:00,gasto,45000,Otros gastos,ayer pagué la luz,45000,no');
+  });
+});
+
 describe('format', () => {
   it('money in es-AR', () => {
     expect(money(36000)).toBe('$36.000');

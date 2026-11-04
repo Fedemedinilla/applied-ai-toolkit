@@ -3,7 +3,7 @@
 // text nodes, through h() in dom.ts.
 
 import { toCsv } from './csv.ts';
-import { readSentence, resolve, type Answer, type Draft, type Row } from './entry.ts';
+import { readSentence, resolve, type Answer, type Draft, type Row, type RowContext } from './entry.ts';
 import { localDay, localTime, money, signedMoney } from './format.ts';
 import { categorise, type Kind } from './categories.ts';
 import { byDay, totalsFor, undoLast, type DayTotals } from './ledger.ts';
@@ -11,6 +11,9 @@ import { mountCorpus } from './corpus-view.ts';
 import { fact, h, need, sentenceView } from './dom.ts';
 import { loadRows, saveRows, type KeyValue } from './storage.ts';
 import { speechError, type RecognitionConstructor } from './speech.ts';
+import { askModel, modelAvailable, modelErrorMessage, type ApiFetch } from './model-mode.ts';
+import { collectAnswers, kindNow as modelKind, modelCard, modelSave, type ModelState } from './model-view.ts';
+import { verdict } from './verdict.ts';
 
 export interface AppDeps {
   storage: KeyValue | null;
@@ -20,6 +23,13 @@ export interface AppDeps {
   loadCorpus(): Promise<unknown>;
   recognition: RecognitionConstructor | null;
   download(fileName: string, text: string): void;
+  /**
+   * fetch for the optional model mode (server/). Without it, or when ./api/health does not answer,
+   * the toggle stays hidden and the app is the offline one.
+   */
+  api?: ApiFetch | null;
+  /** IANA zone of the shop, sent with each sentence. Defaults to the device's. */
+  timeZone?: () => string;
 }
 
 const KIND_LABEL: Record<Kind, string> = { income: 'Ingreso', expense: 'Gasto' };
@@ -45,6 +55,8 @@ export function mountApp(root: Document, deps: AppDeps): void {
   const exportButton = need<HTMLButtonElement>(root, '#export');
   const warning = need<HTMLElement>(root, '#storage-warning');
   const today = need<HTMLElement>(root, '#today');
+  const modelToggle = need<HTMLElement>(root, '#model-toggle');
+  const modelSwitch = need<HTMLInputElement>(root, '#model-mode');
 
   const loaded = loadRows(deps.storage, String(deps.now().getTime()));
   let rows: Row[] = loaded.rows;
@@ -53,6 +65,9 @@ export function mountApp(root: Document, deps: AppDeps): void {
   let persistent = loaded.available && loaded.writable;
   /** True while the status line holds the "type something first" hint, so a later read clears it. */
   let hintShown = false;
+  /** Model mode: the request in flight, and the verdict on the card. */
+  let pending: AbortController | null = null;
+  let model: { state: ModelState; proposed: string | null } | null = null;
 
   const warn = (): void => {
     const lines: string[] = [];
@@ -110,7 +125,7 @@ export function mountApp(root: Document, deps: AppDeps): void {
                     'span',
                     { class: 'what' },
                     h('span', { class: 'said' }, r.sentence),
-                    h('span', { class: 'how' }, `${r.category} · ${r.literal}${r.approximate ? ' · aprox.' : ''}`),
+                    h('span', { class: 'how' }, `${r.category} · ${r.literal}${r.approximate ? ' · aprox.' : ''}${r.via === 'model' ? ' · con IA' : ''}`),
                   ),
                   h('span', { class: 'amt' }, h('span', { class: 'visually-hidden' }, `${KIND_LABEL[r.kind]} `), signedMoney(r.amount, r.kind)),
                 ),
@@ -144,6 +159,24 @@ export function mountApp(root: Document, deps: AppDeps): void {
     h('button', { type: 'button', 'data-action': 'flip' }, kindNow(d) === 'income' ? 'Es un gasto' : 'Es un ingreso');
 
   const renderPreview = (focus: boolean): void => {
+    if (pending && draft && draft.status !== 'no_amount') {
+      preview.replaceChildren(
+        h(
+          'div',
+          { class: 'card muted' },
+          sentenceView(draft.text, draft.spans),
+          h('p', {}, 'Leyendo con IA…'),
+          h('div', { class: 'actions' }, h('button', { type: 'button', 'data-action': 'model-off' }, 'Leer sin IA')),
+        ),
+      );
+      return;
+    }
+    if (model) {
+      const card = modelCard(model.state, model.proposed);
+      preview.replaceChildren(card);
+      if (focus) card.querySelector<HTMLElement>('[data-question] input, [data-question] select, [data-action="model-save"]')?.focus();
+      return;
+    }
     if (!draft) {
       preview.replaceChildren();
       return;
@@ -219,7 +252,41 @@ export function mountApp(root: Document, deps: AppDeps): void {
     if (el) el.textContent = message;
   };
 
+  const stopModel = (): void => {
+    pending?.abort();
+    pending = null;
+    model = null;
+  };
+
+  const savable = (d: Draft): boolean => d.status === 'ready' || (d.status === 'ask' && (d.question.typed || d.question.options.length > 0));
+
+  /** Sends the sentence to the endpoint. Any failure shows the offline reading, with a line saying why. */
+  const readWithModel = (d: Draft & { text: string }): void => {
+    if (!deps.api) return;
+    const controller = new AbortController();
+    pending = controller;
+    const day = localDay(deps.now());
+    const timezone = deps.timeZone ? deps.timeZone() : Intl.DateTimeFormat().resolvedOptions().timeZone;
+    renderPreview(false);
+    void askModel(deps.api, { sentence: d.text, today: day, timezone }, controller.signal).then((answer) => {
+      // A newer read, an edit or "Leer sin IA" made this answer stale.
+      if (pending !== controller) return;
+      pending = null;
+      if (!answer.ok) {
+        status.textContent = modelErrorMessage(answer.error);
+        renderPreview(true);
+        return;
+      }
+      const v = verdict(d.text, answer.reading, day);
+      draft = v.draft;
+      const proposed = answer.reading.category;
+      model = { state: { verdict: v, answers: {}, today: day }, proposed: proposed !== null && proposed.length <= 40 ? proposed : null };
+      renderPreview(true);
+    });
+  };
+
   const read = (): void => {
+    stopModel();
     draft = readSentence(input.value);
     kindOverride = null;
     if (draft.status === 'no_amount' && draft.text === '') {
@@ -233,6 +300,10 @@ export function mountApp(root: Document, deps: AppDeps): void {
       status.textContent = '';
       hintShown = false;
     }
+    if (deps.api && modelSwitch.checked && !modelToggle.hidden && savable(draft)) {
+      readWithModel(draft);
+      return;
+    }
     renderPreview(true);
   };
 
@@ -240,14 +311,16 @@ export function mountApp(root: Document, deps: AppDeps): void {
   // so Guardar can never save a sentence that is no longer in the box.
   input.addEventListener('input', () => {
     if (!draft) return;
+    stopModel();
     draft = null;
     kindOverride = null;
     renderPreview(false);
   });
 
-  const save = (answer: Answer): void => {
+  const save = (answer: Answer, modelCtx?: Pick<RowContext, 'kind' | 'category' | 'day' | 'via'>): void => {
     if (!draft) return;
-    const ctx = kindOverride ? { now: deps.now(), id: deps.newId(), kind: kindOverride } : { now: deps.now(), id: deps.newId() };
+    const base = { now: deps.now(), id: deps.newId() };
+    const ctx: RowContext = modelCtx ? { ...base, ...modelCtx } : kindOverride ? { ...base, kind: kindOverride } : base;
     const result = resolve(draft, answer, ctx);
     if (!result.ok) {
       showError(result.message);
@@ -256,6 +329,7 @@ export function mountApp(root: Document, deps: AppDeps): void {
     rows = [...rows, result.row];
     persist();
     hintShown = false;
+    model = null;
     draft = null;
     kindOverride = null;
     input.value = '';
@@ -284,9 +358,52 @@ export function mountApp(root: Document, deps: AppDeps): void {
     read();
   });
 
+  const saveModel = (): void => {
+    if (!model) return;
+    const card = preview.querySelector('form[data-action="model-form"]');
+    if (card) model.state.answers = collectAnswers(card, model.state.answers);
+    const result = modelSave(model.state);
+    if (!result.ok) {
+      showError(result.message);
+      return;
+    }
+    const { answer, kind, category, day } = result.save;
+    save(answer, day === null ? { kind, category, via: 'model' } : { kind, category, day, via: 'model' });
+  };
+
+  preview.addEventListener('change', (event) => {
+    // Changing the kind changes which categories can be offered, so the card is drawn again.
+    const target = event.target;
+    if (!model || !(target instanceof HTMLInputElement) || target.name !== 'm-kind') return;
+    const card = preview.querySelector('form[data-action="model-form"]');
+    if (card) model.state.answers = collectAnswers(card, model.state.answers);
+    renderPreview(false);
+    preview.querySelector<HTMLInputElement>(`input[name="m-kind"][value="${target.value}"]`)?.focus();
+  });
+
   preview.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest('button') : null;
     if (!target || !draft) return;
+    const action = target.dataset['action'];
+    if (action === 'model-off') {
+      stopModel();
+      renderPreview(true);
+      return;
+    }
+    if (action === 'model-save') {
+      event.preventDefault();
+      saveModel();
+      return;
+    }
+    if (action === 'model-flip' && model) {
+      const card = preview.querySelector('form[data-action="model-form"]');
+      if (card) model.state.answers = collectAnswers(card, model.state.answers);
+      model.state.answers.kind = modelKind(model.state) === 'income' ? 'expense' : 'income';
+      if (model.state.answers.kind === model.state.verdict.kind) delete model.state.answers.kind;
+      renderPreview(false);
+      preview.querySelector<HTMLElement>('[data-action="model-flip"]')?.focus();
+      return;
+    }
     if (target.dataset['action'] === 'save') save({ type: 'as_read' });
     else if (target.dataset['action'] === 'flip' && draft.status !== 'no_amount' && draft.status !== 'invalid') {
       kindOverride = kindNow(draft) === 'income' ? 'expense' : 'income';
@@ -298,6 +415,10 @@ export function mountApp(root: Document, deps: AppDeps): void {
 
   preview.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (event.target instanceof Element && event.target.matches('form[data-action="model-form"]')) {
+      saveModel();
+      return;
+    }
     const typed = preview.querySelector<HTMLInputElement>('#typed-amount');
     save({ type: 'typed', text: typed?.value ?? '' });
   });
@@ -401,6 +522,27 @@ export function mountApp(root: Document, deps: AppDeps): void {
         event.preventDefault();
         select(target, true);
       }
+    });
+  }
+
+  // ── Model mode ────────────────────────────────────────────────────────────────────────────
+
+  if (deps.api) {
+    const api = deps.api;
+    // Asked at load and again whenever the browser reports it is back online, so a till opened
+    // with no signal gets the switch once it has one.
+    const probe = (): void => {
+      void modelAvailable(api).then((ok) => {
+        modelToggle.hidden = !ok;
+      });
+    };
+    probe();
+    root.defaultView?.addEventListener('online', probe);
+    modelSwitch.addEventListener('change', () => {
+      if (modelSwitch.checked || (!pending && !model)) return;
+      // Turned off with a reading on screen: show the offline one for the same sentence.
+      stopModel();
+      renderPreview(false);
     });
   }
 

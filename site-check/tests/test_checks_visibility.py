@@ -203,7 +203,7 @@ class ContactTest(unittest.TestCase):
         self.assertEqual(classify_whatsapp_number("5491123456789").last4, "6789")
 
     def test_vis15(self) -> None:
-        body = '<a href="https://wa.me/5491123456789">WhatsApp</a><footer><a href="tel:+541145678900">Llamar</a></footer>'
+        body = '<a href="https://wa.me/5491123456789">WhatsApp</a><footer><a href="tel:+541100000000">Llamar</a></footer>'
         self.assertEqual(run(contact.evaluate_vis15, "", body).state, State.APROBADO)
         f = run(contact.evaluate_vis15, "", "<p>Sin botones</p>")
         self.assertEqual(f.state, State.FALLA)

@@ -20,6 +20,8 @@ const here = import.meta.dirname;
 // A URL rather than a joined path, so import-fences sees this read of amount-parser's published data.
 const CORPUS = new URL('../../amount-parser/corpus/corpus.json', import.meta.url);
 const SW_NAME = 'sw.js';
+/** server/dev-server.ts listens here. Not imported from it: that would start the server. */
+const API_PORT = 8787;
 
 /** Every file under `dir`, as forward-slash paths relative to it. Dot files are skipped. */
 function filesUnder(dir: string): string[] {
@@ -91,6 +93,10 @@ export default defineConfig(({ command }) => ({
   base: './',
   define: { __CAJA_DEV__: JSON.stringify(command === 'serve') },
   plugins: [cajaPlugin()],
+  // Model mode's endpoint, when server/dev-server.ts runs. Without it the proxy answers with an
+  // error, the health check fails, and the toggle stays hidden.
+  server: { proxy: { '/api': `http://127.0.0.1:${API_PORT}` } },
+  preview: { proxy: { '/api': `http://127.0.0.1:${API_PORT}` } },
   build: {
     outDir: resolve(here, '../../dist/apps/caja'),
     emptyOutDir: true,

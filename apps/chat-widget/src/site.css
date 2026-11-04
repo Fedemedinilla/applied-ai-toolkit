@@ -1,0 +1,50 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbf8;
+  --text: #1a1d1a;
+  --muted: #545b54;
+  --line: #c9cec7;
+  --accent: #2f6b3a;
+  --on-accent: #ffffff;
+  --focus: #0b57d0;
+  --error: #b3261e;
+  --code: #eef0ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141714;
+    --text: #e9ece8;
+    --muted: #aab2a9;
+    --line: #3b423b;
+    --accent: #8fd19e;
+    --on-accent: #0e1a10;
+    --focus: #a8c7fa;
+    --error: #f2b8b5;
+    --code: #1f241f;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, sans-serif; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.site-head { padding: 24px 16px 8px; max-width: 760px; margin: 0 auto; }
+.brand { margin: 0; font-weight: 700; font-size: 1.25rem; }
+.tag { margin: 4px 0 0; color: var(--muted); }
+.page { max-width: 760px; margin: 0 auto; padding: 8px 16px 120px; }
+h1 { font-size: 1.6rem; line-height: 1.25; }
+h2 { font-size: 1.2rem; margin-top: 2rem; }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.form { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+.form label { font-weight: 600; margin-top: 10px; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%; }
+textarea { resize: vertical; }
+button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 16px; background: var(--accent); color: var(--on-accent); cursor: pointer; align-self: flex-start; margin-top: 12px; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button:disabled { opacity: 0.6; cursor: progress; }
+.hint { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.status { min-height: 1.5em; font-weight: 600; }
+.status.error { color: var(--error); }
+[aria-invalid="true"] { border-color: var(--error); border-width: 2px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.row h2 { margin: 1rem 0 0; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }

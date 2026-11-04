@@ -1,0 +1,292 @@
+/* A plain lab bench: neutral cards, one signal colour for the badge, visible focus everywhere. */
+
+:root {
+  --bg: #f4f5f2;
+  --surface: #ffffff;
+  --ink: #17201c;
+  --muted: #55605a;
+  --line: #d4d9d3;
+  --accent: #1d5c4a;
+  --accent-ink: #ffffff;
+  --signal: #c2410c;
+  --signal-ink: #ffffff;
+  --focus: #1f5f99;
+  --radius: 10px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121614;
+    --surface: #1b211e;
+    --ink: #e6ebe7;
+    --muted: #a3ada7;
+    --line: #333d38;
+    --accent: #7fcfb4;
+    --accent-ink: #0f1a16;
+    --signal: #fb8a4c;
+    --signal-ink: #1a0d05;
+    --focus: #8cc4ff;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 40rem;
+  padding: 0 16px 48px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+h1, h2 {
+  line-height: 1.2;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+a {
+  color: var(--focus);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0 12px;
+}
+
+.mark {
+  flex: none;
+  border-radius: 9px;
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+main {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card > p {
+  margin: 0 0 12px;
+}
+
+.step {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.875rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.steps {
+  margin: 0 0 12px;
+  padding-left: 1.25rem;
+}
+
+.steps li + li {
+  margin-top: 4px;
+}
+
+button {
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+fieldset {
+  border: 0;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.choice input {
+  margin-top: 0.3rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.counter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.counter output {
+  min-width: 3rem;
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--signal);
+  color: var(--signal-ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  margin: 8px 0 0;
+  min-height: 1.5em;
+  color: var(--muted);
+}
+
+/* Empty live regions collapse but stay rendered. A region that goes from display: none to visible
+   together with its text is often not announced (VoiceOver in particular), because it was not in
+   the accessibility tree when the text changed. */
+.status:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+.note:empty {
+  padding: 0;
+  border: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.note {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.log {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.log:empty::before {
+  content: 'Todavía no hay eventos.';
+  color: var(--muted);
+}
+
+.log li + li {
+  border-top: 1px solid var(--line);
+}
+
+.log li {
+  padding: 4px 0;
+}
+
+.log time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#diagnose-body p,
+#diagnose-body ul {
+  margin: 8px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

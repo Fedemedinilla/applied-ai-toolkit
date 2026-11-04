@@ -1,0 +1,30 @@
+{
+  "name": "Colegio Bilingüe Monte Lirio",
+  "fictional": true,
+  "timeZone": "America/Argentina/Buenos_Aires",
+  "description": "A fictional bilingual school (Spanish and English) with kindergarten, primary and secondary levels.",
+  "facts": [
+    "Colegio Bilingüe Monte Lirio es un colegio ficticio con Nivel Inicial, Primaria y Secundaria.",
+    "Las clases se dictan en español y en inglés desde Nivel Inicial.",
+    "La Secretaría atiende consultas de familias por correo en secretaria@montelirio.example.",
+    "Las autorizaciones y formularios se envían por la plataforma escolar, en la sección Formularios.",
+    "Las comunicaciones a familias salen por la plataforma escolar y por correo."
+  ],
+  "style": [
+    "Escribir en español neutro de América Latina. Tratar a las familias de \"ustedes\" y nunca de \"vos\".",
+    "Abrir con el dato principal: qué pasa, cuándo y a quién afecta. El saludo va en una sola línea: \"Estimadas familias:\".",
+    "Oraciones de hasta 25 palabras. Un párrafo por idea.",
+    "Fechas como \"jueves 12 de noviembre\" y horas como \"8:30\", sin \"hs\".",
+    "Nada de signos de exclamación en comunicados formales. Como máximo uno en celebraciones.",
+    "Nombrar a las personas por su función (\"la Coordinación de Primaria\"), no por su nombre, salvo que el pedido lo dé.",
+    "Cerrar con la firma del rol en su propia línea. Sin posdatas.",
+    "Usar **negrita** solo para la fecha, la hora o el plazo principal. Listas con \"- \" solo para tres o más elementos."
+  ],
+  "vocabulary": [
+    { "use": "estudiantes", "avoid": ["chicos", "alumnitos", "nenes"] },
+    { "use": "familias", "avoid": ["papis", "padres"] },
+    { "use": "docentes", "avoid": ["profes", "seños"] },
+    { "use": "salida educativa", "avoid": ["excursión", "paseo"] },
+    { "use": "suspensión de clases", "avoid": ["día libre"] }
+  ]
+}

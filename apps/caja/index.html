@@ -51,6 +51,11 @@
             <button type="submit" class="primary">Leer</button>
           </div>
           <p class="hint" id="entry-hint">Escribilo como se lo dirías a alguien. Nada se guarda hasta que lo confirmes.</p>
+          <div class="check model-toggle" id="model-toggle" hidden>
+            <input id="model-mode" type="checkbox" aria-describedby="model-hint">
+            <label for="model-mode">Leer con IA</label>
+            <p class="hint" id="model-hint">Manda la frase a un servidor. El monto lo sigue leyendo el lector de montos; si algo no coincide, te pregunta.</p>
+          </div>
           <div class="examples" role="group" aria-label="Frases de ejemplo">
             <button type="button" data-example="vendí 3 docenas a 12 mil la docena">vendí 3 docenas a 12 mil la docena</button>
             <button type="button" data-example="pagué la luz 45 lucas">pagué la luz 45 lucas</button>
@@ -103,7 +108,8 @@
         <p>Escribís o dictás lo que pasó, como se lo contarías a alguien: «vendí 3 docenas a 12 mil la docena». Un lector de montos busca la plata en la frase y hace la cuenta: 3 por 12 mil, 36.000. Las palabras de donde sacó el número quedan marcadas, para que veas qué leyó.</p>
         <p>Si la frase se puede entender de dos maneras, no elige por vos. «Vendí 5 tortas a 8000» puede ser 8000 cada una o 8000 por todas, así que te pregunta y guarda recién cuando respondés.</p>
         <p>Si es ingreso o gasto y la categoría salen de palabras clave: «vendí» es ingreso, «harina» es materia prima, «luz» es un servicio. Al lado de cada dato ves qué palabra lo decidió. Si no está bien, lo cambiás antes de guardar.</p>
-        <p>No hay inteligencia artificial en el medio ni servidor: todo pasa en tu teléfono, la misma frase da siempre el mismo número y la app anda sin conexión una vez que la abriste. Los movimientos quedan guardados en este navegador. Para pasarlos a una planilla, usá «Exportar CSV».</p>
+        <p>Sin el modo con IA no hay servidor en el medio: todo pasa en tu teléfono, la misma frase da siempre el mismo número y la app anda sin conexión una vez que la abriste. Los movimientos quedan guardados en este navegador. Para pasarlos a una planilla, usá «Exportar CSV».</p>
+        <p>Si la caja está instalada con su servidor, aparece «Leer con IA». Con eso activado, un modelo de lenguaje lee el tipo, la categoría y el día («ayer», «el martes»). El monto no lo decide el modelo: sale siempre del lector de montos, y si los dos leen distinto, o la categoría no es de la lista, la app te pregunta antes de guardar. El servidor tiene un tope de gasto por mes; si se llega, la caja sigue andando sin IA.</p>
         <p>El dictado usa el reconocimiento de voz del navegador. En algunos navegadores eso manda el audio a un servidor y necesita conexión; si no está disponible, el botón no aparece.</p>
         <p>El código está en <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/apps/caja">github.com/Fedemedinilla/applied-ai-toolkit</a>, junto con el <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/amount-parser">lector de montos</a> y sus 165 frases de prueba.</p>
       </section>

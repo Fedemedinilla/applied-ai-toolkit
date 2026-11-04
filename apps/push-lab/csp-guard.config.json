@@ -1,0 +1,33 @@
+{
+  "csp": {
+    "from": "literal",
+    "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+  },
+  "policy": {
+    "default-src": ["'self'"],
+    "script-src": ["'self'"],
+    "style-src": ["'self'"],
+    "img-src": ["'self'", "data:"],
+    "connect-src": ["'self'"],
+    "manifest-src": ["'self'"],
+    "worker-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "frame-ancestors": ["'none'"]
+  },
+  "secrets": { "env": ["PUSH_LAB_VAPID_PRIVATE_KEY"], "missing": "skip" },
+  "lookbehind": {
+    "targets": {
+      "safari": "16.4",
+      "ios": "16.4",
+      "chrome": 109
+    }
+  },
+  "budgets": [
+    {
+      "pages": "index.html",
+      "gzipKb": 12,
+      "brotliKb": 10
+    }
+  ]
+}

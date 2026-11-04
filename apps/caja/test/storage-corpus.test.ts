@@ -35,6 +35,15 @@ describe('storage', () => {
     expect([...store.data.keys()]).toEqual([STORAGE_KEY]);
   });
 
+  it('keeps the model-mode fields and drops rows where they are malformed', () => {
+    const store = new MemoryStore();
+    const dated: Row = { ...good, id: 'm', day: '2026-11-03', via: 'model' };
+    store.setItem(STORAGE_KEY, JSON.stringify([dated, { ...dated, id: 'x', day: 'ayer' }, { ...dated, id: 'y', via: 'magic' }]));
+    const loaded = loadRows(store, 't');
+    expect(loaded.rows).toEqual([dated]);
+    expect(loaded.dropped).toBe(2);
+  });
+
   it('leaves out entries that are not rows, counts them, and keeps a copy of the raw text', () => {
     const store = new MemoryStore();
     const raw = JSON.stringify([good, { ...good, amount: -5 }, { ...good, category: 'Inventada' }, { ...good, at: 'ayer' }, 'texto', null]);

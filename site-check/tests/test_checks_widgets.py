@@ -172,10 +172,10 @@ class WidgetFamiliesTest(unittest.TestCase):
 
     def test_a_real_link_still_wins_over_the_widget(self) -> None:
         # The widget changes nothing when the home has a tel: link in the footer (APROBADO, as before).
-        html = '<footer><a href="tel:+541145678900">4567-8900</a></footer><script src="https://code.tidio.co/abc.js"></script>'
+        html = '<footer><a href="tel:+541100000000">0000-0000</a></footer><script src="https://code.tidio.co/abc.js"></script>'
         f = vis15(html)
         self.assertEqual((f.state, f.measured["plugin_marker"]), (State.APROBADO, "tidio"))
-        control = vis15('<footer><a href="tel:+541145678900">4567-8900</a></footer>')
+        control = vis15('<footer><a href="tel:+541100000000">0000-0000</a></footer>')
         self.assertEqual((control.state, control.measured["plugin_marker"]), (State.APROBADO, None))
 
 
@@ -209,7 +209,7 @@ class PageTextTest(unittest.TestCase):
 # end to end, a site whose only button is an Elfsight script
 # ---------------------------------------------------------------------------
 
-TEL_FOOTER = '<p>Tel: <a href="tel:+541145678900">4567-8900</a></p>\n'
+TEL_FOOTER = '<p>Tel: <a href="tel:+541100000000">0000-0000</a></p>\n'
 ELFSIGHT = (
     '<script src="https://elfsightcdn.com/platform.js" async></script>\n'
     '<div class="elfsight-app-0a1b2c3d-4e5f-6789-abcd-ef0123456789" data-elfsight-app-lazy></div>\n</body>'

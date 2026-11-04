@@ -39,7 +39,9 @@ function isRow(value: unknown): value is Row {
     (r['keyword'] === null || typeof r['keyword'] === 'string') &&
     typeof r['sentence'] === 'string' &&
     typeof r['literal'] === 'string' &&
-    typeof r['approximate'] === 'boolean'
+    typeof r['approximate'] === 'boolean' &&
+    (r['day'] === undefined || (typeof r['day'] === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(r['day']))) &&
+    (r['via'] === undefined || r['via'] === 'model')
   );
 }
 

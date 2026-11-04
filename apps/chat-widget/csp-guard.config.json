@@ -1,0 +1,29 @@
+{
+  "csp": {
+    "from": "literal",
+    "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+  },
+  "policy": {
+    "default-src": ["'self'"],
+    "script-src": ["'self'"],
+    "style-src": ["'self'"],
+    "img-src": ["'self'", "data:"],
+    "connect-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'none'"],
+    "form-action": ["'self'"],
+    "frame-ancestors": ["'none'"]
+  },
+  "secrets": { "env": ["ANTHROPIC_API_KEY", "CHAT_WIDGET_SESSION_SECRET", "CHAT_WIDGET_ADMIN_PASSWORD"], "missing": "skip" },
+  "lookbehind": {
+    "targets": {
+      "safari": "16.4",
+      "ios": "16.4",
+      "chrome": 109
+    }
+  },
+  "budgets": [
+    { "pages": "index.html", "gzipKb": 6, "brotliKb": 5 },
+    { "pages": "panel/index.html", "gzipKb": 4, "brotliKb": 4 }
+  ]
+}

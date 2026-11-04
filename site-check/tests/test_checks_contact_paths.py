@@ -611,7 +611,7 @@ class MailDomainCollectorTest(unittest.TestCase):
 
     def test_the_role_address_of_the_contact_page(self) -> None:
         home = '<a href="/contacto/">Contacto</a><a href="mailto:mlopez@viejo.test">Escribir</a>'
-        interna = '<a href="mailto:Admisiones@viejo.test">Admisiones</a><a href="mailto:consultas@hotmail.es">Consultas</a>'
+        interna = '<a href="mailto:Admisiones@viejo.test">Admisiones</a><a href="mailto:consultas-ficticia@hotmail.es">Consultas</a>'
         obs, services = self.collect(home, interna)
         survey = obs.mail_domains
         self.assertEqual(
@@ -818,7 +818,7 @@ class MailDomainCollectionTest(unittest.TestCase):
             '<a href="mailto:jperez@colegio-viejo.test">Escribir</a> '
             '<a href="mailto:secretaria@colegio-viejo.test">Secretaría (anterior)</a> '
             '<a href="mailto:admisiones-ficticia@gmail.com">Admisiones</a> '
-            '<a href="mailto:consultas@hotmail.es">Consultas</a> '
+            '<a href="mailto:consultas-ficticia@hotmail.es">Consultas</a> '
             '<a href="mailto:prensa@solo-a.test">Prensa</a>'
         )
         sc = with_home(options, ('<a href="mailto:info@colegio.test">Correo de secretaría</a>', mailtos))
