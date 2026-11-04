@@ -1,0 +1,4 @@
+{
+  "runtime": "nodejs24.x",
+  "handler": "index.mjs"
+}

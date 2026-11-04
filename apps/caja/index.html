@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Caja</title>
+    <meta name="description" content="Libro de caja para un negocio chico: escribís o dictás lo que pasó y queda anotado. Funciona sin conexión.">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f2e8" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#16150f" media="(prefers-color-scheme: dark)">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <a class="skip" href="#entry-input">Ir a anotar</a>
+    <header class="top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+          <rect width="512" height="512" rx="96" fill="currentColor"/>
+          <path d="M136 96H376V400L356 424L336 400L316 424L296 400L276 424L256 400L236 424L216 400L196 424L176 400L156 424L136 400Z" fill="var(--paper)"/>
+          <rect x="168" y="150" width="176" height="20" rx="4" fill="currentColor"/>
+          <rect x="168" y="200" width="132" height="20" rx="4" fill="currentColor"/>
+          <rect x="160" y="262" width="192" height="44" rx="6" fill="var(--hl)"/>
+          <rect x="176" y="276" width="160" height="16" rx="4" fill="currentColor"/>
+          <rect x="168" y="340" width="92" height="16" rx="4" fill="currentColor"/>
+        </svg>
+        <div>
+          <h1>Caja</h1>
+          <p class="sub">Libro de caja de una panadería de ejemplo</p>
+        </div>
+      </div>
+      <p class="today" id="today"></p>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" id="tab-caja" aria-controls="panel-caja" aria-selected="true">Caja</button>
+      <button type="button" role="tab" id="tab-frases" aria-controls="panel-frases" aria-selected="false" tabindex="-1">Frases</button>
+      <button type="button" role="tab" id="tab-como" aria-controls="panel-como" aria-selected="false" tabindex="-1">Cómo funciona</button>
+    </nav>
+
+    <main>
+      <section id="panel-caja" role="tabpanel" aria-labelledby="tab-caja" class="panel">
+        <form id="entry-form" class="entry" autocomplete="off">
+          <label for="entry-input">¿Qué pasó?</label>
+          <div class="entry-row">
+            <input id="entry-input" name="frase" type="text" enterkeyhint="done" spellcheck="false"
+                   placeholder="vendí 3 docenas a 12 mil la docena" aria-describedby="entry-hint">
+            <button type="button" id="dictate" class="secondary" aria-pressed="false" hidden>Dictar</button>
+            <button type="submit" class="primary">Leer</button>
+          </div>
+          <p class="hint" id="entry-hint">Escribilo como se lo dirías a alguien. Nada se guarda hasta que lo confirmes.</p>
+          <div class="examples" role="group" aria-label="Frases de ejemplo">
+            <button type="button" data-example="vendí 3 docenas a 12 mil la docena">vendí 3 docenas a 12 mil la docena</button>
+            <button type="button" data-example="pagué la luz 45 lucas">pagué la luz 45 lucas</button>
+            <button type="button" data-example="vendí 5 tortas a 8000">vendí 5 tortas a 8000</button>
+            <button type="button" data-example="compré 2 bolsas de harina a 22.500 la bolsa">compré 2 bolsas de harina a 22.500 la bolsa</button>
+          </div>
+        </form>
+
+        <div id="preview" class="preview" aria-live="polite"></div>
+        <p id="status" class="status" role="status"></p>
+
+        <section class="book" aria-labelledby="book-title">
+          <div class="book-head">
+            <h2 id="book-title">Movimientos</h2>
+            <div class="book-actions">
+              <button type="button" id="undo" class="secondary">Deshacer el último</button>
+              <button type="button" id="export" class="secondary">Exportar CSV</button>
+            </div>
+          </div>
+          <p id="storage-warning" class="warning" hidden></p>
+          <div id="days"></div>
+        </section>
+      </section>
+
+      <section id="panel-frases" role="tabpanel" aria-labelledby="tab-frases" class="panel" hidden>
+        <h2>Las frases de prueba</h2>
+        <p class="lead">Todas las frases con las que se prueba el lector de montos, con lo que tienen que dar y lo que da en este navegador, ahora. Las notas están en inglés, como en el repositorio.</p>
+        <form id="corpus-filter" class="filters" role="search">
+          <div class="field">
+            <label for="corpus-q">Buscar</label>
+            <input id="corpus-q" type="search" placeholder="docena, iva, cuotas">
+          </div>
+          <div class="field">
+            <label for="corpus-family">Familia</label>
+            <select id="corpus-family">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="check">
+            <input id="corpus-asks" type="checkbox">
+            <label for="corpus-asks">Solo las que preguntan</label>
+          </div>
+        </form>
+        <p id="corpus-count" class="count" aria-live="polite"></p>
+        <ol id="corpus-list" class="corpus"></ol>
+      </section>
+
+      <section id="panel-como" role="tabpanel" aria-labelledby="tab-como" class="panel prose" hidden>
+        <h2>Cómo funciona</h2>
+        <p>Escribís o dictás lo que pasó, como se lo contarías a alguien: «vendí 3 docenas a 12 mil la docena». Un lector de montos busca la plata en la frase y hace la cuenta: 3 por 12 mil, 36.000. Las palabras de donde sacó el número quedan marcadas, para que veas qué leyó.</p>
+        <p>Si la frase se puede entender de dos maneras, no elige por vos. «Vendí 5 tortas a 8000» puede ser 8000 cada una o 8000 por todas, así que te pregunta y guarda recién cuando respondés.</p>
+        <p>Si es ingreso o gasto y la categoría salen de palabras clave: «vendí» es ingreso, «harina» es materia prima, «luz» es un servicio. Al lado de cada dato ves qué palabra lo decidió. Si no está bien, lo cambiás antes de guardar.</p>
+        <p>No hay inteligencia artificial en el medio ni servidor: todo pasa en tu teléfono, la misma frase da siempre el mismo número y la app anda sin conexión una vez que la abriste. Los movimientos quedan guardados en este navegador. Para pasarlos a una planilla, usá «Exportar CSV».</p>
+        <p>El dictado usa el reconocimiento de voz del navegador. En algunos navegadores eso manda el audio a un servidor y necesita conexión; si no está disponible, el botón no aparece.</p>
+        <p>El código está en <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/apps/caja">github.com/Fedemedinilla/applied-ai-toolkit</a>, junto con el <a href="https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/amount-parser">lector de montos</a> y sus 165 frases de prueba.</p>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

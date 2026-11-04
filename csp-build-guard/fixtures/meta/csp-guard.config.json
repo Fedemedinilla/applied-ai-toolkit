@@ -1,0 +1,60 @@
+{
+  "csp": {
+    "from": "meta"
+  },
+  "policy": {
+    "default-src": [
+      "'self'"
+    ],
+    "script-src": {
+      "sources": [
+        "'self'"
+      ],
+      "hashes": true
+    },
+    "style-src": {
+      "sources": [
+        "'self'"
+      ],
+      "hashes": true
+    },
+    "img-src": [
+      "'self'",
+      "data:"
+    ],
+    "connect-src": [
+      "'self'"
+    ],
+    "base-uri": [
+      "'self'"
+    ],
+    "object-src": [
+      "'none'"
+    ],
+    "form-action": [
+      "'self'"
+    ]
+  },
+  "secrets": {
+    "env": [
+      "FIXTURE_SECRET"
+    ]
+  },
+  "lookbehind": {
+    "targets": {
+      "safari": "15.6",
+      "chrome": 109
+    }
+  },
+  "budgets": [
+    {
+      "pages": "index.html",
+      "gzipKb": 1,
+      "brotliKb": 1
+    },
+    {
+      "pages": "**/*.html",
+      "gzipKb": 2
+    }
+  ]
+}

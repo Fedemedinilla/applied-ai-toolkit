@@ -1,0 +1,31 @@
+{
+  "csp": {
+    "from": "literal",
+    "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'"
+  },
+  "policy": {
+    "default-src": ["'self'"],
+    "script-src": ["'self'"],
+    "style-src": ["'self'"],
+    "img-src": ["'self'", "data:"],
+    "connect-src": ["'self'"],
+    "manifest-src": ["'self'"],
+    "worker-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"]
+  },
+  "lookbehind": {
+    "targets": {
+      "safari": "15.6",
+      "ios": "15.6",
+      "chrome": 109
+    }
+  },
+  "budgets": [
+    {
+      "pages": "index.html",
+      "gzipKb": 20,
+      "brotliKb": 18
+    }
+  ]
+}

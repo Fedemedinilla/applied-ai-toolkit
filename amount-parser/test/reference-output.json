@@ -1,0 +1,2503 @@
+[
+ {
+  "phrase": "compre 3 docenas de facturas a 12 mil la docena",
+  "output": {
+   "value": 36000,
+   "literal": "3 x 12 mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 12000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 12 empanadas a 1500 c/u",
+  "output": {
+   "value": 18000,
+   "literal": "12 x 1500",
+   "source": "computed",
+   "quantity": 12,
+   "unitPrice": 1500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 5 tortas a 8000",
+  "output": {
+   "value": null,
+   "literal": "vendi 5 tortas a 8000",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me lleve 2 kilos de milanesa a 12.500 el kilo",
+  "output": {
+   "value": 25000,
+   "literal": "2 x 12.500",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 12500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compré dos bolsas de harina a 22.500 la bolsa",
+  "output": {
+   "value": 45000,
+   "literal": "2 x 22.500",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 22500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "a 14 mil el kilo me lleve 3 kilos de asado",
+  "output": {
+   "value": 42000,
+   "literal": "3 x 14 mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 14000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 3 pares de medias por 5000",
+  "output": {
+   "value": 5000,
+   "literal": "5000",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cargue 25 litros a 1.480 el litro",
+  "output": {
+   "value": 37000,
+   "literal": "25 x 1.480",
+   "source": "computed",
+   "quantity": 25,
+   "unitPrice": 1480,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "le vendí 100 empanadas a 1200 la unidad",
+  "output": {
+   "value": 120000,
+   "literal": "100 x 1200",
+   "source": "computed",
+   "quantity": 100,
+   "unitPrice": 1200,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 10 maples de huevos 8 mil por unidad",
+  "output": {
+   "value": 80000,
+   "literal": "10 x 8 mil",
+   "source": "computed",
+   "quantity": 10,
+   "unitPrice": 8000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 2 sillas de plastico 45 mil",
+  "output": {
+   "value": 45000,
+   "literal": "45 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 3 changas a 50 lucas",
+  "output": {
+   "value": null,
+   "literal": "cobre 3 changas a 50 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre kilo y medio de jamon crudo a 18 mil el kilo",
+  "output": {
+   "value": 27000,
+   "literal": "1.5 x 18 mil",
+   "source": "computed",
+   "quantity": 1.5,
+   "unitPrice": 18000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi veinte docenas de facturas a quince mil la docena",
+  "output": {
+   "value": 300000,
+   "literal": "20 x quince mil",
+   "source": "computed",
+   "quantity": 20,
+   "unitPrice": 15000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "hice 5 destapaciones a 35 lucas cada una",
+  "output": {
+   "value": 175000,
+   "literal": "5 x 35 lucas",
+   "source": "computed",
+   "quantity": 5,
+   "unitPrice": 35000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me llevé 200 vasos descartables por 60 mil en total",
+  "output": {
+   "value": 60000,
+   "literal": "60 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "3 tarros de pintura latex 32 lucas el tarro",
+  "output": {
+   "value": 96000,
+   "literal": "3 x 32 lucas",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 32000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste 15 lucas en la verduleria",
+  "output": {
+   "value": 15000,
+   "literal": "15 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me pagaron 2 palos por el techo",
+  "output": {
+   "value": 2000000,
+   "literal": "2 palos",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 3 cajas de tornillos a 2 lucas cada una",
+  "output": {
+   "value": 6000,
+   "literal": "3 x 2 lucas",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 2000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "puse 20k de nafta",
+  "output": {
+   "value": 20000,
+   "literal": "20 k",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el flete me salio una fortuna",
+  "output": null
+ },
+ {
+  "phrase": "vendi 5 docenas de facturas a 6 lucas",
+  "output": {
+   "value": null,
+   "literal": "vendi 5 docenas de facturas a 6 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el arreglo de la camioneta me salio un palo y medio",
+  "output": {
+   "value": 1500000,
+   "literal": "un palo y medio",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "le pague 30 lucas y pico al gasista",
+  "output": {
+   "value": 30000,
+   "literal": "30 lucas y pico",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "me cobraron dos mangos por el arreglo",
+  "output": null
+ },
+ {
+  "phrase": "cobre dos mil quinientos por el delivery",
+  "output": {
+   "value": 2500,
+   "literal": "dos mil quinientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vino la luz 87.430,25",
+  "output": {
+   "value": 87430.25,
+   "literal": "87.430,25",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el estacionamiento me salio 25 gambas",
+  "output": {
+   "value": 2500,
+   "literal": "25 gambas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me deposito el cliente 250 mil pesos",
+  "output": {
+   "value": 250000,
+   "literal": "250 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 2 bolsas de harina a 18500 c/u",
+  "output": {
+   "value": 37000,
+   "literal": "2 x 18500",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 18500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "20 lucas la caja de vino, lleve 6",
+  "output": {
+   "value": 120000,
+   "literal": "6 x 20 lucas",
+   "source": "computed",
+   "quantity": 6,
+   "unitPrice": 20000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobré medio palo por el mural",
+  "output": {
+   "value": 500000,
+   "literal": "medio palo",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste $45 mil en insumos",
+  "output": {
+   "value": 45000,
+   "literal": "45 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "los alfajores salieron 4 lucas y monedas",
+  "output": {
+   "value": 4000,
+   "literal": "4 lucas y monedas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "eh gaste veinte no pera treinta mil en nafta",
+  "output": {
+   "value": 30000,
+   "literal": "treinta mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre tres bolsas de harina a ocho mil cada una",
+  "output": {
+   "value": 24000,
+   "literal": "3 x ocho mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 8000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi cinco tortas a ocho mil",
+  "output": {
+   "value": null,
+   "literal": "vendi cinco tortas a ocho mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "a ver pague la luz veintitres mil quinientos",
+  "output": {
+   "value": 23500,
+   "literal": "veintitres mil quinientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre dos palos y medio por el laburo de la cocina",
+  "output": {
+   "value": 2500000,
+   "literal": "dos palos y medio",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste sesenta 1000 en el mayorista",
+  "output": {
+   "value": 60000,
+   "literal": "sesenta 1000",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "puse ciento cincuenta lucas de nafta en la camioneta",
+  "output": {
+   "value": 150000,
+   "literal": "ciento cincuenta lucas",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "veinticinco mil de la verduleria",
+  "output": {
+   "value": 25000,
+   "literal": "veinticinco mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me entraron trescientos cincuenta y siete mil ochocientos de la transferencia",
+  "output": {
+   "value": 357800,
+   "literal": "trescientos cincuenta y siete mil ochocientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "salieron cuatro mil quinientos cada uno y me lleve seis",
+  "output": {
+   "value": 27000,
+   "literal": "6 x cuatro mil quinientos",
+   "source": "computed",
+   "quantity": 6,
+   "unitPrice": 4500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre dos cajas de doce gaseosas a mil doscientos cada una",
+  "output": {
+   "value": null,
+   "literal": "compre dos cajas de doce gaseosas a mil doscientos cada una",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "several_quantities",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "che eh no se si lo anote gaste cuarenta y cinco mil quinientos en la ferreteria",
+  "output": {
+   "value": 45500,
+   "literal": "cuarenta y cinco mil quinientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi el sillon en un palo y pico",
+  "output": {
+   "value": null,
+   "literal": "un palo y pico",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "open_remainder",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "eh sali a comprar y gaste ochenta mil en el mayorista y otros quince mil en el chino",
+  "output": {
+   "value": 95000,
+   "literal": "ochenta mil + quince mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre veinte mil pesos por el arreglo del termotanque",
+  "output": {
+   "value": 20000,
+   "literal": "veinte mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pera no me acuerdo cuanto salio el flete lo tengo que preguntar",
+  "output": null
+ },
+ {
+  "phrase": "me depositaron un millon doscientos de la factura de julio",
+  "output": {
+   "value": 1200000,
+   "literal": "un millon doscientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi tres docenas de empanadas a mil quinientos la unidad",
+  "output": {
+   "value": 54000,
+   "literal": "36 x mil quinientos",
+   "source": "computed",
+   "quantity": 36,
+   "unitPrice": 1500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "eh pague la mitad ahora fueron ciento veinte mil y el resto la semana que viene",
+  "output": {
+   "value": 120000,
+   "literal": "ciento veinte mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 45 lucas por el arreglo del baño",
+  "output": {
+   "value": 45000,
+   "literal": "45 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me pagaron 3 fletes a 25 lucas",
+  "output": {
+   "value": null,
+   "literal": "me pagaron 3 fletes a 25 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 3 docenas de facturas a 8500 cada una",
+  "output": {
+   "value": 25500,
+   "literal": "3 x 8500",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 8500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendí 2 kilos de queso a 9.800 el kilo",
+  "output": {
+   "value": 19600,
+   "literal": "2 x 9.800",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 9800,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "entro 200 mil de la venta de la mañana",
+  "output": {
+   "value": 200000,
+   "literal": "200 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cierre del dia 1.240.700",
+  "output": {
+   "value": 1240700,
+   "literal": "1.240.700",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me transfirieron un palo y medio por la cocina",
+  "output": {
+   "value": 1500000,
+   "literal": "un palo y medio",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me depositaron el adelanto, 250k",
+  "output": {
+   "value": 250000,
+   "literal": "250 k",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "facture 2 melones este mes",
+  "output": {
+   "value": 2000000,
+   "literal": "2 melones",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre veinticinco mil quinientos por el service",
+  "output": {
+   "value": 25500,
+   "literal": "veinticinco mil quinientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 100 lucas y pico por la instalacion",
+  "output": {
+   "value": 100000,
+   "literal": "100 lucas y pico",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "me pagaron 50 mil de los 120 que me debian",
+  "output": {
+   "value": 50000,
+   "literal": "50 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me dejaron 30 mil de seña",
+  "output": {
+   "value": 30000,
+   "literal": "30 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me devolvieron 15 mil del pedido que no llego",
+  "output": {
+   "value": 15000,
+   "literal": "15 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me prestaron 500 mil para la heladera",
+  "output": {
+   "value": 500000,
+   "literal": "500 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "le pague 60 mil al gasista",
+  "output": {
+   "value": 60000,
+   "literal": "60 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me cobraron 8500 de comision en mercado pago",
+  "output": {
+   "value": 8500,
+   "literal": "8500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 15 gaste 20 mil en la verduleria",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "a las 8 pague 4500 de nafta",
+  "output": {
+   "value": 4500,
+   "literal": "4500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "emiti la factura 1234 por 89 mil",
+  "output": {
+   "value": 89000,
+   "literal": "89 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre por 50 mil con 20% de descuento",
+  "output": {
+   "value": null,
+   "literal": "compre por 50 mil con 20% de descuento",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "discount_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 50 lucas menos el 10 de descuento",
+  "output": {
+   "value": 45000,
+   "literal": "50 lucas - 10%",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 3 de agosto me pagaron 120 lucas del laburo de palermo",
+  "output": {
+   "value": 120000,
+   "literal": "120 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 35 mil por el trabajo en rivadavia 2350",
+  "output": {
+   "value": 35000,
+   "literal": "35 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vino la boleta de luz con 320 kw, 18.750,40",
+  "output": {
+   "value": 18750.4,
+   "literal": "18.750,40",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cargue 20 litros de gasoil, 18500",
+  "output": {
+   "value": 18500,
+   "literal": "18500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pedido 88 lo cobre 12.500",
+  "output": {
+   "value": 12500,
+   "literal": "12.500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 10 vendi 4 a 15 mil",
+  "output": {
+   "value": null,
+   "literal": "el 10 vendi 4 a 15 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el cliente del 1122334455 me transfirio 80 mil",
+  "output": {
+   "value": 80000,
+   "literal": "80 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "lo saque en 3 cuotas de 25 mil",
+  "output": {
+   "value": 75000,
+   "literal": "3 x 25 mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 25000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "facture 100 mil mas iva",
+  "output": {
+   "value": null,
+   "literal": "facture 100 mil mas iva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "tax_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "hice 120 km de flete y cobre 45 mil",
+  "output": {
+   "value": 45000,
+   "literal": "45 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "10 bolsas de cemento 145 mil",
+  "output": {
+   "value": 145000,
+   "literal": "145 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 25 mil por 3 kilos de peceto",
+  "output": {
+   "value": 25000,
+   "literal": "25 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 2 docenas a 6 lucas la docena",
+  "output": {
+   "value": 12000,
+   "literal": "2 x 6 lucas",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 6000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "ayer gaste 15 mil en la verduleria",
+  "output": {
+   "value": 15000,
+   "literal": "15 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "anteayer cobre 120 lucas del laburo de plomeria",
+  "output": {
+   "value": 120000,
+   "literal": "120 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 15 me pagaron 15 mil",
+  "output": {
+   "value": 15000,
+   "literal": "15 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el jueves 12 gaste 12 lucas en insumos",
+  "output": {
+   "value": 12000,
+   "literal": "12 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "El 3 de agosto cobre 250 mil de la obra",
+  "output": {
+   "value": 250000,
+   "literal": "250 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 20 de junio me depositaron 1.250.500 por la obra del centro",
+  "output": {
+   "value": 1250500,
+   "literal": "1.250.500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "hoy temprano puse 30 lucas de nafta",
+  "output": {
+   "value": 30000,
+   "literal": "30 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "recien pague 8500 de la boleta del gas",
+  "output": {
+   "value": 8500,
+   "literal": "8500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "a principios de mes pague el alquiler, 320 mil",
+  "output": {
+   "value": 320000,
+   "literal": "320 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el martes pasado vendi 3 tortas a 8000 cada una",
+  "output": {
+   "value": 24000,
+   "literal": "3 x 8000",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 8000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "la semana pasada compre 20 kilos de harina a 1200 el kilo",
+  "output": {
+   "value": 24000,
+   "literal": "20 x 1200",
+   "source": "computed",
+   "quantity": 20,
+   "unitPrice": 1200,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el viernes vendi 5 docenas a 12 mil",
+  "output": {
+   "value": null,
+   "literal": "el viernes vendi 5 docenas a 12 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "ayer compre 6 cajones de tomate, 45 lucas todo",
+  "output": {
+   "value": 45000,
+   "literal": "45 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "hace dos dias le pague 80 mil al pintor",
+  "output": {
+   "value": 80000,
+   "literal": "80 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el jeuves pague 22 lucas de luz",
+  "output": {
+   "value": 22000,
+   "literal": "22 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el mes pasado se me fueron como 200 mil en fletes",
+  "output": {
+   "value": 200000,
+   "literal": "200 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el finde pasado gaste 32.500,50 en el super",
+  "output": {
+   "value": 32500.5,
+   "literal": "32.500,50",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el martes pague la boleta del agua pero no me acuerdo cuanto",
+  "output": null
+ },
+ {
+  "phrase": "manana pago 40 mil de monotributo",
+  "output": {
+   "value": 40000,
+   "literal": "40 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "anoche cobre 2 palos y medio por la camioneta",
+  "output": {
+   "value": 2500000,
+   "literal": "2 palos y medio",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 5 mil de luz y 3 mil de gas",
+  "output": {
+   "value": 8000,
+   "literal": "5 mil + 3 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste 12.500 en internet y 8.300 en el cable",
+  "output": {
+   "value": 20800,
+   "literal": "12.500 + 8.300",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "15 mil mas 2 mil de envio",
+  "output": {
+   "value": 17000,
+   "literal": "15 mil + 2 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 3 bolsas de cemento a 9500 cada una mas 4 mil de flete",
+  "output": {
+   "value": 32500,
+   "literal": "3 x 9500",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 9500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "como 20 mil en la verduleria",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "unos 15 lucas de nafta",
+  "output": {
+   "value": 15000,
+   "literal": "15 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "entre 20 y 25 mil de flete",
+  "output": {
+   "value": null,
+   "literal": "entre 20 y 25 mil de flete",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me dijeron q sale 40 o 50 mil",
+  "output": {
+   "value": null,
+   "literal": "me dijeron q sale 40 o 50 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre la heladera en 6 cuotas sin interes de 25 lucas",
+  "output": {
+   "value": null,
+   "literal": "compre la heladera en 6 cuotas sin interes de 25 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "instalments",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 50 mil de la obra y pague 12 mil de materiales",
+  "output": {
+   "value": null,
+   "literal": "cobre 50 mil de la obra y pague 12 mil de materiales",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "mixed_directions",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me pagaron 100 mil pero me descontaron 10 mil de comision",
+  "output": {
+   "value": null,
+   "literal": "me pagaron 100 mil pero me descontaron 10 mil de comision",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "net_or_gross",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 2 docenas de facturas a 9 mil la docena y 1500 de envio",
+  "output": {
+   "value": 19500,
+   "literal": "2 x 9 mil",
+   "source": "computed",
+   "quantity": 2,
+   "unitPrice": 9000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cargue treinta lucas de nafta y cinco mil de peaje",
+  "output": {
+   "value": 35000,
+   "literal": "treinta lucas + cinco mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague la mitad de los 80 mil del alquiler",
+  "output": {
+   "value": 40000,
+   "literal": "la mitad de 80 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre mercaderia en el mayorista",
+  "output": null
+ },
+ {
+  "phrase": "hola buen dia",
+  "output": null
+ },
+ {
+  "phrase": "cuanto gaste este mes?",
+  "output": null
+ },
+ {
+  "phrase": "se me fueron 30 y pico de lucas en el chino",
+  "output": {
+   "value": 30000,
+   "literal": "30 y pico de lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "me salio 40 y pico de lucas el service",
+  "output": {
+   "value": 40000,
+   "literal": "40 y pico de lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "me salio cuarenta y pico de lucas el arreglo",
+  "output": {
+   "value": 40000,
+   "literal": "cuarenta y pico de lucas",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "me salio 40 y pico mil el remis",
+  "output": {
+   "value": 40000,
+   "literal": "40 y pico mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "el arreglo me salio un par de lucas",
+  "output": {
+   "value": 2000,
+   "literal": "un par de lucas",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el arreglo me salio un par de palos",
+  "output": {
+   "value": 2000000,
+   "literal": "un par de palos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "deje mil pesos de propina",
+  "output": {
+   "value": 1000,
+   "literal": "mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre un par de zapatillas 45 mil",
+  "output": {
+   "value": 45000,
+   "literal": "45 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague la luz 45 mil, el gas 12 mil",
+  "output": {
+   "value": 57000,
+   "literal": "45 mil + 12 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 20 mil de verdura, 15 mil de carne",
+  "output": {
+   "value": 35000,
+   "literal": "20 mil + 15 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobre 80 mil, me quedan 20 mil",
+  "output": {
+   "value": 80000,
+   "literal": "80 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi la camioneta en 20 mil dolares",
+  "output": {
+   "value": null,
+   "literal": "vendi la camioneta en 20 mil dolares",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 15 mil dolares de la maquina nueva",
+  "output": {
+   "value": null,
+   "literal": "pague 15 mil dolares de la maquina nueva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "u$s 200 de sena",
+  "output": {
+   "value": null,
+   "literal": "u$s 200 de sena",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me pagaron 800 usd por el trabajo",
+  "output": {
+   "value": null,
+   "literal": "me pagaron 800 usd por el trabajo",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi la camioneta en 20 mil",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre el horno en 18 cuotas fijas de 40 mil",
+  "output": {
+   "value": 720000,
+   "literal": "18 x 40 mil",
+   "source": "computed",
+   "quantity": 18,
+   "unitPrice": 40000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre el horno en 18 cuotas mensuales de 40 mil",
+  "output": {
+   "value": 720000,
+   "literal": "18 x 40 mil",
+   "source": "computed",
+   "quantity": 18,
+   "unitPrice": 40000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el proveedor me lo financia en 4 pagos de 90 mil",
+  "output": {
+   "value": 360000,
+   "literal": "4 x 90 mil",
+   "source": "computed",
+   "quantity": 4,
+   "unitPrice": 90000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me lo financian en 6 pagos mensuales de 30 mil",
+  "output": {
+   "value": 180000,
+   "literal": "6 x 30 mil",
+   "source": "computed",
+   "quantity": 6,
+   "unitPrice": 30000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "lo compre en 12 sin interes de 8000",
+  "output": {
+   "value": null,
+   "literal": "lo compre en 12 sin interes de 8000",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "instalments",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me lo dieron en 3 cuotas de 20 mil mas un anticipo de 50 mil",
+  "output": {
+   "value": 110000,
+   "literal": "3 x 20 mil + 50000",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 20000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague la tele 300 mil en 3 cuotas",
+  "output": {
+   "value": 300000,
+   "literal": "300 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "lo pago en 3 cuotas de 40 mil a partir de marzo",
+  "output": {
+   "value": 120000,
+   "literal": "3 x 40 mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 40000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el gasista me pidio de 80 mil a 100 mil",
+  "output": {
+   "value": null,
+   "literal": "el gasista me pidio de 80 mil a 100 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me presupuestaron de 200 mil a 250 mil",
+  "output": {
+   "value": null,
+   "literal": "me presupuestaron de 200 mil a 250 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "sale de 15 lucas a 20 lucas",
+  "output": {
+   "value": null,
+   "literal": "sale de 15 lucas a 20 lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el proveedor me cobro 200 mil mas el 21 de iva",
+  "output": {
+   "value": null,
+   "literal": "el proveedor me cobro 200 mil mas el 21 de iva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "tax_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me facturo 500 mil con el 21 de iva",
+  "output": {
+   "value": null,
+   "literal": "me facturo 500 mil con el 21 de iva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "tax_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 60 mil con el iva incluido",
+  "output": {
+   "value": 60000,
+   "literal": "60 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste 80 mil menos el 20%",
+  "output": {
+   "value": 64000,
+   "literal": "80 mil - 20%",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre por 50 mil menos el 10 por ciento",
+  "output": {
+   "value": 45000,
+   "literal": "50 mil - 10%",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me hicieron un 10 de descuento sobre 45 mil",
+  "output": {
+   "value": null,
+   "literal": "me hicieron un 10 de descuento sobre 45 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "discount_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el mayorista me hace 10 puntos de descuento sobre 300 mil",
+  "output": {
+   "value": null,
+   "literal": "el mayorista me hace 10 puntos de descuento sobre 300 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "discount_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "de los 80 mil me devolvieron 20 mil",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "de los 120 mil que le debia le pague 40 mil",
+  "output": {
+   "value": 40000,
+   "literal": "40 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me devolvieron 3 remeras de 12 mil",
+  "output": {
+   "value": null,
+   "literal": "me devolvieron 3 remeras de 12 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "saque 4 entradas de 12 mil",
+  "output": {
+   "value": null,
+   "literal": "saque 4 entradas de 12 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 10 bolsas de cemento a 4500 la bolsa",
+  "output": {
+   "value": 45000,
+   "literal": "10 x 4500",
+   "source": "computed",
+   "quantity": 10,
+   "unitPrice": 4500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gasté 20 mil en la verdulería",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "20k de nafta",
+  "output": {
+   "value": 20000,
+   "literal": "20 k",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pagué $3.500 de luz",
+  "output": {
+   "value": 3500,
+   "literal": "3.500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "1.234,56 de comisión",
+  "output": {
+   "value": 1234.56,
+   "literal": "1.234,56",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "20,50",
+  "output": {
+   "value": 20.5,
+   "literal": "20,50",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "4500 pesos de fiambre",
+  "output": {
+   "value": 4500,
+   "literal": "4500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gasté 20 en la verdulería",
+  "output": {
+   "value": 20,
+   "literal": "20",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "dos lucas de café",
+  "output": {
+   "value": 2000,
+   "literal": "dos lucas",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "2 palos de alquiler",
+  "output": {
+   "value": 2000000,
+   "literal": "2 palos",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "una gamba de propina",
+  "output": {
+   "value": 100,
+   "literal": "una gamba",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "veinte mil de harina",
+  "output": {
+   "value": 20000,
+   "literal": "veinte mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "dos mil quinientos de fletes",
+  "output": {
+   "value": 2500,
+   "literal": "dos mil quinientos",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "un millón doscientos mil",
+  "output": {
+   "value": 1200000,
+   "literal": "un millon doscientos mil",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cobré 90 mil de un trabajo",
+  "output": {
+   "value": 90000,
+   "literal": "90 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "entraron $145.500 de la caja",
+  "output": {
+   "value": 145500,
+   "literal": "145.500",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendí 5 tortas a 8000 cada una",
+  "output": {
+   "value": 40000,
+   "literal": "5 x 8000",
+   "source": "computed",
+   "quantity": 5,
+   "unitPrice": 8000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compré 3 docenas de facturas a 12 mil la docena",
+  "output": {
+   "value": 36000,
+   "literal": "3 x 12 mil",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 12000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pagué 5 mil de luz y 3 mil de gas",
+  "output": {
+   "value": 8000,
+   "literal": "5 mil + 3 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendí 5 tortas a 8000",
+  "output": {
+   "value": null,
+   "literal": "vendi 5 tortas a 8000",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "3 kg de harina a 4500 pesos",
+  "output": {
+   "value": null,
+   "literal": "3 kg de harina a 4500 pesos",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "unit_or_total",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 2 mil empanadas a 1200 cada una",
+  "output": {
+   "value": 2400000,
+   "literal": "2000 x 1200",
+   "source": "computed",
+   "quantity": 2000,
+   "unitPrice": 1200,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 100 mil menos 20 mil de descuento",
+  "output": {
+   "value": 80000,
+   "literal": "100 mil - 20 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 50 mil por la mercaderia con 10 por ciento de descuento",
+  "output": {
+   "value": null,
+   "literal": "pague 50 mil por la mercaderia con 10 por ciento de descuento",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "discount_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 2,5 kilos de carne a 12 mil el kilo",
+  "output": {
+   "value": 30000,
+   "literal": "2.5 x 12 mil",
+   "source": "computed",
+   "quantity": 2.5,
+   "unitPrice": 12000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compre 2 kilos y medio de carne a 12 mil el kilo",
+  "output": {
+   "value": 30000,
+   "literal": "2.5 x 12 mil",
+   "source": "computed",
+   "quantity": 2.5,
+   "unitPrice": 12000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "cargue 25,5 litros de nafta a 1200 el litro",
+  "output": {
+   "value": 30600,
+   "literal": "25.5 x 1200",
+   "source": "computed",
+   "quantity": 25.5,
+   "unitPrice": 1200,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague la mitad de la deuda, 80 mil",
+  "output": {
+   "value": 80000,
+   "literal": "80 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me pagaron mil millones",
+  "output": {
+   "value": 1000000000,
+   "literal": "mil millones",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 10001 facturas a 300 cada una",
+  "output": {
+   "value": 3000300,
+   "literal": "10001 x 300",
+   "source": "computed",
+   "quantity": 10001,
+   "unitPrice": 300,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendi 12 empanadas a 1500 c/u y me pagaron con 20 mil",
+  "output": {
+   "value": 18000,
+   "literal": "12 x 1500",
+   "source": "computed",
+   "quantity": 12,
+   "unitPrice": 1500,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gaste 30 mil en harina y todavia debo 50 mil",
+  "output": {
+   "value": 30000,
+   "literal": "30 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pague 15 mil de nafta y me quedan 2 mil en la caja",
+  "output": {
+   "value": 15000,
+   "literal": "15 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el 15 gasté 20 mil",
+  "output": {
+   "value": 20000,
+   "literal": "20 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "12 docenas de huevos por 48 mil",
+  "output": {
+   "value": 48000,
+   "literal": "48 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pagué la luz",
+  "output": null
+ },
+ {
+  "phrase": "",
+  "output": null
+ },
+ {
+  "phrase": "no me acuerdo cuánto",
+  "output": null
+ },
+ {
+  "phrase": "me salió 40 y pico de lucas el service",
+  "output": {
+   "value": 40000,
+   "literal": "40 y pico de lucas",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": true
+  }
+ },
+ {
+  "phrase": "el arreglo me salió un par de lucas",
+  "output": {
+   "value": 2000,
+   "literal": "un par de lucas",
+   "source": "words",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pagué la luz 45 mil, el gas 12 mil",
+  "output": {
+   "value": 57000,
+   "literal": "45 mil + 12 mil",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "vendí la camioneta en 20 mil dólares",
+  "output": {
+   "value": null,
+   "literal": "vendi la camioneta en 20 mil dolares",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "pagué 15 mil dólares de la máquina nueva",
+  "output": {
+   "value": null,
+   "literal": "pague 15 mil dolares de la maquina nueva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "foreign_currency",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "compré el horno en 18 cuotas fijas de 40 mil",
+  "output": {
+   "value": 720000,
+   "literal": "18 x 40 mil",
+   "source": "computed",
+   "quantity": 18,
+   "unitPrice": 40000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "me lo dieron en 3 cuotas de 20 mil más un anticipo de 50 mil",
+  "output": {
+   "value": 110000,
+   "literal": "3 x 20 mil + 50000",
+   "source": "computed",
+   "quantity": 3,
+   "unitPrice": 20000,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el proveedor me cobró 200 mil más el 21 de IVA",
+  "output": {
+   "value": null,
+   "literal": "el proveedor me cobro 200 mil mas el 21 de iva",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "tax_unclear",
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "gasté 80 mil menos el 20%",
+  "output": {
+   "value": 64000,
+   "literal": "80 mil - 20%",
+   "source": "computed",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": false,
+   "approximate": false
+  }
+ },
+ {
+  "phrase": "el gasista me pidió de 80 mil a 100 mil",
+  "output": {
+   "value": null,
+   "literal": "el gasista me pidio de 80 mil a 100 mil",
+   "source": "digits",
+   "quantity": null,
+   "unitPrice": null,
+   "ambiguous": true,
+   "reason": "range",
+   "approximate": false
+  }
+ }
+]

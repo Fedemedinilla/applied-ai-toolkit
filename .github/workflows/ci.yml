@@ -1,5 +1,5 @@
-# Runs the same commands as the root README: type check, the Vitest suites, the
-# site-check unittest suite, and slop-lint over the repository's own docs. Everything is offline; the job has no secrets.
+# Runs the same commands as the root README: type check, the Vitest suites, the app builds
+# and their CSP guard, the site-check unittest suite, and slop-lint over the repository's own docs. Everything is offline; the job has no secrets.
 # Actions are pinned to the commit SHA of their release tag, with the version in a
 # comment. To upgrade one, change both.
 name: CI
@@ -42,6 +42,14 @@ jobs:
 
       - name: TypeScript tests
         run: npm test
+
+      # npm test already builds each app into a temporary folder. This builds into dist/apps/ and
+      # runs csp-build-guard over the output, the way a deploy would see it.
+      - name: Build the apps
+        run: npm run build:apps
+
+      - name: Guard the app builds
+        run: npm run guard:apps
 
       # site-check needs Python 3.11 or newer and nothing outside the standard library.
       # ubuntu-latest ships Python 3; this step fails early if it is too old.

@@ -1,0 +1,47 @@
+{
+  "csp": {
+    "from": "meta"
+  },
+  "policy": {
+    "default-src": [
+      "'self'"
+    ],
+    "script-src": {
+      "sources": [
+        "'self'"
+      ],
+      "hashes": true
+    },
+    "style-src": {
+      "sources": [
+        "'self'"
+      ],
+      "hashes": true
+    },
+    "img-src": [
+      "'self'",
+      "data:"
+    ],
+    "connect-src": [
+      "'self'"
+    ],
+    "frame-ancestors": [
+      "'none'"
+    ],
+    "base-uri": [
+      "'self'"
+    ],
+    "object-src": [
+      "'none'"
+    ],
+    "form-action": [
+      "'self'"
+    ]
+  },
+  "lookbehind": {
+    "targets": {
+      "safari": "15.6",
+      "chrome": 109
+    }
+  }
+}

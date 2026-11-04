@@ -9,7 +9,10 @@
     "test": "vitest run",
     "check": "tsc --noEmit",
     "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
-    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md evals/CASE-STUDY.md"
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md apps/*/README.md evals/CASE-STUDY.md",
+    "build:caja": "vite build apps/caja",
+    "build:apps": "npm run build:caja",
+    "guard:apps": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json"
   },
   "devDependencies": {
     "@supabase/supabase-js": "2.118.0",
