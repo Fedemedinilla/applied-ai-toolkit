@@ -360,6 +360,16 @@ describe('structured', () => {
   });
 });
 
+describe('claude-fable-5-2', () => {
+  it('is accepted in a fixed config and sent with effort only: no thinking, no sampling parameters', async () => {
+    const { gateway, requests } = setup([() => jsonResponse(triageResponse())]);
+    await gateway.structured(Triage, { ...REQUEST, config: { model: 'claude-fable-5-2', effort: 'high' } });
+    const body = requests[0]?.body as Record<string, unknown>;
+    expect(body).toMatchObject({ model: 'claude-fable-5-2', output_config: { effort: 'high' } });
+    for (const key of ['thinking', 'temperature', 'top_p', 'top_k', 'tool_choice']) expect(body).not.toHaveProperty(key);
+  });
+});
+
 describe('caps: a reached cap does not call the API', () => {
   it.each([
     {
