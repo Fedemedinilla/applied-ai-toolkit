@@ -6,8 +6,13 @@ import type Anthropic from '@anthropic-ai/sdk';
  * which that API version rejects; no forced tool_choice; and no assistant prefill. A model outside
  * this list is rejected before any call (invalid_config or invalid_request). Adding one means
  * checking those rules for it first.
+ *
+ * claude-fable-5-2 (added 11/2026): same request surface as claude-fable-5-1 per Anthropic's
+ * migration guide (always-on adaptive thinking, temperature/top_p/top_k rejected, prefill and forced
+ * tool_choice rejected, effort low..max, default high). Its thinking blocks are bound to the
+ * conversation for every account; the gateway never replays thinking blocks, so nothing changes.
  */
-export const SUPPORTED_MODELS = ['claude-fable-5-1', 'claude-sonnet-5-5', 'claude-opus-5-5'] as const;
+export const SUPPORTED_MODELS = ['claude-fable-5-2', 'claude-fable-5-1', 'claude-sonnet-5-5', 'claude-opus-5-5'] as const;
 export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
 
 /** output_config.effort, as the SDK types it. */
