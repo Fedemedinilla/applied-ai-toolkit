@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
     "test:php": "cd wp-hardening && composer install --no-interaction --no-progress --quiet && find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && vendor/bin/phpunit",
-    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md SECURITY.md CONTRIBUTING.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md",
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md SECURITY.md CONTRIBUTING.md .github/pull_request_template.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md",
     "build:caja": "vite build apps/caja",
     "build:chat-widget": "vite build --config apps/chat-widget/vite.config.ts",
     "build:checklist": "vite build --config apps/checklist/vite.config.ts",

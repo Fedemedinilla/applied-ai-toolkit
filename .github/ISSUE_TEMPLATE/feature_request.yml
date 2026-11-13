@@ -1,0 +1,38 @@
+# A change in what a folder does. A bug goes in bug_report.yml; a security problem goes
+# through private vulnerability reporting (see SECURITY.md).
+name: Feature request
+description: Propose a change in what a library, an app or the tooling does.
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read the README of the folder first. Each one lists its design decisions with the reason for each, and some requests are already answered there.
+  - type: input
+    id: folder
+    attributes:
+      label: Folder
+      description: The folder the change is for, or "new" for a new one.
+      placeholder: gateway
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change you have in mind, and how a test would show it works.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways you considered, and why they fall short.
