@@ -38,7 +38,7 @@ OK: 5 checks passed, 1 skipped
 
 Caja has no deploy config yet, so it sends no policy of its own. Its config holds, as a `literal` policy, the strict one a host should send for it (`'self'` for scripts, styles, the manifest, the worker, the corpus fetch and the model-mode API, `data:` images, no plugins). The run shows that the build works under that policy with no inline script to hash. No module uses a regex lookbehind that older Safari cannot parse, and the JavaScript of `index.html` stays within its budget. Caja's optional server reads `ANTHROPIC_API_KEY`, so the config lists it under `secrets` with `missing: "skip"`. CI sets a placeholder value for it and for each other app's secret variables, so the search runs there; a local run without them skips it. In a project with real secrets, run the guard with the same environment the build had.
 
-Without `--config` it looks for `csp-guard.config.json`, then `csp-guard.config.ts`, in the current folder. Exit codes: 0 when every check passed or was skipped, 1 when a check failed, 2 for bad usage, an invalid config or a missing input file. `--json` prints the full report, with per-page sizes and the files behind them.
+Without `--config` it looks for `csp-guard.config.json`, then `csp-guard.config.ts`, in the current folder. Exit codes: 0 when every check passed or was skipped, 1 when a check failed, 2 for bad usage, an invalid config or a missing input file. They are the same for every output format. `--json` prints the full report, with per-page sizes and the files behind them. `--sarif` prints SARIF 2.1.0 for GitHub code scanning (see [SARIF output](#sarif-output)). The two are mutually exclusive, and passing both is a usage error. On exit 2 nothing is printed to stdout, only the error to stderr.
 
 The human report has one line per check, then one line per failure. This is the `stale-hash` fixture, cut after the first passing check:
 
@@ -87,6 +87,21 @@ Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a m
 ### 5. JavaScript budget (`js-budget`)
 
 The JavaScript a page makes the browser download on load is measured against a budget per page glob. It counts external scripts, `modulepreload` links, Astro island URLs and inline scripts, then follows every static `import` and `export ... from` in those files. Dynamic `import()` does not count, since it loads later, on demand. Each file is measured compressed with gzip (level 9) and brotli (quality 11); a budget can limit either or both, in kB of 1000 bytes. A script from another origin, a bare specifier or a URL missing from the build is a failure, since an unmeasured file would read as zero.
+
+## SARIF output
+
+```sh
+node csp-build-guard/cli.ts --dir dist --config csp-guard.config.json --sarif --sarif-base . > csp-build-guard.sarif
+```
+
+The log has one rule per check, with its description and a link to its section here, and one result per failure, all with level `error`. The report only knows pass, fail and skip, so there are no warnings or notes among the results.
+
+- A failure about one file (a bundle holding a secret, a script with a lookbehind, a page over budget) points at that file in the build folder. A failure about no single file, such as a policy difference across pages or an unset secret variable, points at the config file.
+- Paths are relative to the current folder, or to `--sarif-base <dir>`, with forward slashes. Code scanning maps them to files in the repository, so the base should be the repository root. A file outside the base gets an absolute `file:` URI instead of a path that starts with `../`.
+- Only the lookbehind check knows a line and column, for a lookbehind in a file, so only those findings carry a `region`. No line is ever guessed.
+- A check that could not run fails in the report, so it is an error result in the SARIF too. Skipped checks are listed as notes of the run (`invocations[0].toolExecutionNotifications`), not as results.
+- Results are sorted by check, path, line and message, so two runs over the same build print the same bytes.
+- Each result has a `partialFingerprints` entry, `cspBuildGuardFinding/v1`, computed from the check, the path and the message, so code scanning tracks one alert across runs (see the design decisions).
 
 ## Configuration
 
@@ -140,11 +155,13 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 **Unreadable deploy rules are config errors.** vercel.json `source` patterns are converted from a subset of path-to-regexp. A pattern outside that subset, or a rule with `has` or `missing` conditions, exits with code 2 instead of being treated as a rule that never matches, which would leave pages unchecked.
 
+**Fingerprints ignore content hashes and positions.** A bundler names a chunk after its content, so `index-AbC123de.js` becomes `index-X9kq-2Lm.js` on the next change to that chunk. A fingerprint built from the raw path would close the alert and open a new one on every build, and the alert history would be lost. Before hashing, the content hash in an asset name is replaced with `*` (`index-*.js`). Vite and Astro write eight characters of Rollup's alphabet, and webpack writes six or more letters and digits. Either form must hold a digit or an uppercase letter, so `chunk-vendors.js` stays as it is. Standalone numbers in the message (line and column, sizes in kB, the count in "and 3 more pages") are replaced too, since they move while the finding stays. Hashes of inline content are kept, since they name the script the finding is about. Two findings that still share a key are told apart by their order, as code scanning's own fingerprints are.
+
 **No browser, no server.** Every check reads files. That keeps the guard fast (a 90-page Astro build took about 4 seconds in my test run) and runnable in any CI job, at the cost of the checks listed under Limits.
 
 ## What the tests cover
 
-103 tests in 6 files, all offline.
+131 tests in 7 files, all offline.
 
 | File | Covers |
 |---|---|
@@ -154,6 +171,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 | `test/fixtures.test.ts` | Every committed fixture through the full run, with the exact failures each one must produce |
 | `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies |
 | `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config |
+| `test/sarif.test.ts` | The SARIF log against a zod schema of what code scanning requires; every failure of every failing fixture as one error result; a check that could not run as an error at the config file; skipped checks as notes; regions only where a line is known; paths relative to the current folder and to `--sarif-base`; fingerprints equal across two builds whose asset names carry different hashes; identical output on two runs; `--json` with `--sarif` as a usage error; the text and JSON reports unchanged |
 
 The fixtures under `fixtures/` are tiny fictional builds, each with its own config. `pass`, `meta` and `netlify` pass every check that applies (`meta` has no header source, so `headers` is skipped). `stale-hash`, `unsafe-inline`, `inline-handler`, `policy-drift`, `secret-leak`, `lookbehind`, `over-budget` and `meta-misplaced` each fail one check in a known way. `vercel-output` is a Build Output folder whose server function holds the secret.
 
@@ -169,6 +187,7 @@ src/
   config.ts            the config schema (zod) and loader
   run.ts               builds the context and runs the checks
   report.ts            the human report
+  sarif.ts             the SARIF 2.1.0 log and its fingerprints
   checks/              one file per check
 test/                  Vitest suites
 fixtures/              small builds that pass and fail each check
