@@ -2,6 +2,24 @@
 
 A TypeScript gateway that is the only code in an application allowed to call the Claude API. Its job is to keep spending caps true in the cases that usually break them. Those are a ledger insert that fails, a stream cut halfway, a fallback model with no price, concurrent calls near a cap and a network outage retried in a loop. Each call reserves its worst-case cost before it goes out and closes that reservation with the cost measured per attempt. Structured output is sent as a JSON schema built from zod and validated with the same schema on return. Every failure maps to a stable error code that says whether the request was billed and whether a retry makes sense. I extracted it from a production app I am building; the stores became interfaces, with an in-memory implementation and a reference Postgres schema.
 
+## Install
+
+```sh
+npm install @fedemedinilla/claude-gateway zod
+```
+
+```ts
+import { createClaudeClient, createGateway, createMemoryStores } from '@fedemedinilla/claude-gateway';
+```
+
+The package entry is `src/index.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and apps import `gateway/src/index.ts` as before.
+
+- **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps. Its `rewriteRelativeImportExtensions` turns each `./x.ts` import into `./x.js`. The `.d.ts` files keep the `.ts` specifiers, which TypeScript resolves to the `.d.ts` next to them; `npm run pack:check` typechecks a strict consumer against them with TypeScript 5.9.
+- **zod is a peer dependency** (`^4.6.7`). The caller builds the schemas it passes to `structured()`, and the gateway turns them into a JSON schema with `z.toJSONSchema` and validates the reply with them. Two copies of zod in one application would mean schemas from one copy handled by the other. As a peer, the application's own zod is the one the gateway uses. 4.6.7 is the version the tests run.
+- **`@anthropic-ai/sdk` is a dependency, pinned to 1.1.0.** The application never builds the client itself. `createClaudeClient` does, and `errors.ts` classifies its errors with `instanceof`. The gateway's own copy of the SDK is the one it was tested against, and the exact pin keeps it that way.
+- **Node 24 or newer** (`engines`). That is the only version the tests and CI run, from `.node-version`. The compiled output may run on older versions, but none is tested, so none is claimed.
+- **The build is checked as installed.** [`test/packaging/pack-check.ts`](../test/packaging/pack-check.ts) packs the package, installs the tarball outside the repository with its two dependencies, and compares its runtime and declared exports with `src/index.ts`.
+
 ## Run it
 
 From the repository root:
