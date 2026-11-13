@@ -131,7 +131,7 @@ Inputs:
 
 | input | required | what |
 |---|---|---|
-| `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
+| `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders, skips hidden ones and does not skip `node_modules`. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
 | `lang` | yes | `en` or `es`. |
 | `format` | no | `text` or `markdown`. Empty, the default, reads a `.md` file as Markdown and anything else as text. |
 | `anchors` | no | Comma-separated anchor terms, passed to `--anchors`. |
@@ -143,7 +143,7 @@ Outputs:
 | output | what |
 |---|---|
 | `sarif-file` | The path the SARIF log was written to, or empty when `sarif-file` was not set. |
-| `exit-code` | The CLI's exit code: 0, 1 or 2, as in Run it. |
+| `exit-code` | The CLI's exit code: 0, 1 or 2, as in Run it. It is 2 when the SARIF file could not be written, and empty when the step stopped before running the CLI. |
 
 How it behaves, and why:
 
@@ -237,7 +237,7 @@ The shared budget is spent in reading order, so context words without an anchor 
 
 ## What the tests cover
 
-207 tests in 10 files, all offline and without an API key:
+208 tests in 10 files, all offline and without an API key:
 
 - `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
@@ -248,7 +248,7 @@ The shared budget is spent in reading order, so context words without an anchor 
 - `output-regression.test.ts`: the text output, the JSON output and the output for two files, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
 - `sarif.test.ts`: the level mapping for every level and severity, `helpUri` from the source references, uri normalization (`./`, absolute paths, Windows separators and drives, percent-encoding, the paths it refuses), code point columns on the multibyte fixture, regions across a line break, the log against a zod schema of what code scanning requires (`sarif-schema.ts`), clean input, several files, determinism, and fingerprints that survive moved lines and columns and tell repeated matches apart.
 - `cli-sarif.test.ts`: `--sarif` as a child process. The log validates, the exit codes stay, the bytes repeat and columns are code points. Several files share one run, uris are relative, and stdin is `stdin` or the `--sarif-uri` value. `--json` with `--sarif`, a misused `--sarif-uri`, an unreadable file or a Windows path exit 2 with nothing on stdout.
-- `action.test.ts`: `action.yml` as text (no expression in the run block, every input through `env:`, setup-node pinned to the SHA in ci.yml, every input and output in this README), then its script, run with bash in a temporary workspace, against `**` globs, space and newline separators, `fail: false`, exit 2 on a pattern with no match even with `fail: false`, inputs that look like shell code, a file named `-letter.txt`, the SARIF file and the outputs, and a `sarif-file` with a line break.
+- `action.test.ts`: `action.yml` as text (no expression in the run block, every input through `env:`, setup-node pinned to the SHA in ci.yml, every input and output in this README), then its script, run with bash in a temporary workspace, against `**` globs, space and newline separators, `fail: false`, exit 2 on a pattern with no match or an unwritable SARIF file even with `fail: false`, inputs that look like shell code, a file named `-letter.txt`, the SARIF file and the outputs, and a `sarif-file` with a line break.
 
 ## The section 15 letters
 

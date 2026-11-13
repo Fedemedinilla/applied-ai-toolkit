@@ -190,6 +190,15 @@ describe('the action script', () => {
     expect(r.stdout).toMatch(/docs\/letter\.txt:1:/u);
   });
 
+  it('fails with exit 2 when the SARIF file cannot be written, even with fail: false', () => {
+    // A redirect into a folder fails with status 1, the same code as a level 1 finding.
+    const ws = workspace({ 'letter.txt': BANNED, 'out/keep.txt': '' });
+    const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'out', SLOP_FAIL: 'false' });
+    expect(r.status).toBe(2);
+    expect(r.outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
+    expect(r.stderr).toMatch(/could not write SARIF to out/u);
+  });
+
   it('refuses a sarif-file with a line break, which could forge another output', () => {
     const ws = workspace({ 'letter.txt': BANNED });
     const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'a.sarif\nexit-code=0', SLOP_FAIL: 'false' });

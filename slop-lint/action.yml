@@ -37,7 +37,7 @@ outputs:
     description: The path the SARIF log was written to, or empty when sarif-file was not set.
     value: ${{ steps.lint.outputs.sarif-file }}
   exit-code:
-    description: The CLI's exit code. 0 no level 1 finding, 1 at least one, 2 bad usage or an unreadable file.
+    description: The CLI's exit code. 0 no level 1 finding, 1 at least one, 2 bad usage or an unreadable file. Empty when the step stopped before running it.
     value: ${{ steps.lint.outputs.exit-code }}
 
 runs:
@@ -90,11 +90,16 @@ runs:
         node "$cli" "${files[@]}" "${args[@]}" || code=$?
         written=''
         if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
-          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")"
+          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")" || fail "cannot create the folder of $SLOP_SARIF_FILE"
           sarif_code=0
           node "$cli" "${files[@]}" "${args[@]}" --sarif > "$SLOP_SARIF_FILE" || sarif_code=$?
-          (( sarif_code == code )) || code=2
-          written="$SLOP_SARIF_FILE"
+          # A failed redirect also exits 1, so the file itself has to be there and not empty.
+          if (( sarif_code != code )) || [[ ! -f "$SLOP_SARIF_FILE" || ! -s "$SLOP_SARIF_FILE" ]]; then
+            printf 'slop-lint: could not write SARIF to %s\n' "$SLOP_SARIF_FILE" >&2
+            code=2
+          else
+            written="$SLOP_SARIF_FILE"
+          fi
         fi
         {
           printf 'exit-code=%s\n' "$code"
