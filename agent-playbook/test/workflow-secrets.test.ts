@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PAGES_DEPLOY_POLICY, workflowFindings, type WorkflowPolicy } from '../src/workflow-secrets.ts';
+import { PAGES_DEPLOY_POLICY, RELEASE_POLICY, workflowFindings, type WorkflowPolicy } from '../src/workflow-secrets.ts';
 
 const WORKFLOWS = new URL('../../.github/workflows/', import.meta.url);
 const SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1';
@@ -147,5 +147,72 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test', '      - run: npm test # ${{ secrets.APP_API_KEY }}'))).toEqual([]);
     expect(rules(CLEAN.replace('    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    # environment: production\n'))).toEqual([]);
     expect(rules(CLEAN.replace('  contents: read', '  contents: read\n  # packages: write'))).toEqual([]);
+  });
+});
+
+/** The shape of release.yml: a version job that can push and open a pull request, a publish job with OIDC. */
+const RELEASE = `name: Release
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - run: npx changeset version
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - run: npx changeset publish
+`;
+
+describe('RELEASE_POLICY', () => {
+  const strict = (text: string) => workflowFindings(text, RELEASE_POLICY).map((f) => `${f.line}:${f.rule}`);
+
+  it('accepts the version and publish jobs, which the default and Pages policies reject', () => {
+    expect(strict(RELEASE)).toEqual([]);
+    expect(rules(RELEASE)).toEqual(['12:write-permission', '13:write-permission', '19:write-permission']);
+    expect(workflowFindings(RELEASE, PAGES_DEPLOY_POLICY).map((f) => f.line)).toEqual([12, 13]);
+  });
+
+  it('rejects every other write permission, in a job or at the top level', () => {
+    for (const name of ['packages', 'actions', 'issues', 'deployments', 'statuses', 'checks', 'security-events', 'pages', 'attestations']) {
+      expect(strict(RELEASE.replace('      pull-requests: write\n', `      pull-requests: write\n      ${name}: write\n`))).toEqual(['14:write-permission']);
+    }
+    expect(strict(RELEASE.replace('    permissions:\n      id-token: write\n', '    permissions: write-all\n'))).toEqual(['18:write-permission']);
+  });
+
+  it('rejects the repository writes at the top level, where they would reach every job', () => {
+    expect(strict(RELEASE.replace('permissions:\n  contents: read', 'permissions:\n  contents: write'))).toEqual(['7:write-permission']);
+    expect(strict(RELEASE.replace('permissions:\n  contents: read', 'permissions:\n  contents: read\n  pull-requests: write'))).toEqual(['8:write-permission']);
+    // id-token is allowed in a job; at the top level every job could publish.
+    expect(strict(RELEASE.replace('permissions:\n  contents: read', 'permissions:\n  contents: read\n  id-token: write'))).toEqual(['8:write-permission']);
+  });
+
+  it('rejects a job that holds id-token next to a repository write', () => {
+    expect(strict(RELEASE.replace('      id-token: write\n', '      id-token: write\n      contents: write\n'))).toEqual(['20:write-permission']);
+    expect(strict(RELEASE.replace('      pull-requests: write\n', '      pull-requests: write\n      id-token: write\n'))).toEqual([
+      '12:write-permission',
+      '13:write-permission',
+    ]);
+  });
+
+  it('still rejects secrets, the token written out, environments and untrusted triggers', () => {
+    const step = '      - run: npx changeset publish\n';
+    expect(strict(RELEASE.replace(step, `${step}        env:\n          NPM_TOKEN: \${{ secrets.NPM_TOKEN }}\n`))).toEqual(['23:credential-value', '23:secret-expression']);
+    expect(strict(RELEASE.replace(step, `${step}        env:\n          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}\n`))).toEqual(['23:credential-value', '23:secret-expression']);
+    expect(strict(RELEASE.replace(step, '      - uses: ./.github/actions/release\n        with:\n          github-token: ${{ github.token }}\n'))).toEqual(['23:secret-expression']);
+    expect(strict(RELEASE.replace('    runs-on: ubuntu-latest\n    permissions:\n      id-token', '    runs-on: ubuntu-latest\n    environment: npm\n    permissions:\n      id-token'))).toEqual([
+      '18:environment',
+    ]);
+    expect(strict(RELEASE.replace('  push:', '  pull_request_target:'))).toEqual(['3:privileged-trigger']);
   });
 });
