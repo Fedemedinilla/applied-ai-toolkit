@@ -2,6 +2,10 @@
   "name": "applied-ai-toolkit",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "gateway",
+    "slop-lint"
+  ],
   "engines": {
     "node": "24.x"
   },
@@ -22,7 +26,9 @@
     "build:apps": "npm run build:caja && npm run build:chat-widget && npm run build:checklist && npm run build:push-lab && npm run build:receipt && npm run build:replay-lab && npm run build:salon-assistant && npm run build:writer",
     "build:pages": "npm run build:caja && npm run build:receipt && npm run build:replay-lab && npm run build:checklist && node apps/pages.ts",
     "guard:apps": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/chat-widget --config apps/chat-widget/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/push-lab --config apps/push-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/salon-assistant --config apps/salon-assistant/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/writer --config apps/writer/csp-guard.config.json",
-    "guard:pages": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json"
+    "guard:pages": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json",
+    "build:packages": "npm run build --workspace gateway --workspace slop-lint",
+    "pack:check": "node test/packaging/pack-check.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",

@@ -1,5 +1,5 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
-# the app builds and their CSP guard, the site-check unittest suite, slop-lint over the
+# the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest suite, slop-lint over the
 # repository's own docs, and the wp-hardening PHPUnit suite in a job of its own. Tests make no
 # network call; the only downloads are the locked npm and Composer packages. No job has secrets.
 # Actions are pinned to the commit SHA of their release tag, with the version in a
@@ -50,6 +50,12 @@ jobs:
 
       - name: Import fences
         run: node import-fences/cli.ts --config import-fences/repo.config.ts
+
+      # Packs the npm packages (gateway, slop-lint) as a publish would, installs each tarball in a
+      # project outside the repository and checks its exports, its types and the slop-lint bin.
+      # Offline. Kept out of npm test because it builds and packs, about 12 s.
+      - name: Pack the npm packages
+        run: npm run pack:check
 
       # npm test already builds each app into a temporary folder. This builds every app into
       # dist/apps/ and runs csp-build-guard over each output, the way a deploy would see it.

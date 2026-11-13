@@ -119,6 +119,7 @@ npm ci                 # exact versions from package-lock.json
 npm run check          # tsc --noEmit over every TypeScript folder (strict)
 npm test               # Vitest suites of every TypeScript folder
 node import-fences/cli.ts --config import-fences/repo.config.ts   # the import fences
+npm run pack:check     # packs gateway and slop-lint as npm would, installs each tarball and checks it
 npm run build:apps     # production build of each app under apps/, into dist/apps/
 npm run guard:apps     # csp-build-guard over each app build, with its own config
 npm run test:python    # site-check's unittest suite
@@ -130,7 +131,7 @@ On 2026-11-04, `npm test` ran 3,145 tests in 151 files, `npm run test:python` ra
 
 ## Requirements
 
-Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Only `apps/` has a build step. Node 24 runs the TypeScript sources directly (type stripping).
+Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Node 24 runs the TypeScript sources directly (type stripping), so working in the repository needs no build. The apps under `apps/` build with Vite, and the two npm packages (`gateway` as `@fedemedinilla/claude-gateway`, `slop-lint` as `@fedemedinilla/slop-lint`) compile to JavaScript only when they are packed, because Node does not strip types inside `node_modules`.
 
 ## Dependencies
 
