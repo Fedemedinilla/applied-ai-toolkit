@@ -103,6 +103,67 @@ The log has one rule per check, with its description and a link to its section h
 - Results are sorted by check, path, line and message, so two runs over the same build print the same bytes.
 - Each result has a `partialFingerprints` entry, `cspBuildGuardFinding/v1`, computed from the check, the path and the message, so code scanning tracks one alert across runs (see the design decisions).
 
+## Use it in CI
+
+The folder is also a composite GitHub Action, [`action.yml`](action.yml). It installs Node 24 with `actions/setup-node`, then zod (the guard's one npm dependency) into the action's own folder, and runs the guard over the build twice. The first run prints the text report to the job log. The second writes the SARIF log, with paths relative to the workspace. This workflow builds the site, runs the guard, uploads the findings to code scanning and then fails the job if a check failed:
+
+```yaml
+name: CSP build guard
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Your build, writing the site to dist/.
+      - run: npm ci && npm run build
+
+      - id: guard
+        # Pin a full commit SHA of this repository, not a branch.
+        uses: Fedemedinilla/applied-ai-toolkit/csp-build-guard@<commit SHA>
+        with:
+          dir: dist
+          config: csp-guard.config.json
+          fail: false
+
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ steps.guard.outputs.sarif-file }}
+          category: csp-build-guard
+
+      - name: Fail on a failed check
+        if: steps.guard.outputs.exit-code != '0'
+        run: exit 1
+```
+
+With `fail: false` the action reports exit code 1 instead of failing, so the upload still runs and the last step fails the job. Exit code 2 (bad usage, an invalid config, a missing folder) fails the action whatever `fail` says, and no SARIF is written. `security-events: write` is what the upload needs; in a private repository, upload-sarif also needs `actions: read`. A pull request from a fork gets a read-only token, so the upload fails there.
+
+| Input | Meaning |
+|---|---|
+| `dir` | Required. The build folder, relative to the workspace. |
+| `config` | The config file, `.json` or `.ts`. Default: `csp-guard.config.json`, then `csp-guard.config.ts`, in the workspace. |
+| `sarif-file` | Where to write the SARIF log. Default: `csp-build-guard.sarif` in the runner's temporary folder. |
+| `fail` | `true` (default) fails the step when a check fails. `false` only sets `exit-code`. |
+
+| Output | Meaning |
+|---|---|
+| `sarif-file` | The path of the SARIF log, empty after exit code 2. |
+| `exit-code` | 0, 1 or 2, as for the CLI. |
+
+Inputs reach the shell only as quoted environment variables, never as `${{ inputs.* }}` inside a `run:` script, so a value such as `$(...)` is a folder name and nothing else. A test reads `action.yml` and fails if that changes, and another runs its shell step with hostile inputs. A `.ts` config works through Node's type stripping, which needs erasable TypeScript only (no `enum`, no `namespace`) and a file outside `node_modules`. If the config lists `secrets`, set those variables on the guard step with the values the build had, so the search runs instead of failing.
+
 ## Configuration
 
 `csp-guard.config.json`, or a `.ts` module whose default export is the same object. Relative paths resolve against the config file's folder. Every key is optional; a check without its section is skipped and the report says so.
@@ -161,7 +222,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 ## What the tests cover
 
-131 tests in 7 files, all offline.
+141 tests in 8 files, all offline.
 
 | File | Covers |
 |---|---|
@@ -172,6 +233,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 | `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies |
 | `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config |
 | `test/sarif.test.ts` | The SARIF log against a zod schema of what code scanning requires; every failure of every failing fixture as one error result; a check that could not run as an error at the config file; skipped checks as notes; regions only where a line is known; paths relative to the current folder and to `--sarif-base`; fingerprints equal across two builds whose asset names carry different hashes; identical output on two runs; `--json` with `--sarif` as a usage error; the text and JSON reports unchanged |
+| `test/action.test.ts` | `action.yml` read as text: no `${{ }}` in a `run:` script, each input passed only through `env:`, setup-node pinned to the commit SHA of `ci.yml`, the zod version of `package.json`, every input and output in this README; its shell step run with bash as GitHub runs it: the default SARIF path, `fail: false`, exit code 2 failing whatever `fail` says, shell syntax in an input left unrun |
 
 The fixtures under `fixtures/` are tiny fictional builds, each with its own config. `pass`, `meta` and `netlify` pass every check that applies (`meta` has no header source, so `headers` is skipped). `stale-hash`, `unsafe-inline`, `inline-handler`, `policy-drift`, `secret-leak`, `lookbehind`, `over-budget` and `meta-misplaced` each fail one check in a known way. `vercel-output` is a Build Output folder whose server function holds the secret.
 
@@ -179,6 +241,7 @@ The fixtures under `fixtures/` are tiny fictional builds, each with its own conf
 
 ```
 cli.ts                 argument parsing, exit codes
+action.yml             the composite GitHub Action
 src/
   csp.ts               the parser, the exact comparison, CSP3 fallback lists
   html.ts              inline content, script URLs and meta policies of a page
@@ -204,3 +267,5 @@ fixtures/              small builds that pass and fail each check
 - The secrets search finds standalone encoded forms; a value embedded inside a larger base64 blob at an unaligned offset is not found.
 - Static imports are found with a regex, not a JavaScript parser. Any quoted specifier after `import` or `export ... from` is followed, so a query string (`./x.js?v=1`) still finds its file and an extensionless one fails as not in the build. Text in a string literal that looks like an import is followed too, and fails the same way. Inline scripts are compressed one by one, which slightly overcounts them.
 - Nonces and `'strict-dynamic'` are outside the model, so a policy that relies on them fails the inline check.
+- The action makes SARIF paths relative to the workspace. A repository checked out into a subfolder (the `path` input of `actions/checkout`) gets paths that code scanning cannot map; run the CLI with `--sarif-base` set to that subfolder instead.
+- The action runs the guard twice, once per output, so it takes twice as long as one CLI run. The CLI prints one format per run, and keeping it that way kept the text and JSON outputs unchanged.
