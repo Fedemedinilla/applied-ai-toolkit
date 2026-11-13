@@ -2,7 +2,7 @@
 
 Hi, I'm Federico Medinilla, a software developer in Buenos Aires, Argentina. I spent six years building websites and front ends. Since 2024 I have run KyndredAI, a small studio where I build AI assistants, n8n automations and web apps for schools, shops and small businesses.
 
-This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and eight small apps that show the pieces working together. It is open source, so you can download any part and use it in your own projects.
+This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and eight small apps that show the pieces working together. It is open source under the [MIT license](LICENSE), so you can download any part and use it in your own projects.
 
 - **Try it in your browser:** [live demos](https://fedemedinilla.github.io/applied-ai-toolkit/). Four apps, no account, and nothing you type leaves your device.
 - **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, and [kyndredai.com](https://kyndredai.com) is my studio.
@@ -142,4 +142,4 @@ Every fixture is fictional, and no client data, real diagnostic run, conversatio
 
 ## License
 
-No license is granted yet; contact via [federicomedinilla.com](https://federicomedinilla.com).
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Federico Medinilla.

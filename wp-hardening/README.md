@@ -108,4 +108,4 @@ The file walks stop after 20,000 files, and a walk that stopped early, or hit a 
 - User names still appear where WordPress prints them on purpose, in author archive slugs, oEmbed responses and comment classes. This control closes enumeration by id, not every place a slug is shown.
 - `X-Content-Type-Options` sent from PHP does not reach files the web server serves directly; that is why the uploads block sets it at the server.
 - `.htaccess` checks look for the generated block in the file, not at what the server does. A 403 for a `.php` file placed in `uploads/` on a staging copy is the real test.
-- No license yet. The repository grants none (see the root README), so the plugin header has no `License:` line. A release on wordpress.org would need GPL-2.0-or-later.
+- MIT, like the rest of the repository ([LICENSE](../LICENSE)), declared in `composer.json` and in the plugin header. MIT is compatible with the GPL, so the plugin can run next to GPL code in WordPress, and wordpress.org accepts GPL-compatible licenses.
