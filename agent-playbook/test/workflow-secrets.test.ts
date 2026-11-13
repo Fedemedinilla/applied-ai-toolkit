@@ -4,8 +4,11 @@ import { PAGES_DEPLOY_POLICY, RELEASE_POLICY, workflowFindings, type WorkflowPol
 
 const WORKFLOWS = new URL('../../.github/workflows/', import.meta.url);
 const SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1';
-/** The one workflow that deploys: the static demos to GitHub Pages. Every other file gets the default policy. */
-const POLICIES: Readonly<Record<string, WorkflowPolicy>> = { 'pages.yml': PAGES_DEPLOY_POLICY };
+/**
+ * The two workflows that publish: the static demos to GitHub Pages, and the npm packages through
+ * Changesets. Every other file gets the default policy.
+ */
+const POLICIES: Readonly<Record<string, WorkflowPolicy>> = { 'pages.yml': PAGES_DEPLOY_POLICY, 'release.yml': RELEASE_POLICY };
 
 // The rule pointed at this repository's own CI. Adding a secret, an environment or a write
 // permission to a workflow fails the suite, so the decision is made in review, not by accident.
@@ -25,6 +28,16 @@ describe("this repository's workflows", () => {
     const pages = readFileSync(new URL('pages.yml', WORKFLOWS), 'utf8');
     expect(pages).toMatch(/^permissions:\n  contents: read\n/m);
     expect(workflowFindings(pages).map((f) => f.rule).sort()).toEqual(['environment', 'write-permission', 'write-permission']);
+  });
+
+  it('gives release.yml its write permissions only in jobs, and the publish job only id-token', () => {
+    const release = readFileSync(new URL('release.yml', WORKFLOWS), 'utf8');
+    expect(release).toMatch(/^permissions:\n  contents: read\n/m);
+    expect(release).toMatch(/^on:\n  push:\n    branches:\n      - main\n/m);
+    expect(release).not.toMatch(/pull_request/);
+    // Under the default policy, the three writes are the only findings: contents and
+    // pull-requests in the version job, id-token in the publish job.
+    expect(workflowFindings(release).map((f) => f.text)).toEqual(['contents: write', 'pull-requests: write', 'id-token: write']);
   });
 
   it('ci.yml really passes credential-shaped variables, so the placeholder check is exercised', () => {
