@@ -60,6 +60,7 @@ export {
   type RegistryPriceRow,
   type SupportedModel,
 } from './models.ts';
+export { otelAttributes, otelObserver, type CallObserver, type CallOperation, type CallSpan, type OtelSpan, type OtelTracer } from './observe.ts';
 export { createPostgresStores, type PgQueryable, type PostgresStores } from './postgres-store.ts';
 export { jsonLinesLog, systemClock, type Clock, type ConfigStore, type EventLog, type PriceStore, type UsageRow, type UsageStore, type UsageWindows } from './ports.ts';
 export { structuredFormat, toApiJsonSchema } from './schema.ts';

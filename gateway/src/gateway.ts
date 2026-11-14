@@ -57,6 +57,7 @@ import {
   type ResponseErrorCode,
 } from './errors.ts';
 import { BUILT_IN_REGISTRY, FALLBACK_DEFAULT_BETA, type Effort, type ModelRegistry, type ModelSpec, type SupportedModel } from './models.ts';
+import type { CallObserver, CallOperation, CallSpan } from './observe.ts';
 import type { Clock, ConfigStore, EventLog, PriceStore, UsageRow, UsageStore } from './ports.ts';
 import { structuredFormat, type StructuredFormat } from './schema.ts';
 import { requirePositiveInt, requireTimeZone } from './setup.ts';
@@ -86,7 +87,9 @@ export type NoticeEvent =
    */
   | 'usage_unmeasured'
   /** The first insert failed and the retry went in. */
-  | 'record_retried';
+  | 'record_retried'
+  /** The observer threw while taking a call's span. The call's result is unchanged. */
+  | 'observer_failed';
 
 /** A failure that left someone without their result. Logged on its own channel, at error level. */
 export type FailureEvent = 'reservation_failed' | 'record_failed';
@@ -105,6 +108,12 @@ export interface GatewayDeps<M extends string = SupportedModel> {
   readonly prices: PriceStore;
   readonly notices: EventLog<NoticeEvent>;
   readonly failures: EventLog<FailureEvent>;
+  /**
+   * Receives one span per call after it ends (observe.ts). Optional: without it nothing is
+   * measured for tracing. With it, each call reads the prices once more, after the result, to
+   * value its reservation.
+   */
+  readonly observer?: CallObserver;
   /** IANA zone of the cap's day and month. */
   readonly timeZone: string;
   /**
@@ -266,6 +275,20 @@ interface Reservation {
    * (UsageStore.reserve). Null: the store has no such step, and the second cap check reads them.
    */
   readonly totals: { readonly raw: unknown } | null;
+  readonly trace: Trace | null;
+}
+
+/** What a call's span needs, collected as the call goes. Exists only when the gateway has an observer. */
+interface Trace {
+  readonly startTime: Date;
+  readonly startMono: number;
+  model: string | null;
+  effort: Effort | null;
+  reservationId: string | null;
+  estimatedInput: number | null;
+  /** The row that closed the reservation, once it is in the ledger. */
+  closing: UsageRow | null;
+  fellBack: boolean;
 }
 
 interface Deadline {
@@ -452,12 +475,12 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
   }
 
   return {
-    structured: async (schema, request) => structure(structuredFormat(schema), request, { kind: 'complete' }),
+    structured: async (schema, request) => observed('structured', request, (trace) => structure(schema, request, { kind: 'complete' }, trace)),
     structuredStream: (schema, request) => {
       const { promise: started, resolve: markStarted } = Promise.withResolvers<void>();
       const final = (async () => {
         try {
-          return await structure(structuredFormat(schema), request, { kind: 'stream', onStart: () => markStarted() });
+          return await observed('structured_stream', request, (trace) => structure(schema, request, { kind: 'stream', onStart: () => markStarted() }, trace));
         } finally {
           markStarted();
         }
@@ -467,16 +490,94 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
       final.catch(() => undefined);
       return { started, final };
     },
-    text: async (request) => {
-      const mode: Mode = request.onText ? { kind: 'stream', onText: request.onText } : { kind: 'stream' };
-      const { response, meta } = await call(request, null, mode);
-      requireNormalStop(response, meta);
-      return { text: responseText(response.content), content: response.content, meta };
-    },
+    text: async (request) =>
+      observed('text', request, async (trace) => {
+        const mode: Mode = request.onText ? { kind: 'stream', onText: request.onText } : { kind: 'stream' };
+        const { response, meta } = await call(request, null, mode, trace);
+        requireNormalStop(response, meta);
+        return { text: responseText(response.content), content: response.content, meta };
+      }),
   };
 
-  async function structure<T>(format: StructuredFormat<T>, request: GatewayRequest<string>, mode: Mode): Promise<StructuredResult<T, M>> {
-    const { response, meta } = await call(request, format, mode);
+  /**
+   * Runs one entry point and, when the gateway has an observer, hands it the call's span once the
+   * call has ended, whatever the outcome. Without an observer nothing is measured: the clock is
+   * not read and no trace is kept.
+   */
+  async function observed<R>(operation: CallOperation, request: GatewayRequest<string>, run: (trace: Trace | null) => Promise<R>): Promise<R> {
+    const observer = deps.observer;
+    if (observer === undefined) return run(null);
+    const trace: Trace = {
+      startTime: deps.clock.now(),
+      startMono: deps.clock.monotonicMs(),
+      model: null,
+      effort: null,
+      reservationId: null,
+      estimatedInput: null,
+      closing: null,
+      fellBack: false,
+    };
+    let errorCode: CallSpan['errorCode'] = null;
+    try {
+      return await run(trace);
+    } catch (error) {
+      errorCode = error instanceof GatewayError ? error.code : 'unknown';
+      throw error;
+    } finally {
+      const row = trace.closing;
+      const span: CallSpan = {
+        operation,
+        task: request.task,
+        promptVersion: request.promptVersion,
+        model: trace.model,
+        modelResponded: row?.modelResponded ?? null,
+        effort: trace.effort,
+        maxTokens: request.maxTokens,
+        streaming: operation !== 'structured',
+        tokens: row && { input: row.inputTokens, output: row.outputTokens, cacheRead: row.cacheReadTokens, cacheWrite5m: row.cacheWrite5mTokens, cacheWrite1h: row.cacheWrite1hTokens },
+        reservedUsd: await reservedUsd(trace, request.maxTokens),
+        settledUsd: row?.costUsd ?? null,
+        outcome: errorCode === null ? 'ok' : 'error',
+        errorCode,
+        stopReason: row?.stopReason ?? null,
+        fellBack: trace.fellBack,
+        requestId: row?.requestId ?? null,
+        reservationId: trace.reservationId,
+        usageId: row?.id ?? null,
+        startTime: trace.startTime,
+        durationMs: Math.round(deps.clock.monotonicMs() - trace.startMono),
+      };
+      try {
+        observer.onCall(span);
+      } catch (error) {
+        deps.notices.log('observer_failed', { task: request.task, error: errorName(error) });
+      }
+    }
+  }
+
+  /**
+   * The reservation's worst case for the span: the estimated input and maxTokens of output at the
+   * highest price in force among the registry's models, the way the stores value an open
+   * reservation. Null when nothing was reserved or the prices cannot be read. Never throws.
+   */
+  async function reservedUsd(trace: Trace, maxTokens: number): Promise<number | null> {
+    if (trace.estimatedInput === null) return null;
+    try {
+      const rows = z.array(PriceRow).safeParse(await deps.prices.pricesFor(models.ids, trace.startTime));
+      if (!rows.success) return null;
+      const inForce = [...pricesInForce(rows.data, trace.startTime).values()];
+      if (inForce.length === 0) return null;
+      const input = Math.max(...inForce.map((price) => price.input));
+      const output = Math.max(...inForce.map((price) => price.output));
+      return Math.round(trace.estimatedInput * input + maxTokens * output) / 1_000_000;
+    } catch {
+      return null;
+    }
+  }
+
+  async function structure<S extends z.ZodType>(schema: S, request: GatewayRequest<string>, mode: Mode, trace: Trace | null): Promise<StructuredResult<z.output<S>, M>> {
+    const format = structuredFormat(schema);
+    const { response, meta } = await call(request, format, mode, trace);
     requireNormalStop(response, meta);
     const validation = format.validate(responseText(response.content));
     if (!validation.ok) throw responseError('invalid_output', 'The output does not satisfy the schema', response, meta, validation.problems);
@@ -489,7 +590,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
    * reads) throws ApiError with no row and no notice: nothing was spent. A cut while the
    * reservation was being written closes it with a zero-usage row.
    */
-  async function call(request: GatewayRequest<string>, format: StructuredFormat<unknown> | null, mode: Mode): Promise<Call<M>> {
+  async function call(request: GatewayRequest<string>, format: StructuredFormat<unknown> | null, mode: Mode, trace: Trace | null): Promise<Call<M>> {
     const fixed = validateRequest(request, mode.kind === 'stream', schemas);
     if (request.signal?.aborted) throw cutBeforeSending('cancelled', request.signal.reason);
 
@@ -514,7 +615,15 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         throw error;
       }
       if (deadline.signal.aborted) throw cutBeforeSending(cutCode(), deadline.signal.reason);
-      reservation = await reserve(prepared);
+      if (trace) {
+        trace.model = prepared.model;
+        trace.effort = prepared.effort;
+      }
+      reservation = await reserve(prepared, trace);
+      if (trace) {
+        trace.reservationId = reservation.id;
+        trace.estimatedInput = reservation.estimatedInput;
+      }
       const refused = deadline.signal.aborted ? null : await recheckCaps(prepared, reservation, deadline.signal);
       if (deadline.signal.aborted) {
         const code = cutCode();
@@ -537,7 +646,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
   }
 
   /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
-  async function reserve(prepared: Prepared<M>): Promise<Reservation> {
+  async function reserve(prepared: Prepared<M>, trace: Trace | null): Promise<Reservation> {
     const id = crypto.randomUUID();
     const estimatedInput = estimateInputTokens(prepared.params) + prepared.attachmentBound;
     const row: UsageRow = {
@@ -562,12 +671,12 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
       const atomic = deps.usage.reserve?.bind(deps.usage);
       if (atomic === undefined) {
         await insert(row);
-        return { id, estimatedInput, totals: null };
+        return { id, estimatedInput, totals: null, trace };
       }
       // One step in the store: the row and the totals without it, ordered against other reservations.
       const { windows, userId, jobId } = prepared.caps;
       const raw = await twice(id, () => atomic(row, { ...windows, userId, jobId }));
-      return { id, estimatedInput, totals: { raw } };
+      return { id, estimatedInput, totals: { raw }, trace };
     } catch (error) {
       deps.failures.log('reservation_failed', { usageId: id, task: prepared.row.task, error: errorName(error) });
       throw new ReservationError(id, { cause: error });
@@ -730,7 +839,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
       requestId: executed.requestId,
       modelRequested: prepared.model,
       modelResponded: response.model,
-      fellBack: fellBack(response) && response.stop_reason !== 'refusal',
+      fellBack: (reservation.trace ? (reservation.trace.fellBack = fellBack(response)) : fellBack(response)) && response.stop_reason !== 'refusal',
       effort: prepared.effort,
       costUsd: cost.usd,
       durationMs: executed.durationMs,
@@ -877,6 +986,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
   async function close(row: UsageRow, reservation: Reservation): Promise<void> {
     try {
       await insert(row);
+      if (reservation.trace) reservation.trace.closing = row;
     } catch (error) {
       deps.failures.log('record_failed', { usageId: reservation.id, costUsd: row.costUsd, error: errorName(error) });
       throw new RecordError(reservation.id, row.costUsd, { cause: error });
