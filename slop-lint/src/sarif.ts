@@ -155,8 +155,14 @@ function descriptor(rule: Rule): SarifRule {
   };
 }
 
-/** One SARIF log for every input, in input order. rules[] lists, in catalog order, each rule that has a finding. */
-export function toSarif(inputs: readonly SarifInput[]): SarifLog {
+/**
+ * One SARIF log for every input, in input order. rules[] lists, in catalog order, each rule that has a finding.
+ * An input whose uri came earlier is left out: it names the same file again (a.md and ./a.md, or two
+ * globs that overlap), and its results would repeat with the same fingerprints.
+ */
+export function toSarif(all: readonly SarifInput[]): SarifLog {
+  const uris = new Set<string>();
+  const inputs = all.filter(({ uri }) => !uris.has(uri) && uris.add(uri));
   const used = new Set(inputs.flatMap((i) => i.result.findings.map((f) => f.ruleId)));
   const rules = RULES.filter((r) => used.has(r.id));
   const index = new Map(rules.map((r, i) => [r.id, i]));

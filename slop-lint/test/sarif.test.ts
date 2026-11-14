@@ -152,6 +152,14 @@ describe('toSarif', () => {
     expect([...uris]).toEqual(['a.txt', 'b/c.txt']);
   });
 
+  it('leaves out an input whose uri came earlier, so the same file twice gives each result once', () => {
+    const once = toSarif([input('a.txt', multibyte)]);
+    const twice = toSarif([input('a.txt', multibyte), input('b.txt', 'I am passionate about data.'), input('a.txt', multibyte)]);
+    const fps = twice.runs[0].results.map((r) => r.partialFingerprints[FINGERPRINT_KEY]);
+    expect(new Set(fps).size).toBe(fps.length);
+    expect(twice.runs[0].results.filter((r) => r.locations[0]?.physicalLocation.artifactLocation.uri === 'a.txt')).toEqual(once.runs[0].results);
+  });
+
   it('is deterministic', () => {
     const a = JSON.stringify(toSarif([input('a.txt', multibyte)]));
     const b = JSON.stringify(toSarif([input('a.txt', multibyte)]));

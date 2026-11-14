@@ -53,6 +53,13 @@ describe('cli --sarif', () => {
     expect(uris(log)).toEqual([PASSING, FIXTURE]);
   });
 
+  it('gives each result once when the same file is named twice', () => {
+    const once = parse(run([FIXTURE, '--lang', 'en', '--sarif']).stdout).runs[0]?.results ?? [];
+    const twice = parse(run([FIXTURE, `./${FIXTURE}`, '--lang', 'en', '--sarif']).stdout).runs[0]?.results ?? [];
+    expect(once.length).toBeGreaterThan(0);
+    expect(twice).toEqual(once);
+  });
+
   it('writes the uri relative, with forward slashes and no leading ./', () => {
     expect(uris(parse(run([`./${FIXTURE}`, '--lang', 'en', '--sarif']).stdout))).toEqual([FIXTURE]);
     expect(uris(parse(run([join(dir, FIXTURE), '--lang', 'en', '--sarif']).stdout))).toEqual([FIXTURE]);
