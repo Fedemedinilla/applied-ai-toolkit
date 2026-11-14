@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assemblePages, landingLinks, PAGES_APPS, PAGES_URL } from './pages.ts';
+import { assemblePages, DOCS_FOLDER, landingLinks, PAGES_APPS, PAGES_URL } from './pages.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const landing = read('./index.html');
@@ -14,6 +14,14 @@ const landing = read('./index.html');
 describe('the landing page', () => {
   it('links every published app once, in the order of PAGES_APPS', () => {
     expect(landingLinks(landing)).toEqual([...PAGES_APPS]);
+  });
+
+  it('links the docs site once, in a folder that no app uses', () => {
+    expect(landing.split(`<a href="./${DOCS_FOLDER}/">`).length - 1).toBe(1);
+    expect(PAGES_APPS).not.toContain(DOCS_FOLDER);
+    // pages.yml copies the docs build into that folder, and the docs are built for that path.
+    expect(read('../.github/workflows/pages.yml')).toContain(`cp -R docs-site/dist dist/pages/${DOCS_FOLDER}\n`);
+    expect(read('../docs-site/scripts/site.ts')).toContain(`export const BASE = '${new URL(PAGES_URL).pathname}${DOCS_FOLDER}';`);
   });
 
   it('has a language, a strict policy, and no inline script or style', () => {
