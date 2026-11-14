@@ -70,6 +70,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from .fmt import ART
+from .i18n import Catalog, catalog
 from .model import COLOUR_ORDER, COLOUR_STYLES, PRIORITY_RANK, Colour, State
 
 if TYPE_CHECKING:
@@ -77,60 +78,31 @@ if TYPE_CHECKING:
     from .checks.tables import MailAuthTable, VelocityTable
     from .model import Finding
 
-# The footer of both files. No author line and no contact address: the report
-# says how it was made.
-SIGNATURE = "Informe generado con site-check {version}, sin inteligencia artificial: la misma medición da siempre este texto."
-
-# "Qué se miró y qué no" names only the blocklist that answered: Google's list
-# is never queried and Spamhaus can refuse queries from public resolvers, so a
-# fixed "listas de sitios peligrosos" would contradict the grey fold.
-WHAT_WAS_SEEN_HEAD = "Se revisó lo que cualquier persona puede ver desde afuera: cómo responde el sitio, cómo carga en un celular"
-WHAT_WAS_SEEN_LISTED = ", cómo está configurado el dominio y el correo, y si el dominio figura en la lista de bloqueo de Spamhaus."
-WHAT_WAS_SEEN_NO_LIST = " y cómo está configurado el dominio y el correo."
-WHAT_WAS_SEEN_SHARED = "Se revisó lo que cualquier persona puede ver desde afuera: cómo responde el sitio y cómo carga en un celular."
-WHAT_WAS_SEEN_TAIL = (
-    " No se entró al panel ni al hosting, así que lo que pasa adentro (usuarios, copias de seguridad, componentes "
-    "instalados) no está en este informe."
-)
+# Every string of the report frame lives in catalogs/<lang>.json (i18n.py). The
+# names below are the Spanish ones, kept for the code and the tests that read them.
+_ES = catalog("es")
+SIGNATURE = _ES["signature"]
 DBL_ANSWERED = frozenset({"listed", "not-listed"})
-PSI_GREY_SENTENCE = " La medición de velocidad de Google no se pudo completar el {fecha} y se repite aparte."
-PSI_SKIPPED_SENTENCE = " La medición de velocidad de Google no se hizo en esta corrida."
-
-FIXED_UNSEEN: tuple[str, ...] = (
-    "Usuarios y cuentas del panel.",
-    "Copias de seguridad y si restauran.",
-    "Componentes instalados y sus versiones.",
-    "Archivos y base de datos.",
-)
-UNSEEN_HEADING = "### Lo que solo se ve con acceso al sitio"
-UNSEEN_CLOSING = "Eso solo se revisa con acceso autorizado al sitio."
-# VIS-09: the broken addresses live in the annex only (a path may carry a name).
-BROKEN_LINKS_HEADING = "## Enlaces de la página principal que llevan a páginas que no existen"
-MANUAL_HEADING = "## Comprobaciones a mano"
-MANUAL_INTRO = "Lo que este chequeo no consulta y se puede mirar a mano:"
+UNSEEN_KEYS: tuple[str, ...] = ("unseen.users", "unseen.backups", "unseen.components", "unseen.files")
+FIXED_UNSEEN: tuple[str, ...] = tuple(_ES[key] for key in UNSEEN_KEYS)
 
 TRANSPARENCY_URL = "https://transparencyreport.google.com/safe-browsing/search?url={domain}"
 SPAMHAUS_URL = "https://check.spamhaus.org/results?query={domain}"
 SITE_QUERY = "site:{domain} viagra OR casino OR replica"
 ICANN_LOOKUP = "https://lookup.icann.org/"
 
-CATEGORY_COLUMNS: tuple[tuple[str, str], ...] = (
-    ("performance", "Rendimiento"),
-    ("accessibility", "Accesibilidad"),
-    ("best-practices", "Buenas prácticas"),
-    ("seo", "SEO"),
-)
+CATEGORY_KEYS: tuple[str, ...] = ("performance", "accessibility", "best-practices", "seo")
 
 # First words that keep their capital letter when a sentence is lowercased.
 PROPER_WORDS: frozenset[str] = frozenset(
     {"Google", "WordPress", "PageSpeed", "Spamhaus", "WhatsApp", "Chrome", "Mozilla", "Gmail", "Microsoft"}
 )
 
-STEP_COMPROMISED = "Revisar el sitio a fondo, con acceso autorizado, antes de cualquier otro cambio"
-STEP_FIX = "Corregir primero lo marcado para arreglar ya y para revisar"
-STEP_OPTIONAL = "Las mejoras opcionales, si {el} quiere mejorar cómo se ve y se encuentra"
-STEP_KEEP = "Mantener el sitio como está y repetir este chequeo de vez en cuando"
-STEP_REPEAT = "Repetir el chequeo"
+STEP_COMPROMISED = _ES["step.compromised"]
+STEP_FIX = _ES["step.fix"]
+STEP_OPTIONAL = _ES["step.optional"]
+STEP_KEEP = _ES["step.keep"]
+STEP_REPEAT = _ES["step.repeat"]
 
 _NUMBER_WORDS = {1: "una", 2: "dos", 3: "tres", 4: "cuatro", 5: "cinco"}
 
@@ -172,6 +144,7 @@ class ReportContext:
     kind: str = "institución"  # --kind, for the "only blues" next step
     conditions: str = ""  # measurement conditions after the time window ("celular, tres corridas...")
     psi_skipped: bool = False  # --no-pagespeed: the EXT-08 sentence says it was not run
+    lang: str = "es"  # --lang: the catalog of the report (i18n.py)
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +258,19 @@ def _found(f: "Finding") -> str:
     return f.name_plain
 
 
+def _name(f: "Finding", cat: Catalog) -> str:
+    """The name of the check in the report language (the stored Spanish name when the catalog has none)."""
+    return cat.strings.get(f"check.{f.id}.name") or f.name_plain
+
+
+def _about(f: "Finding", cat: Catalog) -> str:
+    return cat.strings.get(f"check.{f.id}.about", "")
+
+
+def _label(colour: Colour, cat: Catalog) -> str:
+    return cat[f"colour.{colour.value}.label"]
+
+
 def _action(f: "Finding") -> str:
     return f.phrase_report.action.strip() if f.phrase_report else ""
 
@@ -317,7 +303,7 @@ def _failures_first(findings: list["Finding"], hack_gate: bool) -> list["Finding
     return ordered
 
 
-def five_lines(findings: list["Finding"], *, hack_gate: bool = False) -> list[str]:
+def five_lines(findings: list["Finding"], *, hack_gate: bool = False, cat: Catalog | None = None) -> list[str]:
     """The "En cinco líneas" lines per the rule above (2 to 5 lines).
 
     Line 5 takes its two actions in the next-step order: the
@@ -325,6 +311,13 @@ def five_lines(findings: list["Finding"], *, hack_gate: bool = False) -> list[st
     reason, so the report never recommends one thing first and justifies the
     next step with another. Lines 1 to 3 keep the report order.
     """
+    cat = cat or _ES
+    if cat.by_rule:
+        # No sentence of a rule: the first two checks to act on, by name, in the next-step order.
+        first = [_name(f, cat) for f in _failures_first(findings, hack_gate)][:2]
+        if len(first) == 2:
+            return [cat.t("rules.first_two", first=first[0], second=first[1])]
+        return [cat.t("rules.first_one", first=first[0])] if first else []
     lines: list[str] = []
     top = _non_green(findings)[:3]
     lines.extend(_found(f) for f in top)
@@ -334,39 +327,48 @@ def five_lines(findings: list["Finding"], *, hack_gate: bool = False) -> list[st
     actions = [strip_end(lower_first(_action(f))) for f in _failures_first(findings, hack_gate)]
     actions = [a for a in actions if a][:2]
     if len(actions) >= 2:
-        lines.append(f"Lo primero: {actions[0]}; después, {actions[1]}.")
+        lines.append(cat.t("five.first_two", first=actions[0], second=actions[1]))
     elif len(actions) == 1:
-        lines.append(f"Lo primero: {actions[0]}.")
+        lines.append(cat.t("five.first_one", first=actions[0]))
     return lines
 
 
-def next_step(findings: list["Finding"], hack_gate: bool, *, kind: str = "institución") -> tuple[str, str]:
+def next_step(
+    findings: list["Finding"], hack_gate: bool, *, kind: str = "institución", cat: Catalog | None = None
+) -> tuple[str, str]:
     """(paso, razon) per the next-step map of the module docstring."""
+    cat = cat or _ES
+
+    def because(f: "Finding") -> str:
+        if cat.by_rule:
+            return cat.t("rules.reason.fail", name=_name(f, cat))
+        return strip_end(lower_first(_found(f)))
+
     non_green = _non_green(findings)
     if hack_gate:
         # The hack signal first; the same order as line 5.
         ordered = _failures_first(findings, True)
         source = ordered[0] if ordered else None
-        reason = strip_end(lower_first(_found(source))) if source else "hay señales de que el sitio fue intervenido"
-        return STEP_COMPROMISED, reason
+        reason = because(source) if source else cat["reason.compromised"]
+        return cat["step.compromised"], reason
     # The reason is a FALLA (red first, then yellow), never an observation. The
     # same order gives the first action of line 5 (_failures_first).
     failures = [f for f in _failures_first(findings, False) if f.state == State.FALLA and _colour_of(f) in (Colour.ROJO, Colour.AMARILLO)]
     if failures:
-        return STEP_FIX, strip_end(lower_first(_found(failures[0])))
+        return cat["step.fix"], because(failures[0])
     to_review = sum(1 for f in non_green if _colour_of(f) in (Colour.ROJO, Colour.AMARILLO))
     if to_review:
-        return STEP_FIX, f"hay {plural(to_review, 'punto para revisar', 'puntos para revisar')}"
+        return cat["step.fix"], cat.n("reason.review", to_review)
     if non_green:
         from .kinds import of as kind_of
 
         return (
-            STEP_OPTIONAL.format(el=kind_of(kind).el),
-            f"hay {plural(len(non_green), 'mejora opcional', 'mejoras opcionales')}",
+            cat.t("step.optional", el=cat[f"kind.{kind_of(kind).key}.the"]),
+            cat.n("reason.optional", len(non_green)),
         )
     if _greens(findings):
-        return STEP_KEEP, "todo lo que se pudo medir desde afuera está bien"
-    return STEP_REPEAT, "no se pudo medir casi nada desde afuera en esta medición"
+        return cat["step.keep"], cat["reason.keep"]
+    return cat["step.repeat"], cat["reason.repeat"]
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +376,7 @@ def next_step(findings: list["Finding"], hack_gate: bool, *, kind: str = "instit
 # ---------------------------------------------------------------------------
 
 
-def what_was_seen(findings: list["Finding"]) -> str:
+def what_was_seen(findings: list["Finding"], cat: Catalog | None = None) -> str:
     """The "Qué se miró y qué no" paragraph, naming a blocklist only when it answered.
 
     Spamhaus answered when EXT-23 measured a verdict "listed" or "not-listed";
@@ -383,63 +385,67 @@ def what_was_seen(findings: list["Finding"]) -> str:
     """
     # On a shared domain (Blogger, wixsite.com, a university subdomain) the
     # domain and mail checks are NO_APLICA, so the intro must not claim them.
+    cat = cat or _ES
     domain_checks = [f for f in findings if f.id in ("EXT-05", "EXT-13")]
     if domain_checks and all(f.state == State.NO_APLICA for f in domain_checks):
-        return WHAT_WAS_SEEN_SHARED + WHAT_WAS_SEEN_TAIL
+        return cat["seen.shared"] + cat["seen.tail"]
     ext23 = next((f for f in findings if f.id == "EXT-23"), None)
     verdict = None
     if ext23 is not None and ext23.state != State.NO_APLICA and isinstance(ext23.measured, dict):
         verdict = ext23.measured.get("verdict")
-    middle = WHAT_WAS_SEEN_LISTED if verdict in DBL_ANSWERED else WHAT_WAS_SEEN_NO_LIST
-    return WHAT_WAS_SEEN_HEAD + middle + WHAT_WAS_SEEN_TAIL
+    middle = cat["seen.listed"] if verdict in DBL_ANSWERED else cat["seen.no_list"]
+    return cat["seen.head"] + middle + cat["seen.tail"]
 
 
-def _score_text(c: "ScoreCell | None") -> str:
+def _score_text(c: "ScoreCell | None", cat: Catalog) -> str:
     if c is None or c.score is None:
-        return "○ sin dato"
-    label = f" ({c.label})" if c.label else ""
+        return cat["google.no_data"]
+    # The band label is stored in Spanish with the score; the report by rule prints the shape and the score.
+    label = f" ({c.label})" if c.label and not cat.by_rule else ""
     return f"{c.shape} {c.score}{label}".strip()
 
 
-def _google_section(ctx: ReportContext) -> list[str]:
+def _google_section(ctx: ReportContext, cat: Catalog) -> list[str]:
     s = ctx.google_summary
-    out = [f"**Resumen de Google** (PageSpeed, {fecha_dmy(ctx.run_date)}; puntaje de 0 a 100)", ""]
-    sides = (("Celular", s.mobile or {}), ("Computadora", s.desktop or {}))
+    out = [cat.t("google.heading", date=cat.date(ctx.run_date)), ""]
+    sides = ((cat["google.mobile"], s.mobile or {}), (cat["google.desktop"], s.desktop or {}))
     any_score = any(c is not None and c.score is not None for _, side in sides for c in side.values())
     reasons: list[str] = []
     if any_score:
-        out.append("| | " + " | ".join(name for _, name in CATEGORY_COLUMNS) + " |")
-        out.append("|---|" + "---|" * len(CATEGORY_COLUMNS))
+        out.append("| | " + " | ".join(cat[f"google.category.{key}"] for key in CATEGORY_KEYS) + " |")
+        out.append("|---|" + "---|" * len(CATEGORY_KEYS))
         for side_name, side in sides:
             cells = []
-            for key, _ in CATEGORY_COLUMNS:
+            for key in CATEGORY_KEYS:
                 c = side.get(key)
-                cells.append(cell(_score_text(c)))
+                cells.append(cell(_score_text(c, cat)))
                 if c is not None and c.score is None and c.reason and c.reason not in reasons:
                     reasons.append(c.reason)
             out.append(f"| {side_name} | " + " | ".join(cells) + " |")
         out.append("")
+        if cat.by_rule:
+            reasons = [cat["google.default_reason"]] if reasons else []  # the stored reasons are Spanish
         for r in reasons:
-            out.append(f"○ No se pudo medir: {strip_end(r)}.")
+            out.append(cat.t("google.not_measured", reason=strip_end(r)))
             out.append("")
     else:
         reason = s.reason or next((c.reason for _, side in sides for c in side.values() if c and c.reason), None)
-        reason = reason or "la herramienta de velocidad de Google no dio resultados"
-        out.append(f"○ No se pudo medir: {strip_end(reason)}.")
+        if cat.by_rule or not reason:
+            reason = cat["google.default_reason"]
+        out.append(cat.t("google.not_measured", reason=strip_end(reason)))
         out.append("")
     return out
 
 
-def _counts_line(c: Counts) -> str:
-    head = plural(c.aplicables, "chequeo aplicable", "chequeos aplicables")
+def _counts_line(c: Counts, cat: Catalog) -> str:
     parts = [
-        f"▲ {c.rojo} para arreglar ya",
-        f"■ {c.amarillo} para revisar",
-        f"◆ {plural(c.azul, 'mejora opcional', 'mejoras opcionales')}",
-        f"● {c.verde} bien",
-        f"○ {c.gris} {'que no se pudo ver' if c.gris == 1 else 'que no se pudieron ver'}",
+        cat.t("counts.red", n=c.rojo),
+        cat.t("counts.yellow", n=c.amarillo),
+        cat.n("counts.blue", c.azul),
+        cat.t("counts.green", n=c.verde),
+        cat.n("counts.grey", c.gris),
     ]
-    return f"**{head}:** " + " · ".join(parts) + "."
+    return cat.t("counts.line", head=cat.n("counts.applicable", c.aplicables), parts=" · ".join(parts))
 
 
 def _row_found(f: "Finding") -> str:
@@ -450,22 +456,30 @@ def _row_found(f: "Finding") -> str:
     return found
 
 
-def _fix_section(findings: list["Finding"], counts: Counts) -> list[str]:
+def _result(f: "Finding", cat: Catalog) -> str:
+    key = f"rules.result.{f.state.value}"
+    return cat.strings.get(key) or cat["rules.result.other"]
+
+
+def _fix_section(findings: list["Finding"], counts: Counts, cat: Catalog) -> list[str]:
     groups = [(Colour.ROJO, counts.rojo), (Colour.AMARILLO, counts.amarillo), (Colour.AZUL, counts.azul)]
     if not any(n for _, n in groups):
         return []
-    out = ["## Lo que conviene arreglar", "", "Ordenado por lo que más riesgo trae si se deja como está.", ""]
+    out = [cat["fix.heading"], "", cat["fix.intro"], ""]
     ordered = sort_for_report(findings)
     for colour, n in groups:
         if not n:
             continue
         style = COLOUR_STYLES[colour]
-        out.append(f"### {style.shape} {style.label} ({n})")
+        out.append(f"### {style.shape} {_label(colour, cat)} ({n})")
         out.append("")
-        out.append("| Qué se encontró | Qué puede pasar si queda así | Qué se hace | Quién |")
-        out.append("|---|---|---|---|")
+        out.append(cat["rules.columns"] if cat.by_rule else cat["fix.columns"])
+        out.append("|---|---|---|" if cat.by_rule else "|---|---|---|---|")
         for f in ordered:
             if _colour_of(f) != colour:
+                continue
+            if cat.by_rule:
+                out.append(f"| {f.id} · {cell(_name(f, cat))} | {cell(strip_end(_about(f, cat)))} | {_result(f, cat)} |")
                 continue
             p = f.phrase_report
             # Table cells carry no final period, whatever the check wrote.
@@ -477,19 +491,21 @@ def _fix_section(findings: list["Finding"], counts: Counts) -> list[str]:
     return out
 
 
-def _velocity_section(ctx: ReportContext) -> list[str]:
+def _velocity_section(ctx: ReportContext, cat: Catalog) -> list[str]:
     v = ctx.velocity
-    out = ["## Velocidad", ""]
+    out = [cat["speed.heading"], ""]
+    if cat.by_rule:
+        return out + [cat["rules.tables_note"] if v.rows else cat.t("speed.none", date=cat.date(ctx.run_date)), ""]
     if v.intro:
         out += [v.intro.strip(), ""]
     if v.rows:
-        out.append(f"| Qué se midió | Antes · {fecha_dmy(ctx.run_date)} | Qué significa |")
+        out.append(cat.t("speed.columns", date=cat.date(ctx.run_date)))
         out.append("|---|---|---|")
         for r in v.rows:
             out.append(f"| {cell(r.what)} | {cell(r.value)} | {cell(r.meaning)} |")
         out.append("")
     else:
-        out += [f"No se midió la velocidad el {fecha_dmy(ctx.run_date)}.", ""]
+        out += [cat.t("speed.none", date=cat.date(ctx.run_date)), ""]
     if v.lab_note:
         out += [v.lab_note.strip(), ""]
     if v.attribution:
@@ -497,11 +513,13 @@ def _velocity_section(ctx: ReportContext) -> list[str]:
     return out
 
 
-def _mail_auth_section(ctx: ReportContext) -> list[str]:
+def _mail_auth_section(ctx: ReportContext, cat: Catalog) -> list[str]:
     m = ctx.mail_auth
-    out = ["## Correo del dominio", ""]
+    out = [cat["mail.heading"], ""]
+    if cat.by_rule:
+        return out + [cat["rules.tables_note"] if m.rows else cat.t("mail.none", date=cat.date(ctx.run_date)), ""]
     if m.rows:
-        out.append("| Protección | Estado | Qué significa |")
+        out.append(cat["mail.columns"])
         out.append("|---|---|---|")
         for r in m.rows:
             out.append(f"| {cell(r.what)} | {cell(r.value)} | {cell(r.meaning)} |")
@@ -509,140 +527,174 @@ def _mail_auth_section(ctx: ReportContext) -> list[str]:
     if m.not_applicable_note:
         out += [m.not_applicable_note.strip(), ""]
     if not m.rows and not m.not_applicable_note:
-        out += [f"No se pudo leer la configuración del correo del dominio el {fecha_dmy(ctx.run_date)}.", ""]
+        out += [cat.t("mail.none", date=cat.date(ctx.run_date)), ""]
     return out
 
 
-def _green_section(findings: list["Finding"], counts: Counts) -> list[str]:
-    out = ["## Lo que está bien", ""]
+def _green_section(findings: list["Finding"], counts: Counts, cat: Catalog) -> list[str]:
+    out = [cat["green.heading"], ""]
     if not counts.verde:
-        return out + ["● 0 cosas bien en esta medición.", ""]
-    summary = "● 1 cosa bien" if counts.verde == 1 else f"● {counts.verde} cosas bien"
-    out += [f"<details><summary>{summary}</summary>", "", "| Qué | Por qué importa |", "|---|---|"]
+        return out + [cat["green.zero"], ""]
+    summary = cat.n("green.summary", counts.verde)
+    columns = cat["rules.green_columns"] if cat.by_rule else cat["green.columns"]
+    out += [f"<details><summary>{summary}</summary>", "", columns, "|---|---|"]
     for f in _greens(findings):
+        if cat.by_rule:
+            out.append(f"| {f.id} · {cell(_name(f, cat))} | {cell(strip_end(_about(f, cat)))} |")
+            continue
         p = f.phrase_report
         out.append(f"| {cell(strip_end(_row_found(f)))} | {cell(strip_end(p.consequence) if p else '')} |")
     return out + ["", "</details>", ""]
 
 
-def _grey_line(f: "Finding") -> str:
+def _grey_line(f: "Finding", cat: Catalog) -> str:
+    if cat.by_rule:
+        return cat.t("rules.grey_line", name=f"{f.id} · {_name(f, cat)}")
     text = ""
     if f.phrase_report and f.phrase_report.found.strip():
         text = f.phrase_report.found.strip()
     elif f.reason:
         text = f.reason.strip()
     else:
-        text = "no se pudo medir"
+        text = cat["grey.default"]
     name = f.name_plain.strip()
     if name.endswith("?"):
         return f"{name} {end_with_period(text[0].upper() + text[1:])}"
     return f"{name}: {end_with_period(lower_first(text))}"
 
 
-def _manual_checks(findings: list["Finding"], domain: str) -> list[str]:
+def _manual_checks(findings: list["Finding"], domain: str, cat: Catalog) -> list[str]:
     """The checks a person can make by hand, once each (annex only)."""
     by_id = {f.id: f for f in findings}
     lines: list[str] = []
     ext23 = by_id.get("EXT-23")
     if ext23 is not None and ext23.state not in (State.APROBADO, State.NO_APLICA):
-        lines.append(f"Lista de sitios peligrosos de Google: {TRANSPARENCY_URL.format(domain=domain)}")
+        lines.append(cat.t("manual.google", url=TRANSPARENCY_URL.format(domain=domain)))
         verdict = (ext23.measured or {}).get("verdict") if isinstance(ext23.measured, dict) else None
         if verdict not in ("not-listed", "listed"):
-            lines.append(f"Lista de bloqueo de Spamhaus: {SPAMHAUS_URL.format(domain=domain)}")
+            lines.append(cat.t("manual.spamhaus", url=SPAMHAUS_URL.format(domain=domain)))
     ext24 = by_id.get("EXT-24")
     if ext24 is not None and ext24.state == State.NO_VERIFICADO:
-        lines.append(f"Páginas ajenas en Google: buscar «{SITE_QUERY.format(domain=domain)}».")
+        lines.append(cat.t("manual.site_query", query=SITE_QUERY.format(domain=domain)))
     ext13 = by_id.get("EXT-13")
     if ext13 is not None and ext13.state == State.NO_VERIFICADO:
         where = "nic.ar" if domain.endswith(".ar") else ICANN_LOOKUP
-        lines.append(f"Vencimiento del dominio: {where}")
+        lines.append(cat.t("manual.domain", where=where))
     vis02 = by_id.get("VIS-02")
     robots_state = (vis02.measured or {}).get("robots_state") if vis02 is not None and isinstance(vis02.measured, dict) else None
     if vis02 is not None and vis02.state == State.NO_VERIFICADO and robots_state in ("4xx", "5xx", "soft-404", "invalid"):
-        lines.append("Mapa del sitio: robots.txt no se pudo usar y la herramienta no lo buscó en otras direcciones; se busca a mano.")
+        lines.append(cat["manual.sitemap"])
     return lines
 
 
-def _grey_section(ctx: ReportContext, counts: Counts) -> list[str]:
+def _grey_section(ctx: ReportContext, counts: Counts, cat: Catalog) -> list[str]:
     """The grey fold counts exactly its bullets; the fixed «never from outside» lines go apart, uncounted."""
     n = counts.gris
-    out = ["## Lo que no se pudo ver desde afuera", ""]
+    out = [cat["grey.heading"], ""]
     if n:
-        summary = "○ 1 cosa que no se pudo ver" if n == 1 else f"○ {n} cosas que no se pudieron ver"
-        out += [f"<details><summary>{summary}</summary>", ""]
+        out += [f"<details><summary>{cat.n('grey.summary', n)}</summary>", ""]
         for f in sort_for_report(ctx.findings):
             if _colour_of(f) == Colour.GRIS:
-                out.append(f"- {cell(_grey_line(f))}")
+                out.append(f"- {cell(_grey_line(f, cat))}")
         out += ["", "</details>", ""]
     else:
-        out += ["○ 0 cosas que no se pudieron ver en esta medición.", ""]
-    out += [UNSEEN_HEADING, ""]
-    out += [f"- {line}" for line in FIXED_UNSEEN]
-    out += ["", UNSEEN_CLOSING, ""]
+        out += [cat["grey.zero"], ""]
+    out += [cat["unseen.heading"], ""]
+    out += [f"- {cat[key]}" for key in UNSEEN_KEYS]
+    out += ["", cat["unseen.closing"], ""]
     return out
 
 
-def _how_section(ctx: ReportContext) -> list[str]:
-    tools = join_es(ctx.tools_used)
-    tools_text = f"Herramientas: {tools}." if tools else "Herramientas: ninguna respondió."
-    window = (
-        f"Condiciones: {fecha_dmy(ctx.run_date)}, de {hora(ctx.started_local)} a {hora(ctx.finished_local)}, "
-        "desde Buenos Aires"
-    )
-    if ctx.conditions.strip():
+def _how_section(ctx: ReportContext, cat: Catalog) -> list[str]:
+    # The names of the tools and the conditions are stored as Spanish text: the report by rule leaves them to run.json.
+    tools = "" if cat.by_rule else join_es(ctx.tools_used)
+    tools_text = cat.t("how.tools", tools=tools) if tools else ("" if cat.by_rule else cat["how.no_tools"])
+    window = cat.t("how.window", date=cat.date(ctx.run_date), start=hora(ctx.started_local), end=hora(ctx.finished_local))
+    if ctx.conditions.strip() and not cat.by_rule:
         window += f"; {strip_end(ctx.conditions)}"
-    requests = plural(ctx.n_site_requests, "pedido", "pedidos")
-    minutes = plural(max(ctx.site_minutes, 1), "minuto", "minutos")
     if ctx.n_site_requests:
-        load = f" Se hicieron {requests} a su sitio en {minutes}, de a uno por vez y con pausas."
+        load = cat.t(
+            "how.load",
+            requests=cat.n("how.request", ctx.n_site_requests),
+            minutes=cat.n("how.minute", max(ctx.site_minutes, 1)),
+        )
     else:
-        load = " No se hizo ningún pedido a su sitio."
+        load = cat["how.no_load"]
     return [
-        "## Cómo se midió",
+        cat["how.heading"],
         "",
-        f"{tools_text} {window}.{load} Las mediciones y las salidas completas quedan a disposición, "
-        "y el anexo técnico con el estado de cada chequeo va aparte.",
+        cat.t("how.paragraph", tools=tools_text, window=window, load=load).strip(),
         "",
     ]
 
 
 def render_annex(ctx: ReportContext) -> str:
     """technical-annex.md: the header and the technical annex of the run."""
+    cat = catalog(ctx.lang)
     out = [
-        f"**{ctx.institution} · Anexo técnico del estado del sitio {ctx.domain}**",
+        cat.t("annex.title", organisation=ctx.institution, domain=ctx.domain),
         "",
-        f"Fecha: {fecha_dmy(ctx.run_date)} · Para: {ctx.para}",
+        cat.t("date_line", date=cat.date(ctx.run_date), to=ctx.para),
         "",
     ]
-    out += _annex(list(ctx.findings))
-    out += _broken_links(list(ctx.findings))
-    manual = _manual_checks(list(ctx.findings), ctx.domain)
+    out += _annex(list(ctx.findings), cat)
+    if cat.by_rule:
+        out += _measured_values(list(ctx.findings), cat)
+    out += _broken_links(list(ctx.findings), cat)
+    manual = _manual_checks(list(ctx.findings), ctx.domain, cat)
     if manual:
-        out += [MANUAL_HEADING, "", MANUAL_INTRO, ""]
+        out += [cat["manual.heading"], "", cat["manual.intro"], ""]
         out += [f"- {line}" for line in manual]
         out.append("")
-    out += ["---", "", _signature(), ""]
+    out += ["---", "", _signature(cat), ""]
     return "\n".join(out).rstrip("\n") + "\n"
 
 
-def _signature() -> str:
+def _signature(cat: Catalog | None = None) -> str:
     from . import __version__
 
-    return SIGNATURE.format(version=__version__)
+    return (cat or _ES).t("signature", version=__version__)
 
 
-def _broken_links(findings: list["Finding"]) -> list[str]:
+def _measured_values(findings: list["Finding"], cat: Catalog) -> list[str]:
+    """The report by rule: every number and yes/no a check stored, under its run.json name.
+
+    Each printed value is ``checks[ID].measured.<name>`` of run.json as it is
+    stored: the name is printed next to it, so the value needs no other trace.
+    Text values are left out: they can carry text of the site or Spanish codes.
+    """
+    from .runformat import MEASURED_KEYS
+
+    rows: list[str] = []
+    for f in sorted(findings, key=lambda x: x.id):
+        if not isinstance(f.measured, dict):
+            continue
+        for key in sorted(f.measured, key=lambda k: MEASURED_KEYS.get(k, k)):
+            value = f.measured[key]
+            if isinstance(value, bool):
+                shown = cat["rules.measured.yes"] if value else cat["rules.measured.no"]
+            elif isinstance(value, (int, float)):
+                shown = str(value)
+            else:
+                continue
+            rows.append(f"| {f.id} | {MEASURED_KEYS.get(key, key)} | {shown} |")
+    if not rows:
+        return []
+    return [cat["rules.measured.heading"], "", cat["rules.measured.intro"], "", cat["rules.measured.columns"], "|---|---|---|", *rows, ""]
+
+
+def _broken_links(findings: list["Finding"], cat: Catalog) -> list[str]:
     """The VIS-09 broken addresses (host plus path), when VIS-09 failed and measured them."""
     for f in findings:
         if f.id != "VIS-09" or f.state != State.FALLA or not isinstance(f.measured, dict):
             continue
         addresses = [str(a) for a in (f.measured.get("broken_addresses") or []) if a]
         if addresses:
-            return [BROKEN_LINKS_HEADING, "", *[f"- {a}" for a in addresses], ""]
+            return [cat["broken.heading"], "", *[f"- {a}" for a in addresses], ""]
     return []
 
 
-def _annex(findings: list["Finding"]) -> list[str]:
+def _annex(findings: list["Finding"], cat: Catalog) -> list[str]:
     by_state: dict[State, int] = {}
     for f in findings:
         by_state[f.state] = by_state.get(f.state, 0) + 1
@@ -651,75 +703,81 @@ def _annex(findings: list["Finding"]) -> list[str]:
     n_na = by_state.get(State.NO_APLICA, 0)
     aplicables = len(findings) - n_na
     out = [
-        "## Anexo técnico",
+        cat["annex.heading"],
         "",
-        f"Chequeos aprobados sobre aplicables: {n_ap + n_aco} de {aplicables} ({n_ap} APROBADO, "
-        f"{n_aco} APROBADO_CON_OBSERVACION). FALLA: {by_state.get(State.FALLA, 0)}. "
-        f"NO_VERIFICADO: {by_state.get(State.NO_VERIFICADO, 0)}. NO_APLICA: {n_na}. Total: {len(findings)}.",
+        cat.t(
+            "annex.counts", passed=n_ap + n_aco, applicable=aplicables, n_pass=n_ap, n_note=n_aco,
+            n_fail=by_state.get(State.FALLA, 0), n_grey=by_state.get(State.NO_VERIFICADO, 0), n_na=n_na,
+            total=len(findings),
+        ),
         "",
-        "| ID | Estado | Color | Evidencia (recortada) |",
+        cat["annex.columns"],
         "|---|---|---|---|",
     ]
     for f in sorted(findings, key=lambda x: x.id):
         colour = _colour_of(f)
         if colour == Colour.OCULTO:
-            shown = "no se muestra"
+            shown = cat["annex.hidden"]
         else:
             style = COLOUR_STYLES[colour]
-            shown = f"{style.shape} {style.label}"
+            shown = f"{style.shape} {_label(colour, cat)}"
             if f.colour_reason:
-                shown += f" (color ajustado: {strip_end(f.colour_reason)})"
+                shown += cat.t("annex.adjusted", reason=strip_end(f.colour_reason))
         evidence = ", ".join(f.evidence)
         if len(evidence) > 60:
             evidence = evidence[:57].rstrip(", ") + "..."
-        out.append(f"| {f.id} | {f.state.value if isinstance(f.state, State) else f.state} | {cell(shown)} | {cell(evidence)} |")
+        state = cat[f"state.{f.state.value}"] if isinstance(f.state, State) else f.state
+        out.append(f"| {f.id} | {state} | {cell(shown)} | {cell(evidence)} |")
     out.append("")
     return out
 
 
 def render_report(ctx: ReportContext) -> str:
     """The whole report.md text (UTF-8, '\\n' newlines), ready for textlint."""
+    cat = catalog(ctx.lang)
     findings = list(ctx.findings)
     counts = count_colours(findings)
     by_id = {f.id: f for f in findings}
 
     # Without --name the institution is the domain itself, so it is not repeated.
     if ctx.institution.strip().lower() == ctx.domain.lower():
-        title = f"**Estado del sitio {ctx.domain}**"
+        title = cat.t("title.bare", domain=ctx.domain)
     else:
-        title = f"**{ctx.institution} · Estado del sitio {ctx.domain}**"
+        title = cat.t("title.named", organisation=ctx.institution, domain=ctx.domain)
     out = [
         title,
         "",
-        f"Fecha: {fecha_dmy(ctx.run_date)} · Para: {ctx.para}",
+        cat.t("date_line", date=cat.date(ctx.run_date), to=ctx.para),
         "",
     ]
-    out += _google_section(ctx)
+    if cat.by_rule:
+        out += [cat["rules.note"], ""]
+    out += _google_section(ctx, cat)
 
-    seen = what_was_seen(findings)
+    seen = what_was_seen(findings, cat)
     ext08 = by_id.get("EXT-08")
     if ctx.psi_skipped:
-        seen += PSI_SKIPPED_SENTENCE
+        seen += cat["seen.psi_skipped"]
     elif ext08 is not None and ext08.state == State.NO_VERIFICADO:
-        seen += PSI_GREY_SENTENCE.format(fecha=fecha_dmy(ctx.run_date))
-    out += ["## Qué se miró y qué no", "", seen, ""]
+        seen += cat.t("seen.psi_grey", date=cat.date(ctx.run_date))
+    out += [cat["seen.heading"], "", seen, ""]
 
-    out += ["## En cinco líneas", "", _counts_line(counts), ""]
-    lines = five_lines(findings, hack_gate=ctx.hack_gate)
+    out += [cat["five.heading"], "", _counts_line(counts, cat), ""]
+    lines = five_lines(findings, hack_gate=ctx.hack_gate, cat=cat)
     # Every numbered line ends with one period, whatever the check wrote.
     out += [f"{i}. {end_with_period(line)}" for i, line in enumerate(lines, start=1)]
     if lines:
         out.append("")
 
-    out += _fix_section(findings, counts)
-    out += _velocity_section(ctx)
-    out += _mail_auth_section(ctx)
-    out += _green_section(findings, counts)
-    out += _grey_section(ctx, counts)
+    out += _fix_section(findings, counts, cat)
+    out += _velocity_section(ctx, cat)
+    out += _mail_auth_section(ctx, cat)
+    out += _green_section(findings, counts, cat)
+    out += _grey_section(ctx, counts, cat)
 
-    step, reason = next_step(findings, ctx.hack_gate, kind=ctx.kind)
-    out += [f"**Próximo paso recomendado:** {step}, porque {end_with_period(reason)}", ""]
+    step, reason = next_step(findings, ctx.hack_gate, kind=ctx.kind, cat=cat)
+    out += [cat.t("next.line", step=step, reason=end_with_period(reason)), ""]
 
-    out += _how_section(ctx)
-    out += ["---", "", _signature(), ""]
+    out += _how_section(ctx, cat)
+    out += ["---", "", _signature(cat), ""]
     return "\n".join(out).rstrip("\n") + "\n"

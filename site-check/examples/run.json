@@ -1614,6 +1614,7 @@
       "valid": 3
     },
     "python_version": "pinned",
+    "report_language": "es",
     "requests": {
       "api": 17,
       "control": 3,

@@ -9,7 +9,11 @@ Options:
                           (default), or the Spanish noun the report uses: colegio,
                           escuela, instituto, jardín, empresa, institución
                           (kinds.py; anything else is exit 2)
-  --to TEXT               who the report is addressed to (default "Dirección")
+  --to TEXT               who the report is addressed to (default "Dirección";
+                          "Management" with --lang en)
+  --lang LANG             report language: es (default) or en. The sentences of the
+                          rules exist in Spanish only, so the English report states
+                          each rule with a fixed text (i18n.py)
   --inner-page URL        an inner page to read (measured only if the home links it)
   --form-page URL         a page with a form for VIS-13 (measured only if the home links it)
   --psi-runs N            mobile PageSpeed runs, 1..5 (default 3; the median is used)
@@ -71,6 +75,7 @@ from .config import (
 )
 from .endpoints import CONTROL_ENV_VAR, control_domain_from_env
 from .exclusions import ENV_VAR as EXCLUDE_ENV_VAR
+from .i18n import DEFAULT_LANG, LANGS, catalog
 from .kinds import CLI_NAMES, KINDS, normalize_kind
 
 # Top-level module names already loaded when the CLI was imported (the
@@ -101,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Passive, outside-in website check: reads only what the site serves to any visitor, plus public "
             "DNS, RDAP, Spamhaus and PageSpeed answers, and writes run.json, report.md and technical-annex.md. "
-            "The report is written in Spanish."
+            "The report is written in Spanish, or by rule in English with --lang en."
         ),
         epilog=(
             "Example: SITE_CHECK_CONTROL_DOMAIN=your-own-site.example "
@@ -117,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
         f"the Spanish nouns of the report are accepted too ({', '.join(KINDS)})",
     )
     p.add_argument("--to", dest="to", metavar="TEXT", default=None, help=f"who the report is addressed to (default: {DEFAULT_PARA})")
+    p.add_argument(
+        "--lang", metavar="LANG", default=None, choices=LANGS,
+        help=f"report language: {' or '.join(LANGS)} (default: {DEFAULT_LANG}, or with --rerender the language the run "
+        "was written in). The en report states each rule with a fixed text; the detailed sentences are Spanish only",
+    )
     p.add_argument("--inner-page", dest="inner_page", metavar="URL", help="inner page; read only if the home links it")
     p.add_argument("--form-page", dest="form_page", metavar="URL", help="page with a form; read only if the home links it")
     p.add_argument(
@@ -312,7 +322,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             option
             for option, value in (
                 ("a URL", args.url), ("--rerender", args.rerender), ("--overrides", args.overrides),
-                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--out", args.out),
+                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--lang", args.lang), ("--out", args.out),
                 ("--exclude", args.exclude),
             )
             if value
@@ -347,6 +357,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             kind=args.kind.strip() if args.kind else DEFAULT_KIND,
             kind_explicit=args.kind is not None,
             para=args.to.strip() if args.to else "",
+            lang=args.lang,
             overrides=overrides,
             rerender_from=rerender_from,
             out_root=out_root,
@@ -374,7 +385,8 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         institution=args.name.strip() if args.name else None,
         kind=args.kind.strip() if args.kind else DEFAULT_KIND,
         kind_explicit=args.kind is not None,
-        para=args.to.strip() if args.to else DEFAULT_PARA,
+        para=args.to.strip() if args.to else catalog(args.lang or DEFAULT_LANG)["default_to"],
+        lang=args.lang,
         interna=args.inner_page.strip() if args.inner_page else None,
         form_page=args.form_page.strip() if args.form_page else None,
         psi_runs=args.psi_runs,

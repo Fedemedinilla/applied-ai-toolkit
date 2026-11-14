@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
 from . import SCHEMA_VERSION, __version__, fmt, outputs, runformat
+from .i18n import normalize_lang
 from .exitcodes import DESCRIPTION, ExitCode, OutcomeFlags, resolve
 from .fmt import ART
 
@@ -402,6 +403,7 @@ def _build_meta(state: _State, finished: dt.datetime, extra: dict[str, Any]) -> 
         "tipo": config.kind,
         "tipo_explicito": config.kind_explicit,
         "para": config.para,
+        "idioma_informe": normalize_lang(config.lang),
         "inicio_utc": _iso_utc(state.started),
         "fin_utc": _iso_utc(finished),
         "inicio_local": _iso_local(state.started),
@@ -972,6 +974,7 @@ def _run(
         kind=config.kind,
         conditions=conditions,
         psi_skipped=not config.psi_enabled,
+        lang=normalize_lang(config.lang),
     )
     _write_client_files(paths, render_report(report_ctx), render_annex(report_ctx), rerender=False)
     outputs.write_tiempo(paths, state.started, finished)
@@ -1277,6 +1280,8 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
     institution = config.institution or meta.get("institucion") or domain
     para = config.para or meta.get("para") or DEFAULT_PARA
     kind = config.kind if config.kind_explicit else (meta.get("tipo") or DEFAULT_KIND)
+    # The language the run was written in, unless --lang asks for another; a run stored before --lang is Spanish.
+    lang = normalize_lang(config.lang or meta.get("idioma_informe"))
     velocity, mail_auth = _tables_from_datos(old.get("tablas"))
     now = _now_utc()
     report_ctx = ReportContext(
@@ -1297,6 +1302,7 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         kind=str(kind),
         conditions=str(meta.get("condiciones") or ""),
         psi_skipped=bool(meta.get("sin_pagespeed")),
+        lang=lang,
     )
     _write_client_files(paths, render_report(report_ctx), render_annex(report_ctx), rerender=True)
 
@@ -1309,6 +1315,8 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         new_meta["institucion"] = config.institution.strip()
     if config.kind_explicit:
         new_meta["tipo"], new_meta["tipo_explicito"] = str(kind), True
+    if config.lang or "idioma_informe" in meta:
+        new_meta["idioma_informe"] = lang
     new["meta"] = new_meta
     new["checks"] = _findings_to_datos(findings, errors)
     new["resumen"] = _resumen(findings)

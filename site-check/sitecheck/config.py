@@ -78,6 +78,7 @@ class RunConfig:
     pace_seconds: float = DEFAULT_PACE_SECONDS  # --pause (>= 3, <= 60)
     site_budget: int = DEFAULT_SITE_BUDGET  # --max-requests (1..90)
     kind_explicit: bool = False  # True when --kind was given (run.json meta.tipo_explicito)
+    lang: str | None = None  # --lang: report language; None is Spanish, or with --rerender the run's own
     compare: tuple[Path, Path] | None = None  # --compare BEFORE AFTER: two run folders or run.json files
 
     @property

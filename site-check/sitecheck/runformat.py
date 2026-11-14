@@ -585,7 +585,12 @@ def to_internal(document: dict[str, Any]) -> dict[str, Any]:
     if version == SCHEMA_VERSION:
         return _apply(document, _RUN_BACK, _RUN_BACK, _MEASURED_BACK)
     if version == LEGACY_SCHEMA_VERSION:
-        return {**document, "schema_version": SCHEMA_VERSION}
+        internal = {**document, "schema_version": SCHEMA_VERSION}
+        meta = internal.get("meta")
+        if isinstance(meta, dict):
+            # Version 1 had one report language and did not record it.
+            internal["meta"] = {"idioma_informe": "es", **meta}
+        return internal
     raise RunFormatError(
         f"schema_version {version!r}; this tool reads {SCHEMA_VERSION} and migrates {LEGACY_SCHEMA_VERSION}"
     )
