@@ -2,6 +2,29 @@
 
 A CLI that audits a built static site (a `dist/` folder) or a Vercel Build Output folder before it is deployed. It catches five failures that only show in production, because a dev server neither bundles like the build nor sends the deploy's headers. An inline script whose hash went stale is blocked by the browser. A policy drifts from what was reviewed. A secret is inlined by the bundler. A regex lookbehind stops a whole module on older Safari. The JavaScript a page loads keeps growing. Each check reads the build and the deploy configuration from disk, with no server and no network. I extracted it from the build scripts of two production sites, where each check was added after one of those failures or to keep it from happening.
 
+## Install
+
+```sh
+npm install --save-dev @fedemedinilla/csp-build-guard
+npx csp-build-guard --dir dist --config csp-guard.config.json
+```
+
+```ts
+import { runGuard } from '@fedemedinilla/csp-build-guard';
+import { loadConfig } from '@fedemedinilla/csp-build-guard/config';
+import { formatReport } from '@fedemedinilla/csp-build-guard/report';
+import { toSarif } from '@fedemedinilla/csp-build-guard/sarif';
+```
+
+The `csp-build-guard` bin is built from `cli.ts` and takes the same arguments as `node csp-build-guard/cli.ts`. The package entry is built from `src/run.ts`. The folder has no index module, so the rest comes through subpaths named after the source files: `/config`, `/report`, `/sarif`, `/site` (for `InputError`) and `/types`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+
+- **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps that carry the text of the `.ts` sources, which are not shipped.
+- **`zod` is the one dependency, pinned to 4.6.7.** It validates the config. A caller never passes a zod schema in, so nothing has to be shared with the project's copy.
+- **A `.ts` config still works.** It is the project's own file, outside `node_modules`, so Node 24 strips its types when the installed bin imports it. It has to be erasable TypeScript (no `enum`, no `namespace`). The JSON form needs none of that.
+- **`import` and `require()` both load it.** Each `exports` entry pairs `types` with `default`, and Node 24 loads an ES module through `require()`.
+- **Node 24 or newer** (`engines`). That is the only version the tests and CI run.
+- **The build is checked as installed.** [`test/packaging/pack-check.ts`](../test/packaging/pack-check.ts) packs the package, installs the tarball in an empty project, compares the exports of every entry with the source, and runs the installed bin and `node csp-build-guard/cli.ts` on the same fixtures to compare output and exit code.
+
 ## Run it
 
 From the repository root:
@@ -256,6 +279,13 @@ src/
 test/                  Vitest suites; test/golden/ holds the output output-regression.test.ts pins
 fixtures/              small builds that pass and fail each check
 ```
+
+## What it does not do
+
+- It does not write or suggest a policy. It compares the build with the policy the config states.
+- It does not talk to a server or a browser. It reads files on disk, so it says nothing about headers a host adds, a CDN rewrites or a server sets at request time.
+- It does not scan for secrets it was not told about. It searches for the values of the variables the config names, not for patterns that look like keys.
+- It does not fix the build, and it does not upload SARIF. The action writes the file, and the workflow uploads it.
 
 ## Limits
 

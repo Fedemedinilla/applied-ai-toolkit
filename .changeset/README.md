@@ -1,6 +1,6 @@
 # Changesets
 
-Two folders of this repository are published to npm: `gateway/` as `@fedemedinilla/claude-gateway` and `slop-lint/` as `@fedemedinilla/slop-lint`. Their versions and changelogs are managed with [Changesets](https://changesets.dev). The rest of the repository is not published, and the root package is private.
+Four folders of this repository are published to npm: `gateway/` as `@fedemedinilla/claude-gateway`, `slop-lint/` as `@fedemedinilla/slop-lint`, `import-fences/` as `@fedemedinilla/import-fences` and `csp-build-guard/` as `@fedemedinilla/csp-build-guard`. Their versions and changelogs are managed with [Changesets](https://changesets.dev). The rest of the repository is not published, and the root package is private.
 
 ## Record a change
 
