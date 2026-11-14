@@ -114,7 +114,8 @@ function main(): number {
   if (args.sarif) {
     out = `${JSON.stringify(toSarif(runs.map(({ file, text, result }) => ({ uri: uris.get(file) ?? '', text, result }))), null, 2)}\n`;
   } else if (args.json) {
-    out = `${JSON.stringify(single ? single.result : runs, null, 2)}\n`;
+    // The text is kept for SARIF regions only; the JSON report never held the files' contents.
+    out = `${JSON.stringify(single ? single.result : runs.map(({ file, format, result }) => ({ file, format, result })), null, 2)}\n`;
   } else {
     out = runs
       .map(({ file, result }) => {
