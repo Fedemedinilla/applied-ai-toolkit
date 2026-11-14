@@ -1,0 +1,82 @@
+{
+  "violations": [
+    {
+      "file": "import-fences.config.ts",
+      "line": 0,
+      "column": 0,
+      "rule": "empty-group",
+      "reason": "group \"workers\" matches no file, so its rules check nothing (include: src/workers/**)"
+    },
+    {
+      "file": "import-fences.config.ts",
+      "line": 0,
+      "column": 0,
+      "rule": "stale-allow",
+      "reason": "allow entry src/server/gone.ts matches no file of group \"all\"",
+      "why": "every call goes through the spending cap"
+    },
+    {
+      "file": "src/client/app.ts",
+      "line": 1,
+      "column": 1,
+      "rule": "relative-extension",
+      "reason": "imports ../shared/format without a file extension; Node does not resolve it (write ../shared/format.ts)"
+    },
+    {
+      "file": "src/client/app.ts",
+      "line": 2,
+      "column": 1,
+      "rule": "forbidden-import",
+      "reason": "imports node:fs, forbidden in group \"client\"",
+      "why": "client code ships to the browser"
+    },
+    {
+      "file": "src/client/app.ts",
+      "line": 3,
+      "column": 1,
+      "rule": "forbidden-import",
+      "reason": "imports src/server/db.ts, a path forbidden in group \"client\"",
+      "why": "client code ships to the browser"
+    },
+    {
+      "file": "src/client/app.ts",
+      "line": 4,
+      "column": 39,
+      "rule": "dynamic-import",
+      "reason": "import() with a computed argument: a bundler turns it into a glob and bundles every file that matches"
+    },
+    {
+      "file": "src/client/app.ts",
+      "line": 4,
+      "column": 39,
+      "rule": "unresolved-import",
+      "reason": "import() with a computed argument: a bundler turns it into a glob and bundles every file that matches; the walk for group \"client\" cannot follow it",
+      "why": "client code ships to the browser"
+    },
+    {
+      "file": "src/server/report.ts",
+      "line": 1,
+      "column": 1,
+      "rule": "single-importer",
+      "reason": "imports values from @vendor/sdk; only src/server/llm.ts, src/server/gone.ts may",
+      "why": "every call goes through the spending cap"
+    },
+    {
+      "file": "src/server/report.ts",
+      "line": 3,
+      "column": 25,
+      "rule": "single-reader",
+      "reason": "reads VENDOR_API_KEY (process.env['VENDOR_API_KEY']); only src/server/llm.ts may"
+    },
+    {
+      "file": "src/shared/label.ts",
+      "line": 1,
+      "column": 1,
+      "rule": "forbidden-import",
+      "reason": "imports src/server/secret.ts, a path forbidden in group \"client\", reached from src/client/widget.ts",
+      "why": "client code ships to the browser"
+    }
+  ],
+  "files": 9,
+  "rules": 5
+}
