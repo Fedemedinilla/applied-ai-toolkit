@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "slop-lint",
+          "informationUri": "https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/slop-lint",
+          "rules": [
+            {
+              "id": "LEX-03",
+              "shortDescription": {
+                "text": "Tier 1 phrases (English)"
+              },
+              "fullDescription": {
+                "text": "Banned cover-letter phrase."
+              },
+              "help": {
+                "text": "Replace it with a fact from the CV: a project, a tool, a number, a year."
+              },
+              "helpUri": "https://arxiv.org/pdf/2406.07016",
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "level": 1,
+                "severity": "high",
+                "evidence": [
+                  "MEDIDO",
+                  "CONSENSO"
+                ],
+                "source": "Kobak et al. 2025, Science Advances (arxiv.org/pdf/2406.07016); section 12, English Tier 1"
+              }
+            },
+            {
+              "id": "LEX-04",
+              "shortDescription": {
+                "text": "Tier 2 vocabulary (English)"
+              },
+              "fullDescription": {
+                "text": "Excess style vocabulary. Tolerated twice per text, never the same word twice."
+              },
+              "help": {
+                "text": "Use the plain verb or the fact."
+              },
+              "helpUri": "https://arxiv.org/html/2403.07183v2",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "level": 2,
+                "severity": "medium",
+                "evidence": [
+                  "MEDIDO"
+                ],
+                "source": "Liang et al. 2024, ICML (arxiv.org/html/2403.07183v2); Kobak et al. 2025"
+              }
+            },
+            {
+              "id": "EST-08",
+              "shortDescription": {
+                "text": "Participle tail"
+              },
+              "fullDescription": {
+                "text": "Gerund or participle tail that tacks a consequence onto the sentence."
+              },
+              "help": {
+                "text": "Give the result its own clause: \"; so the close went from 3 days to 4 hours\"."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "level": 2,
+                "severity": "medium",
+                "evidence": [
+                  "NORMA",
+                  "SÍNTESIS"
+                ],
+                "source": "NGLE (RAE/ASALE) on the gerund of posteriority; section 5.1"
+              }
+            },
+            {
+              "id": "FMT-02",
+              "shortDescription": {
+                "text": "Emoji"
+              },
+              "fullDescription": {
+                "text": "Emoji in a cover letter."
+              },
+              "help": {
+                "text": "Delete it."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "level": 1,
+                "severity": "high",
+                "evidence": [
+                  "CONSENSO"
+                ],
+                "source": "Section 4.4"
+              }
+            }
+          ]
+        }
+      },
+      "columnKind": "unicodeCodePoints",
+      "results": [
+        {
+          "ruleId": "FMT-02",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": {
+            "text": "Emoji in a cover letter. Found \"🎉\". Suggestion: Delete it."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 6,
+                  "endLine": 3,
+                  "endColumn": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "042f73fde7e26b4d0722b00b88af3b5cdf188f78137574454236d3743debe257"
+          }
+        },
+        {
+          "ruleId": "FMT-02",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": {
+            "text": "Emoji in a cover letter. Found \"👩\". Suggestion: Delete it."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 19,
+                  "endLine": 3,
+                  "endColumn": 20
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "36d15f0b8a4565ae9c15c8ddea731c3b415d98d4b303f4059c14eaca767b5481"
+          }
+        },
+        {
+          "ruleId": "FMT-02",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": {
+            "text": "Emoji in a cover letter. Found \"💻\". Suggestion: Delete it."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 21,
+                  "endLine": 3,
+                  "endColumn": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "ca9cb53c9bd5d02ca8ad4375b3e0612228f4013445aea7cb6e537a5af2cc0176"
+          }
+        },
+        {
+          "ruleId": "LEX-03",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Banned cover-letter phrase. Found \"I am writing to express\". Suggestion: Replace it with a fact from the CV: a project, a tool, a number, a year."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 24,
+                  "endLine": 3,
+                  "endColumn": 47
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "9624de5525f00f38300bf827147515e42f226055c2c3f668c3840a0deb066618"
+          }
+        },
+        {
+          "ruleId": "LEX-03",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Banned cover-letter phrase. Found \"keen interest\". Suggestion: Replace it with a fact from the CV: a project, a tool, a number, a year."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 51,
+                  "endLine": 3,
+                  "endColumn": 64
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "7fd30222c24f05acd1af7a0ecce2ee9fe735955fe0e2d5993381bb8e589a8ede"
+          }
+        },
+        {
+          "ruleId": "LEX-03",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Banned cover-letter phrase. Found \"passionate about\". Suggestion: Replace it with a fact from the CV: a project, a tool, a number, a year."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 6,
+                  "endLine": 4,
+                  "endColumn": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "d7acf5f7934a942f4e7119739c04eb972392fd5e5fc564fbd5e857e8209ba901"
+          }
+        },
+        {
+          "ruleId": "LEX-04",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "Excess style vocabulary. Tolerated twice per text, never the same word twice. (Tier 2 word 3; the budget is 2 per text) Found \"seamless\". Suggestion: Use the plain verb or the fact."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "test/fixtures/sarif/multibyte.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 54,
+                  "endLine": 4,
+                  "endColumn": 62
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "2deed099819baa41b20120af4e6155455c4f086e0363e2d73b0f6901def25f74"
+          }
+        },
+        {
+          "ruleId": "EST-08",
+          "ruleIndex": 2,
+          "level": "warning",
+          "message": {
+            "text": "Gerund or participle tail that tacks a consequence onto the sentence. Found \"automated our monthly close report in Python (pandas, SQL...\". Suggestion: Give the result its own clause: \"; so the close went from 3 days to 4 hours\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixtures/cover-letters/en-after.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 183,
+                  "endLine": 3,
+                  "endColumn": 257
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slopLint/v1": "0bbc3736cc96fbc7bb54e69c86051444e8086e92fe5fecc3eee7395bf61c0359"
+          }
+        }
+      ]
+    }
+  ]
+}

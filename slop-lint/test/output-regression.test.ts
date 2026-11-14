@@ -6,6 +6,7 @@
 //   node cli.ts test/fixtures/sarif/multibyte.txt fixtures/cover-letters/en-after.txt --lang en > test/golden/two-files.text.txt
 //   node cli.ts test/fixtures/sarif/multibyte.txt fixtures/cover-letters/en-after.txt --lang en --json > test/golden/two-files.json
 // two-files.json was written by the CLI of b6127b9, the commit before --sarif, with the same fixtures.
+// two-files.sarif was written by the CLI of 51503bf, the commit before the config file, the same way with --sarif.
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -38,5 +39,11 @@ describe('existing output formats', () => {
     const r = run(['test/fixtures/sarif/multibyte.txt', 'fixtures/cover-letters/en-after.txt', '--lang', 'en', '--json']);
     expect(r.status).toBe(1);
     expect(r.stdout).toBe(golden('two-files.json'));
+  });
+
+  it('prints the same SARIF output for several files, byte for byte', () => {
+    const r = run(['test/fixtures/sarif/multibyte.txt', 'fixtures/cover-letters/en-after.txt', '--lang', 'en', '--sarif']);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe(golden('two-files.sarif'));
   });
 });
