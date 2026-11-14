@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -97,7 +97,11 @@ describe('action.yml', () => {
 describe('the run step, executed as GitHub runs it', () => {
   const step = runBlocks().find((b) => b.text.includes('cli.ts'))?.text ?? '';
 
-  function runStep(inputs: { dir?: string; config?: string; sarifFile?: string; fail?: string }, env: Record<string, string> = { FIXTURE_SECRET: 'fixture-secret-value-0001' }) {
+  function runStep(
+    inputs: { dir?: string; config?: string; sarifFile?: string; fail?: string },
+    env: Record<string, string> = { FIXTURE_SECRET: 'fixture-secret-value-0001' },
+    cwd = ROOT,
+  ) {
     const tmp = mkdtempSync(join(tmpdir(), 'csp-guard-action-'));
     const script = join(tmp, 'step.sh');
     const output = join(tmp, 'output');
@@ -105,12 +109,12 @@ describe('the run step, executed as GitHub runs it', () => {
     writeFileSync(output, '');
     // GitHub runs a bash step as `bash --noprofile --norc -eo pipefail {0}`.
     const result = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', script], {
-      cwd: ROOT,
+      cwd,
       encoding: 'utf8',
       env: {
         PATH: process.env.PATH ?? '',
         GITHUB_ACTION_PATH: FOLDER,
-        GITHUB_WORKSPACE: ROOT,
+        GITHUB_WORKSPACE: cwd,
         GITHUB_OUTPUT: output,
         RUNNER_TEMP: tmp,
         INPUT_DIR: inputs.dir ?? '',
@@ -156,6 +160,29 @@ describe('the run step, executed as GitHub runs it', () => {
     expect(runStep({ ...fixture('pass'), fail: 'yes' })).toMatchObject({ code: 2, outputs: { 'exit-code': '2' } });
     expect(runStep({ config: fixture('pass').config })).toMatchObject({ code: 2, outputs: { 'exit-code': '2' } });
     expect(runStep({ ...fixture('pass'), sarifFile: 'a\nexit-code=0' })).toMatchObject({ code: 2, outputs: { 'exit-code': '2' } });
+  });
+
+  it('takes a dir and a config whose names start with -, as relative paths', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'csp-guard-dash-'));
+    cpSync(join(FOLDER, 'fixtures', 'pass'), join(workspace, '-build'), { recursive: true });
+    const result = runStep({ dir: '-build/site', config: '-build/csp-guard.config.json' }, undefined, workspace);
+    expect(result.stderr).toBe('');
+    expect(result).toMatchObject({ code: 0, outputs: { 'exit-code': '0' } });
+    expect(result.stdout).toMatch(/^OK: 6 checks passed, 0 skipped$/m);
+  });
+
+  it('fails with exit 2 when the SARIF file cannot be written, and never reports a folder as the SARIF file', () => {
+    for (const name of ['pass', 'lookbehind']) {
+      const folder = mkdtempSync(join(tmpdir(), 'csp-guard-sarif-dir-'));
+      writeFileSync(join(folder, 'old.sarif'), '{}');
+      const result = runStep({ ...fixture(name), fail: 'false', sarifFile: folder });
+      expect(result, name).toMatchObject({ code: 2, outputs: { 'exit-code': '2' } });
+      expect(result.outputs['sarif-file'], name).toBeUndefined();
+      expect(readFileSync(join(folder, 'old.sarif'), 'utf8')).toBe('{}');
+      // A path under a regular file: its folder cannot be created.
+      const blocked = join(folder, 'old.sarif', 'csp.sarif');
+      expect(runStep({ ...fixture(name), fail: 'false', sarifFile: blocked }), name).toMatchObject({ code: 2, outputs: { 'exit-code': '2' } });
+    }
   });
 
   it('treats inputs as data: shell syntax in an input is never run', () => {

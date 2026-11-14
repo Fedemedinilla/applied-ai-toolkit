@@ -77,10 +77,13 @@ runs:
         case "$sarif" in
           *$'\n'* | *$'\r'*) stop "the sarif-file input must be one line" ;;
         esac
-        args=(--dir "$INPUT_DIR")
-        if [ -n "$INPUT_CONFIG" ]; then args+=(--config "$INPUT_CONFIG"); fi
+        # One argument each, --dir=value: a separate value that starts with - would read as an option.
+        args=("--dir=$INPUT_DIR")
+        if [ -n "$INPUT_CONFIG" ]; then args+=("--config=$INPUT_CONFIG"); fi
         cli="$GITHUB_ACTION_PATH/cli.ts"
-        mkdir -p -- "$(dirname -- "$sarif")"
+        # Only a regular file, or nothing yet, can take the log: a folder would be uploaded as it is.
+        if [ -e "$sarif" ] && [ ! -f "$sarif" ]; then stop "the sarif-file input names $sarif, which is not a file"; fi
+        mkdir -p -- "$(dirname -- "$sarif")" || stop "cannot create the folder of $sarif"
 
         set +e
         node "$cli" "${args[@]}"
@@ -95,8 +98,9 @@ runs:
           echo "exit-code=$code" >> "$GITHUB_OUTPUT"
           exit "$code"
         fi
-        if [ "$sarif_code" -ne "$code" ] || [ ! -s "$sarif" ]; then
-          rm -f -- "$sarif"
+        # A failed redirect also exits 1, so the file itself has to be there and not empty.
+        if [ "$sarif_code" -ne "$code" ] || [ ! -f "$sarif" ] || [ ! -s "$sarif" ]; then
+          if [ -f "$sarif" ]; then rm -f -- "$sarif"; fi
           stop "the SARIF run exited with $sarif_code and the text run with $code"
         fi
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
