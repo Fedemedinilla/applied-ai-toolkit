@@ -106,6 +106,74 @@ What the log holds:
 - `partialFingerprints` holds one value under `importFencesViolation/v1`: a SHA-256 of the rule id, the uri and the reason, cut to 32 hex digits, plus `:1`, `:2` for the same violation repeated in one file. No line, column or `why` goes in, so code added above an import, or a reworded `why`, keeps its alert instead of closing it and opening a new one. Renaming the file, or a change in the chain that reaches it, makes a new alert.
 - Results are sorted by uri, line, column, rule id and message, compared by code unit. The same tree gives the same bytes on any machine. No timestamp, host name, absolute path or tool version goes in.
 
+## Use it in CI
+
+The folder is also a composite GitHub Action, [`action.yml`](action.yml). It installs Node 24 with `actions/setup-node`, then `typescript` and `zod` into the action's own folder, and runs the checker over the workspace twice. The first run prints the text report to the job log. The second writes the SARIF log, with paths relative to the workspace. This workflow checks the fences on every pull request, uploads the violations to code scanning and then fails the job if a fence is broken:
+
+```yaml
+name: Import fences
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  fences:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only if a forbidden-import rule has to tell an installed package from a typo; see below.
+      - run: npm ci --ignore-scripts
+
+      - id: fences
+        # Pin a full commit SHA of this repository, not a branch.
+        uses: Fedemedinilla/applied-ai-toolkit/import-fences@<commit SHA>
+        with:
+          config: import-fences.config.json
+          fail: false
+
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ steps.fences.outputs.sarif-file }}
+          category: import-fences
+
+      - name: Fail on a broken fence
+        if: steps.fences.outputs.exit-code != '0'
+        run: exit 1
+```
+
+With `fail: false` the action reports exit code 1 instead of failing, so the upload still runs and the last step fails the job. Exit code 2 (bad usage, a missing or invalid config) fails the action whatever `fail` says, and no SARIF is written. `security-events: write` is what the upload needs; in a private repository, upload-sarif also needs `actions: read`. A pull request from a fork gets a read-only token, so the upload fails there.
+
+| Input | Meaning |
+|---|---|
+| `config` | Required. The config file, `.json` or `.ts`, relative to the workspace. |
+| `sarif-file` | Where to write the SARIF log. Default: `import-fences.sarif` in the runner's temporary folder. A path that names a folder, or a log that cannot be written, is exit code 2. |
+| `fail` | `true` (default) fails the step when a fence is broken. `false` only sets `exit-code`. |
+
+| Output | Meaning |
+|---|---|
+| `sarif-file` | The path of the SARIF log, empty after exit code 2. |
+| `exit-code` | 0, 1 or 2, as for the CLI. |
+
+How it behaves, and why:
+
+- **Inputs are data, never code.** They reach the shell only as quoted environment variables, never as `${{ inputs.* }}` inside a `run:` script, so a value such as `$(...)` is a file name and nothing else. `test/action.test.ts` reads `action.yml` and fails if that changes, and runs its shell step with hostile inputs.
+- **Exit code 2 always fails the step.** A config that does not load means no fence was checked. `fail: false` is for violations; a broken config that passed would hide every violation from then on.
+- **The config is the only input.** Which files are read comes from the config's `root`, groups and `ignore`, so the action and a local run check the same set.
+- **`npm ci` is needed only for `unresolved-import`.** A `forbidden-import` rule reports a bare specifier that is neither a built-in nor a package under `node_modules`. Without an install step every package import of the group is reported that way. The other rules read source files alone.
+- **A `.ts` config must be self-contained here.** It runs through Node's type stripping, which needs erasable TypeScript only (no `enum`, no `namespace`). The action is not installed in the workspace, so the config cannot import `defineConfig` from it. Export the plain object, or install the npm package and import from that.
+- **Paths are relative to the workspace.** A repository checked out into a subfolder (the `path` input of `actions/checkout`) gets paths that code scanning cannot map. Run the CLI with `--sarif-base` set to that subfolder instead.
+- **The checker runs twice**, once per output, so the step takes twice as long as one CLI run. The CLI prints one format per run, which kept the text and JSON outputs unchanged.
+- **setup-node stays set up.** The composite step changes the job's Node to 24 for the steps after it too.
+
 ## Design decisions
 
 **The AST, never a regex.** Files are parsed with the TypeScript compiler API, so a commented-out import never counts, while `import type`, `export * from`, a `require()` inside a function and a template-literal `import()` all do. A regular expression over file text can read `// import x from '../server/client'` as an import, and can miss `import{x}from'../server/client'` or an `import()` split across lines. Each file is parsed with `ts.createSourceFile` and only nodes count. Comments are not nodes, and strings only count where a rule asks for strings. Tests feed comments and strings that look like imports and expect nothing, and feed the compact and multi-line forms and expect them found.
