@@ -269,6 +269,18 @@ describe('fingerprints', () => {
     }
   });
 
+  it('stay the same when a count in the message crosses 1, so the noun turns plural', () => {
+    // 1 regex lookbehind, then 2 regex lookbehinds: the same finding in the same file.
+    const one = run(hashedBuild('lookbehind', 'AbC123de')).filter((r) => r.ruleId === 'lookbehind');
+    const two = run(hashedBuild('lookbehind', 'D-3kX_9a', (t) => `${t}export const cents=s=>s.replace(/(?<!\\d)0/,"");\n`)).filter((r) => r.ruleId === 'lookbehind');
+    expect([one.length, two.length]).toEqual([1, 1]);
+    expect(at(one).message.text).toContain(': 1 regex lookbehind,');
+    expect(at(two).message.text).toContain(': 2 regex lookbehinds,');
+    expect(two.map(fingerprintOf)).toEqual(one.map(fingerprintOf));
+    expect(fingerprintKey('a.js:1:1: 1 regex lookbehind, which x')).toBe(fingerprintKey('a.js:1:1: 3 regex lookbehinds, which x'));
+    expect(fingerprintKey('1 page sends x')).toBe(fingerprintKey('2 pages send x'));
+  });
+
   it('normalize content hashes in asset names and nothing else', () => {
     const cases: Array<[string, string]> = [
       ['_astro/index-AbC123.js', '_astro/index-*.js'],
@@ -286,7 +298,7 @@ describe('fingerprints', () => {
   });
 
   it('drop the numbers that move, and keep paths and inline content hashes', () => {
-    expect(fingerprintKey('_astro/app-AbC123de.js:12:7: 2 regex lookbehinds')).toBe('_astro/app-*.js:#:#: # regex lookbehinds');
+    expect(fingerprintKey('_astro/app-AbC123de.js:12:7: 2 regex lookbehinds')).toBe('_astro/app-*.js:#:#: # regex lookbehind');
     expect(fingerprintKey('index.html: 61.2 kB gzip, budget 60 kB (largest: /_astro/app-AbC123de.js 40.1 kB)')).toBe(
       'index.html: # kB gzip, budget # kB (largest: /_astro/app-*.js # kB)',
     );

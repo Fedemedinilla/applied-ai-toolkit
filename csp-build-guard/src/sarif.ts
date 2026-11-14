@@ -151,12 +151,14 @@ export function withoutContentHashes(text: string): string {
  * (index-AbC123de.js), so the same finding gets a new file name on every change to that chunk; the
  * hash is replaced with *, as in index-*.js. Standalone numbers (line and column, sizes in kB, the
  * page count in "and 3 more pages") are replaced with #, except inside a path such as blog/2024/: they move while the finding stays the same.
+ * A count also decides whether the words after it are plural ("1 regex lookbehind", "2 regex
+ * lookbehinds"), so a final s in the one or two lowercase words after a # is dropped as well.
  * Hashes of inline content stay, since they name what the finding is about.
  */
 export function fingerprintKey(text: string): string {
   return withoutContentHashes(text)
     .replace(/(?<![\w./-])\d+(?:\.\d+)?(?![\w/-])/g, '#')
-    .replace(/\bmore pages?\b/g, 'more pages');
+    .replace(/(#(?: [a-z]+)??) ([a-z]+?)s\b/g, '$1 $2');
 }
 
 const LINE_AND_COLUMN = /^:(\d+):(\d+): /;
