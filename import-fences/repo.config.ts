@@ -158,7 +158,10 @@ export default defineConfig({
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
   // .claude/worktrees/ (gitignored locally) holds whole checkouts while coding agents work.
   // .stryker-tmp/ holds StrykerJS's copies of the repository during a mutation run, reports/ its output.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**', '.stryker-tmp/**', 'reports/**'],
+  // docs-site/ has its own package.json and lockfile: its Astro config and content config import
+  // packages that exist only after `npm ci` inside it, and .astro/ is generated. Its scripts/ import
+  // Node built-ins alone and stay under the fences.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**', '.stryker-tmp/**', 'reports/**', 'docs-site/astro.config.mjs', 'docs-site/src/**', 'docs-site/.astro/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },
