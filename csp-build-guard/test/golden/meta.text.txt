@@ -1,0 +1,10 @@
+csp-build-guard: csp-build-guard/fixtures/meta/site (2 HTML pages)
+PASS inline-hashes  3 inline scripts and styles on 2 pages, 2 distinct, all allowed by hash; no stale hash
+PASS policy         2 pages send exactly the expected policy (8 directives)
+SKIP headers        no headers in the config
+PASS secrets        7 files searched, no value of FIXTURE_SECRET
+PASS lookbehind     5 browser files and 2 inline scripts, no regex lookbehind
+PASS js-budget      2 pages within budget, heaviest about/index.html at 0.3 kB gzip, 0.2 kB brotli
+          0.3 kB gzip    0.2 kB brotli  about/index.html  (gzip <= 2 kB)
+          0.3 kB gzip    0.2 kB brotli  index.html  (gzip <= 1, brotli <= 1 kB)
+OK: 5 checks passed, 1 skipped

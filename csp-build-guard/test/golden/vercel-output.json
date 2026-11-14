@@ -1,0 +1,118 @@
+{
+  "ok": false,
+  "dir": "<root>/csp-build-guard/fixtures/vercel-output/output",
+  "staticRoot": "<root>/csp-build-guard/fixtures/vercel-output/output/static",
+  "pages": 2,
+  "checks": [
+    {
+      "id": "inline-hashes",
+      "status": "pass",
+      "summary": "3 inline scripts and styles on 2 pages, 2 distinct, all allowed by hash; no stale hash",
+      "failures": []
+    },
+    {
+      "id": "policy",
+      "status": "pass",
+      "summary": "2 pages send exactly the expected policy (9 directives)",
+      "failures": []
+    },
+    {
+      "id": "headers",
+      "status": "pass",
+      "summary": "2 pages send X-Content-Type-Options, Referrer-Policy with the expected values",
+      "failures": []
+    },
+    {
+      "id": "secrets",
+      "status": "fail",
+      "summary": "1 problem in 10 files",
+      "failures": [
+        {
+          "message": "the value of FIXTURE_SECRET is in functions/_render.func/index.mjs",
+          "file": "functions/_render.func/index.mjs"
+        }
+      ]
+    },
+    {
+      "id": "lookbehind",
+      "status": "pass",
+      "summary": "5 browser files and 2 inline scripts, no regex lookbehind",
+      "failures": []
+    },
+    {
+      "id": "js-budget",
+      "status": "pass",
+      "summary": "2 pages within budget, heaviest static/about/index.html at 0.3 kB gzip, 0.2 kB brotli",
+      "failures": [],
+      "details": [
+        {
+          "page": "static/about/index.html",
+          "budget": "**/*.html",
+          "gzipKb": 2,
+          "total": {
+            "raw": 221,
+            "gzip": 286,
+            "brotli": 212
+          },
+          "files": [
+            {
+              "url": "/_astro/island.js",
+              "raw": 59,
+              "gzip": 77,
+              "brotli": 62
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            },
+            {
+              "url": "/_astro/client.js",
+              "raw": 37,
+              "gzip": 57,
+              "brotli": 41
+            }
+          ],
+          "inline": {
+            "raw": 78,
+            "gzip": 85,
+            "brotli": 58
+          },
+          "unmeasured": []
+        },
+        {
+          "page": "static/index.html",
+          "budget": "index.html",
+          "gzipKb": 1,
+          "brotliKb": 1,
+          "total": {
+            "raw": 225,
+            "gzip": 266,
+            "brotli": 196
+          },
+          "files": [
+            {
+              "url": "/_astro/app.js",
+              "raw": 100,
+              "gzip": 114,
+              "brotli": 87
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            }
+          ],
+          "inline": {
+            "raw": 78,
+            "gzip": 85,
+            "brotli": 58
+          },
+          "unmeasured": []
+        }
+      ]
+    }
+  ]
+}

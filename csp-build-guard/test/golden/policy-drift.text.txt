@@ -1,0 +1,16 @@
+csp-build-guard: csp-build-guard/fixtures/policy-drift/site (2 HTML pages)
+FAIL inline-hashes  1 problem with inline scripts and styles
+     - style-src lists 'sha256-B6A6aA2CJ7Xb8XTlZFLRuOX/XrsFGspTfqngrXAXrtc=', which matches no inline content on about/index.html. A stale hash keeps allowing inline content nobody ships; remove it.
+FAIL policy         2 of 2 pages differ from the expected policy
+     - about/index.html: 2 rules set Content-Security-Policy (csp-build-guard/fixtures/policy-drift/vercel.json headers[1] /(.*); csp-build-guard/fixtures/policy-drift/vercel.json headers[2] /about/:path*); what the host sends then depends on how it merges them
+     - index.html: script-src is repeated: the browser uses the first and ignores the rest
+     - index.html: object-src 'none' has non-ASCII characters: the browser drops it
+     - index.html: connect-src: unexpected https:
+     - index.html: unexpected directive upgrade-insecure-requests
+PASS headers        2 pages send X-Content-Type-Options, Referrer-Policy with the expected values
+PASS secrets        7 files searched, no value of FIXTURE_SECRET
+PASS lookbehind     5 browser files and 2 inline scripts, no regex lookbehind
+PASS js-budget      2 pages within budget, heaviest about/index.html at 0.3 kB gzip, 0.2 kB brotli
+          0.3 kB gzip    0.2 kB brotli  about/index.html  (gzip <= 2 kB)
+          0.3 kB gzip    0.2 kB brotli  index.html  (gzip <= 1, brotli <= 1 kB)
+FAILED: 2 of 6 checks

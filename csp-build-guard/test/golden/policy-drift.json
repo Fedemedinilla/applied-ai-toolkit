@@ -1,0 +1,133 @@
+{
+  "ok": false,
+  "dir": "<root>/csp-build-guard/fixtures/policy-drift/site",
+  "staticRoot": "<root>/csp-build-guard/fixtures/policy-drift/site",
+  "pages": 2,
+  "checks": [
+    {
+      "id": "inline-hashes",
+      "status": "fail",
+      "summary": "1 problem with inline scripts and styles",
+      "failures": [
+        {
+          "message": "style-src lists 'sha256-B6A6aA2CJ7Xb8XTlZFLRuOX/XrsFGspTfqngrXAXrtc=', which matches no inline content on about/index.html. A stale hash keeps allowing inline content nobody ships; remove it."
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "status": "fail",
+      "summary": "2 of 2 pages differ from the expected policy",
+      "failures": [
+        {
+          "message": "about/index.html: 2 rules set Content-Security-Policy (csp-build-guard/fixtures/policy-drift/vercel.json headers[1] /(.*); csp-build-guard/fixtures/policy-drift/vercel.json headers[2] /about/:path*); what the host sends then depends on how it merges them"
+        },
+        {
+          "message": "index.html: script-src is repeated: the browser uses the first and ignores the rest"
+        },
+        {
+          "message": "index.html: object-src 'none' has non-ASCII characters: the browser drops it"
+        },
+        {
+          "message": "index.html: connect-src: unexpected https:"
+        },
+        {
+          "message": "index.html: unexpected directive upgrade-insecure-requests"
+        }
+      ]
+    },
+    {
+      "id": "headers",
+      "status": "pass",
+      "summary": "2 pages send X-Content-Type-Options, Referrer-Policy with the expected values",
+      "failures": []
+    },
+    {
+      "id": "secrets",
+      "status": "pass",
+      "summary": "7 files searched, no value of FIXTURE_SECRET",
+      "failures": []
+    },
+    {
+      "id": "lookbehind",
+      "status": "pass",
+      "summary": "5 browser files and 2 inline scripts, no regex lookbehind",
+      "failures": []
+    },
+    {
+      "id": "js-budget",
+      "status": "pass",
+      "summary": "2 pages within budget, heaviest about/index.html at 0.3 kB gzip, 0.2 kB brotli",
+      "failures": [],
+      "details": [
+        {
+          "page": "about/index.html",
+          "budget": "**/*.html",
+          "gzipKb": 2,
+          "total": {
+            "raw": 221,
+            "gzip": 286,
+            "brotli": 212
+          },
+          "files": [
+            {
+              "url": "/_astro/island.js",
+              "raw": 59,
+              "gzip": 77,
+              "brotli": 62
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            },
+            {
+              "url": "/_astro/client.js",
+              "raw": 37,
+              "gzip": 57,
+              "brotli": 41
+            }
+          ],
+          "inline": {
+            "raw": 78,
+            "gzip": 85,
+            "brotli": 58
+          },
+          "unmeasured": []
+        },
+        {
+          "page": "index.html",
+          "budget": "index.html",
+          "gzipKb": 1,
+          "brotliKb": 1,
+          "total": {
+            "raw": 225,
+            "gzip": 266,
+            "brotli": 196
+          },
+          "files": [
+            {
+              "url": "/_astro/app.js",
+              "raw": 100,
+              "gzip": 114,
+              "brotli": 87
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            }
+          ],
+          "inline": {
+            "raw": 78,
+            "gzip": 85,
+            "brotli": 58
+          },
+          "unmeasured": []
+        }
+      ]
+    }
+  ]
+}

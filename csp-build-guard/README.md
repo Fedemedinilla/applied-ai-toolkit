@@ -233,6 +233,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 | `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies |
 | `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config |
 | `test/sarif.test.ts` | The SARIF log against a zod schema of what code scanning requires; every failure of every failing fixture as one error result; a check that could not run as an error at the config file; skipped checks as notes; regions only where a line is known; paths relative to the current folder and to `--sarif-base`; fingerprints equal across two builds whose asset names carry different hashes; identical output on two runs; `--json` with `--sarif` as a usage error; the text and JSON reports unchanged |
+| `test/output-regression.test.ts` | The text and `--json` output of six fixtures, byte for byte against `test/golden/`, which the CLI of the commit before `--sarif` wrote; `meta` and `meta-misplaced` pin the SKIP lines. `sarif.test.ts` compares the CLI with the report functions it calls, so only these files catch an edit to `formatReport` or to the report shape |
 | `test/action.test.ts` | `action.yml` read as text: no `${{ }}` in a `run:` script, each input passed only through `env:`, setup-node pinned to the commit SHA of `ci.yml`, the zod version of `package.json`, every input and output in this README; its shell step run with bash as GitHub runs it: the default SARIF path, `fail: false`, exit code 2 failing whatever `fail` says, a `sarif-file` that is a folder or cannot be created, `dir` and `config` paths that start with `-`, shell syntax in an input left unrun |
 
 The fixtures under `fixtures/` are tiny fictional builds, each with its own config. `pass`, `meta` and `netlify` pass every check that applies (`meta` has no header source, so `headers` is skipped). `stale-hash`, `unsafe-inline`, `inline-handler`, `policy-drift`, `secret-leak`, `lookbehind`, `over-budget` and `meta-misplaced` each fail one check in a known way. `vercel-output` is a Build Output folder whose server function holds the secret.
@@ -252,7 +253,7 @@ src/
   report.ts            the human report
   sarif.ts             the SARIF 2.1.0 log and its fingerprints
   checks/              one file per check
-test/                  Vitest suites
+test/                  Vitest suites; test/golden/ holds the output output-regression.test.ts pins
 fixtures/              small builds that pass and fail each check
 ```
 

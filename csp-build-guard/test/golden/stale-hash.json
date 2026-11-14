@@ -1,0 +1,121 @@
+{
+  "ok": false,
+  "dir": "<root>/csp-build-guard/fixtures/stale-hash/site",
+  "staticRoot": "<root>/csp-build-guard/fixtures/stale-hash/site",
+  "pages": 2,
+  "checks": [
+    {
+      "id": "inline-hashes",
+      "status": "fail",
+      "summary": "2 problems with inline scripts and styles",
+      "failures": [
+        {
+          "message": "script-src does not list 'sha256-YSTNrpfIyqR0fDGCH3SuGJnsFBYz/88U40wl7pzYU9g=', the hash of an inline <script> on about/index.html and 1 more page. The browser blocks it. If the content changed on purpose, replace the old hash with this one.",
+          "file": "about/index.html"
+        },
+        {
+          "message": "script-src lists 'sha256-l2rlx9AdVltct3vNjFj7Ba2RsyBsJgijalc2DD9opMI=', which matches no inline content on about/index.html and 1 more page. A stale hash keeps allowing inline content nobody ships; remove it."
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "status": "pass",
+      "summary": "2 pages send exactly the expected policy (9 directives)",
+      "failures": []
+    },
+    {
+      "id": "headers",
+      "status": "pass",
+      "summary": "2 pages send X-Content-Type-Options, Referrer-Policy with the expected values",
+      "failures": []
+    },
+    {
+      "id": "secrets",
+      "status": "pass",
+      "summary": "7 files searched, no value of FIXTURE_SECRET",
+      "failures": []
+    },
+    {
+      "id": "lookbehind",
+      "status": "pass",
+      "summary": "5 browser files and 2 inline scripts, no regex lookbehind",
+      "failures": []
+    },
+    {
+      "id": "js-budget",
+      "status": "pass",
+      "summary": "2 pages within budget, heaviest about/index.html at 0.3 kB gzip, 0.2 kB brotli",
+      "failures": [],
+      "details": [
+        {
+          "page": "about/index.html",
+          "budget": "**/*.html",
+          "gzipKb": 2,
+          "total": {
+            "raw": 220,
+            "gzip": 285,
+            "brotli": 211
+          },
+          "files": [
+            {
+              "url": "/_astro/island.js",
+              "raw": 59,
+              "gzip": 77,
+              "brotli": 62
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            },
+            {
+              "url": "/_astro/client.js",
+              "raw": 37,
+              "gzip": 57,
+              "brotli": 41
+            }
+          ],
+          "inline": {
+            "raw": 77,
+            "gzip": 84,
+            "brotli": 57
+          },
+          "unmeasured": []
+        },
+        {
+          "page": "index.html",
+          "budget": "index.html",
+          "gzipKb": 1,
+          "brotliKb": 1,
+          "total": {
+            "raw": 224,
+            "gzip": 265,
+            "brotli": 195
+          },
+          "files": [
+            {
+              "url": "/_astro/app.js",
+              "raw": 100,
+              "gzip": 114,
+              "brotli": 87
+            },
+            {
+              "url": "/_astro/chunk.js",
+              "raw": 47,
+              "gzip": 67,
+              "brotli": 51
+            }
+          ],
+          "inline": {
+            "raw": 77,
+            "gzip": 84,
+            "brotli": 57
+          },
+          "unmeasured": []
+        }
+      ]
+    }
+  ]
+}
