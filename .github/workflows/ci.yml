@@ -126,6 +126,7 @@ jobs:
             */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md
             agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md
             apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md
+            test/bench/README.md docs-site/pages/*.md n8n-templates/diagrams/*.md
           lang: en
           format: markdown
           sarif-file: ${{ runner.temp }}/sarif/slop-lint.sarif

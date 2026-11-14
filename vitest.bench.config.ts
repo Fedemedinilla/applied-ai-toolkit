@@ -8,7 +8,8 @@ export default defineConfig({
   test: {
     benchmark: {
       include: ['**/*.bench.ts'],
-      exclude: ['node_modules/**', 'dist/**', '**/dist/**', '.stryker-tmp/**', 'reports/**'],
+      // Nested node_modules (docs-site, agent worktrees under .claude/) ship *.bench.ts files of their own.
+      exclude: ['**/node_modules/**', 'dist/**', '**/dist/**', '.claude/**', '.stryker-tmp/**', 'reports/**'],
     },
     setupFiles: ['test/bench/calibration.setup.ts'],
     fileParallelism: false,
