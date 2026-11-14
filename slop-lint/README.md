@@ -18,7 +18,7 @@ import { lint } from '@fedemedinilla/slop-lint';
 import type { LintOptions, LintResult } from '@fedemedinilla/slop-lint/types';
 ```
 
-The package entry is built from `src/lint.ts` (`lint`, `RULES`, `appliesTo`, `rawMatches`), and `@fedemedinilla/slop-lint/types` holds the types of `src/types.ts`. The `slop-lint` bin is built from `cli.ts` and takes the same arguments as `node slop-lint/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+The package entry is built from `src/lint.ts` (`lint`, `RULES`, `appliesTo`, `rawMatches`), and `@fedemedinilla/slop-lint/types` holds the types of `src/types.ts`. `@fedemedinilla/slop-lint/config` is `src/config.ts` (`validateConfig`, `settingsFor`), for a caller of `lint()` that reads a config itself and passes the result as `rules` and `suppressions`. `@fedemedinilla/slop-lint/config.schema.json` is the config's JSON Schema. The `slop-lint` bin is built from `cli.ts` and takes the same arguments as `node slop-lint/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
 
 - **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps. The `.ts` sources are not shipped, so each source map carries their text (`inlineSources`), and there are no declaration maps, which could only point at those missing files. Its `rewriteRelativeImportExtensions` turns each `./x.ts` import into `./x.js`. The `.d.ts` files keep the `.ts` specifiers, which TypeScript resolves to the `.d.ts` next to them; `npm run pack:check` typechecks a strict consumer against them with TypeScript 5.9.
 - **No runtime dependencies**, as in the repository.
@@ -41,9 +41,10 @@ node slop-lint/cli.ts README.md slop-lint/README.md --lang en   # Markdown, one 
 node slop-lint/cli.ts README.md slop-lint/README.md --lang en --sarif > slop-lint.sarif   # for code scanning
 npm run lint:docs                          # every README and the case study; fails on a tier 1 finding
 node slop-lint/scripts/rules-table.ts      # prints the rule table below from the catalog
+node slop-lint/cli.ts --list-rules         # every rule that applies, after slop-lint.config.json if there is one
 ```
 
-The CLI exits 1 when a level 1 rule fires in any of its files, 0 otherwise, and 2 on bad usage or an unreadable file, so it can gate a pipeline. The first two findings of the first command, and its last line:
+The CLI exits 1 when a level 1 rule fires in any of its files, 0 otherwise, and 2 on bad usage, a config file it cannot use or an unreadable file. That lets it gate a pipeline. `--lang` is required unless a config file sets the language (see Config file). The first two findings of the first command, and its last line:
 
 ```text
 slop-lint/fixtures/cover-letters/en-before.txt:2:1    L1 high       LEX-03    Banned cover-letter phrase.
@@ -152,9 +153,10 @@ Inputs:
 | input | required | what |
 |---|---|---|
 | `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders, skips hidden ones and does not skip `node_modules`. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
-| `lang` | yes | `en` or `es`. |
+| `lang` | no | `en` or `es`. Empty, the default, leaves the language to the config file, which can set it per folder. With neither, the step fails. |
 | `format` | no | `text` or `markdown`. Empty, the default, reads a `.md` file as Markdown and anything else as text. |
 | `anchors` | no | Comma-separated anchor terms, passed to `--anchors`. |
+| `config` | no | Path of a config file, passed to `--config`. Empty, the default, looks for `slop-lint.config.json` from the workspace root (see Config file). `lang`, `format` and `anchors`, when set, win over it. |
 | `sarif-file` | no | A path to write the SARIF log to, as well as the text output. Its folder is created. |
 | `fail` | no | `true` (the default) fails the step on a level 1 finding. `false` never fails on findings. |
 
@@ -198,9 +200,182 @@ Words such as <!-- slop-lint-disable -->"robust" and "seamless"<!-- slop-lint-en
 - SIN-EN-01 flags "actually" in its English sense.
 ```
 
-Everything between `slop-lint-disable` and `slop-lint-enable` is masked like code, inside a line or across paragraphs; a `disable` without an `enable` runs to the end of the file. `slop-lint-disable-next-line` masks the line after the comment. Directives are HTML comments, so they do not show on a rendered page, and they only work in Markdown mode. Inside a code block they are code, which is why the example above is not applied.
+These directives carry no rule id, and they are a mask. Everything between `slop-lint-disable` and `slop-lint-enable` is masked like code, inside a line or across paragraphs; a `disable` without an `enable` runs to the end of the file. `slop-lint-disable-next-line` masks the line after the comment. Directives are HTML comments, so they do not show on a rendered page, and they only work in Markdown mode. Inside a code block they are code, which is why the example above is not applied. A directive that names a rule id works differently. It hides nothing and records what it suppressed. See Inline suppression.
 
 The Tier 2 budget, the colon budget and the em dash budget stay at their cover-letter sizes. A README of 2,000 words spends them early, so it gets level 2 findings that a letter of the same density would not. They are reported, and they do not fail the run.
+
+## Config file
+
+A team adapts slop-lint to its own writing with a `slop-lint.config.json`, without editing the source. The CLI looks for it in the working directory and then in each folder above it. The search ends after the folder that holds `.git`, or at the file system root, so the config of another project further up is never read. `--config <file>` names one, and `--no-config` ignores any. Without a config file the output is byte for byte what it was before config files existed, which three golden files pin.
+
+```json
+{
+  "$schema": "./node_modules/@fedemedinilla/slop-lint/dist/schema/config.schema.json",
+  "lang": "en",
+  "anchors": ["dbt", "airflow"],
+  "ignore": ["CHANGELOG.md", "vendor/**"],
+  "ruleSettings": {
+    "LEX-08": "off",
+    "EST-10": { "level": 1, "severity": "high" }
+  },
+  "rules": [
+    {
+      "id": "X-CIRCLE-BACK",
+      "name": "Meeting filler",
+      "message": "House style bans this phrase.",
+      "suggestion": "Say who answers, and by when.",
+      "lang": "en",
+      "level": 1,
+      "severity": "high",
+      "pattern": "(?<![\\p{L}\\p{N}])circle back(?![\\p{L}\\p{N}])",
+      "flags": "giu"
+    }
+  ],
+  "overrides": [
+    { "files": ["docs/es/**"], "lang": "es" },
+    { "files": ["drafts/**"], "ruleSettings": { "X-CIRCLE-BACK": "off" } }
+  ],
+  "suppressions": { "allowDisqualify": false, "mask": true, "failOnProblems": false }
+}
+```
+
+| key | what |
+|---|---|
+| `$schema` | Path or address of [`schema/config.schema.json`](schema/config.schema.json), for completion and checks in an editor. The CLI ignores it. |
+| `lang` | `en` or `es`, used when `--lang` is not given. With a `lang` here or in an override, `--lang` is optional. |
+| `format` | `text` or `markdown` for every file, used when `--format` is not given. Left out, a `.md` file is Markdown and anything else is text. |
+| `anchors` | Extra anchor terms. `--anchors` replaces them. |
+| `ignore` | Globs of files to skip, even when they are named on the command line. Standard input is never skipped. |
+| `ruleSettings` | Per rule id: `"off"`, or an object with a new `level` (1, 2 or 3), a new `severity` (`disqualify`, `high`, `medium`, `low`) or both. The id is a built-in rule's or a custom rule's. |
+| `rules` | Custom pattern rules (below). |
+| `overrides` | A list of `{ "files": [globs], ... }` with any of `lang`, `format`, `anchors` and `ruleSettings` for the files that match. |
+| `suppressions` | Three switches for the inline directives, all optional (see Inline suppression). |
+
+How the values combine:
+
+- **Flags win over the config.** `--lang`, `--format` and `--anchors` replace what the config says for every file, overrides included. A flag is typed for one run, and the config is the standing rule.
+- **Every matching override applies, in the order written.** A later `lang` or `format` replaces an earlier one. `anchors` are added to the top-level list. A rule's setting replaces the earlier setting of that rule as a whole, so an override can turn a rule back on.
+- **Globs are relative to the folder of the config file**, with forward slashes, and match the whole path. `*` stays inside one path segment, `?` is one character, and `**` crosses folders; `docs/**/a.md` also matches `docs/a.md`. There are no braces, character classes or negation. `README.md` is the one at the top, and `**/README.md` is every one. A file outside that folder matches no glob and gets the top-level settings.
+- **A bad config is a usage error.** An unknown key, a wrong type, an id that names no rule or a regex that does not compile exits 2 with the file and the key path, such as `slop-lint.config.json: rules[0].flags: has the flag y; only g, i, m, s, u are supported`, and prints nothing on stdout. A typo that was skipped in silence would turn a setting off without anyone noticing.
+- **The schema and the validator are both written by hand.** The package has no runtime dependency, so the CLI does not load a schema library. `test/config-schema.test.ts` runs the JSON Schema and the validator over the same 60 fixtures and fails when one accepts what the other rejects. Six fixtures are rejected only by the validator, each for a reason a JSON Schema cannot state, such as a regex that does not compile.
+
+A changed level changes what the rule does, as Levels describes. A level 1 rule fails the run. A level 2 rule is reported and passes. A level 3 pattern rule passes in a sentence with an anchor and otherwise joins the Tier 2 budget.
+
+### Custom rules
+
+A custom rule is a pattern rule. It is one regex, tested against the text the built-in rules read. Structural checks, which count instead of match, cannot be written in a config.
+
+| field | required | what |
+|---|---|---|
+| `id` | yes | Starts with `X-`, then capitals, digits and hyphens. No built-in id starts with `X-`, now or later, so a custom rule can never replace a built-in one by taking its id. To change a built-in rule, use `ruleSettings`. |
+| `name` | no | A short name for `--list-rules` and SARIF. The id when left out. |
+| `message`, `suggestion` | yes | What is wrong and what to write instead, shown with every finding. |
+| `lang` | yes | `en`, `es` or `both`. |
+| `level`, `severity` | yes | As for the built-in rules. Level 2 has no budget, so every hit is reported. |
+| `pattern` | yes | JavaScript regex source. |
+| `flags` | no | Any of `g`, `i`, `m`, `s`, `u`, each once. `giu` when left out. `g` and `u` are always added, because the engine needs both. |
+
+A custom finding looks like a built-in one in the text output, in `--json` and in `--sarif`, where the rule gets its own descriptor. Two things to know when writing one:
+
+- **Word boundaries.** `\b` is ASCII-only in JavaScript, so write `(?<![\p{L}\p{N}])` and `(?![\p{L}\p{N}])` around a word, as the example does and as Design decisions explains.
+- **Each span is charged once.** When a built-in hit of a stricter or equal level covers the same text, it keeps the finding and the custom one is dropped. A level 2 custom rule for a word that LEX-03 already bans adds nothing until LEX-03 is off.
+
+What is checked about the regex, and what is not:
+
+- It has to compile with its flags. If it does not, that is a usage error with the engine's own message.
+- It may not match the empty string. Such a pattern matches between every two characters and has no text to report.
+- **Nothing limits how long it runs.** A pattern with nested quantifiers, such as `(a+)+$`, can take exponential time on some inputs, and JavaScript has no way to stop a regex that is running. A time budget would have to measure the clock, so the same file could pass on one machine and fail on a slower one, and the lint would stop being deterministic. A static check for dangerous patterns would miss some and refuse safe ones. So there is neither. The config file is reviewed like code, and the performance of a custom regex belongs to whoever adds it.
+
+### A worked example
+
+A docs team with English guides, Spanish guides under `docs/es/` and its own style sheet starts with what applies today:
+
+```bash
+npx slop-lint --list-rules
+```
+
+It writes the config at the repository root. English is the default and `docs/es/**` is Spanish. LEX-08 goes off, because the guides use its context words in every paragraph. The style sheet's banned phrase becomes `X-CIRCLE-BACK` at level 1, and the generated changelog is ignored. That is the example at the top of this section. Then it checks what the config did, for the tree and for one Spanish file:
+
+```bash
+npx slop-lint --list-rules
+npx slop-lint --list-rules docs/es/guia.md
+npx slop-lint README.md docs/guide.md docs/es/guia.md
+```
+
+The last command needs no `--lang`. In CI the action finds the same file, so the workflow passes only the globs:
+
+```yaml
+      - uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<commit-sha>
+        with:
+          files: |
+            README.md
+            docs/**/*.md
+```
+
+One guide quotes a job posting that uses a banned phrase. Turning LEX-03 off for the folder would hide every other use of it. The directive below suppresses that one line, with the reason next to it:
+
+```markdown
+<!-- slop-lint-disable-next-line LEX-03: quoted from the posting -->
+> The posting asks for someone "passionate about data".
+```
+
+When the quote is later removed, the directive matches nothing and the next run reports it as SUP-01, so it does not stay behind.
+
+### List the rules
+
+`--list-rules` prints every rule that applies, after the config. Each row has the id, level, severity, language, kind, source (`built-in` or `config`) and name, with the default next to a level or severity the config changed. The rules that are off come last. With one file argument it applies that file's overrides. `--json` prints the same as `{ config, rules, off }`. It needs no input file and no `--lang`.
+
+```text
+id             level  severity    lang  kind        source    name
+LEX-01         1      high        es    pattern     built-in  Tier 1 phrases (Spanish)
+...
+EST-10         1      high        both  structural  built-in  Long sentence (default: level 2, medium)
+X-CIRCLE-BACK  1      high        en    pattern     config    Meeting filler
+52 rules: 51 built-in, 1 from the config; 1 off (LEX-08)
+config: slop-lint.config.json
+```
+
+## Inline suppression
+
+In Markdown mode a comment can suppress the findings of the rules it names. The comment does not show on a rendered page.
+
+```markdown
+<!-- slop-lint-disable LEX-03, FMT-02: examples from the old template -->
+Two paragraphs that quote the old template.
+<!-- slop-lint-enable -->
+
+<!-- slop-lint-disable-next-line LEX-03 -->
+A single line.
+```
+
+- `slop-lint-disable RULE-ID` suppresses the named rules after the comment, up to the next `slop-lint-enable` or the end of the file. `slop-lint-enable RULE-ID` closes only that rule.
+- `slop-lint-disable-next-line RULE-ID` suppresses them for the findings that start on the line after the comment.
+- Several ids are separated by commas or spaces. The text after a colon is the reason. It is kept in `--json` and becomes the SARIF `justification`.
+
+The rules, with the reason for each:
+
+- **A suppressed finding is kept, not dropped.** It leaves `findings`, so it does not count for the exit code, the verdict or the score. The summary line ends with `; 2 suppressed`, `--json` lists each one under `suppressed` with the line and column of its directive, and `--sarif` gives it a result with `suppressions: [{ "kind": "inSource" }]`. A reviewer can still see what was waved through, and code scanning shows the alert as suppressed, not as fixed.
+- **Suppression never changes another finding.** The rules run as if the directive were not there, and the directive is applied to the finished findings. A suppressed hit has already spent its rule's budget and its slot in the Tier 2 pool. Otherwise, suppressing the third Tier 2 word would decide whether the fourth is reported.
+- **An unused suppression is reported.** A directive whose rule has no finding in its range is SUP-01, at the directive's position. Without that, a directive outlives the sentence it was written for and covers the next finding of that rule in its range, which nobody reviewed. A budgeted hit that was within budget is not a finding, so a directive on it is unused too.
+- **A disqualify rule cannot be suppressed inline.** FMT-04, an unfilled placeholder, sets the score to 0 because the text cannot be sent as it is. A comment next to the text is written by whoever wrote the text, which may be the model that left the placeholder. The directive is refused as SUP-02 and the finding stays. `"suppressions": { "allowDisqualify": true }` allows it, in the config file, where the change is reviewed once for the repository. The check uses the rule's severity after `ruleSettings`, so a rule raised to `disqualify` is protected too.
+- **A directive that cannot be applied is reported**, as SUP-03. That covers a rule id that is misspelled, that does not exist or that the config turned off, and an enable for a rule with no open disable. A silent no-op would look like a working suppression.
+- **Plain text has no inline syntax.** Text mode lints the text as it will be sent, in a portal's field or an email. A marker inside it would be part of the letter. For plain text, change the rule for those files in the config with `ruleSettings` or an override.
+
+SUP-01, SUP-02 and SUP-03 are directive problems, not prose rules. They are printed after the findings in the text output, listed under `directiveProblems` in `--json`, and are warnings in `--sarif`. They are not in `findings`, cost no points and are not in `--list-rules`. They do not change the exit code unless the config sets `"suppressions": { "failOnProblems": true }`, which makes the CLI exit 1 on any of them. The keys `suppressed` and `directiveProblems` are present in `--json` only when they hold something, so the report of a file without directives has the shape it always had.
+
+The directives without a rule id, described under Markdown mode, are a different tool. They are a mask. The span is hidden from every rule, as code is, and nothing is recorded. This file uses them around the banned phrases it quotes. A mask also hides a placeholder from FMT-04. To have every exception named, set `"suppressions": { "mask": false }`. Each mask is then refused as SUP-02 and its text is linted.
+
+## What it does not do
+
+- **It does not run code from the config.** The config is JSON. A custom rule is one regex, and there are no plugins, no JavaScript rule files and no custom structural checks.
+- **It does not limit the running time of a custom regex**, for the reason given under Custom rules.
+- **It does not merge config files.** The nearest file is the only one read. There is no `extends`, no cascade through parent folders and no user-level file.
+- **It does not find files.** `ignore` removes files from the ones named on the command line, and the shell or the action expands the globs. There is no `include` key.
+- **It does not read directives in plain text**, and a directive cannot change a rule's level, set anchors or switch the language. Those belong in the config.
+- **It does not fix anything.** There is no `--fix`. The suggestion is for a person or for the next model call.
+- **It does not change budgets or thresholds from the config.** The Tier 2 budget, the per-rule budgets and the sentence-length limits are the report's numbers. A rule can be turned off or moved to another level, and that is all.
+- **It does not keep a baseline** of known findings to ignore. A finding is fixed, suppressed by name or covered by a setting.
+- **It does not detect who wrote a text**, as Limits and what is not included explains.
 
 ## Layout
 
@@ -212,6 +387,11 @@ The Tier 2 budget, the colon budget and the em dash budget stay at their cover-l
 | `src/text.ts` | sentence splitting, words, anchors, offsets |
 | `src/markdown.ts` | Markdown mode: masks code, tables, comments, link URLs and markers with spaces, reads the disable directives, splits the document into blocks |
 | `src/regex.ts` | Unicode-aware word boundaries |
+| `src/config.ts` | the config file as data: its shape, the hand-written validator with key paths, custom rules, and `settingsFor()`, which resolves the settings of one file |
+| `src/config-file.ts` | finds `slop-lint.config.json` and reads it; the only config code that touches the file system |
+| `src/glob.ts` | the globs of `ignore` and `overrides` |
+| `src/suppress.ts` | applies the directives that name rule ids: suppressed findings, and the SUP-01 to SUP-03 directive problems |
+| `schema/config.schema.json` | JSON Schema of the config file, for editors; shipped in the package as `@fedemedinilla/slop-lint/config.schema.json` |
 | `src/sarif.ts` | `toSarif()`: the SARIF 2.1.0 log, levels, code point columns, relative uris, fingerprints |
 | `cli.ts` | command-line entry point |
 | `action.yml` | the composite GitHub Action (Use it in CI) |
@@ -257,7 +437,7 @@ The shared budget is spent in reading order, so context words without an anchor 
 
 ## What the tests cover
 
-213 tests in 10 files, all offline and without an API key:
+337 tests in 14 files, all offline and without an API key:
 
 - `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
@@ -265,10 +445,14 @@ The shared budget is spent in reading order, so context words without an anchor 
 - `cover-letters.test.ts`: the six letters of section 15 (below).
 - `markdown.test.ts`: the masked copy keeps length and newlines; code blocks, inline code, tables, comments, link URLs and markers are masked; findings point into the original file; FMT-01 is skipped and the other rules still fire; list items do not merge into one sentence; EST-10 scope; inline code as an anchor; the three directives; text mode unchanged.
 - `cli.test.ts`: exit codes 0, 1 and 2, text and JSON output, stdin, `--anchors`, `--format` and the `.md` default, several files with one summary line each.
-- `output-regression.test.ts`: the text and JSON output for one file and for two, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
+- `output-regression.test.ts`: the text and JSON output for one file and for two, and the SARIF output for two, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
 - `sarif.test.ts`: the level mapping for every level and severity, `helpUri` from the source references, uri normalization (`./`, absolute paths, Windows separators and drives, percent-encoding, the paths it refuses), code point columns on the multibyte fixture, regions across a line break, the log against a zod schema of what code scanning requires (`sarif-schema.ts`), clean input, several files, the same file given twice, determinism, and fingerprints that survive moved lines and columns, tell repeated matches apart, and count them again from 0 in each file.
 - `cli-sarif.test.ts`: `--sarif` as a child process. The log validates, the exit codes stay, the bytes repeat and columns are code points. Several files share one run, uris are relative, and stdin is `stdin` or the `--sarif-uri` value. `--json` with `--sarif`, a misused `--sarif-uri`, an unreadable file or a Windows path exit 2 with nothing on stdout.
 - `action.test.ts`: `action.yml` as text (no expression in the run block, every input through `env:`, setup-node pinned to the SHA in ci.yml, every input and output in this README), then its script, run with bash in a temporary workspace, against `**` globs, space and newline separators, `fail: false`, exit 2 on a pattern with no match or an unwritable SARIF file even with `fail: false`, inputs that look like shell code, a file named `-letter.txt`, the SARIF file and the outputs, and a `sarif-file` with a line break.
+- `config.test.ts`: the globs; the validator's message and key path for 25 bad values; the `X-` prefix against the catalog; custom rules through `lint()` at each level; one charge per span next to a built-in rule; `settingsFor()` with settings, overrides in order, stdin and `ignore`.
+- `config-schema.test.ts`: the JSON Schema and the hand validator over the same 60 fixtures in `test/fixtures/config/`, the top-level keys of both, and that the schema closes every object.
+- `suppress.test.ts`: suppression by rule id for a region, a line and a span inside a line; several ids and a reason; budgets unchanged by a suppression; unused, refused and invalid directives with their position; the disqualify rule with and without `allowDisqualify`, at the severity the config gives; the mask turned off; the result's unchanged shape without directives.
+- `cli-config.test.ts`: the CLI in temporary folders. Discovery in the folder, in a parent and not past `.git`; `--config` and `--no-config`; the same bytes with an empty config in text, JSON and SARIF; exit 2 with the key path. Flags over config; per-glob language; `ignore`; a custom rule and a suppressed finding in text, `--json` and `--sarif`; `--list-rules` with and without a config.
 
 ## The section 15 letters
 

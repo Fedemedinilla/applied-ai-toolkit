@@ -1,0 +1,24 @@
+{
+  "lang": "en",
+  "overrides": [
+    {
+      "files": [
+        "docs/es/**"
+      ],
+      "lang": "es"
+    },
+    {
+      "files": [
+        "letters/*.txt",
+        "drafts/**/*.txt"
+      ],
+      "format": "text",
+      "anchors": [
+        "airflow"
+      ],
+      "ruleSettings": {
+        "EST-10": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "ruleSettings": {
+    "LEX-04": "off",
+    "EST-10": {
+      "level": 2,
+      "severity": "low"
+    },
+    "FMT-02": {
+      "severity": "medium"
+    },
+    "LEX-08": {
+      "level": 2
+    }
+  }
+}

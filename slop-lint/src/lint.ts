@@ -1,9 +1,10 @@
 import { compile } from './regex.ts';
-import { PATTERN_RULES, RULES, STRUCTURAL_RULES, TIER2_BUDGET } from './rules.ts';
-import { blockSentences, maskMarkdown } from './markdown.ts';
+import { RULES, TIER2_BUDGET } from './rules.ts';
+import { blockSentences, maskMarkdown, type MarkdownView } from './markdown.ts';
+import { applyDirectives } from './suppress.ts';
 import { coefficientOfVariation, runStructural } from './structural.ts';
 import { countAnchors, isProse, lineColumn, lineStarts, quotedRanges, splitSentences, words, type Span } from './text.ts';
-import type { Finding, Lang, LintOptions, LintResult, PatternRule, Rule, Severity } from './types.ts';
+import type { Finding, Lang, LintOptions, LintResult, PatternRule, Rule, Severity, StructuralRule } from './types.ts';
 
 interface Hit {
   rule: Rule;
@@ -96,10 +97,14 @@ function score(findings: readonly Finding[]): number {
  * In Markdown mode the rules run on a masked copy of the input (see markdown.ts) with
  * the same length, so every offset, line and column points into the input, and each
  * finding's match is the input's text at those offsets.
+ *
+ * Markdown mode also reads the inline directives. One that names rule ids moves the findings
+ * of those rules to `suppressed` (see suppress.ts). Plain text has no directive syntax: it is
+ * the text as it will be sent, so a marker in it would be part of the letter.
  */
 export function lint(source: string, options: LintOptions): LintResult {
   if (options.format === 'markdown') {
-    const view = maskMarkdown(source);
+    const view = maskMarkdown(source, { mask: options.suppressions?.mask ?? true });
     const sentences = blockSentences(view);
     // EST-10 flags a sentence over 35 words (40 in Spanish). As plain text, a Markdown
     // file distorts it two ways. A line that starts in lowercase continues the sentence
@@ -118,7 +123,7 @@ export function lint(source: string, options: LintOptions): LintResult {
     // Inline code is masked, but a file name, a command or a field name is something a
     // reader can check, which is what an anchor is. Each code span counts as one.
     const codeIn = (s: Span): number => view.code.filter(([a]) => a >= s.start && a < s.end).length;
-    return run(source, view.text, sentences, options, { markdown: true, longSentenceScope, extraAnchorsIn: codeIn });
+    return run(source, view.text, sentences, options, { markdown: true, longSentenceScope, extraAnchorsIn: codeIn, view });
   }
   const sentences = splitSentences(source);
   return run(source, source, sentences, options, { markdown: false, longSentenceScope: sentences, extraAnchorsIn: () => 0 });
@@ -130,11 +135,17 @@ interface Mode {
   longSentenceScope: readonly Span[];
   /** Anchors the masked text no longer shows, per sentence. */
   extraAnchorsIn: (sentence: Span) => number;
+  /** The masked document, whose directives are applied to the findings. Absent in text mode. */
+  view?: MarkdownView;
 }
 
 /** `text` is what the rules read; `source` is the input, which findings quote. Both have the same length. */
 function run(source: string, text: string, sentences: Span[], options: LintOptions, mode: Mode): LintResult {
   const { lang } = options;
+  // The catalog unless the caller passes its own list, as the CLI does for a config file.
+  const rules = options.rules ?? RULES;
+  const patternRules = rules.filter((r): r is PatternRule => r.kind === 'pattern');
+  const structuralRules = rules.filter((r): r is StructuralRule => r.kind === 'structural');
   const extraAnchors = options.anchors ?? [];
   const active = (rule: Rule): boolean => !(mode.markdown && rule.plainTextOnly);
   const anchorCache = new Map<number, number>();
@@ -150,7 +161,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
   const inQuotes = (start: number, end: number): boolean => quotes.some(([a, b]) => start >= a && end <= b);
 
   const hits: Hit[] = [];
-  PATTERN_RULES.forEach((rule, order) => {
+  patternRules.forEach((rule, order) => {
     if (!active(rule)) return;
     for (const m of rawMatches(rule, text, lang, sentences)) {
       if (rule.quoteExempt && inQuotes(m.start, m.end)) continue;
@@ -189,17 +200,17 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
   }
 
   const ctx = { text, lang, sentences, anchorsIn, longSentenceScope: mode.longSentenceScope };
-  STRUCTURAL_RULES.forEach((rule, i) => {
+  structuralRules.forEach((rule, i) => {
     if (!appliesTo(rule, lang) || !active(rule)) return;
     for (const s of runStructural(rule.id, ctx)) {
-      const hit: Hit = { rule, order: PATTERN_RULES.length + i, start: s.start, end: s.end };
+      const hit: Hit = { rule, order: patternRules.length + i, start: s.start, end: s.end };
       if (s.detail !== undefined) hit.detail = s.detail;
       reported.push(hit);
     }
   });
 
   const starts = lineStarts(text);
-  const findings: Finding[] = reported
+  const all: Finding[] = reported
     .sort((a, b) => a.start - b.start || a.rule.level - b.rule.level || a.order - b.order)
     .map((h) => {
       const { line, column } = lineColumn(starts, h.start);
@@ -218,6 +229,15 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
       if (h.detail !== undefined) f.detail = h.detail;
       return f;
     });
+
+  // Directives are applied last, on finished findings: a suppressed hit has already spent its
+  // rule's budget and its place in the Tier 2 pool, so suppressing it never changes another finding.
+  const view = mode.view;
+  const applied =
+    view && (view.directives.length > 0 || view.directiveIssues.length > 0)
+      ? applyDirectives(all, view.directives, view.directiveIssues, rules, { allowDisqualify: options.suppressions?.allowDisqualify ?? false }, source, starts)
+      : { kept: all, suppressed: [], problems: [] };
+  const findings = applied.kept;
 
   const prose = sentences.filter(isProse);
   const lengths = prose.map((s) => words(s.text).length);
@@ -238,6 +258,8 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
       tier2Used: pool.length,
       tier2Budget: TIER2_BUDGET,
     },
+    ...(applied.suppressed.length > 0 ? { suppressed: applied.suppressed } : {}),
+    ...(applied.problems.length > 0 ? { directiveProblems: applied.problems } : {}),
   };
 }
 

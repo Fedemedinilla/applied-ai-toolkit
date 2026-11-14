@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "id": "X-SYNERGY",
+      "message": "House style bans this word.",
+      "suggestion": "Say what the two teams did together.",
+      "lang": "en",
+      "level": 1,
+      "severity": "high",
+      "pattern": "(?<![\\p{L}\\p{N}])synerg(?:y|ies)(?![\\p{L}\\p{N}])"
+    },
+    {
+      "id": "X-ACME-2",
+      "message": "House style bans this word.",
+      "suggestion": "Say what the two teams did together.",
+      "lang": "both",
+      "level": 3,
+      "severity": "low",
+      "pattern": "AcmeSuite",
+      "name": "Old product name",
+      "flags": "g"
+    }
+  ],
+  "ruleSettings": {
+    "X-SYNERGY": {
+      "level": 2
+    }
+  }
+}
