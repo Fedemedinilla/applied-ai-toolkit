@@ -1,0 +1,10 @@
+csp-build-guard: csp-build-guard/fixtures/meta-misplaced/site (1 HTML page)
+PASS inline-hashes  2 inline scripts and styles on 1 page, 2 distinct, all allowed by hash; no stale hash
+FAIL policy         1 of 1 page differs from the expected policy
+     - index.html: the <meta> policy comes after a script or style, which runs before the policy applies
+     - index.html: frame-ancestors has no effect in a <meta> policy; send it as a header
+SKIP headers        no headers in the config
+SKIP secrets        no secrets in the config
+PASS lookbehind     3 browser files and 1 inline script, no regex lookbehind
+SKIP js-budget      no budgets in the config
+FAILED: 1 of 3 checks

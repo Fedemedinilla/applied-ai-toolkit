@@ -1,0 +1,89 @@
+# A bug in a library, an app or the repository's own tooling. Security problems go through
+# private vulnerability reporting instead (see SECURITY.md and config.yml in this folder).
+# The folder list mirrors the top-level folders and apps/<name>; add a folder here when one is added.
+name: Bug report
+description: Something in a folder does not do what its README says.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If the bug is a security problem, do not file it here: follow [SECURITY.md](https://github.com/Fedemedinilla/applied-ai-toolkit/blob/main/SECURITY.md).
+        Use fictional data only. No real keys, client data or personal details.
+  - type: dropdown
+    id: folder
+    attributes:
+      label: Folder
+      description: Where the bug is.
+      options:
+        - agent-playbook
+        - amount-parser
+        - content-forge
+        - csp-build-guard
+        - deterministic-sim
+        - evals
+        - fake-supabase-auth
+        - gateway
+        - grounded-assistant
+        - idempotent-orders
+        - import-fences
+        - n8n-templates
+        - pdf-receipt
+        - safe-contact-form
+        - safe-markdown
+        - site-check
+        - slop-lint
+        - supabase-auth-hardening
+        - wp-hardening
+        - apps/caja
+        - apps/chat-widget
+        - apps/checklist
+        - apps/push-lab
+        - apps/receipt
+        - apps/replay-lab
+        - apps/salon-assistant
+        - apps/shared
+        - apps/writer
+        - apps (landing page or Pages build)
+        - Repository (CI, workflows, root configuration)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The package version from npm, or the commit SHA you ran (git rev-parse HEAD).
+      placeholder: "@fedemedinilla/slop-lint 0.1.0, or b6127b9"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node, Python or PHP version and operating system, and the browser for an app.
+      placeholder: Node 24, Ubuntu 24.04
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The smallest steps, input or test that shows the bug.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What should have happened, and where the README or a test says so if it does.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead, with the exact output or error.
+      render: text
+    validations:
+      required: true

@@ -1,0 +1,151 @@
+[
+  {
+    "file": "test/fixtures/sarif/multibyte.txt",
+    "format": "text",
+    "result": {
+      "lang": "en",
+      "findings": [
+        {
+          "ruleId": "FMT-02",
+          "level": 1,
+          "severity": "high",
+          "start": 22,
+          "end": 24,
+          "line": 3,
+          "column": 6,
+          "match": "🎉",
+          "message": "Emoji in a cover letter.",
+          "suggestion": "Delete it."
+        },
+        {
+          "ruleId": "FMT-02",
+          "level": 1,
+          "severity": "high",
+          "start": 36,
+          "end": 38,
+          "line": 3,
+          "column": 20,
+          "match": "👩",
+          "message": "Emoji in a cover letter.",
+          "suggestion": "Delete it."
+        },
+        {
+          "ruleId": "FMT-02",
+          "level": 1,
+          "severity": "high",
+          "start": 39,
+          "end": 41,
+          "line": 3,
+          "column": 23,
+          "match": "💻",
+          "message": "Emoji in a cover letter.",
+          "suggestion": "Delete it."
+        },
+        {
+          "ruleId": "LEX-03",
+          "level": 1,
+          "severity": "high",
+          "start": 43,
+          "end": 66,
+          "line": 3,
+          "column": 27,
+          "match": "I am writing to express",
+          "message": "Banned cover-letter phrase.",
+          "suggestion": "Replace it with a fact from the CV: a project, a tool, a number, a year."
+        },
+        {
+          "ruleId": "LEX-03",
+          "level": 1,
+          "severity": "high",
+          "start": 70,
+          "end": 83,
+          "line": 3,
+          "column": 54,
+          "match": "keen interest",
+          "message": "Banned cover-letter phrase.",
+          "suggestion": "Replace it with a fact from the CV: a project, a tool, a number, a year."
+        },
+        {
+          "ruleId": "LEX-03",
+          "level": 1,
+          "severity": "high",
+          "start": 107,
+          "end": 123,
+          "line": 4,
+          "column": 6,
+          "match": "passionate about",
+          "message": "Banned cover-letter phrase.",
+          "suggestion": "Replace it with a fact from the CV: a project, a tool, a number, a year."
+        },
+        {
+          "ruleId": "LEX-04",
+          "level": 2,
+          "severity": "medium",
+          "start": 155,
+          "end": 163,
+          "line": 4,
+          "column": 54,
+          "match": "seamless",
+          "message": "Excess style vocabulary. Tolerated twice per text, never the same word twice.",
+          "suggestion": "Use the plain verb or the fact.",
+          "detail": "Tier 2 word 3; the budget is 2 per text"
+        }
+      ],
+      "passesTier1": false,
+      "disqualified": false,
+      "score": {
+        "points": 0,
+        "max": 15
+      },
+      "stats": {
+        "words": 31,
+        "sentences": 3,
+        "proseSentences": 2,
+        "meanSentenceLength": 14,
+        "sentenceLengthCV": 0.07142857142857142,
+        "emDashes": 0,
+        "anchors": 0,
+        "tier2Used": 3,
+        "tier2Budget": 2
+      }
+    }
+  },
+  {
+    "file": "fixtures/cover-letters/en-after.txt",
+    "format": "text",
+    "result": {
+      "lang": "en",
+      "findings": [
+        {
+          "ruleId": "EST-08",
+          "level": 2,
+          "severity": "medium",
+          "start": 383,
+          "end": 457,
+          "line": 3,
+          "column": 183,
+          "match": "automated our monthly close report in Python (pandas, SQLAlchemy), cutting",
+          "message": "Gerund or participle tail that tacks a consequence onto the sentence.",
+          "suggestion": "Give the result its own clause: \"; so the close went from 3 days to 4 hours\"."
+        }
+      ],
+      "passesTier1": true,
+      "disqualified": false,
+      "score": {
+        "points": 13.5,
+        "max": 15
+      },
+      "stats": {
+        "words": 166,
+        "sentences": 13,
+        "proseSentences": 10,
+        "meanSentenceLength": 15.3,
+        "sentenceLengthCV": 0.5453111603559777,
+        "emDashes": 0,
+        "anchors": 30,
+        "tier2Used": 0,
+        "tier2Budget": 2
+      }
+    }
+  }
+]

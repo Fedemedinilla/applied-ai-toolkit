@@ -2,6 +2,10 @@
   "name": "applied-ai-toolkit",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "gateway",
+    "slop-lint"
+  ],
   "engines": {
     "node": "24.x"
   },
@@ -10,7 +14,7 @@
     "check": "tsc --noEmit",
     "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
     "test:php": "cd wp-hardening && composer install --no-interaction --no-progress --quiet && find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && vendor/bin/phpunit",
-    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md",
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md SECURITY.md CONTRIBUTING.md .github/pull_request_template.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md",
     "build:caja": "vite build apps/caja",
     "build:chat-widget": "vite build --config apps/chat-widget/vite.config.ts",
     "build:checklist": "vite build --config apps/checklist/vite.config.ts",
@@ -22,9 +26,15 @@
     "build:apps": "npm run build:caja && npm run build:chat-widget && npm run build:checklist && npm run build:push-lab && npm run build:receipt && npm run build:replay-lab && npm run build:salon-assistant && npm run build:writer",
     "build:pages": "npm run build:caja && npm run build:receipt && npm run build:replay-lab && npm run build:checklist && node apps/pages.ts",
     "guard:apps": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/chat-widget --config apps/chat-widget/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/push-lab --config apps/push-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/salon-assistant --config apps/salon-assistant/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/writer --config apps/writer/csp-guard.config.json",
-    "guard:pages": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json"
+    "guard:pages": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json",
+    "build:packages": "npm run build --workspace gateway --workspace slop-lint",
+    "pack:check": "node test/packaging/pack-check.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
+    "release": "npm run pack:check && changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@electric-sql/pglite": "0.5.9",
     "@supabase/supabase-js": "2.118.0",
     "@types/node": "24.19.2",

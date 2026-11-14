@@ -2,7 +2,7 @@
 
 Hi, I'm Federico Medinilla, a software developer in Buenos Aires, Argentina. I spent six years building websites and front ends. Since 2024 I have run KyndredAI, a small studio where I build AI assistants, n8n automations and web apps for schools, shops and small businesses.
 
-This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and eight small apps that show the pieces working together. It is open source, so you can download any part and use it in your own projects.
+This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and eight small apps that show the pieces working together. It is open source under the [MIT license](LICENSE), so you can download any part and use it in your own projects.
 
 - **Try it in your browser:** [live demos](https://fedemedinilla.github.io/applied-ai-toolkit/). Four apps, no account, and nothing you type leaves your device.
 - **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, and [kyndredai.com](https://kyndredai.com) is my studio.
@@ -64,7 +64,7 @@ Each folder has its own README, tests and public entry.
 
 | Folder | What it is | What it demonstrates | Test |
 |---|---|---|---|
-| [`csp-build-guard/`](csp-build-guard/) | A CLI that audits a built site before deploy. It runs over every app here. | A Content-Security-Policy compared as sets; inlined secrets; lookbehind for older Safari; a JavaScript budget per page; a check that cannot run fails | `npx vitest run csp-build-guard` |
+| [`csp-build-guard/`](csp-build-guard/) | A CLI that audits a built site before deploy. It runs over every app here, and is also a composite GitHub Action. | A Content-Security-Policy compared as sets; inlined secrets; lookbehind for older Safari; a JavaScript budget per page; a check that cannot run fails; `--sarif` output for code scanning | `npx vitest run csp-build-guard` |
 | [`import-fences/`](import-fences/) | A config-driven checker that turns import rules into a failing test. | This repository's own fences: one SDK importer, one key reader per app server, browser code with no Node built-ins, apps that use only a library's public entry | `npx vitest run import-fences` |
 | [`supabase-auth-hardening/`](supabase-auth-hardening/) | SQL that closes four gaps Supabase Auth leaves open: open sign-ups, pre-registered passwords, email changes, unlimited code guesses. | Each control tested in PGlite against Supabase's default grants, next to a test that reproduces the gap without it; a read-only audit of RLS, grants and `search_path` | `npx vitest run supabase-auth-hardening` |
 | [`safe-markdown/`](safe-markdown/) | An escape-first Markdown renderer for model replies shown with `innerHTML`. One file, no dependencies. | Every tag in the output written by the renderer; an XSS battery; a fast-check property test in jsdom | `npx vitest run safe-markdown` |
@@ -86,7 +86,7 @@ Each folder has its own README, tests and public entry.
 | Folder | What it is | What it demonstrates | Test |
 |---|---|---|---|
 | [`fake-supabase-auth/`](fake-supabase-auth/) | A fetch function that answers like Supabase Auth and PostgREST, for the real `@supabase/supabase-js` client. | Faking the wire instead of mocking `supabase.auth`; real ES256 and HS256 JWTs with a JWKS | `npx vitest run fake-supabase-auth` |
-| [`slop-lint/`](slop-lint/) | A linter for the patterns that make writing read as generated, in English and Spanish. 52 rules, each with its source. | A deterministic pass before a model judge; every doc in this repository passes it in CI | `npx vitest run slop-lint` |
+| [`slop-lint/`](slop-lint/) | A linter for the patterns that make writing read as generated, in English and Spanish. 52 rules, each with its source. Also a composite GitHub Action and the npm package `@fedemedinilla/slop-lint`. | A deterministic pass before a model judge; every doc in this repository passes it in CI; `--sarif` output for code scanning | `npx vitest run slop-lint` |
 | [`n8n-templates/`](n8n-templates/) | Thirteen n8n workflows for small businesses, the English versions of the ones I publish at [kyndredai.com/templates](https://kyndredai.com/templates). | Payment signature checks, idempotency where a repeat costs money, tests that run the Code nodes | `npx vitest run n8n-templates` |
 | [`agent-playbook/`](agent-playbook/) | How coding agents work in a repository without real credentials: session hook, test environment isolation, a CI-has-no-secrets check, edit hooks, a read-only reviewer, a CLAUDE.md template. | A pinned Node verified by SHA-256; a test that fails if a workflow reads a secret or can write beyond its policy; protected paths the agent cannot edit with the file tools | `npx vitest run agent-playbook` |
 
@@ -119,22 +119,41 @@ npm ci                 # exact versions from package-lock.json
 npm run check          # tsc --noEmit over every TypeScript folder (strict)
 npm test               # Vitest suites of every TypeScript folder
 node import-fences/cli.ts --config import-fences/repo.config.ts   # the import fences
+npm run build:packages # compiles gateway and slop-lint to their dist/ folders, as npm pack does
+npm run pack:check     # packs gateway and slop-lint as npm would, installs each tarball and checks it
 npm run build:apps     # production build of each app under apps/, into dist/apps/
 npm run guard:apps     # csp-build-guard over each app build, with its own config
 npm run test:python    # site-check's unittest suite
 npm run test:php       # wp-hardening: composer install from the lock, php -l, PHPUnit
 npm run lint:docs      # slop-lint in Markdown mode over every README and doc a reader opens
+
+# SARIF 2.1.0 logs for code scanning, from the two CLIs that write them
+node slop-lint/cli.ts --lang en --format markdown --sarif README.md > slop-lint.sarif
+node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json --sarif --sarif-base . > caja.sarif
 ```
 
-On 2026-11-04, `npm test` ran 3,145 tests in 151 files, `npm run test:python` ran 639 (one skipped) and `npm run test:php` ran 171 (one skipped). The fences checked 35 rules in 509 files with no violation. Tests never call a real API and never need a key. Live runs are opt-in scripts listed in each folder's README. The ones that call the Claude API read `ANTHROPIC_API_KEY` and exit before any call when it is missing, and the app servers start without it and answer "not available". [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same commands on every push to `main` and every pull request, with no secrets and with placeholder values for the apps' secret variables, so the guard searches each build for them.
+On 2026-11-14, `npm test` ran 3,255 tests in 158 files, `npm run test:python` ran 639 (one skipped) and `npm run test:php` ran 171 (one skipped). The fences checked 37 rules in 520 files with no violation. Tests never call a real API and never need a key. Live runs are opt-in scripts listed in each folder's README. The ones that call the Claude API read `ANTHROPIC_API_KEY` and exit before any call when it is missing, and the app servers start without it and answer "not available". [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same commands on every push to `main` and every pull request, with no secrets and with placeholder values for the apps' secret variables, so the guard searches each build for them. A separate job runs the two actions from this checkout (`uses: ./slop-lint` on the docs, `uses: ./csp-build-guard` on the Caja build) and checks that each SARIF file parses. It does not upload them, since that would need `security-events: write`.
 
 ## Requirements
 
-Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Only `apps/` has a build step. Node 24 runs the TypeScript sources directly (type stripping).
+Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Node 24 runs the TypeScript sources directly (type stripping), so working in the repository needs no build. The apps under `apps/` build with Vite, and the two npm packages (`gateway` as `@fedemedinilla/claude-gateway`, `slop-lint` as `@fedemedinilla/slop-lint`) compile to JavaScript only when they are packed, because Node does not strip types inside `node_modules`.
+
+## Packages
+
+Two folders are prepared as npm packages. Neither is published yet.
+
+| Package | Folder | What it ships |
+|---|---|---|
+| `@fedemedinilla/claude-gateway` | [`gateway/`](gateway/) | The gateway's public entry, compiled to JavaScript with declarations |
+| `@fedemedinilla/slop-lint` | [`slop-lint/`](slop-lint/) | `lint`, the rules and their types, and the `slop-lint` bin |
+
+Each README has an Install section. Releases go through Changesets and the `release.yml` workflow with npm trusted publishing, so no npm token is stored; [.changeset/README.md](.changeset/README.md) gives the steps. `npm run pack:check` installs each tarball outside the repository and checks it, in CI on every run.
+
+`slop-lint/` and `csp-build-guard/` are also composite GitHub Actions (`uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<commit SHA>`). Each writes a SARIF file that `github/codeql-action/upload-sarif` can send to code scanning. Their READMEs document the inputs and give a full workflow.
 
 ## Dependencies
 
-Runtime: `@anthropic-ai/sdk` 1.1.0 and `zod` 4.6.7, plus `pdf-lib` 1.17.1 for `pdf-receipt` and `web-push` 3.6.7 for the push-lab server. Development: TypeScript 5.9.3, Vitest 5.0.5 and `@types/node` 24.19.2. Vite 8.3.4 builds the apps, and jsdom 30.1.2 runs the DOM tests. fast-check 4.10.2 drives property tests in `amount-parser`, `pdf-receipt`, `idempotent-orders`, `deterministic-sim`, `safe-markdown` and Caja. `@electric-sql/pglite` 0.5.9 runs real Postgres in process for `idempotent-orders`, `supabase-auth-hardening` and the chat widget's store test. `fake-supabase-auth` is tested through the real `@supabase/supabase-js` 2.118.0 client, and `@types/web-push` 3.6.4 types the push-lab server. Versions are exact (`.npmrc` sets `save-exact`). wp-hardening's dev dependencies (PHPUnit 10.5.66, Brain Monkey 2.7.0, Mockery 1.6.15) are locked in `wp-hardening/composer.lock`. site-check, slop-lint, safe-markdown and deterministic-sim have no runtime dependencies.
+Runtime: `@anthropic-ai/sdk` 1.1.0 and `zod` 4.6.7, plus `pdf-lib` 1.17.1 for `pdf-receipt` and `web-push` 3.6.7 for the push-lab server. Development: TypeScript 5.9.3, Vitest 5.0.5, `@types/node` 24.19.2 and `@changesets/cli` 3.0.3 for releases. Vite 8.3.4 builds the apps, and jsdom 30.1.2 runs the DOM tests. fast-check 4.10.2 drives property tests in `amount-parser`, `pdf-receipt`, `idempotent-orders`, `deterministic-sim`, `safe-markdown` and Caja. `@electric-sql/pglite` 0.5.9 runs real Postgres in process for `idempotent-orders`, `supabase-auth-hardening` and the chat widget's store test. `fake-supabase-auth` is tested through the real `@supabase/supabase-js` 2.118.0 client, and `@types/web-push` 3.6.4 types the push-lab server. Versions are exact (`.npmrc` sets `save-exact`). wp-hardening's dev dependencies (PHPUnit 10.5.66, Brain Monkey 2.7.0, Mockery 1.6.15) are locked in `wp-hardening/composer.lock`. site-check, slop-lint, safe-markdown and deterministic-sim have no runtime dependencies.
 
 ## Fixtures and data
 
@@ -142,4 +161,6 @@ Every fixture is fictional, and no client data, real diagnostic run, conversatio
 
 ## License
 
-No license is granted yet; contact via [federicomedinilla.com](https://federicomedinilla.com).
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Federico Medinilla.
+
+To report a vulnerability, read [SECURITY.md](SECURITY.md); to send a change, read [CONTRIBUTING.md](CONTRIBUTING.md).

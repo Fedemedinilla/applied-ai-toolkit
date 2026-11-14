@@ -1,0 +1,113 @@
+# slop-lint as a composite action: uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<ref>
+# The README's "Use it in CI" section documents every input and output, with a full workflow.
+#
+# Security: no ${{ inputs.* }} expression appears inside a run: script. Every input reaches the
+# script through env: and is quoted there, so a value such as $(cmd) is data, never code.
+# test/action.test.ts checks this, the SHA pin, and that the README documents every input.
+name: slop-lint
+description: Flag template phrases and generated-text patterns in English or Spanish prose, with optional SARIF for code scanning.
+author: Federico Medinilla
+
+inputs:
+  files:
+    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that matches no file fails the step.
+    required: true
+  lang:
+    description: Language of the text, en or es.
+    required: true
+  format:
+    description: text or markdown. Empty reads a .md file as Markdown and anything else as text.
+    required: false
+    default: ''
+  anchors:
+    description: Comma-separated extra anchor terms, such as tool names written in lowercase.
+    required: false
+    default: ''
+  sarif-file:
+    description: When set, also writes one SARIF 2.1.0 log for every file to this path.
+    required: false
+    default: ''
+  fail:
+    description: true fails the step when a level 1 rule fires. false never fails on findings; a usage or read error still fails.
+    required: false
+    default: 'true'
+
+outputs:
+  sarif-file:
+    description: The path the SARIF log was written to, or empty when sarif-file was not set.
+    value: ${{ steps.lint.outputs.sarif-file }}
+  exit-code:
+    description: The CLI's exit code. 0 no level 1 finding, 1 at least one, 2 bad usage or an unreadable file. Empty when the step stopped before running it.
+    value: ${{ steps.lint.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
+    - id: lint
+      shell: bash
+      env:
+        SLOP_FILES: ${{ inputs.files }}
+        SLOP_LANG: ${{ inputs.lang }}
+        SLOP_FORMAT: ${{ inputs.format }}
+        SLOP_ANCHORS: ${{ inputs.anchors }}
+        SLOP_SARIF_FILE: ${{ inputs.sarif-file }}
+        SLOP_FAIL: ${{ inputs.fail }}
+      run: |
+        set -euo pipefail
+        fail() { printf 'slop-lint: %s\n' "$1" >&2; exit 2; }
+        (( BASH_VERSINFO[0] >= 4 )) || fail "needs bash 4 or newer for ** globs"
+        shopt -s globstar nullglob
+        case "$SLOP_FAIL" in true | false) ;; *) fail "fail must be true or false" ;; esac
+        [[ "$SLOP_SARIF_FILE" != *$'\n'* ]] || fail "sarif-file must be one path"
+
+        # Split on spaces and newlines without expanding anything, then expand each pattern
+        # as a glob. Only regular files count; a pattern that leaves none fails the step.
+        read -r -d '' -a patterns <<< "$SLOP_FILES" || true
+        (( ${#patterns[@]} > 0 )) || fail "files is empty"
+        files=()
+        for pattern in "${patterns[@]}"; do
+          matched=0
+          for path in $pattern; do
+            [[ -f "$path" ]] || continue
+            # A path that starts with - would read as an option.
+            [[ "$path" == -* ]] && path="./$path"
+            files+=("$path")
+            matched=1
+          done
+          (( matched )) || fail "no file matches $pattern"
+        done
+
+        args=(--lang "$SLOP_LANG")
+        if [[ -n "$SLOP_FORMAT" ]]; then args+=(--format "$SLOP_FORMAT"); fi
+        if [[ -n "$SLOP_ANCHORS" ]]; then args+=(--anchors "$SLOP_ANCHORS"); fi
+        cli="$GITHUB_ACTION_PATH/cli.ts"
+
+        code=0
+        node "$cli" "${files[@]}" "${args[@]}" || code=$?
+        written=''
+        if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
+          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")" || fail "cannot create the folder of $SLOP_SARIF_FILE"
+          sarif_code=0
+          node "$cli" "${files[@]}" "${args[@]}" --sarif > "$SLOP_SARIF_FILE" || sarif_code=$?
+          # A failed redirect also exits 1, so the file itself has to be there and not empty.
+          if (( sarif_code != code )) || [[ ! -f "$SLOP_SARIF_FILE" || ! -s "$SLOP_SARIF_FILE" ]]; then
+            printf 'slop-lint: could not write SARIF to %s\n' "$SLOP_SARIF_FILE" >&2
+            code=2
+          else
+            written="$SLOP_SARIF_FILE"
+          fi
+        fi
+        {
+          printf 'exit-code=%s\n' "$code"
+          printf 'sarif-file=%s\n' "$written"
+        } >> "$GITHUB_OUTPUT"
+
+        case "$code" in
+          0) ;;
+          1) if [[ "$SLOP_FAIL" == true ]]; then exit 1; fi ;;
+          *) exit "$code" ;;
+        esac

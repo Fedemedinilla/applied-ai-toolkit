@@ -1,0 +1,12 @@
+csp-build-guard: csp-build-guard/fixtures/stale-hash/site (2 HTML pages)
+FAIL inline-hashes  2 problems with inline scripts and styles
+     - script-src does not list 'sha256-YSTNrpfIyqR0fDGCH3SuGJnsFBYz/88U40wl7pzYU9g=', the hash of an inline <script> on about/index.html and 1 more page. The browser blocks it. If the content changed on purpose, replace the old hash with this one.
+     - script-src lists 'sha256-l2rlx9AdVltct3vNjFj7Ba2RsyBsJgijalc2DD9opMI=', which matches no inline content on about/index.html and 1 more page. A stale hash keeps allowing inline content nobody ships; remove it.
+PASS policy         2 pages send exactly the expected policy (9 directives)
+PASS headers        2 pages send X-Content-Type-Options, Referrer-Policy with the expected values
+PASS secrets        7 files searched, no value of FIXTURE_SECRET
+PASS lookbehind     5 browser files and 2 inline scripts, no regex lookbehind
+PASS js-budget      2 pages within budget, heaviest about/index.html at 0.3 kB gzip, 0.2 kB brotli
+          0.3 kB gzip    0.2 kB brotli  about/index.html  (gzip <= 2 kB)
+          0.3 kB gzip    0.2 kB brotli  index.html  (gzip <= 1, brotli <= 1 kB)
+FAILED: 1 of 6 checks

@@ -1,0 +1,6 @@
+# Every issue starts from a form, so a report always names its folder and version.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Fedemedinilla/applied-ai-toolkit/security/advisories/new
+    about: Report it in private, not as an issue. See SECURITY.md for what is in scope.

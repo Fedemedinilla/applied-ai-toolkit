@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "inlineSources": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["cli.ts", "src/**/*.ts"],
+  "exclude": ["test", "fixtures", "scripts", "research", "dist", "node_modules"]
+}

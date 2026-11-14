@@ -1,0 +1,51 @@
+{
+  "ok": false,
+  "dir": "<root>/csp-build-guard/fixtures/meta-misplaced/site",
+  "staticRoot": "<root>/csp-build-guard/fixtures/meta-misplaced/site",
+  "pages": 1,
+  "checks": [
+    {
+      "id": "inline-hashes",
+      "status": "pass",
+      "summary": "2 inline scripts and styles on 1 page, 2 distinct, all allowed by hash; no stale hash",
+      "failures": []
+    },
+    {
+      "id": "policy",
+      "status": "fail",
+      "summary": "1 of 1 page differs from the expected policy",
+      "failures": [
+        {
+          "message": "index.html: the <meta> policy comes after a script or style, which runs before the policy applies"
+        },
+        {
+          "message": "index.html: frame-ancestors has no effect in a <meta> policy; send it as a header"
+        }
+      ]
+    },
+    {
+      "id": "headers",
+      "status": "skip",
+      "summary": "no headers in the config",
+      "failures": []
+    },
+    {
+      "id": "secrets",
+      "status": "skip",
+      "summary": "no secrets in the config",
+      "failures": []
+    },
+    {
+      "id": "lookbehind",
+      "status": "pass",
+      "summary": "3 browser files and 1 inline script, no regex lookbehind",
+      "failures": []
+    },
+    {
+      "id": "js-budget",
+      "status": "skip",
+      "summary": "no budgets in the config",
+      "failures": []
+    }
+  ]
+}

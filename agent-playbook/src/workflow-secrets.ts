@@ -10,7 +10,9 @@
  *
  * The parser is line-based on purpose: the checks look for keys and expressions that are
  * recognizable on one line, and it needs no YAML dependency. It reads block-style YAML as GitHub's
- * own examples write it; a workflow written in flow style ({ a: b }) is out of scope.
+ * own examples write it; a workflow written in flow style ({ a: b }) is out of scope. Permissions
+ * are the exception, since the rule that keeps id-token apart from repository writes depends on
+ * them: a flow mapping and quoted keys are read, and a value the check cannot read is a finding.
  */
 
 export interface WorkflowPolicy {
@@ -24,6 +26,15 @@ export interface WorkflowPolicy {
   readonly allowWrite?: readonly string[];
   /** Deployment environments this workflow may name, such as `github-pages`. Empty by default. */
   readonly allowEnvironments?: readonly string[];
+  /**
+   * Permissions from the never-write set below that this workflow may still set to write. Empty by
+   * default, and only RELEASE_POLICY lists any. Each one is allowed in a job's own permissions
+   * block only: at the top level it would reach every job. And never in a job that also holds
+   * `id-token: write`, so the job that can publish cannot push to the repository.
+   */
+  readonly allowRepositoryWrite?: readonly string[];
+  /** When true, every write permission at the top level is a finding, whatever the lists allow. */
+  readonly writeInJobsOnly?: boolean;
 }
 
 export const DEFAULT_WORKFLOW_POLICY: WorkflowPolicy = { placeholder: /^ci-placeholder-[\w-]+$/ };
@@ -35,7 +46,24 @@ export const PAGES_DEPLOY_POLICY: WorkflowPolicy = {
   allowEnvironments: ['github-pages'],
 };
 
-/** Never allowed to write, even when a policy lists them: each one can change the repository. */
+/**
+ * The policy for .github/workflows/release.yml, which versions and publishes the npm packages with
+ * Changesets. Its version job pushes a branch and opens the "Version Packages" pull request
+ * (`contents` and `pull-requests`); its publish job holds `id-token`, for npm trusted publishing
+ * and provenance. No secret and no environment: the actions take the job token as their default
+ * input, so the workflow never writes a secrets or github.token expression.
+ */
+export const RELEASE_POLICY: WorkflowPolicy = {
+  ...DEFAULT_WORKFLOW_POLICY,
+  allowWrite: ['id-token'],
+  allowRepositoryWrite: ['contents', 'pull-requests'],
+  writeInJobsOnly: true,
+};
+
+/**
+ * Never allowed to write, even when a policy lists them in allowWrite: each one can change the
+ * repository. A policy can allow some of them only through allowRepositoryWrite.
+ */
 const NEVER_WRITE = new Set(['contents', 'packages', 'actions', 'pull-requests', 'deployments', 'security-events', 'statuses', 'checks', 'issues']);
 
 export interface Finding {
@@ -95,6 +123,11 @@ function stepOf(all: readonly Line[], at: number): Line[] {
 
 const unquote = (value: string): string => value.trim().replace(/^(['"])(.*)\1$/, '$2');
 
+/** A permissions key, quoted or not; group 2 is what follows the colon. */
+const PERMISSIONS = /^\s*(['"]?)permissions\1\s*:(.*)$/;
+/** One `name: value` entry of a permissions block or flow mapping, the name quoted or not. */
+const KEY_VALUE = /^\s*(['"]?)([\w-]+)\1\s*:(.*)$/;
+
 export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_WORKFLOW_POLICY): Finding[] {
   const all = lines(text);
   const findings: Finding[] = [];
@@ -118,15 +151,31 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
       if (name === undefined || !(policy.allowEnvironments ?? []).includes(unquote(name))) add(line, 'environment');
     }
     if (/\bpull_request_target\b|\bworkflow_run\b/.test(code)) add(line, 'privileged-trigger');
-    if (line.indent === 0 && /^permissions\s*:/.test(code)) topPermissions = true;
-    const permissions = /^\s*permissions\s*:(.*)$/.exec(code)?.[1];
-    if (permissions !== undefined && unquote(permissions) === 'write-all') add(line, 'write-permission');
-    if (permissions !== undefined && permissions.trim() === '') {
-      for (const entry of blockUnder(all, i)) {
-        const pair = /^\s*([\w-]+)\s*:(.*)$/.exec(entry.code);
-        const [name, value] = [pair?.[1], pair?.[2]];
-        if (name === undefined || value === undefined || unquote(value) !== 'write') continue;
-        if (NEVER_WRITE.has(name) || !(policy.allowWrite ?? []).includes(name)) add(entry, 'write-permission');
+    const permissions = PERMISSIONS.exec(code)?.[2];
+    if (line.indent === 0 && permissions !== undefined) topPermissions = true;
+    if (permissions !== undefined) {
+      const value = unquote(permissions);
+      // A block under the key, or a flow mapping on its line, read entry by entry. Anything else
+      // but read-all is a value the check cannot read, so it fails closed.
+      const pairs =
+        value === ''
+          ? blockUnder(all, i).map((entry) => ({ pair: KEY_VALUE.exec(entry.code), entry }))
+          : /^\{.*\}$/.test(value)
+            ? value.slice(1, -1).split(',').filter((part) => part.trim() !== '').map((part) => ({ pair: KEY_VALUE.exec(part), entry: line }))
+            : undefined;
+      if (pairs === undefined && value !== 'read-all') add(line, 'write-permission');
+      const writes: Array<{ name: string; entry: Line }> = [];
+      for (const { pair, entry } of pairs ?? []) {
+        const [name, level] = [pair?.[2], pair?.[3] === undefined ? undefined : unquote(pair[3])];
+        if (name === undefined || level === undefined || !['read', 'write', 'none'].includes(level)) add(entry, 'write-permission');
+        else if (level === 'write') writes.push({ name, entry });
+      }
+      const holdsIdToken = writes.some((w) => w.name === 'id-token');
+      for (const { name, entry } of writes) {
+        const allowed = NEVER_WRITE.has(name)
+          ? (policy.allowRepositoryWrite ?? []).includes(name) && line.indent > 0 && !holdsIdToken
+          : (policy.allowWrite ?? []).includes(name);
+        if (!allowed || (policy.writeInJobsOnly === true && line.indent === 0)) add(entry, 'write-permission');
       }
     }
 

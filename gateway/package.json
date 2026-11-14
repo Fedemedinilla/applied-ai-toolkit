@@ -1,0 +1,58 @@
+{
+  "name": "@fedemedinilla/claude-gateway",
+  "version": "0.1.0",
+  "description": "The only code in an application allowed to call the Claude API: spending caps that hold through failed ledger inserts, cut streams and concurrent calls, with structured output validated by zod.",
+  "license": "MIT",
+  "author": "Federico Medinilla",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fedemedinilla/applied-ai-toolkit.git",
+    "directory": "gateway"
+  },
+  "homepage": "https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/gateway#readme",
+  "bugs": {
+    "url": "https://github.com/Fedemedinilla/applied-ai-toolkit/issues"
+  },
+  "keywords": [
+    "claude",
+    "anthropic",
+    "llm",
+    "gateway",
+    "spending-cap",
+    "budget",
+    "structured-output",
+    "zod"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/src/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../LICENSE','LICENSE')\" && npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.1.0"
+  },
+  "peerDependencies": {
+    "zod": "^4.6.7"
+  }
+}

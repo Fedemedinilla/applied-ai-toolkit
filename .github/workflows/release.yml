@@ -1,0 +1,153 @@
+# Versions and publishes the npm packages (@fedemedinilla/claude-gateway from gateway/,
+# @fedemedinilla/slop-lint from slop-lint/) with Changesets. .changeset/README.md explains the
+# flow and the one-time setup on npmjs.com; until the repository variable NPM_RELEASE is set to
+# "enabled", no job runs.
+#
+# With changesets on main, the version job opens or updates the "Version Packages" pull request.
+# Once that is merged, the pack job builds and checks the tarballs and the publish job sends them
+# to npm with trusted publishing (OIDC) and provenance. No secret is read: npm trusts the OIDC
+# token GitHub issues to the publish job, and the Changesets actions take the job token as their
+# default input. Each job holds only what its step needs: the version job can push its branch and
+# open the pull request, the publish job can request an OIDC token and cannot push.
+# agent-playbook/test/workflow-secrets.test.ts checks this file with RELEASE_POLICY.
+# Actions are pinned to the commit SHA of their release tag, with the version in a comment.
+name: Release
+
+# Pushes to main only. Never on a pull request: a pull request's code must not reach these jobs.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# One release run at a time; a run in progress finishes before the next one starts.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  select-mode:
+    name: Select mode
+    if: vars.NPM_RELEASE == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      publish-plan: ${{ steps.select.outputs.publish-plan-artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No dependency cache in a release: a cache written by another run could change what ships.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - run: npm ci
+
+      # "version" with changesets in .changeset/, "publish" when a package version is not on npm
+      # yet, "none" otherwise.
+      - id: select
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+
+  version:
+    name: Open the Version Packages pull request
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'version'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - run: npm ci
+
+      # changeset version, then a lockfile refresh. The action commits through the GitHub API
+      # with the job token and opens or updates the pull request.
+      - uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          script: npm run version-packages
+
+  pack:
+    name: Build, check and pack
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      pack-dir: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run check
+
+      - name: Package tests
+        run: npx vitest run gateway slop-lint
+
+      # The same check CI runs: each tarball installed outside the repository, its exports, its
+      # types and the slop-lint bin.
+      - name: Pack check
+        run: npm run pack:check
+
+      # Packs the packages in the publish plan; each package's prepack copies LICENSE and builds.
+      - id: pack
+        uses: changesets/action/pack@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan }}
+
+  publish:
+    name: Publish to npm
+    needs: [select-mode, pack]
+    if: needs.select-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      # The job that can publish runs no install script and no build: it only sends the tarballs
+      # the pack job made.
+      - run: npm ci --ignore-scripts
+
+      # Git tags and GitHub releases would need contents: write here; npm provenance already
+      # records the commit each version was built from.
+      - uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir }}
+          create-github-releases: false
+          push-git-tags: false

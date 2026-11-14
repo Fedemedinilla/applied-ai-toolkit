@@ -1,0 +1,11 @@
+csp-build-guard: csp-build-guard/fixtures/vercel-output/output (2 HTML pages)
+PASS inline-hashes  3 inline scripts and styles on 2 pages, 2 distinct, all allowed by hash; no stale hash
+PASS policy         2 pages send exactly the expected policy (9 directives)
+PASS headers        2 pages send X-Content-Type-Options, Referrer-Policy with the expected values
+FAIL secrets        1 problem in 10 files
+     - the value of FIXTURE_SECRET is in functions/_render.func/index.mjs
+PASS lookbehind     5 browser files and 2 inline scripts, no regex lookbehind
+PASS js-budget      2 pages within budget, heaviest static/about/index.html at 0.3 kB gzip, 0.2 kB brotli
+          0.3 kB gzip    0.2 kB brotli  static/about/index.html  (gzip <= 2 kB)
+          0.3 kB gzip    0.2 kB brotli  static/index.html  (gzip <= 1, brotli <= 1 kB)
+FAILED: 1 of 6 checks

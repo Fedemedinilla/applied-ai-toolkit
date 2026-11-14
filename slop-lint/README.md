@@ -6,6 +6,26 @@ The 52 rules come from a deep-research report I commissioned and curated (what i
 
 Porting the report's regexes to JavaScript turned up bugs in them. `\b` is ASCII-only, so its Spanish participle-tail pattern could never match "Lideré". Its placeholder pattern, compiled with `i`, read `<div>` as an unfilled placeholder and disqualified any text in brackets, "[sic]" included. Each fix is recorded in the rule's `deviation` field; see Design decisions.
 
+## Install
+
+```sh
+npm install @fedemedinilla/slop-lint
+npx slop-lint letter.txt --lang en
+```
+
+```ts
+import { lint } from '@fedemedinilla/slop-lint';
+import type { LintOptions, LintResult } from '@fedemedinilla/slop-lint/types';
+```
+
+The package entry is built from `src/lint.ts` (`lint`, `RULES`, `appliesTo`, `rawMatches`), and `@fedemedinilla/slop-lint/types` holds the types of `src/types.ts`. The `slop-lint` bin is built from `cli.ts` and takes the same arguments as `node slop-lint/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+
+- **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps. The `.ts` sources are not shipped, so each source map carries their text (`inlineSources`), and there are no declaration maps, which could only point at those missing files. Its `rewriteRelativeImportExtensions` turns each `./x.ts` import into `./x.js`. The `.d.ts` files keep the `.ts` specifiers, which TypeScript resolves to the `.d.ts` next to them; `npm run pack:check` typechecks a strict consumer against them with TypeScript 5.9.
+- **No runtime dependencies**, as in the repository.
+- **`import` and `require()` both load it.** Each `exports` entry pairs `types` with `default`, not `import`. TypeScript reads `types` in every resolution mode, so a CommonJS file typechecks against the package, and Node 24 loads an ES module through `require()`. With an `import` condition alone, that file compiled cleanly and then failed at runtime with `ERR_PACKAGE_PATH_NOT_EXPORTED`. `npm run pack:check` loads each entry both ways.
+- **Node 24 or newer** (`engines`). That is the only version the tests and CI run, from `.node-version`. The compiled output may run on older versions, but none is tested, so none is claimed.
+- **The build is checked as installed.** [`test/packaging/pack-check.ts`](../test/packaging/pack-check.ts) packs the package, installs the tarball outside the repository, compares its exports with the source, and runs the installed bin and `node slop-lint/cli.ts` on the same files to compare output and exit code.
+
 ## Run it
 
 Offline, no key, from the repository root:
@@ -18,6 +38,7 @@ node slop-lint/cli.ts slop-lint/fixtures/cover-letters/en-before.txt --lang en
 node slop-lint/cli.ts slop-lint/fixtures/cover-letters/es-rioplatense-after.txt --lang es --json
 printf 'Uso dbt con el equipo de datos.' | node slop-lint/cli.ts - --lang es --anchors "dbt,Contoso Agro"
 node slop-lint/cli.ts README.md slop-lint/README.md --lang en   # Markdown, one summary line per file
+node slop-lint/cli.ts README.md slop-lint/README.md --lang en --sarif > slop-lint.sarif   # for code scanning
 npm run lint:docs                          # every README and the case study; fails on a tier 1 finding
 node slop-lint/scripts/rules-table.ts      # prints the rule table below from the catalog
 ```
@@ -49,6 +70,108 @@ result.stats;         // words, sentences, sentenceLengthCV, anchors, tier2Used,
 ```
 
 `start` and `end` are UTF-16 offsets, so `text.slice(start, end) === match`. Node 24 runs the `.ts` files directly (type stripping), so there is no build step and no dependency beyond the repository's dev tooling.
+
+## SARIF for code scanning
+
+`--sarif` prints one SARIF 2.1.0 log to stdout for every input file, which is the format GitHub code scanning reads. It replaces the text output. It cannot be combined with `--json`, and asking for both is a usage error with exit 2 and nothing on stdout. The exit codes do not change, so a job can upload the log and still fail on a level 1 finding.
+
+```bash
+node slop-lint/cli.ts README.md docs/guide.md --lang en --sarif > slop-lint.sarif
+printf 'I am passionate about data.' | node slop-lint/cli.ts - --lang en --sarif --sarif-uri letters/draft.txt
+```
+
+What the log holds:
+
+- One run. `tool.driver` names slop-lint and lists, in catalog order, each rule that has a finding, with its id, its name as `shortDescription`, its message as `fullDescription`, its suggestion as `help`, the web address in its source as `helpUri` when the source has one, and its default level.
+- One result per finding, with `ruleId`, `ruleIndex`, the level below, and a message that quotes the matched text and ends with the suggestion.
+- `artifactLocation.uri` is the path as given on the command line, with forward slashes, without a leading `./`, each segment percent-encoded. An absolute path is made relative to the working directory, and a path on another Windows drive is a usage error. Code scanning resolves the uri against the repository root, so run the CLI from there. Standard input gets the uri `stdin`, or the one `--sarif-uri` gives (only with `--sarif` and a `-` input).
+- Lines and columns are 1-based, and `endColumn` is the column after the match. `lint()` counts columns in UTF-16 code units, as JavaScript strings do, and the text output prints those. The log counts Unicode code points, and its `columnKind` says so, because SARIF allows either unit and a reader has to know which one it gets. An emoji such as `🎉` is two columns in the text output and one in the log. The CLI drops a leading byte order mark before it lints, because editors and GitHub's file view do not show it, so it would push every column on line 1 one place to the right.
+- `partialFingerprints` holds a SHA-256 of the rule id, the uri, the matched text, and how many times that rule already matched that text earlier in the file. No line or column goes in, so a paragraph added above a finding keeps its alert instead of closing it and opening a new one. A file named twice in one run (`a.md` and `./a.md`, or two globs that overlap) is reported once, under its first name, since its results would repeat with the same fingerprints.
+- The same input gives the same bytes. No timestamp, host name or tool version goes in.
+
+Each finding gets a SARIF level:
+
+| finding | SARIF level |
+|---|---|
+| level 1, any severity | `error` |
+| level 2 or 3 with severity high or disqualify | `error` |
+| level 2, severity medium or low | `warning` |
+| level 3, severity medium or low | `note` |
+
+Level 1 fails the CLI, so it is an error. A high finding costs 3 of the 15 score points even when it is budgeted, so it is shown as strongly as a level 1 finding. Today that is ESP-02, anchor density, the one level 2 rule with severity high. It stays out of the exit code, which follows level 1 alone. Level 2 findings are tolerated up to a budget, which makes them warnings. Level 3 context words pass next to an anchor, so the reader decides, which is what a note is for.
+
+## Use it in CI
+
+This folder is also a composite GitHub Action. It installs Node 24 with `actions/setup-node`, pinned by commit SHA, expands the file patterns, and runs `cli.ts` once for the job log and, when `sarif-file` is set, once more for the SARIF log. A workflow that lints the docs on every pull request and uploads the findings to code scanning:
+
+```yaml
+name: Prose
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  slop-lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pin a commit of this repository, the same way as any other action.
+      - id: slop
+        uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<commit-sha>
+        with:
+          files: |
+            README.md
+            docs/**/*.md
+          lang: en
+          sarif-file: results/slop-lint.sarif
+          fail: false
+
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        if: always() && steps.slop.outputs.sarif-file != ''
+        with:
+          sarif_file: ${{ steps.slop.outputs.sarif-file }}
+          category: slop-lint
+```
+
+With `fail: false` the findings arrive as alerts and the job passes. With the default `fail: true` the lint step fails on a level 1 finding, and `if: always()` still uploads the log.
+
+Inputs:
+
+| input | required | what |
+|---|---|---|
+| `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders, skips hidden ones and does not skip `node_modules`. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
+| `lang` | yes | `en` or `es`. |
+| `format` | no | `text` or `markdown`. Empty, the default, reads a `.md` file as Markdown and anything else as text. |
+| `anchors` | no | Comma-separated anchor terms, passed to `--anchors`. |
+| `sarif-file` | no | A path to write the SARIF log to, as well as the text output. Its folder is created. |
+| `fail` | no | `true` (the default) fails the step on a level 1 finding. `false` never fails on findings. |
+
+Outputs:
+
+| output | what |
+|---|---|
+| `sarif-file` | The path the SARIF log was written to, or empty when `sarif-file` was not set. |
+| `exit-code` | The CLI's exit code: 0, 1 or 2, as in Run it. It is 2 when the SARIF file could not be written, and empty when the step stopped before running the CLI. |
+
+How it behaves, and why:
+
+- **Inputs are data, never code.** No `${{ inputs.* }}` expression appears inside the run script. Each input reaches it through `env:` and is quoted there, so a value such as `$(touch pwned)` is a pattern that matches nothing. `test/action.test.ts` reads `action.yml` and fails if an expression ever lands in a run block.
+- **Exit 2 always fails the step.** A pattern that matches nothing, a bad `lang` or `format`, or an unreadable file means the lint did not run. `fail: false` is for findings, and a broken configuration that passes would hide every finding from then on.
+- **Paths are relative to the workspace.** The step runs in the checkout, so the uris in the log match the repository. A checkout into a subfolder (`path:` on actions/checkout) would need the patterns and the uris to start from that folder, which this action does not do.
+- **A path that starts with `-` gets `./` in front**, so the CLI reads it as a file and not as an option.
+- **setup-node stays set up.** The composite step changes the job's Node to 24 for the steps after it too.
 
 ## Markdown mode
 
@@ -89,10 +212,12 @@ The Tier 2 budget, the colon budget and the em dash budget stay at their cover-l
 | `src/text.ts` | sentence splitting, words, anchors, offsets |
 | `src/markdown.ts` | Markdown mode: masks code, tables, comments, link URLs and markers with spaces, reads the disable directives, splits the document into blocks |
 | `src/regex.ts` | Unicode-aware word boundaries |
+| `src/sarif.ts` | `toSarif()`: the SARIF 2.1.0 log, levels, code point columns, relative uris, fingerprints |
 | `cli.ts` | command-line entry point |
+| `action.yml` | the composite GitHub Action (Use it in CI) |
 | `fixtures/cover-letters/` | the six letters of the report's section 15, all fictional |
 | `research/PROMPT.md` | what the research report covers and where its rules live |
-| `test/` | offline tests |
+| `test/` | offline tests; `test/golden/` holds the CLI output that `output-regression.test.ts` pins |
 
 ## Levels
 
@@ -132,7 +257,7 @@ The shared budget is spent in reading order, so context words without an anchor 
 
 ## What the tests cover
 
-162 tests in 6 files, all offline and without an API key:
+213 tests in 10 files, all offline and without an API key:
 
 - `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
@@ -140,6 +265,10 @@ The shared budget is spent in reading order, so context words without an anchor 
 - `cover-letters.test.ts`: the six letters of section 15 (below).
 - `markdown.test.ts`: the masked copy keeps length and newlines; code blocks, inline code, tables, comments, link URLs and markers are masked; findings point into the original file; FMT-01 is skipped and the other rules still fire; list items do not merge into one sentence; EST-10 scope; inline code as an anchor; the three directives; text mode unchanged.
 - `cli.test.ts`: exit codes 0, 1 and 2, text and JSON output, stdin, `--anchors`, `--format` and the `.md` default, several files with one summary line each.
+- `output-regression.test.ts`: the text and JSON output for one file and for two, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
+- `sarif.test.ts`: the level mapping for every level and severity, `helpUri` from the source references, uri normalization (`./`, absolute paths, Windows separators and drives, percent-encoding, the paths it refuses), code point columns on the multibyte fixture, regions across a line break, the log against a zod schema of what code scanning requires (`sarif-schema.ts`), clean input, several files, the same file given twice, determinism, and fingerprints that survive moved lines and columns, tell repeated matches apart, and count them again from 0 in each file.
+- `cli-sarif.test.ts`: `--sarif` as a child process. The log validates, the exit codes stay, the bytes repeat and columns are code points. Several files share one run, uris are relative, and stdin is `stdin` or the `--sarif-uri` value. `--json` with `--sarif`, a misused `--sarif-uri`, an unreadable file or a Windows path exit 2 with nothing on stdout.
+- `action.test.ts`: `action.yml` as text (no expression in the run block, every input through `env:`, setup-node pinned to the SHA in ci.yml, every input and output in this README), then its script, run with bash in a temporary workspace, against `**` globs, space and newline separators, `fail: false`, exit 2 on a pattern with no match or an unwritable SARIF file even with `fail: false`, inputs that look like shell code, a file named `-letter.txt`, the SARIF file and the outputs, and a `sarif-file` with a line break.
 
 ## The section 15 letters
 
