@@ -12,10 +12,17 @@
  * The output shape is enforced twice: by the API (structured output with the
  * JSON schema below) and by zod after parsing, because the second check is the
  * one that also runs against a fake client in tests.
+ *
+ * This is the built-in `groundedness` rubric (see rubric.ts for what a rubric
+ * is). The request building and the judge call are the generic ones; the
+ * rubric text, the labels, the verdict shape and the line rule live here.
  */
 import { z } from 'zod';
 import type { BlindPiece } from './blind.ts';
 import type { CallSettings, ModelClient, ModelRequest } from './model.ts';
+import { JudgeError, judgeWith, rubricRequest, type JudgeRubric } from './rubric.ts';
+
+export { JudgeError };
 
 export const RUBRIC = `You judge short pieces of business writing against a fact sheet. You do not know who or what wrote each piece, and it does not matter.
 
@@ -92,23 +99,50 @@ export function numberedLines(text: string): string[] {
     .filter(Boolean);
 }
 
-export function judgeRequest(piece: BlindPiece, factSheet: string, call: CallSettings = JUDGE_CALL): ModelRequest {
-  const lines = numberedLines(piece.text);
-  const body = [
-    'FACT SHEET',
-    factSheet,
-    '',
-    'BRIEF',
-    piece.brief,
-    '',
-    `PIECE (${lines.length} lines)`,
-    ...lines.map((l, i) => `${i + 1}. ${l}`),
-  ].join('\n');
-  return { ...call, system: [{ type: 'text', text: RUBRIC }], messages: [{ role: 'user', content: body }] };
-}
+/**
+ * The line-by-line rubric of the case study, as a pluggable rubric. A piece
+ * passes when no line is marked invented. The verdict's other calls (voice,
+ * robotic, quality) are metrics: they are reported, and they do not decide
+ * pass or fail.
+ */
+export const groundedness: JudgeRubric<Verdict> = {
+  kind: 'judge',
+  name: 'groundedness',
+  version: '1',
+  instructions: RUBRIC,
+  call: JUDGE_CALL,
+  verdict: Verdict,
+  prompt(piece, factSheet) {
+    const lines = numberedLines(piece.text);
+    return [
+      'FACT SHEET',
+      factSheet,
+      '',
+      'BRIEF',
+      piece.brief,
+      '',
+      `PIECE (${lines.length} lines)`,
+      ...lines.map((l, i) => `${i + 1}. ${l}`),
+    ].join('\n');
+  },
+  complete: (verdict, piece) => checkLineCoverage(verdict, numberedLines(piece.text).length),
+  reduce: (verdict) => ({
+    pass: inventedLines(verdict).length === 0,
+    metrics: {
+      invented_lines: inventedLines(verdict).length,
+      off_voice: verdict.voice === 'off' ? 1 : 0,
+      quality: verdict.quality,
+      robotic: verdict.robotic ? 1 : 0,
+    },
+  }),
+  describe: (verdict) =>
+    inventedLines(verdict)
+      .map((l) => `line ${l.line} invented${l.note ? `: ${l.note}` : ''}`)
+      .join('; '),
+};
 
-export class JudgeError extends Error {
-  override name = 'JudgeError';
+export function judgeRequest(piece: BlindPiece, factSheet: string, call: CallSettings = JUDGE_CALL): ModelRequest {
+  return rubricRequest(groundedness, piece, factSheet, call);
 }
 
 /** Parses and checks one verdict. Every line from 1 to n, each exactly once. */
@@ -138,18 +172,14 @@ export function checkLineCoverage(v: Pick<Verdict, 'lines'>, lineCount: number):
 export const JudgedPiece = Verdict.extend({ id: z.string().min(1), judge: z.number().int().min(1) });
 export type JudgedPiece = z.infer<typeof JudgedPiece>;
 
-export async function judgePiece(
+export function judgePiece(
   client: ModelClient,
   piece: BlindPiece,
   factSheet: string,
   judge = 1,
   call: CallSettings = JUDGE_CALL,
 ): Promise<JudgedPiece> {
-  const reply = await client.create(judgeRequest(piece, factSheet, call));
-  if (reply.stopReason === 'max_tokens' || reply.stopReason === 'refusal') {
-    throw new JudgeError(`judge stopped with ${reply.stopReason} on ${piece.id}`);
-  }
-  return { id: piece.id, judge, ...parseVerdict(reply.text, numberedLines(piece.text).length) };
+  return judgeWith(groundedness, client, piece, factSheet, judge, call);
 }
 
 export const inventedLines = (v: Verdict) => v.lines.filter((l) => l.support === 'invented');

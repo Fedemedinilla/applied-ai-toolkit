@@ -1,0 +1,8 @@
+[
+{"case":"booking-1","input":"Hi, a tune-up for two bikes on Friday please. Ana","output":"{\"service\":\"tune-up\",\"bikes\":2,\"day\":\"Friday\"}","expected":{"service":"tune-up","bikes":2,"day":"Friday"}},
+{"case":"booking-2","input":"Can you do a full service on my bike this Tuesday?","output":"{\"service\":\"full service\",\"bikes\":2}","expected":{"service":"full service","bikes":1,"day":"Tuesday"}},
+{"case":"booking-3","input":"Flat tyre, one bike, I can come Saturday.","output":"{\"service\":\"brakes\",\"bikes\":1,\"day\":\"Monday\",\"urgent\":true}","expected":{"service":"flat tyre","bikes":1,"day":"Saturday"}},
+{"case":"booking-4","input":"Brakes on three bikes, any day works.","output":"{\"service\":\"brakes\",\"bikes\":3,\"day\":null}","expected":{"service":"brakes","bikes":3,"day":null}},
+{"case":"booking-5","input":"One tune-up on Wednesday.","output":"I could not find a booking in this message.","expected":{"service":"tune-up","bikes":1,"day":"Wednesday"}},
+{"case":"booking-6","input":"Full service for two bikes on Thursday.","output":"{\"service\":\"full service\",\"bikes\":2,\"day\":\"Thursday\"}","expected":{"service":"full service","bikes":2,"day":"Thursday"}}
+]
