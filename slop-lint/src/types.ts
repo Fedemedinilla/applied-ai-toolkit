@@ -109,6 +109,30 @@ export interface Finding {
   detail?: string;
 }
 
+/** A finding that an inline directive suppressed, with the place of that directive. */
+export interface SuppressedFinding extends Finding {
+  suppressedBy: {
+    /** 1-based position of the directive comment. */
+    line: number;
+    column: number;
+    /** The text after the colon in the directive, when it gives one. */
+    reason?: string;
+  };
+}
+
+/** How lint() honors the inline directives of Markdown mode. */
+export interface SuppressionOptions {
+  /**
+   * Lets a directive suppress a rule whose severity is disqualify. False when left out: such a
+   * rule sets the score to 0 because the text cannot be sent as it is, and a comment written
+   * next to the text, by its author or by the model that wrote it, is the wrong place to decide
+   * otherwise. The config file is the right one.
+   */
+  allowDisqualify?: boolean;
+  /** False refuses the directives without a rule id, which hide a span from every rule. True when left out. */
+  mask?: boolean;
+}
+
 /** How lint() reads its input. */
 export type Format = 'text' | 'markdown';
 
@@ -131,6 +155,8 @@ export interface LintOptions {
    * and severities, and adds the custom rules after the catalog's.
    */
   rules?: readonly Rule[];
+  /** Only read in Markdown mode; plain text has no inline directives. */
+  suppressions?: SuppressionOptions;
 }
 
 export interface LintStats {
@@ -162,4 +188,16 @@ export interface LintResult {
    */
   score: { points: number; max: 15 };
   stats: LintStats;
+  /**
+   * Findings that an inline directive suppressed, in reading order. They are not in `findings`
+   * and do not count for `passesTier1`, `disqualified` or `score`. The key is present only
+   * when at least one finding was suppressed, so a result without directives keeps its shape.
+   */
+  suppressed?: SuppressedFinding[];
+  /**
+   * Directives that are unused (SUP-01), refused (SUP-02) or invalid (SUP-03), each at the
+   * position of its comment. They are not prose findings: they are not in `findings` and cost
+   * no points. The key is present only when there is at least one.
+   */
+  directiveProblems?: Finding[];
 }
