@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { freshOutput } from '../src/files.ts';
 
 /** Flags that take no value, so the next argument is not swallowed as one. */
-const BOOLEAN_FLAGS = new Set(['--dump', '--allow-missing']);
+const BOOLEAN_FLAGS = new Set(['--dump', '--allow-missing', '--json', '--markdown', '--multi']);
 
 /** A usage error: one line on stderr and exit code 2, no stack trace. */
 export function usageError(message: string): never {
