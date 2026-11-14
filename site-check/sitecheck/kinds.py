@@ -7,6 +7,12 @@ article forms and the people who use the site ("las familias" for schools, "los
 clientes" for a company). VIS-17 (inscripciones) applies only to the
 educational kinds.
 
+The keys are the Spanish nouns the report uses, and run.json stores them as
+they are. On the command line each kind also has an English name (ALIASES):
+school, institute, kindergarten, company and organisation. "escuela" has none
+of its own, because English has one word for colegio and escuela; it is
+chosen by its Spanish name.
+
 A value outside the set is exit 2 in the CLI. --rerender on a run.json with
 another value falls back to the neutral "institución".
 """
@@ -55,11 +61,23 @@ def _fold(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
-_BY_FOLDED: dict[str, str] = {_fold(k): k for k in KINDS}
+# The English name of each kind on the command line, and the kind it selects.
+ALIASES: dict[str, str] = {
+    "school": "colegio",
+    "institute": "instituto",
+    "kindergarten": "jardín",
+    "company": "empresa",
+    "organisation": "institución",
+    "organization": "institución",
+}
+# What --help lists: the English names, then the Spanish nouns they select.
+CLI_NAMES: tuple[str, ...] = ("school", "institute", "kindergarten", "company", "organisation")
+
+_BY_FOLDED: dict[str, str] = {**{_fold(k): k for k in KINDS}, **{_fold(a): k for a, k in ALIASES.items()}}
 
 
 def normalize_kind(value: str | None) -> str | None:
-    """The key of KINDS for a --kind value (case and accents ignored), or None when it is not one."""
+    """The key of KINDS for a --kind value, English or Spanish (case and accents ignored), or None when it is not one."""
     if value is None:
         return None
     return _BY_FOLDED.get(_fold(value))

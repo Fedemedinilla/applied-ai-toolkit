@@ -68,7 +68,7 @@ class RunConfig:
     form_page: str | None = None  # --form-page
     psi_runs: int = DEFAULT_PSI_RUNS  # --psi-runs
     observatory: bool = False  # --observatory
-    overrides: Path | None = None  # --overrides: colour overrides {ID: {color, motivo}}
+    overrides: Path | None = None  # --overrides: colour overrides {ID: {colour, reason}}
     rerender_from: Path | None = None  # --rerender: path to an existing run.json
     out_root: Path = field(default_factory=default_output_root)  # --out
     exclude: Path | None = None  # --exclude (or SITE_CHECK_EXCLUDE): extra exclusion list

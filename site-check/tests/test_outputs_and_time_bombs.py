@@ -65,7 +65,7 @@ class CommandsTest(unittest.TestCase):
         flat = " ".join(out.split())
         self.assertIn(
             'Example: SITE_CHECK_CONTROL_DOMAIN=your-own-site.example python3 -m sitecheck https://www.example.org/ '
-            '--name "Example School" --kind colegio',
+            '--name "Example School" --kind school',
             flat,
         )
         for option in ("--name", "--kind", "--to", "--inner-page", "--form-page", "--psi-runs", "--no-pagespeed",

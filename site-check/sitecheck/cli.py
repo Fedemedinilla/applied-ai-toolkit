@@ -5,9 +5,11 @@ Options:
                           required, except with --rerender (then it is read from run.json)
   --name NAME             the organisation's name (VIS-04 title test; report header)
   --kind KIND             kind of organisation, for the wording of the report:
-                          colegio, escuela, instituto, jardín, empresa or institución
-                          (default; kinds.py; anything else is exit 2)
-  --to TEXT               the "Para:" line of the report (default "Dirección")
+                          school, institute, kindergarten, company or organisation
+                          (default), or the Spanish noun the report uses: colegio,
+                          escuela, instituto, jardín, empresa, institución
+                          (kinds.py; anything else is exit 2)
+  --to TEXT               who the report is addressed to (default "Dirección")
   --inner-page URL        an inner page to read (measured only if the home links it)
   --form-page URL         a page with a form for VIS-13 (measured only if the home links it)
   --psi-runs N            mobile PageSpeed runs, 1..5 (default 3; the median is used)
@@ -15,7 +17,7 @@ Options:
   --observatory           also ask MDN Observatory for its header grade (off by default)
   --pause SECONDS         pause between site requests, 3 (default) to 60; never below 3
   --max-requests N        site request budget, 1 to 90 (default 90); never above 90
-  --overrides FILE        colour overrides {ID: {"color", "motivo"}}, each with its reason
+  --overrides FILE        colour overrides {ID: {"colour", "reason"}}, each with its reason
   --rerender RUN_JSON   rebuild the report of an earlier run from its run.json, no requests
   --compare BEFORE AFTER  compare two stored runs (folders or run.json files), no requests;
                           writes comparison.md and comparison.json into the AFTER folder
@@ -69,7 +71,7 @@ from .config import (
 )
 from .endpoints import CONTROL_ENV_VAR, control_domain_from_env
 from .exclusions import ENV_VAR as EXCLUDE_ENV_VAR
-from .kinds import KINDS, normalize_kind
+from .kinds import CLI_NAMES, KINDS, normalize_kind
 
 # Top-level module names already loaded when the CLI was imported (the
 # interpreter's own startup, or the test runner). Only modules loaded AFTER
@@ -98,19 +100,24 @@ def build_parser() -> argparse.ArgumentParser:
         prog="site-check",
         description=(
             "Passive, outside-in website check: reads only what the site serves to any visitor, plus public "
-            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes run.json, report.md and technical-annex.md."
+            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes run.json, report.md and technical-annex.md. "
+            "The report is written in Spanish."
         ),
         epilog=(
             "Example: SITE_CHECK_CONTROL_DOMAIN=your-own-site.example "
-            "python3 -m sitecheck https://www.example.org/ --name \"Example School\" --kind colegio"
+            "python3 -m sitecheck https://www.example.org/ --name \"Example School\" --kind school"
         ),
         allow_abbrev=False,
     )
     p.add_argument("url", nargs="?", metavar="URL", help="home page of the site (http or https, no path)")
     p.add_argument("--name", metavar="NAME", help="the organisation's name, for the title check and the report")
-    p.add_argument("--kind", metavar="KIND", default=None, help=f"kind of organisation: {', '.join(KINDS)} (default: {DEFAULT_KIND})")
-    p.add_argument("--to", dest="para", metavar="TEXT", default=None, help=f'the "Para:" line of the report (default: {DEFAULT_PARA})')
-    p.add_argument("--inner-page", dest="interna", metavar="URL", help="inner page; read only if the home links it")
+    p.add_argument(
+        "--kind", metavar="KIND", default=None,
+        help=f"kind of organisation: {', '.join(CLI_NAMES)} (default: organisation); "
+        f"the Spanish nouns of the report are accepted too ({', '.join(KINDS)})",
+    )
+    p.add_argument("--to", dest="to", metavar="TEXT", default=None, help=f"who the report is addressed to (default: {DEFAULT_PARA})")
+    p.add_argument("--inner-page", dest="inner_page", metavar="URL", help="inner page; read only if the home links it")
     p.add_argument("--form-page", dest="form_page", metavar="URL", help="page with a form; read only if the home links it")
     p.add_argument(
         "--psi-runs", dest="psi_runs", type=int, default=DEFAULT_PSI_RUNS, metavar="N",
@@ -126,11 +133,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-requests", dest="max_requests", type=int, default=DEFAULT_SITE_BUDGET, metavar="N",
         help=f"site request budget, 1 to {DEFAULT_SITE_BUDGET} (default: {DEFAULT_SITE_BUDGET})",
     )
-    p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"color", "motivo"}}')
-    p.add_argument("--rerender", metavar="RUN_JSON", help="rebuild the report from a run.json, without requests")
+    p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"colour", "reason"}}')
+    p.add_argument("--rerender", metavar="RUN_JSON", help="rebuild the report from a stored run (run.json, or a datos.json of an earlier version), without requests")
     p.add_argument(
         "--compare", nargs=2, metavar=("BEFORE", "AFTER"),
-        help="compare two stored runs (folders or run.json files) without requests; writes into the AFTER folder",
+        help="compare two stored runs (folders or run.json files) without requests; writes comparison.md and "
+        "comparison.json into the AFTER folder",
     )
     p.add_argument("--out", metavar="DIR", help="output root (default: $SITE_CHECK_OUT, else ./site-check-runs)")
     p.add_argument("--exclude", metavar="FILE", help=f"exclusion list, one domain per line (default: ${EXCLUDE_ENV_VAR})")
@@ -268,7 +276,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         parser.error(f"--pause must be between {DEFAULT_PACE_SECONDS:g} and {MAX_PACE_SECONDS:g} seconds")
     if not 1 <= args.max_requests <= DEFAULT_SITE_BUDGET:
         parser.error(f"--max-requests must be between 1 and {DEFAULT_SITE_BUDGET}")
-    for name, option in (("name", "--name"), ("kind", "--kind"), ("para", "--to")):
+    for name, option in (("name", "--name"), ("kind", "--kind"), ("to", "--to")):
         value = getattr(args, name)
         if value is not None and not value.strip():
             parser.error(f"{option} cannot be empty")
@@ -276,7 +284,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
     if args.kind is not None:
         kind_key = normalize_kind(args.kind)
         if kind_key is None:
-            parser.error(f"--kind must be one of: {', '.join(KINDS)}")
+            parser.error(f"--kind must be one of: {', '.join((*CLI_NAMES, *KINDS))}")
         args.kind = kind_key
 
     out_root = Path(args.out).absolute() if args.out else default_output_root()
@@ -304,7 +312,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             option
             for option, value in (
                 ("a URL", args.url), ("--rerender", args.rerender), ("--overrides", args.overrides),
-                ("--name", args.name), ("--kind", args.kind), ("--to", args.para), ("--out", args.out),
+                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--out", args.out),
                 ("--exclude", args.exclude),
             )
             if value
@@ -338,7 +346,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             institution=args.name.strip() if args.name else None,
             kind=args.kind.strip() if args.kind else DEFAULT_KIND,
             kind_explicit=args.kind is not None,
-            para=args.para.strip() if args.para else "",
+            para=args.to.strip() if args.to else "",
             overrides=overrides,
             rerender_from=rerender_from,
             out_root=out_root,
@@ -351,7 +359,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
     problem = _check_home_url(url, test_hooks=test_hooks)
     if problem:
         parser.error(problem)
-    for option, value in (("--inner-page", args.interna), ("--form-page", args.form_page)):
+    for option, value in (("--inner-page", args.inner_page), ("--form-page", args.form_page)):
         if value:
             problem = _check_page_url(option, value)
             if problem:
@@ -366,8 +374,8 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         institution=args.name.strip() if args.name else None,
         kind=args.kind.strip() if args.kind else DEFAULT_KIND,
         kind_explicit=args.kind is not None,
-        para=args.para.strip() if args.para else DEFAULT_PARA,
-        interna=args.interna.strip() if args.interna else None,
+        para=args.to.strip() if args.to else DEFAULT_PARA,
+        interna=args.inner_page.strip() if args.inner_page else None,
         form_page=args.form_page.strip() if args.form_page else None,
         psi_runs=args.psi_runs,
         observatory=args.observatory,
