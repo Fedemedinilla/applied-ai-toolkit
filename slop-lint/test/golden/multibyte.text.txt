@@ -1,0 +1,15 @@
+test/fixtures/sarif/multibyte.txt:3:6   L1 high       FMT-02    Emoji in a cover letter.
+    "🎉" -> Delete it.
+test/fixtures/sarif/multibyte.txt:3:20  L1 high       FMT-02    Emoji in a cover letter.
+    "👩" -> Delete it.
+test/fixtures/sarif/multibyte.txt:3:23  L1 high       FMT-02    Emoji in a cover letter.
+    "💻" -> Delete it.
+test/fixtures/sarif/multibyte.txt:3:27  L1 high       LEX-03    Banned cover-letter phrase.
+    "I am writing to express" -> Replace it with a fact from the CV: a project, a tool, a number, a year.
+test/fixtures/sarif/multibyte.txt:3:54  L1 high       LEX-03    Banned cover-letter phrase.
+    "keen interest" -> Replace it with a fact from the CV: a project, a tool, a number, a year.
+test/fixtures/sarif/multibyte.txt:4:6   L1 high       LEX-03    Banned cover-letter phrase.
+    "passionate about" -> Replace it with a fact from the CV: a project, a tool, a number, a year.
+test/fixtures/sarif/multibyte.txt:4:54  L2 medium     LEX-04    Excess style vocabulary. Tolerated twice per text, never the same word twice. (Tier 2 word 3; the budget is 2 per text)
+    "seamless" -> Use the plain verb or the fact.
+7 findings (L1 6, L2 1, L3 0); slop score 0/15; fails tier 1
