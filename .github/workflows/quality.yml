@@ -1,0 +1,94 @@
+# The slow checks: mutation testing (StrykerJS) of the critical modules and the benchmarks. Weekly
+# and on demand, never on a push: one mutation target takes minutes, where CI takes seconds.
+#
+# - mutation: one job per target (gateway caps and cost, grounded-assistant decide and money guard,
+#   amount-parser core). A job fails when the mutation score falls below thresholds.break in that
+#   folder's stryker.config.json. Each README has a "Mutation testing" section with the numbers.
+# - bench: `npm run bench`, then the comparison with test/bench/baseline.json, which fails on a
+#   regression beyond the tolerance. test/bench/README.md explains the method and its limits.
+#
+# The reports are uploaded as artifacts whether the job passed or not. No job has secrets or write
+# permissions; agent-playbook/test/workflow-secrets.test.ts checks this file with the default
+# policy. Actions are pinned to the commit SHA of their release tag, with the version in a comment.
+name: Quality
+
+# Mondays at 05:17 UTC, and by hand from the Actions tab.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mutation:
+    name: Mutation (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [gateway, grounded-assistant, amount-parser]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Mutation testing
+        run: npm run mutation:${{ matrix.target }}
+
+      - name: Upload the mutation report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-${{ matrix.target }}
+          path: reports/mutation/${{ matrix.target }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run the benchmarks
+        run: npm run bench
+
+      - name: Compare with the committed baseline
+        run: npm run bench:compare
+
+      - name: Upload the benchmark results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench
+          path: reports/bench/
+          if-no-files-found: warn
+          retention-days: 30
