@@ -1,8 +1,10 @@
 /**
  * The config format. A config is a TypeScript module whose default export goes through
- * defineConfig, so the editor checks it, and it is validated again with zod when the CLI loads it,
- * because a typo in a rule name must stop the run instead of turning a fence off.
+ * defineConfig, so the editor checks it, or a JSON file that an editor checks against
+ * schema/config.schema.json. Either one is validated again with zod when the CLI loads it, because
+ * a typo in a rule name must stop the run instead of turning a fence off.
  */
+import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -130,16 +132,59 @@ export function parseConfig(value: unknown): FencesConfig {
   return result.data;
 }
 
-/** Imports a config module and returns it with its root resolved to an absolute path. */
+/** Where the committed JSON Schema of a JSON config is published. */
+export const CONFIG_SCHEMA_URL = 'https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/import-fences/schema/config.schema.json';
+
+/**
+ * The JSON Schema (draft 2020-12) of a JSON config, generated from the zod schema above so the two
+ * cannot drift; schema/config.schema.json is this value, and a test compares them. It describes
+ * what a config file may hold before defaults are filled, plus the `$schema` key an editor reads.
+ * The three cross-field checks of the CLI (a rule names a known group, a forbidden-import rule has
+ * specifiers or paths, except needs paths) are not expressible here and stay with the CLI.
+ */
+export function configJsonSchema(): Record<string, unknown> {
+  const { $schema, ...generated } = z.toJSONSchema(Config, { io: 'input' }) as Record<string, unknown>;
+  const properties = (generated['properties'] ?? {}) as Record<string, unknown>;
+  return {
+    $schema,
+    $id: CONFIG_SCHEMA_URL,
+    title: 'import-fences config',
+    ...generated,
+    properties: { $schema: { type: 'string', description: 'The address of this schema, for editors. The CLI ignores it.' }, ...properties },
+  };
+}
+
+/** A JSON config: the object a module would export, with an optional `$schema` key for editors. */
+function readJsonConfig(absolute: string): unknown {
+  const value: unknown = JSON.parse(readFileSync(absolute, 'utf8'));
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const { $schema: _schema, ...config } = value as Record<string, unknown>;
+  return config;
+}
+
+/**
+ * Loads a config and returns it with its root resolved to an absolute path. A path ending in .json
+ * is read as JSON; anything else is imported as a module whose default export is the config.
+ */
 export async function loadConfig(path: string): Promise<{ config: FencesConfig; root: string }> {
   const absolute = resolve(path);
-  let module: { default?: unknown };
-  try {
-    module = (await import(pathToFileURL(absolute).href)) as { default?: unknown };
-  } catch (error) {
-    throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+  let value: unknown;
+  if (absolute.endsWith('.json')) {
+    try {
+      value = readJsonConfig(absolute);
+    } catch (error) {
+      throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+    }
+  } else {
+    let module: { default?: unknown };
+    try {
+      module = (await import(pathToFileURL(absolute).href)) as { default?: unknown };
+    } catch (error) {
+      throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+    }
+    if (module.default === undefined) throw new ConfigError(`${path} has no default export`);
+    value = module.default;
   }
-  if (module.default === undefined) throw new ConfigError(`${path} has no default export`);
-  const config = parseConfig(module.default);
+  const config = parseConfig(value);
   return { config, root: resolve(dirname(absolute), config.root ?? '.') };
 }

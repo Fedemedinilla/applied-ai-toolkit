@@ -20,11 +20,11 @@ web/a.ts:2:1  forbidden-import  imports node:fs, forbidden in group "browser". W
 import-fences: 2 violations in 3 files, 2 rules
 ```
 
-`--json` prints the same as JSON. Exit codes: 0 no violation, 1 at least one, 2 bad usage or an invalid config. Without `--config` the CLI loads `import-fences.config.ts` from the current folder. Node 24 runs the TypeScript sources directly (type stripping), so there is no build step, and the only dependencies are `typescript` (the parser) and `zod` (the config check).
+`--json` prints the same as JSON, and `--sarif` prints a SARIF 2.1.0 log (see SARIF for code scanning). Exit codes: 0 no violation, 1 at least one, 2 bad usage or an invalid config. Without `--config` the CLI loads `import-fences.config.ts` from the current folder, or `import-fences.config.json` when there is no `.ts` one. Node 24 runs the TypeScript sources directly (type stripping), so there is no build step, and the only dependencies are `typescript` (the parser) and `zod` (the config check).
 
 ## The config
 
-A config is a TypeScript module. Groups name sets of files by glob; each rule applies to one group.
+A config is a TypeScript module or a JSON file. Groups name sets of files by glob; each rule applies to one group.
 
 ```ts
 import { defineConfig, NODE_BUILTINS } from './import-fences/src/config.ts';
@@ -47,6 +47,33 @@ export default defineConfig({
 
 Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
 
+### A JSON config, and a minimal example
+
+A path that ends in `.json` is read as JSON, with the same keys. A project that has `src/client`, `src/server` and one module that creates the SDK client can start from this file, saved as `import-fences.config.json` at its root:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/import-fences/schema/config.schema.json",
+  "groups": {
+    "client": { "include": ["src/client/**"] },
+    "source": { "include": ["src/**"], "exclude": ["**/*.test.ts"] }
+  },
+  "rules": [
+    { "rule": "forbidden-import", "group": "client", "specifiers": ["node:*"], "paths": ["src/server/**"], "why": "client code ships to the browser" },
+    { "rule": "single-importer", "group": "source", "package": "@vendor/sdk", "allow": ["src/server/llm/client.ts"], "why": "every call goes through one client" },
+    { "rule": "single-reader", "group": "source", "variable": "VENDOR_API_KEY", "allow": ["src/server/llm/client.ts"] }
+  ]
+}
+```
+
+It says three things. No file under `src/client` reaches a `node:` built-in or a file under `src/server`, however many imports away. Only `src/server/llm/client.ts` imports values from `@vendor/sdk`. Only that file reads `VENDOR_API_KEY`. `test/schema.test.ts` runs this exact block over a tree with that layout and expects zero violations.
+
+- **`$schema` is for the editor.** [`schema/config.schema.json`](schema/config.schema.json) is a JSON Schema (draft 2020-12) generated from the zod schema the CLI validates with, by `node import-fences/scripts/write-schema.ts`; a test fails when the two differ. An editor that reads it completes rule names and flags an unknown key while typing. The CLI ignores the key and validates the rest itself, so a config without `$schema` works the same.
+- **The schema cannot say everything.** Three checks compare one part of the config with another: a rule names a group that exists, a `forbidden-import` rule has `specifiers` or `paths`, and `except` comes with `paths`. JSON Schema has no clean way to write them, so the editor accepts those mistakes and the CLI stops on them with exit code 2.
+- **JSON has no `NODE_BUILTINS`.** `"node:*"` covers every import written with the prefix. The bare spellings (`fs`, `path`) have to be listed one by one in JSON; a `.ts` config spreads `NODE_BUILTINS`, which holds both.
+- **JSON cannot compute.** This repository's own config lists the folders on disk and builds one rule per folder, so it is a `.ts` module. A config that is a fixed list fits in JSON.
+- **Add `relative-extension` only where Node runs the sources.** A project whose bundler resolves `./x` to `./x.ts` would get one violation per import.
+
 ## Rule reference
 
 | Rule | Options | Reports |
@@ -59,6 +86,25 @@ Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alter
 | `dynamic-import` | none | `import()`, `require()` and `new URL(x, import.meta.url)` with a computed argument, and `import.meta.glob()`. |
 
 Two more ids come from the config itself. `empty-group` reports a group that matches no file (set `allowEmpty: true` for a group kept for code that does not exist yet). `stale-allow` reports an `allow` entry that matches no file of the group, or matches files that no longer do what it allows, and an `except` entry that no import of the group uses.
+
+## SARIF for code scanning
+
+`--sarif` prints one SARIF 2.1.0 log to stdout, the format GitHub code scanning reads. It replaces the text output. It cannot be combined with `--json`; asking for both is a usage error with exit code 2 and nothing on stdout. The exit codes do not change, so a job can upload the log and still fail on a violation.
+
+```sh
+node import-fences/cli.ts --config import-fences/repo.config.ts --sarif > import-fences.sarif
+node ../import-fences/cli.ts --sarif --sarif-base .. > import-fences.sarif   # run inside a package of a monorepo
+```
+
+What the log holds:
+
+- One run. `tool.driver` names import-fences and lists the ten rule ids of the rule reference, always all of them and in the same order, each with a name, a short and a full description, and a link to the rule reference.
+- One result per violation, with level `error`, since every violation fails the CLI. `ruleId` is the id the text report prints, such as `forbidden-import`. The message is the reason, followed by the rule's `why` when it has one, exactly as in the text report.
+- A violation in code points at the file that holds the import, with the line and the column of the statement. Columns count UTF-16 code units, and `columnKind` says so. For a crossing reached through other files, that is the file whose import crosses the fence, and the message names the chain.
+- `stale-allow` and `empty-group` are results too, since they fail the run. They point at the config file and carry no line: the checker knows which entry is stale, not where in the file it is written.
+- `artifactLocation.uri` is relative to `--sarif-base` (default: the current folder), with forward slashes and each segment percent-encoded. Code scanning resolves it against the repository root, so run the CLI from there or pass the root as `--sarif-base`. A file outside the base gets an absolute `file:` URI instead of a `../` path. `--sarif-base` without `--sarif` is a usage error.
+- `partialFingerprints` holds one value under `importFencesViolation/v1`: a SHA-256 of the rule id, the uri and the reason, cut to 32 hex digits, plus `:1`, `:2` for the same violation repeated in one file. No line, column or `why` goes in, so code added above an import, or a reworded `why`, keeps its alert instead of closing it and opening a new one. Renaming the file, or a change in the chain that reaches it, makes a new alert.
+- Results are sorted by uri, line, column, rule id and message, compared by code unit. The same tree gives the same bytes on any machine. No timestamp, host name, absolute path or tool version goes in.
 
 ## Design decisions
 
