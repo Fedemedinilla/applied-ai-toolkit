@@ -1,7 +1,7 @@
 """Before/after comparison of two stored runs: ``site_check.py --compare BEFORE AFTER``.
 
-It reads two ``datos.json`` files and writes ``comparacion.md`` and
-``comparacion.json`` into the AFTER run folder. It makes no request and reads
+It reads two ``run.json`` files and writes ``comparison.md`` and
+``comparison.json`` into the AFTER run folder. It makes no request and reads
 no clock: the same two files always give the same bytes.
 
 The protocol it enforces (the rule each part prevents breaking):
@@ -39,7 +39,7 @@ The protocol it enforces (the rule each part prevents breaking):
   left out of the denominator, NO_VERIFICADO stays in it and never counts as
   passed.
 
-The report text goes through textlint like informe.md; a problem is exit 4,
+The report text goes through textlint like report.md; a problem is exit 4,
 with the files written and the problems listed, as in a run.
 """
 
@@ -56,12 +56,13 @@ from . import __version__, fmt
 from .checks.common import UNDER_A_TENTH
 from .exitcodes import ExitCode
 from .model import COLOUR_STYLES, Colour
-from .outputs import DATOS, dumps_datos, read_datos, write_text
+from . import runformat
+from .outputs import dumps_datos, read_datos, run_file_of, write_text
 from .render_report import number_word
 from .textlint import lint_text
 
-REPORT = "comparacion.md"
-DATA = "comparacion.json"
+REPORT = "comparison.md"
+DATA = "comparison.json"
 COMPARISON_SCHEMA = 1
 FIELD_WINDOW_DAYS = 28  # Chrome UX Report: the 28 days before the measurement
 FIELD_SCOPES = frozenset({"pagina", "origen"})
@@ -97,7 +98,7 @@ NO_CHANGE = "sin cambio"
 
 @dataclass(frozen=True)
 class StoredRun:
-    """One datos.json, with the parts the comparison reads."""
+    """One run.json, with the parts the comparison reads."""
 
     folder: Path
     datos: dict[str, Any]
@@ -128,9 +129,14 @@ def _parse_moment(value: Any) -> dt.datetime | None:
 
 
 def load_run(path: Path) -> StoredRun:
-    """A run folder (holding datos.json) or a datos.json path. ValueError when unreadable."""
+    """A run folder or a stored-run file, of either format. ValueError when unreadable.
+
+    A folder is read from its run.json, else from the datos.json of a run
+    written before the rename; both become the same internal dict, so a run in
+    the old format compares with one in the new format.
+    """
     path = Path(path)
-    source = path / DATOS if path.is_dir() else path
+    source = run_file_of(path) if path.is_dir() else path
     datos = read_datos(source)
     meta = datos.get("meta") if isinstance(datos.get("meta"), dict) else {}
     checks = {str(c.get("id")): c for c in datos.get("checks") or [] if isinstance(c, dict) and c.get("id")}
@@ -157,7 +163,7 @@ def _psi_runs(run: StoredRun) -> dict[str, Any]:
 # The meta keys every comparable run must record, with what each one pins down.
 IDENTITY_KEYS: tuple[tuple[str, str], ...] = (
     ("dominio", "the domain"),
-    ("url_canonica", "the measured page (meta.url_canonica)"),
+    ("url_canonica", "the measured page (meta.canonical_url)"),
     ("version_script", "the site-check version (other rules)"),
     ("modo_prueba", "test mode"),
     ("sin_pagespeed", "PageSpeed on or off (--no-pagespeed)"),
@@ -165,7 +171,7 @@ IDENTITY_KEYS: tuple[tuple[str, str], ...] = (
     ("tipo", "the kind of organisation (--kind)"),
 )
 # Keys that may be null in a valid run (no inner page linked), compared as stored.
-OPTIONAL_KEYS: tuple[tuple[str, str], ...] = (("url_interna", "the inner page read (meta.url_interna)"),)
+OPTIONAL_KEYS: tuple[tuple[str, str], ...] = (("url_interna", "the inner page read (meta.inner_url)"),)
 MIN_VALID_PSI_RUNS = 3  # the protocol: three mobile runs and the median
 
 
@@ -175,9 +181,9 @@ def _psi_problems(label: str, runs: dict[str, Any], lighthouse: Any) -> list[str
     for key in ("pedidas", "validas"):
         value = runs.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
-            problems.append(f"the {label} run does not record {key} in meta.corridas_psi")
+            problems.append(f"the {label} run does not record {runformat.PSI_RUNS_KEYS[key]} in meta.psi_runs")
     if not isinstance(runs.get("computadora_valida"), bool):
-        problems.append(f"the {label} run does not record computadora_valida in meta.corridas_psi")
+        problems.append(f"the {label} run does not record desktop_valid in meta.psi_runs")
     valid = runs.get("validas")
     if isinstance(valid, int) and not isinstance(valid, bool):
         if valid < MIN_VALID_PSI_RUNS:
@@ -190,7 +196,7 @@ def _psi_problems(label: str, runs: dict[str, Any], lighthouse: Any) -> list[str
                 f"the {label} run has {valid} valid mobile PageSpeed runs, an even count with no middle run"
             )
     if _lighthouse_major(lighthouse) is None:
-        problems.append(f"the {label} run does not record the Lighthouse version (meta.version_lighthouse)")
+        problems.append(f"the {label} run does not record the Lighthouse version (meta.lighthouse_version)")
     return problems
 
 
@@ -198,7 +204,7 @@ def comparability_problems(before: StoredRun, after: StoredRun) -> list[str]:
     """Every reason the two runs cannot be compared; empty when they can.
 
     A key missing from a run is a reason of its own: a truncated or hand-made
-    datos.json must not pass the identity checks because None equals None.
+    run.json must not pass the identity checks because None equals None.
     """
     problems: list[str] = []
     runs = (("BEFORE", before), ("AFTER", after))
@@ -211,7 +217,7 @@ def comparability_problems(before: StoredRun, after: StoredRun) -> list[str]:
         if run.meta.get("sitio_cortado"):
             problems.append(f"an anti-bot check cut the {label} run, so part of the site was not read")
         if run.started is None:
-            problems.append(f"the {label} run has no start time (meta.inicio_utc)")
+            problems.append(f"the {label} run has no start time (meta.started_utc)")
 
     def differs_values(what: str, a: Any, b: Any) -> None:
         if a != b:
@@ -265,7 +271,7 @@ def comparability_problems(before: StoredRun, after: StoredRun) -> list[str]:
 class Cell:
     value: Any  # the raw stored value, or None
     text: str  # what the report prints
-    trace: str | None  # where the value lives in that run's datos.json
+    trace: str | None  # where the value lives in that run's run.json
 
 
 @dataclass
@@ -709,7 +715,7 @@ def build_comparison(before: StoredRun, after: StoredRun) -> Comparison:
 
 
 # ---------------------------------------------------------------------------
-# Rendering (Spanish, formal "usted", like informe.md)
+# Rendering (Spanish, formal "usted", like report.md)
 # ---------------------------------------------------------------------------
 
 
@@ -930,7 +936,7 @@ def run_compare(before_path: Path, after_path: Path, *, stdout: IO[str], stderr:
     write_text(after.folder / REPORT, text)
     write_text(after.folder / DATA, dumps_datos(comparison_to_datos(comp, issues, code)))
     for issue in issues:
-        print(f"Text control: {issue['archivo']}:{issue['linea']} {issue['regla']}: {issue['extracto']}", file=stderr)
+        print(f"Text control: {issue['archivo']}:{issue['linea']} {runformat.TEXT_RULES.get(issue['regla'], issue['regla'])}: {issue['extracto']}", file=stderr)
     total_b, total_a = comp.counts_before["TOTAL"], comp.counts_after["TOTAL"]
     print(f"site-check compare {after.meta.get('dominio')}: exit {int(code)}.", file=stdout)
     print(f"Report: {after.folder / REPORT}", file=stdout)

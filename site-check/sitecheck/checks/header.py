@@ -39,7 +39,7 @@ class GoogleSummary:
     reason: str | None = None  # Spanish motivo when the whole summary is missing
 
     def to_datos(self) -> dict:
-        """JSON-ready form for datos.json "encabezado"."""
+        """JSON-ready form for run.json "encabezado"."""
 
         def side(cells: dict[str, ScoreCell]) -> dict:
             return {

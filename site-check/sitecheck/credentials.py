@@ -2,7 +2,7 @@
 
 The key comes only from the environment variable PAGESPEED_API_KEY. It is sent
 only in the ``X-goog-api-key`` header and never appears in a URL, a log line,
-datos.json, an evidence file or an exception message. The tool never reads a
+run.json, an evidence file or an exception message. The tool never reads a
 key file, and a ``.env`` inside the repository is never looked at.
 
 Test isolation: in test mode (any ``--test-*`` flag, see
@@ -27,7 +27,7 @@ FAKE_TEST_KEY = "FAKE-TEST-KEY-not-a-secret-0000"
 # Google API key is that short.
 MIN_KEY_LENGTH = 8
 
-# How a key is spelled in datos.json: only presence, never the value.
+# How a key is spelled in run.json: only presence, never the value.
 PRESENT = "presente"
 ABSENT = "ausente"
 
@@ -52,7 +52,7 @@ class ApiKey:
         return bool(self.value)
 
     def as_datos(self) -> str:
-        """Return PRESENT or ABSENT, the only form that reaches datos.json."""
+        """Return PRESENT or ABSENT, the only form that reaches run.json."""
         return PRESENT if self.present else ABSENT
 
     def __repr__(self) -> str:  # never leak the value

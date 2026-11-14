@@ -190,7 +190,7 @@ def strip_controls(text: str) -> str:
 
 
 def _audit_url(url: str) -> str:
-    """A URL as written to datos.json or a message: e-mails, phone-like numbers and control characters masked."""
+    """A URL as written to run.json or a message: e-mails, phone-like numbers and control characters masked."""
     return _LONG_DIGITS_RE.sub("[numero]", _EMAIL_RE.sub("[correo]", strip_controls(str(url))))
 
 
@@ -212,7 +212,7 @@ def _is_ip_literal(host: str) -> bool:
 
 @dataclass
 class Admission:
-    """Why a URL is allowed; listed in datos.json meta.scope for auditability."""
+    """Why a URL is allowed; listed in run.json meta.scope for auditability."""
 
     url: str
     purpose: Purpose
@@ -714,7 +714,7 @@ class ScopeGuard:
         return t is not None and self._on_site(t.host)
 
     def describe(self) -> dict:
-        """JSON-ready summary for datos.json meta.scope: admissions and refusals with reasons."""
+        """JSON-ready summary for run.json meta.scope: admissions and refusals with reasons."""
         return {
             "dominio": self.registrable,
             "url_entrada": _audit_url(self.input_url),

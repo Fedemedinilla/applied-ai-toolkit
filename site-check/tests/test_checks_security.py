@@ -242,7 +242,7 @@ class Ext05Test(unittest.TestCase):
         site = mail_dns("colegio.test", txt=["v=spf1 include:_spf.google.com ~all"], dmarc=["v=DMARC1; p=none; rua=mailto:dmarc@colegio.test"], mx=GOOGLE_MX, dkim=DKIM_OK)
         f = self.evaluate(site)
         self.assertEqual(f.state, State.APROBADO)
-        self.assertNotIn("dmarc@colegio.test", json.dumps(f.measured), "no site e-mail in datos.json")
+        self.assertNotIn("dmarc@colegio.test", json.dumps(f.measured), "no site e-mail in run.json")
 
     def test_failures(self) -> None:
         no_dmarc = mail_dns("colegio.test", txt=["v=spf1 include:_spf.google.com ~all"], dmarc=None, mx=GOOGLE_MX, dkim=DKIM_OK)

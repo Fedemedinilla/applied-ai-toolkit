@@ -1237,7 +1237,7 @@ def evaluate_ext23(obs: "Observations", ctx: "EvalContext") -> "Finding":
         spamhaus = "la lista de Spamhaus no respondió"
     reason = f"{REASON_GOOGLE_MANUAL}; {spamhaus}"
     # The report says what was not seen; the manual links are written once in
-    # anexo-tecnico.md.
+    # technical-annex.md.
     if dbl is not None and dbl.verdict == DblVerdict.NOT_LISTED:
         grey = "La lista de Spamhaus no marca el dominio; la de Google no se consultó en este chequeo"
     else:

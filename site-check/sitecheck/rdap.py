@@ -13,7 +13,7 @@ anything else (404, 429, timeout, HTML, no such event) is a result with
 Personal data: NEVER store entities, vcardArray,
 remarks or any holder data. scrub_rdap keeps only ldhName, status, events
 (eventAction, eventDate) and secureDNS.delegationSigned before anything is
-written to rdap.json or datos.json.
+written to rdap.json or run.json.
 """
 
 from __future__ import annotations

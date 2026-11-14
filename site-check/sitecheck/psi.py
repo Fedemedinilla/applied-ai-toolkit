@@ -26,7 +26,7 @@ concept, the candidate IDs newest first.
 
 Each raw JSON is stored as evidence (psi-mobile-<n>.json, psi-desktop.json) with
 the key scrubbed. Google APIs ToS 5e: raw JSON is evidence of the run, not a
-database; datos.json keeps derived numbers only. The screenshots of the home
+database; run.json keeps derived numbers only. The screenshots of the home
 are never stored: ``strip_screenshots`` drops the
 SCREENSHOT_AUDITS, ``lighthouseResult.fullPageScreenshot`` and any other
 ``data:image`` string before the evidence is written.
@@ -70,7 +70,7 @@ FIELD_METRICS: dict[str, str] = {
 
 # The Lighthouse major the audit IDs below were verified against (Lighthouse 13
 # renamed several audits). Another major may rename audits again: the run then warns on the console
-# and records the note in datos.json meta.aviso_lighthouse.
+# and records the note in run.json meta.aviso_lighthouse.
 VERIFIED_LIGHTHOUSE_MAJOR = 13
 LIGHTHOUSE_NOTE = (
     "PageSpeed respondió con Lighthouse {version} y los nombres de las pruebas que lee el script se verificaron "
@@ -189,7 +189,7 @@ REASON_ERROR = "la herramienta de velocidad de Google no respondió"
 REASON_NO_VALID = "la herramienta de Google no pudo medir la página"
 
 # A key Google rejects. The client text stays
-# plain; the note is for the operator (console, datos.json meta.aviso_pagespeed and
+# plain; the note is for the operator (console, run.json meta.aviso_pagespeed and
 # the nota_interna of the PageSpeed greys).
 ERROR_KEY_REJECTED = "key-rejected"
 STATUS_KEY_REJECTED = "clave-rechazada"

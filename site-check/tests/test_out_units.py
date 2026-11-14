@@ -9,7 +9,7 @@ import json
 import unittest
 
 import support  # noqa: F401
-from support import TEST_KEY, run_cli, temp_dir
+from support import TEST_KEY, read_run, run_cli, temp_dir
 
 from sitecheck import exclusions, exitcodes, outputs, render_report, textlint
 from sitecheck.checks.header import GoogleSummary
@@ -60,7 +60,7 @@ class ExitCodeResolveTest(unittest.TestCase):
 
 class TextLintTest(unittest.TestCase):
     def rules(self, text: str, redactor: Redactor | None = None) -> list[str]:
-        return [i.rule for i in textlint.lint_text(text, name="informe.md", redactor=redactor)]
+        return [i.rule for i in textlint.lint_text(text, name="report.md", redactor=redactor)]
 
     def test_clean_template_passes(self) -> None:
         self.assertEqual(self.rules("Además, después de más de un año, el inglés del sitio está bien."), [])
@@ -77,7 +77,7 @@ class TextLintTest(unittest.TestCase):
         self.assertEqual(self.rules(f"clave {TEST_KEY}", Redactor([TEST_KEY])), ["clave"])
 
     def test_line_numbers_and_redaction(self) -> None:
-        issues = textlint.lint_text(f"ok\nok\nclave {TEST_KEY}\n", name="informe.md", redactor=Redactor([TEST_KEY]))
+        issues = textlint.lint_text(f"ok\nok\nclave {TEST_KEY}\n", name="report.md", redactor=Redactor([TEST_KEY]))
         self.assertEqual(issues[0].line, 3)
         self.assertNotIn(TEST_KEY, issues[0].excerpt)
 
@@ -147,7 +147,7 @@ class OutputsTest(unittest.TestCase):
         self.assertEqual(outputs.foreign_emails("Escribir a info@colegio.test", frozenset({"info@colegio.test"})), [])
         with temp_dir() as root:
             (root / "ok.txt").write_text("nada", encoding="utf-8")
-            leak = root / "evidencia" / "psi-mobile-1.json"
+            leak = root / "evidence" / "psi-mobile-1.json"
             leak.parent.mkdir()
             leak.write_text(f'{{"k": "{TEST_KEY}"}}', encoding="utf-8")
             deleted = outputs.sweep_secrets(root, Redactor([TEST_KEY]))
@@ -225,7 +225,7 @@ class CliTest(unittest.TestCase):
         c = parse_args(["https://www.colegio-ejemplo.edu.ar", "--name", "Colegio X", "--psi-runs", "1", "--observatory"])
         self.assertEqual((c.institution, c.psi_runs, c.observatory), ("Colegio X", 1, True))
         with temp_dir() as d:
-            datos = d / "datos.json"
+            datos = d / "run.json"
             datos.write_text("{}", encoding="utf-8")
             c = parse_args(["--rerender", str(datos)])
             self.assertEqual(c.rerender_from, datos)
@@ -265,7 +265,7 @@ class CliExtrasTest(unittest.TestCase):
 
     def test_more_invalid_input_is_exit_2(self) -> None:
         with temp_dir() as d:
-            datos = d / "datos.json"
+            datos = d / "run.json"
             datos.write_text("{}", encoding="utf-8")
             for argv in (
                 [],
@@ -323,7 +323,7 @@ class CliExtrasTest(unittest.TestCase):
 
     def test_rerender_leaves_to_and_kind_to_datos(self) -> None:
         with temp_dir() as d:
-            datos = d / "datos.json"
+            datos = d / "run.json"
             datos.write_text("{}", encoding="utf-8")
             c = parse_args(["--rerender", str(datos)])
             self.assertEqual((c.para, c.institution, c.url), ("", None, ""))
@@ -352,8 +352,8 @@ class OutputsExtrasTest(unittest.TestCase):
                 outputs.write_datos(paths, {"schema_version": 1})
             outputs.write_datos(paths, {"schema_version": 1, "n": 2}, rerender=True)
             outputs.write_datos(paths, {"schema_version": 1, "n": 3}, rerender=True)
-            self.assertEqual(json.loads((paths.root / "datos-1.json").read_text(encoding="utf-8")), {"schema_version": 1})
-            self.assertEqual(json.loads((paths.root / "datos-2.json").read_text(encoding="utf-8"))["n"], 2)
+            self.assertEqual(json.loads((paths.root / "run-1.json").read_text(encoding="utf-8")), {"schema_version": 2})
+            self.assertEqual(json.loads((paths.root / "run-2.json").read_text(encoding="utf-8"))["n"], 2)
             self.assertEqual(outputs.read_datos(paths.datos)["n"], 3)
 
     def test_tiempo_in_buenos_aires_time(self) -> None:
@@ -361,12 +361,12 @@ class OutputsExtrasTest(unittest.TestCase):
             paths = outputs.create_run_dir(salidas, "colegio.test", dt.date(2026, 10, 9))
             start = dt.datetime(2026, 10, 9, 17, 5, tzinfo=dt.timezone.utc)
             outputs.write_tiempo(paths, start, start + dt.timedelta(minutes=8))
-            self.assertEqual(paths.tiempo.read_text(encoding="utf-8"), "inicio: 9/10/2026 14:05\nfin: 9/10/2026 14:13\n")
+            self.assertEqual(paths.tiempo.read_text(encoding="utf-8"), "start: 9/10/2026 14:05\nend: 9/10/2026 14:13\n")
 
 
 class TextLintExtrasTest(unittest.TestCase):
     def rules(self, text: str) -> list[str]:
-        return [i.rule for i in textlint.lint_text(text, name="informe.md")]
+        return [i.rule for i in textlint.lint_text(text, name="report.md")]
 
     def test_voseo_is_accent_sensitive_and_usted_passes(self) -> None:
         self.assertEqual(self.rules("Mira el informe y mire la tabla."), [])
@@ -486,10 +486,10 @@ class PipelineWithFakesTest(unittest.TestCase):
     def test_key_in_evidence_is_deleted(self) -> None:
         res, _ = self.run_pipeline(self.mail_findings(), leak=True)
         self.assertEqual(res.exit_code, ExitCode.TEXT_CONTROL)
-        self.assertFalse((res.run_dir / "evidencia" / "psi-mobile-1.json").exists())
-        self.assertTrue((res.run_dir / "informe.md").exists())
-        d = json.loads(res.datos_path.read_text(encoding="utf-8"))
-        self.assertIn("evidencia/psi-mobile-1.json", d["salida"]["borrados"])
+        self.assertFalse((res.run_dir / "evidence" / "psi-mobile-1.json").exists())
+        self.assertTrue((res.run_dir / "report.md").exists())
+        d = read_run(res.datos_path)
+        self.assertIn("evidence/psi-mobile-1.json", d["salida"]["borrados"])
         self.assertNotIn(TEST_KEY, res.datos_path.read_text(encoding="utf-8"))
 
 
@@ -498,15 +498,15 @@ class PipelineWithFakesTest(unittest.TestCase):
 
         res, _ = self.run_pipeline([], collect_error=ScopeError("refused https://www.colegio.test/wp-json/"))
         self.assertEqual(res.exit_code, ExitCode.SCOPE_VIOLATION)
-        d = json.loads(res.datos_path.read_text(encoding="utf-8"))
+        d = read_run(res.datos_path)
         self.assertEqual((d["salida"]["codigo"], d["checks"]), (50, []))
-        self.assertFalse((res.run_dir / "informe.md").exists())
+        self.assertFalse((res.run_dir / "report.md").exists())
 
     def test_sin_pagespeed_swaps_the_clients(self) -> None:
         res, seen = self.run_pipeline(self.mail_findings(), psi_enabled=False)
         series = seen["psi"].run_series("https://www.colegio.test/", 3)
         self.assertEqual((series.status, series.reason), ("omitido", "la medición de velocidad no se pidió en esta corrida"))
-        self.assertIn("La medición de velocidad de Google no se hizo en esta corrida.", (res.run_dir / "informe.md").read_text(encoding="utf-8"))
+        self.assertIn("La medición de velocidad de Google no se hizo en esta corrida.", (res.run_dir / "report.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

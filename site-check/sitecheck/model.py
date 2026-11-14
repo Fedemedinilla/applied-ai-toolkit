@@ -1,6 +1,6 @@
 """The findings data model: states, colours, priorities, Finding, CheckSpec.
 
-The states are Spanish and kept verbatim in datos.json and in the technical
+The states are Spanish and kept verbatim in run.json and in the technical
 annex. A passive check produces five of them: APROBADO, APROBADO_CON_OBSERVACION,
 FALLA, NO_APLICA, NO_VERIFICADO. CORREGIDO and RIESGO_ACEPTADO belong to a
 follow-up with access to the site and are never produced here.
@@ -127,10 +127,10 @@ class Finding:
     priority: Priority
     state: State
     measured: dict[str, Any] = field(default_factory=dict)  # JSON-ready raw values (numbers, not text)
-    evidence: list[str] = field(default_factory=list)  # artifact names under evidencia/
+    evidence: list[str] = field(default_factory=list)  # artifact names under evidence/
     reason: str | None = None  # Spanish motivo: NO_VERIFICADO / NO_APLICA / observation
     note: str | None = None  # Spanish extra note shown in the report row
-    # A note for the operator only (datos.json "nota_interna"); never printed
+    # A note for the operator only (run.json "nota_interna"); never printed
     # in the report: "no se indicó --name", "the rounded figure equals the
     # threshold"...
     internal_note: str | None = None
@@ -156,7 +156,7 @@ class Finding:
         return COLOUR_STYLES[self.colour].label if self.colour else ""
 
     def to_datos(self) -> dict[str, Any]:
-        """Serialize for datos.json "checks".
+        """Serialize for run.json "checks".
 
         Keys: id, nombre_llano, modulo, prioridad, estado, color_derivado,
         color_final, motivo_ajuste, mediciones, evidencia, evidencia_ok,

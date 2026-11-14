@@ -1,4 +1,4 @@
-"""Evidence files: ``<out>/<D>/<date>/evidencia/``.
+"""Evidence files: ``<out>/<D>/<date>/evidence/``.
 
 "A green without evidence does not exist." Every measurement that a
 state relies on is written here as soon as it is obtained, and the store

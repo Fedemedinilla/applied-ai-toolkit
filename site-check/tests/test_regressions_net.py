@@ -145,7 +145,7 @@ class SiteRedirectToDeniedPathTest(unittest.TestCase):
         sc.routes[f"{BASE}/contacto/"] = Route(302, [("Location", "/wp-login.php?redirect_to=%2Fcontacto%2F")])
         r = run_e2e(sc, default_apis())
         self.assertEqual(r.code, 0, r.err)
-        self.assertIn("informe.md", r.files)
+        self.assertIn("report.md", r.files)
         self.assertEqual(len(r.datos["checks"]), 37)  # VIS-20 and VIS-21 
         self.assertFalse(any("wp-login" in u for u in r.site_urls))
         refused = [x for x in r.log_lines() if x["outcome"] == "refused-scope"]
