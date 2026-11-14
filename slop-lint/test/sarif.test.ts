@@ -178,6 +178,14 @@ describe('fingerprints', () => {
     expect(other[0]?.fp).not.toBe(one[0]?.fp);
   });
 
+  it('count occurrences in each file from 0, so one file does not move the fingerprints of the next', () => {
+    const text = 'I am passionate about data. I am passionate about maps.';
+    const lex = (inputs: SarifInput[]) => fingerprints(inputs).filter((x) => x.ruleId === 'LEX-03').map((x) => x.fp);
+    const alone = lex([input('b.txt', text)]);
+    expect(lex([input('a.txt', text), input('b.txt', text)])).toEqual([...lex([input('a.txt', text)]), ...alone]);
+    expect(alone).toEqual([fingerprint('LEX-03', 'b.txt', 'passionate about', 0), fingerprint('LEX-03', 'b.txt', 'passionate about', 1)]);
+  });
+
   it('do not depend on the column either', () => {
     const a = fingerprints([input('a.txt', 'I am passionate about data.')]);
     const b = fingerprints([input('a.txt', 'Today, I am passionate about data.')]).filter((x) => x.ruleId === 'LEX-03');
