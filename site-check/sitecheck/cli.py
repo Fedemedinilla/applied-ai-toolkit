@@ -441,16 +441,21 @@ def assert_stdlib_only() -> list[str]:
     Modules that were already loaded when the CLI was imported (interpreter
     startup hooks, the test runner) and modules that live inside the site-check
     folder (the test harness) are not counted: the check is about what sitecheck pulls in.
+
+    The folder exemption is for a source checkout only (site_check.py next to
+    the package). Installed, the folder that holds the package is
+    site-packages, where every third-party module lives: nothing there is exempt.
     """
     stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names)
     own = (__package__ or "sitecheck").partition(".")[0]
     root = package_root().resolve()
+    checkout = (root / "site_check.py").is_file()
     bad: set[str] = set()
     for name, module in list(sys.modules.items()):
         top = name.partition(".")[0]
         if top in stdlib or top in (own, "__main__") or top in _BASELINE_MODULES:
             continue
-        if _under(getattr(module, "__file__", None), root):
+        if checkout and _under(getattr(module, "__file__", None), root):
             continue
         bad.add(top)
     return sorted(bad)
