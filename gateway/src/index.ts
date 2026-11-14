@@ -46,6 +46,19 @@ export {
   type MemoryStores,
   type StoredUsageRow,
 } from './memory-store.ts';
-export { EFFORTS, FALLBACK_DEFAULT_BETA, SUPPORTED_MODELS, type Effort, type SupportedModel } from './models.ts';
+export {
+  BUILT_IN_MODELS,
+  createModelRegistry,
+  EFFORTS,
+  FALLBACK_DEFAULT_BETA,
+  ModelPrice,
+  ModelSpec,
+  ModelSurface,
+  SUPPORTED_MODELS,
+  type Effort,
+  type ModelRegistry,
+  type RegistryPriceRow,
+  type SupportedModel,
+} from './models.ts';
 export { jsonLinesLog, systemClock, type Clock, type ConfigStore, type EventLog, type PriceStore, type UsageRow, type UsageStore, type UsageWindows } from './ports.ts';
 export { structuredFormat, toApiJsonSchema } from './schema.ts';

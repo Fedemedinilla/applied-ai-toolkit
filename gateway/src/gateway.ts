@@ -26,7 +26,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { capWindows, checkCaps, type CapCheck, type CapWindows } from './caps.ts';
-import { parseAccountCaps, parseCallConfig, parseGlobalCaps, parseTaskConfig, parseUsageTotals, type CallConfig } from './config.ts';
+import { configSchemasFor, parseAccountCaps, parseCallConfig, parseGlobalCaps, parseTaskConfig, parseUsageTotals, type ConfigSchemas, type RegisteredCallConfig } from './config.ts';
 import {
   costUsd,
   countAttachments,
@@ -56,7 +56,7 @@ import {
   type OutputProblem,
   type ResponseErrorCode,
 } from './errors.ts';
-import { FALLBACK_DEFAULT_BETA, type Effort, type SupportedModel } from './models.ts';
+import { BUILT_IN_REGISTRY, FALLBACK_DEFAULT_BETA, type Effort, type ModelRegistry, type ModelSpec, type SupportedModel } from './models.ts';
 import type { Clock, ConfigStore, EventLog, PriceStore, UsageRow, UsageStore } from './ports.ts';
 import { structuredFormat, type StructuredFormat } from './schema.ts';
 import { requirePositiveInt, requireTimeZone } from './setup.ts';
@@ -91,9 +91,14 @@ export type NoticeEvent =
 /** A failure that left someone without their result. Logged on its own channel, at error level. */
 export type FailureEvent = 'reservation_failed' | 'record_failed';
 
-export interface GatewayDeps {
+export interface GatewayDeps<M extends string = SupportedModel> {
   /** Built with createClaudeClient (client.ts): maxRetries 0, explicit baseURL and timeout. */
   readonly client: Anthropic;
+  /**
+   * The models this gateway accepts (createModelRegistry in models.ts). Without it, the built-in
+   * entries. A model outside the registry is rejected before any call.
+   */
+  readonly models?: ModelRegistry<M>;
   readonly clock: Clock;
   readonly config: ConfigStore;
   readonly usage: UsageStore;
@@ -120,7 +125,7 @@ type AssistantMessage = Anthropic.Beta.BetaAssistantMessageParam;
 /** The conversation always ends on a user turn: no assistant prefill. */
 export type Conversation = readonly [...(UserMessage | AssistantMessage)[], UserMessage];
 
-export interface GatewayRequest {
+export interface GatewayRequest<M extends string = SupportedModel> {
   /** Picks the model and effort from the task config, and labels the ledger row. */
   readonly task: string;
   /** Who the call is for. Null for calls without a user (an eval run, a system job): only the monthly cap applies. */
@@ -148,7 +153,7 @@ export interface GatewayRequest {
    */
   readonly attachmentTokenBound?: number;
   /** Model and effort for this call instead of the task config. The task config is then not read. */
-  readonly config?: CallConfig;
+  readonly config?: { readonly model: M; readonly effort: Effort };
   /** Use the task's hardCaseEffort if it has one. Not combinable with `config`. */
   readonly hardCase?: boolean;
   readonly signal?: AbortSignal;
@@ -156,7 +161,7 @@ export interface GatewayRequest {
   readonly timeoutMs?: number;
 }
 
-export interface TextRequest extends GatewayRequest {
+export interface TextRequest<M extends string = SupportedModel> extends GatewayRequest<M> {
   /** Each piece of text as it arrives. */
   readonly onText?: (delta: string) => void;
 }
@@ -165,11 +170,11 @@ export interface TextRequest extends GatewayRequest {
 // Result
 // ---------------------------------------------------------------------------
 
-export interface CallMeta {
+export interface CallMeta<M extends string = SupportedModel> {
   /** The ledger row that closed this call's reservation. */
   readonly usageId: string;
   readonly requestId: string | null;
-  readonly modelRequested: SupportedModel;
+  readonly modelRequested: M;
   /** response.model: another model after a server-side fallback. */
   readonly modelResponded: string;
   readonly fellBack: boolean;
@@ -180,17 +185,17 @@ export interface CallMeta {
   readonly tokens: TokenTotals & { readonly thinking: number | null };
 }
 
-export interface StructuredResult<T> {
+export interface StructuredResult<T, M extends string = SupportedModel> {
   readonly data: T;
   /** The content as it arrived, thinking and fallback blocks included. */
   readonly content: readonly ContentBlock[];
-  readonly meta: CallMeta;
+  readonly meta: CallMeta<M>;
 }
 
-export interface TextResult {
+export interface TextResult<M extends string = SupportedModel> {
   readonly text: string;
   readonly content: readonly ContentBlock[];
-  readonly meta: CallMeta;
+  readonly meta: CallMeta<M>;
 }
 
 export interface StreamingCall<R> {
@@ -203,21 +208,22 @@ export interface StreamingCall<R> {
   readonly final: Promise<R>;
 }
 
-export interface Gateway {
+/** M is the union of the model ids of the gateway's registry: the built-in ones unless GatewayDeps.models adds others. */
+export interface Gateway<M extends string = SupportedModel> {
   /**
    * Structured output without streaming, for short calls: maxTokens up to
    * MAX_TOKENS_WITHOUT_STREAMING. Without streaming there is no usage until the end, so a cut
    * call is recorded as incomplete with the estimated input and max_tokens of output.
    */
-  structured<S extends z.ZodType>(schema: S, request: GatewayRequest): Promise<StructuredResult<z.output<S>>>;
+  structured<S extends z.ZodType>(schema: S, request: GatewayRequest<M>): Promise<StructuredResult<z.output<S>, M>>;
   /**
    * Structured output with streaming, for long calls and attachments. message_start brings the
    * measured input; output arrives at the end (message_delta). A cut after message_start is
    * recorded with the measured input and max_tokens of output.
    */
-  structuredStream<S extends z.ZodType>(schema: S, request: GatewayRequest): StreamingCall<StructuredResult<z.output<S>>>;
+  structuredStream<S extends z.ZodType>(schema: S, request: GatewayRequest<M>): StreamingCall<StructuredResult<z.output<S>, M>>;
   /** Free text with streaming. */
-  text(request: TextRequest): Promise<TextResult>;
+  text(request: TextRequest<M>): Promise<TextResult<M>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -241,9 +247,9 @@ const NO_TOKEN_COLUMNS = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, 
 /** Fields the reservation and the closing row share. */
 type RowBase = Pick<UsageRow, 'userId' | 'task' | 'jobId' | 'effort' | 'promptVersion' | 'modelRequested' | 'maxTokens'>;
 
-interface Prepared {
+interface Prepared<M extends string> {
   readonly params: Anthropic.Beta.MessageCreateParamsNonStreaming;
-  readonly model: SupportedModel;
+  readonly model: M;
   readonly effort: Effort;
   readonly attachmentBound: number;
   readonly row: RowBase;
@@ -282,9 +288,9 @@ interface Executed {
   readonly durationMs: number;
 }
 
-interface Call {
+interface Call<M extends string> {
   readonly response: BetaMessage;
-  readonly meta: CallMeta;
+  readonly meta: CallMeta<M>;
 }
 
 /** A cut before the request left. usageId is set only if a reservation stayed open. */
@@ -302,7 +308,7 @@ function breakpointsInMessages(messages: Conversation): number {
 }
 
 /** Validates the request and returns its fixed config, if any. */
-function validateRequest(request: GatewayRequest, streaming: boolean): CallConfig | null {
+function validateRequest(request: GatewayRequest<string>, streaming: boolean, schemas: ConfigSchemas): RegisteredCallConfig | null {
   const fail = (detail: string): never => {
     throw new RequestError(`Malformed request: ${detail}`);
   };
@@ -335,7 +341,7 @@ function validateRequest(request: GatewayRequest, streaming: boolean): CallConfi
   }
   if (request.config === undefined) return null;
   if (request.hardCase) fail('hardCase does not combine with config, which already fixes the effort');
-  return parseCallConfig(request.config);
+  return parseCallConfig(request.config, schemas);
 }
 
 /** Text blocks in order. Thinking and fallback blocks carry no text. */
@@ -357,12 +363,30 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
-export function createGateway(deps: GatewayDeps): Gateway {
+export function createGateway<M extends string = SupportedModel>(deps: GatewayDeps<M>): Gateway<M> {
   requireTimeZone(deps.timeZone);
   requirePositiveInt(deps.timeoutMs, 'timeoutMs of the gateway');
+  // Without deps.models, M is its default, SupportedModel, which is what the built-in registry holds.
+  const models = (deps.models ?? BUILT_IN_REGISTRY) as ModelRegistry<M>;
+  const schemas = configSchemasFor(models.ids);
+
+  /**
+   * The registry entry of the call's model, after checking what the entry rules out: an effort
+   * level the model does not take, more output than it can write, a schema when it has no
+   * structured outputs. `fail` builds the error for the first two: a fixed config is the
+   * request's fault, a task config the store's.
+   */
+  function requireModel(model: string, effort: Effort, maxTokens: number, structured: boolean, fail: (detail: string) => GatewayError): { readonly id: M; readonly spec: ModelSpec } {
+    const spec = models.get(model);
+    if (!models.has(model) || spec === undefined) throw fail(`model ${model} is not registered`);
+    if (!spec.surface.efforts.includes(effort)) throw fail(`model ${model} does not take effort ${effort}`);
+    if (maxTokens > spec.maxOutputTokens) throw new RequestError(`Malformed request: maxTokens ${maxTokens} is over the ${spec.maxOutputTokens} that ${model} can write`);
+    if (structured && !spec.surface.structuredOutputs) throw new RequestError(`Malformed request: ${model} is registered without structured outputs: use text`);
+    return { id: model, spec };
+  }
 
   /** Reads config and usage, checks the caps and builds the request body. The only place that builds it. */
-  async function prepare(request: GatewayRequest, fixed: CallConfig | null, format: StructuredFormat<unknown> | null, signal: AbortSignal): Promise<Prepared> {
+  async function prepare(request: GatewayRequest<string>, fixed: RegisteredCallConfig | null, format: StructuredFormat<unknown> | null, signal: AbortSignal): Promise<Prepared<M>> {
     const userId = request.userId;
     const jobId = request.jobId ?? null;
     const windows = capWindows(deps.clock.now(), deps.timeZone);
@@ -372,15 +396,18 @@ export function createGateway(deps: GatewayDeps): Gateway {
       userId === null ? null : deps.config.accountCaps(userId, signal),
       deps.usage.totalsForCaps({ ...windows, userId, jobId }, signal),
     ]);
-    let model: SupportedModel;
+    let requested: string;
     let effort: Effort;
     if (fixed !== null) {
-      ({ model, effort } = fixed);
+      ({ model: requested, effort } = fixed);
     } else {
-      const config = parseTaskConfig(taskRow, request.task);
-      model = config.model;
+      const config = parseTaskConfig(taskRow, request.task, schemas);
+      requested = config.model;
       effort = request.hardCase && config.hardCaseEffort ? config.hardCaseEffort : config.effort;
     }
+    const { id: model, spec } = requireModel(requested, effort, request.maxTokens, format !== null, (detail) =>
+      fixed !== null ? new RequestError(`Malformed request: config: ${detail}`) : new ConfigError('invalid_config', `Task config of ${request.task}: ${detail}`),
+    );
     const global = parseGlobalCaps(globalRow);
     const account = userId === null ? null : parseAccountCaps(accountRow, userId);
     const totals = parseUsageTotals(totalsRaw);
@@ -401,8 +428,8 @@ export function createGateway(deps: GatewayDeps): Gateway {
     const params: Anthropic.Beta.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: request.maxTokens,
-      betas: [FALLBACK_DEFAULT_BETA],
-      fallbacks: 'default',
+      // A model registered without server-side fallbacks gets neither the field nor its beta header.
+      ...(spec.surface.serverFallback === 'default' ? { betas: [FALLBACK_DEFAULT_BETA], fallbacks: 'default' as const } : {}),
       output_config: format ? { effort, format: format.format } : { effort },
       ...(request.system.length > 0
         ? { system: request.system.map((text) => ({ type: 'text' as const, text, cache_control: { type: 'ephemeral' as const } })) }
@@ -443,7 +470,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
     },
   };
 
-  async function structure<T>(format: StructuredFormat<T>, request: GatewayRequest, mode: Mode): Promise<StructuredResult<T>> {
+  async function structure<T>(format: StructuredFormat<T>, request: GatewayRequest<string>, mode: Mode): Promise<StructuredResult<T, M>> {
     const { response, meta } = await call(request, format, mode);
     requireNormalStop(response, meta);
     const validation = format.validate(responseText(response.content));
@@ -457,8 +484,8 @@ export function createGateway(deps: GatewayDeps): Gateway {
    * reads) throws ApiError with no row and no notice: nothing was spent. A cut while the
    * reservation was being written closes it with a zero-usage row.
    */
-  async function call(request: GatewayRequest, format: StructuredFormat<unknown> | null, mode: Mode): Promise<Call> {
-    const fixed = validateRequest(request, mode.kind === 'stream');
+  async function call(request: GatewayRequest<string>, format: StructuredFormat<unknown> | null, mode: Mode): Promise<Call<M>> {
+    const fixed = validateRequest(request, mode.kind === 'stream', schemas);
     if (request.signal?.aborted) throw cutBeforeSending('cancelled', request.signal.reason);
 
     const timeoutMs = request.timeoutMs ?? deps.timeoutMs;
@@ -470,7 +497,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
       timeoutMs,
     };
     const cutCode = () => (deadline.timer.aborted ? 'timeout' : 'cancelled');
-    let prepared: Prepared;
+    let prepared: Prepared<M>;
     let reservation: Reservation;
     let executed: Executed;
     try {
@@ -505,7 +532,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
   }
 
   /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
-  async function reserve(prepared: Prepared): Promise<Reservation> {
+  async function reserve(prepared: Prepared<M>): Promise<Reservation> {
     const reservation: Reservation = { id: crypto.randomUUID(), estimatedInput: estimateInputTokens(prepared.params) + prepared.attachmentBound };
     try {
       await insert({
@@ -543,7 +570,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
    * the error goes toward refusing. Returns the error to throw, or null to go on. A cut during the
    * read returns null and the caller handles the cut.
    */
-  async function recheckCaps(prepared: Prepared, reservation: Reservation, signal: AbortSignal): Promise<CapError | ConfigError | null> {
+  async function recheckCaps(prepared: Prepared<M>, reservation: Reservation, signal: AbortSignal): Promise<CapError | ConfigError | null> {
     const { windows, ...caps } = prepared.caps;
     try {
       const totals = parseUsageTotals(await deps.usage.totalsForCaps({ ...windows, userId: caps.userId, jobId: caps.jobId, excludeId: reservation.id }, signal));
@@ -563,7 +590,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
    * the API, SDK and network (a bug, not retried). In that last case nobody knows whether the
    * request left, so the reservation stays open at its worst case.
    */
-  async function execute(prepared: Prepared, reservation: Reservation, mode: Mode, deadline: Deadline): Promise<Executed> {
+  async function execute(prepared: Prepared<M>, reservation: Reservation, mode: Mode, deadline: Deadline): Promise<Executed> {
     // Wall-clock time picks the price in force; duration uses the monotonic clock, which does not
     // jump backwards when the system time is adjusted.
     const startedAt = deps.clock.now();
@@ -648,7 +675,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
   }
 
   /** Cost and ledger row for a response with final usage, closing the reservation. */
-  async function recordResponse(prepared: Prepared, reservation: Reservation, executed: Executed, errorCode: ApiErrorCode | null = null): Promise<CallMeta> {
+  async function recordResponse(prepared: Prepared<M>, reservation: Reservation, executed: Executed, errorCode: ApiErrorCode | null = null): Promise<CallMeta<M>> {
     const { response } = executed;
     const usageId = crypto.randomUUID();
     const attempts = splitUsage(response, prepared.model);
@@ -703,7 +730,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
    * at the highest price in force for each token type.
    */
   async function recordIncomplete(
-    prepared: Prepared,
+    prepared: Prepared<M>,
     reservation: Reservation,
     cut: { readonly partial: BetaMessage | null; readonly requestId: string | null; readonly durationMs: number },
     code: ApiErrorCode | null,
@@ -754,7 +781,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
 
   /** The row of a request that was not billed: an HTTP error, a connection that never opened, or a cut before sending. */
   async function recordUnbilled(
-    prepared: Prepared,
+    prepared: Prepared<M>,
     reservation: Reservation,
     end: { readonly code: GatewayErrorCode; readonly requestId: string | null; readonly durationMs: number },
   ): Promise<void> {
@@ -835,7 +862,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
     }
   }
 
-  function responseError(code: ResponseErrorCode, message: string, response: BetaMessage, meta: CallMeta, problems: readonly OutputProblem[] = []): ResponseError {
+  function responseError(code: ResponseErrorCode, message: string, response: BetaMessage, meta: CallMeta<string>, problems: readonly OutputProblem[] = []): ResponseError {
     const refusal = response.stop_reason === 'refusal' ? response.stop_details : null;
     return new ResponseError(code, message, {
       usageId: meta.usageId,
@@ -850,7 +877,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
   }
 
   /** stop_reason first, content second: only end_turn continues. */
-  function requireNormalStop(response: BetaMessage, meta: CallMeta): void {
+  function requireNormalStop(response: BetaMessage, meta: CallMeta<string>): void {
     switch (response.stop_reason) {
       case 'end_turn':
         return;
