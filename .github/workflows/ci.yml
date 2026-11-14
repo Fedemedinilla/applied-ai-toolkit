@@ -1,9 +1,13 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
-# the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest suite, slop-lint over the
-# repository's own docs, and the wp-hardening PHPUnit suite in a job of its own. Tests make no
-# network call; the only downloads are the locked npm and Composer packages. No job has secrets.
-# Actions are pinned to the commit SHA of their release tag, with the version in a
-# comment. To upgrade one, change both.
+# the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest
+# suite, slop-lint over the repository's own docs, and the wp-hardening PHPUnit suite in a job of
+# its own. A third job runs the repository's two composite actions (./slop-lint and
+# ./csp-build-guard) as a user's workflow would, and checks the SARIF each one writes. It does not
+# upload SARIF: that needs security-events: write, which no job here has. Tests make no network
+# call; the only downloads are the locked npm and Composer packages, and zod for the guard action.
+# No job has secrets. Actions are pinned to the commit SHA of their release tag, with the version
+# in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml and
+# csp-build-guard/action.yml, and their tests fail until the three SHAs match.
 name: CI
 
 # Pushes to main, and pull requests. A push to a PR branch runs once, through pull_request.
@@ -92,6 +96,74 @@ jobs:
       # The docs must pass their own linter: no tier 1 finding in any README or the case study.
       - name: Lint the docs
         run: npm run lint:docs
+
+  # The local actions, used the way the README of each one shows, from this checkout. fail: true,
+  # so a finding fails the job; then each SARIF file must parse as JSON with version 2.1.0 and at
+  # least one run whose tool is the action's own.
+  actions:
+    name: Composite actions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      # The same files as npm run lint:docs.
+      - id: slop
+        name: slop-lint action over the docs
+        uses: ./slop-lint
+        with:
+          files: >-
+            README.md SECURITY.md CONTRIBUTING.md .github/pull_request_template.md
+            */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md
+            agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md
+            apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md
+          lang: en
+          format: markdown
+          sarif-file: ${{ runner.temp }}/sarif/slop-lint.sarif
+          fail: true
+
+      # The placeholder is not a secret; with it set, the guard's secrets check runs instead of skipping.
+      - name: Build caja
+        run: npm run build:caja
+        env:
+          ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
+
+      - id: guard
+        name: csp-build-guard action over the caja build
+        uses: ./csp-build-guard
+        with:
+          dir: dist/apps/caja
+          config: apps/caja/csp-guard.config.json
+          sarif-file: ${{ runner.temp }}/sarif/csp-build-guard.sarif
+          fail: true
+        env:
+          ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
+
+      - name: Check the SARIF files
+        env:
+          SLOP_SARIF: ${{ steps.slop.outputs.sarif-file }}
+          GUARD_SARIF: ${{ steps.guard.outputs.sarif-file }}
+        run: |
+          node -e '
+            const { readFileSync } = require("node:fs");
+            for (const [file, tool] of [[process.env.SLOP_SARIF, "slop-lint"], [process.env.GUARD_SARIF, "csp-build-guard"]]) {
+              if (!file) throw new Error(`${tool}: the action reported no SARIF file`);
+              const log = JSON.parse(readFileSync(file, "utf8"));
+              if (log.version !== "2.1.0") throw new Error(`${file}: version is ${log.version}, not 2.1.0`);
+              const run = Array.isArray(log.runs) ? log.runs[0] : undefined;
+              if (run?.tool?.driver?.name !== tool) throw new Error(`${file}: no run from ${tool}`);
+              console.log(`${file}: SARIF ${log.version}, ${log.runs.length} run, ${run.results?.length ?? 0} results`);
+            }
+          '
 
   php:
     name: wp-hardening (PHP)
