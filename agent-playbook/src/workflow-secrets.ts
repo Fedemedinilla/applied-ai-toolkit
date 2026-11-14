@@ -10,7 +10,9 @@
  *
  * The parser is line-based on purpose: the checks look for keys and expressions that are
  * recognizable on one line, and it needs no YAML dependency. It reads block-style YAML as GitHub's
- * own examples write it; a workflow written in flow style ({ a: b }) is out of scope.
+ * own examples write it; a workflow written in flow style ({ a: b }) is out of scope. Permissions
+ * are the exception, since the rule that keeps id-token apart from repository writes depends on
+ * them: a flow mapping and quoted keys are read, and a value the check cannot read is a finding.
  */
 
 export interface WorkflowPolicy {
@@ -121,6 +123,11 @@ function stepOf(all: readonly Line[], at: number): Line[] {
 
 const unquote = (value: string): string => value.trim().replace(/^(['"])(.*)\1$/, '$2');
 
+/** A permissions key, quoted or not; group 2 is what follows the colon. */
+const PERMISSIONS = /^\s*(['"]?)permissions\1\s*:(.*)$/;
+/** One `name: value` entry of a permissions block or flow mapping, the name quoted or not. */
+const KEY_VALUE = /^\s*(['"]?)([\w-]+)\1\s*:(.*)$/;
+
 export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_WORKFLOW_POLICY): Finding[] {
   const all = lines(text);
   const findings: Finding[] = [];
@@ -144,16 +151,24 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
       if (name === undefined || !(policy.allowEnvironments ?? []).includes(unquote(name))) add(line, 'environment');
     }
     if (/\bpull_request_target\b|\bworkflow_run\b/.test(code)) add(line, 'privileged-trigger');
-    if (line.indent === 0 && /^permissions\s*:/.test(code)) topPermissions = true;
-    const permissions = /^\s*permissions\s*:(.*)$/.exec(code)?.[1];
-    if (permissions !== undefined && unquote(permissions) === 'write-all') add(line, 'write-permission');
-    if (permissions !== undefined && permissions.trim() === '') {
+    const permissions = PERMISSIONS.exec(code)?.[2];
+    if (line.indent === 0 && permissions !== undefined) topPermissions = true;
+    if (permissions !== undefined) {
+      const value = unquote(permissions);
+      // A block under the key, or a flow mapping on its line, read entry by entry. Anything else
+      // but read-all is a value the check cannot read, so it fails closed.
+      const pairs =
+        value === ''
+          ? blockUnder(all, i).map((entry) => ({ pair: KEY_VALUE.exec(entry.code), entry }))
+          : /^\{.*\}$/.test(value)
+            ? value.slice(1, -1).split(',').filter((part) => part.trim() !== '').map((part) => ({ pair: KEY_VALUE.exec(part), entry: line }))
+            : undefined;
+      if (pairs === undefined && value !== 'read-all') add(line, 'write-permission');
       const writes: Array<{ name: string; entry: Line }> = [];
-      for (const entry of blockUnder(all, i)) {
-        const pair = /^\s*([\w-]+)\s*:(.*)$/.exec(entry.code);
-        const [name, value] = [pair?.[1], pair?.[2]];
-        if (name === undefined || value === undefined || unquote(value) !== 'write') continue;
-        writes.push({ name, entry });
+      for (const { pair, entry } of pairs ?? []) {
+        const [name, level] = [pair?.[2], pair?.[3] === undefined ? undefined : unquote(pair[3])];
+        if (name === undefined || level === undefined || !['read', 'write', 'none'].includes(level)) add(entry, 'write-permission');
+        else if (level === 'write') writes.push({ name, entry });
       }
       const holdsIdToken = writes.some((w) => w.name === 'id-token');
       for (const { name, entry } of writes) {

@@ -128,6 +128,15 @@ describe('workflowFindings', () => {
     expect(listed.map((f) => `${f.line}:${f.rule}`)).toEqual(['11:write-permission']);
   });
 
+  it('reads write permissions in a flow mapping or under a quoted key, and fails on a value it cannot read', () => {
+    expect(rules(CLEAN.replace('permissions:\n  contents: read', 'permissions: { contents: write }'))).toEqual(['4:write-permission']);
+    expect(rules(CLEAN.replace('permissions:\n  contents: read', 'permissions: {}'))).toEqual([]);
+    expect(rules(CLEAN.replace('permissions:\n  contents: read', 'permissions: read-all'))).toEqual([]);
+    expect(rules(CLEAN.replace('contents: read', '"contents": write'))).toEqual(['5:write-permission']);
+    expect(rules(CLEAN.replace('permissions:\n  contents: read', '"permissions":\n  contents: write'))).toEqual(['5:write-permission']);
+    expect(rules(CLEAN.replace('permissions:\n  contents: read', 'permissions: ${{ fromJSON(vars.PERMS) }}'))).toEqual(['4:write-permission']);
+  });
+
   it('reads quoted permission values', () => {
     expect(rules(CLEAN.replace('contents: read', "contents: 'write'"))).toEqual(['5:write-permission']);
     expect(rules(CLEAN.replace('contents: read', 'contents: "write"'))).toEqual(['5:write-permission']);
@@ -216,6 +225,21 @@ describe('RELEASE_POLICY', () => {
       '12:write-permission',
       '13:write-permission',
     ]);
+  });
+
+  it('reads a quoted key and a flow mapping, so neither hides id-token next to a repository write', () => {
+    for (const key of ['"id-token"', "'id-token'"]) {
+      expect(strict(RELEASE.replace('      id-token: write\n', `      ${key}: write\n      contents: write\n`))).toEqual(['20:write-permission']);
+      expect(strict(RELEASE.replace('      id-token: write\n', `      ${key}: write\n`))).toEqual([]);
+    }
+    expect(strict(RELEASE.replace('    permissions:\n      id-token: write\n', '    "permissions":\n      id-token: write\n      contents: write\n'))).toEqual([
+      '20:write-permission',
+    ]);
+    const flow = (value: string) => strict(RELEASE.replace('    permissions:\n      id-token: write\n', `    permissions: ${value}\n`));
+    expect(flow('{ id-token: write, contents: write }')).toEqual(['18:write-permission']);
+    expect(flow('{ "id-token": "write", "contents": "write" }')).toEqual(['18:write-permission']);
+    expect(flow('{id-token: write}')).toEqual([]);
+    expect(strict(RELEASE.replace('permissions:\n  contents: read', 'permissions: { contents: read, id-token: write }'))).toEqual(['6:write-permission']);
   });
 
   it('still rejects secrets, the token written out, environments and untrusted triggers', () => {
