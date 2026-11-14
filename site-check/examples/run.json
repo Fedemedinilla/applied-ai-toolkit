@@ -1,0 +1,1808 @@
+{
+  "checks": [
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "psi-mobile-1.json",
+        "psi-mobile-2.json",
+        "psi-mobile-3.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-08",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "cls": 0.05,
+        "field_source": "psi",
+        "inp_ms": 180,
+        "lab_cls_median": 0.04,
+        "lab_lcp_ms_median": 4830,
+        "lcp_ms": 4830,
+        "lighthouse_version": "13.5.0",
+        "runs": 3,
+        "scope": "pagina",
+        "valid_runs": 3
+      },
+      "module": "EXT",
+      "name": "¿Qué tan rápido lo ven los usuarios reales en el celular?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "Plan de velocidad: imágenes, caché y lo que carga primero.",
+        "consequence": "Quien entra desde el celular espera más de lo que Google considera aceptable en cada visita.",
+        "found": "En celular, lo principal de la página tarda 4,8 segundos en aparecer; Google considera bien hasta 2,5 segundos.",
+        "who": "Quien mantiene el sitio, con acceso al panel."
+      },
+      "shape": "■",
+      "state": "fail",
+      "traces": {
+        "{lcp_s}": "checks[EXT-08].measured.lcp_ms"
+      }
+    },
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "psi-mobile-1.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-21",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "html_decoded_bytes": 5836,
+        "html_raw_bytes": 2003,
+        "image_bytes": 2000000,
+        "image_savings_bytes": null,
+        "lighthouse_huge": false,
+        "n_img": 3,
+        "n_script_src": 2,
+        "n_style": 1,
+        "third_party_bytes": 300000,
+        "third_party_top": [
+          "YouTube",
+          "Google Tag Manager"
+        ],
+        "total_bytes": 3000000
+      },
+      "module": "EXT",
+      "name": "¿Cuánto pesa la página y cuánto es de terceros?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Achicar y convertir las imágenes y revisar lo que se carga de afuera",
+        "consequence": "Cada visita desde un celular con datos móviles descarga todo eso antes de poder usar la página",
+        "found": "La página principal pesa 2,9 MB: 1,9 MB son imágenes y 0,3 MB llegan de servicios externos (YouTube, Google Tag Manager)",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "■",
+      "state": "fail",
+      "traces": {
+        "{img_mb}": "checks[EXT-21].measured.image_bytes",
+        "{peso_mb}": "checks[EXT-21].measured.total_bytes",
+        "{terceros_mb}": "checks[EXT-21].measured.third_party_bytes"
+      }
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "ttfb.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-20",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "control_ms_median": 1,
+        "control_samples": [
+          1,
+          1,
+          1
+        ],
+        "site_samples": [
+          1,
+          1,
+          1
+        ],
+        "ttfb_ms_median": 1
+      },
+      "module": "EXT",
+      "name": "¿Cuánto tarda el servidor en empezar a responder?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "La página arranca rápido aunque la red sea lenta",
+        "found": "El servidor empieza a responder en menos de una décima de segundo",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "tls.json",
+        "headers-home.txt"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-18",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "alpn": "h2",
+        "content_encoding": "gzip",
+        "decoded_bytes": 5836,
+        "h3_announced": false,
+        "raw_bytes": 2003
+      },
+      "module": "EXT",
+      "name": "¿El servidor usa los protocolos rápidos?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Carga menos datos de los que pesa",
+        "found": "La página principal viaja comprimida (6 KB → 2 KB) y por el protocolo moderno",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {
+        "{kb_antes}": "checks[EXT-18].measured.decoded_bytes",
+        "{kb_despues}": "checks[EXT-18].measured.raw_bytes"
+      }
+    },
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "headers-home-2.txt",
+        "headers-home-3.txt"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-19",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "cache_signals": [],
+        "plugin_signature": null,
+        "reloads": 2
+      },
+      "module": "EXT",
+      "name": "¿Hay una capa de caché o CDN funcionando?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Activar caché de página, sin cachear los formularios",
+        "consequence": "Cada visita obliga al servidor a armar la página de cero; con picos de visitas se pone lento",
+        "found": "El servidor no guarda páginas listas para servir: dos cargas seguidas, sin señal de caché",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "■",
+      "state": "fail",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "og-image.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-06",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "duplicates": false,
+        "image_height": 630,
+        "image_status": 200,
+        "image_type": "image/png",
+        "image_width": 1200,
+        "og_description": true,
+        "og_image": true,
+        "og_locale": true,
+        "og_title": true,
+        "twitter_card": true
+      },
+      "module": "VIS",
+      "name": "¿El link se ve con foto y título cuando lo comparten por WhatsApp?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "El enlace se ve completo en WhatsApp y en redes",
+        "found": "Al compartir el sitio aparece imagen, título y descripción",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "home.html",
+        "interna.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-04",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "description_len": 153,
+        "generic_title": false,
+        "inner_checked": true,
+        "inner_fails": false,
+        "name_checked": true,
+        "name_missing": false,
+        "name_partial": false,
+        "no_description": false,
+        "title_len": 74
+      },
+      "module": "VIS",
+      "name": "¿El título y la descripción dicen qué es el sitio?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": "largo del título o de la descripción",
+      "sentence": {
+        "action": "Escribir título y descripción en el plugin de SEO, página por página clave",
+        "consequence": "Google los corta o los completa a su manera",
+        "found": "El título tiene 74 caracteres y la descripción 153; lo recomendado es 50 a 60 y 120 a 160",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "pass_with_note",
+      "traces": {
+        "{m}": "checks[VIS-04].measured.description_len",
+        "{n}": "checks[VIS-04].measured.title_len"
+      }
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "headers-home.txt",
+        "robots.txt",
+        "interna.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-01",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "home_noindex_header": false,
+        "home_noindex_meta": false,
+        "inner_checked": true,
+        "inner_noindex": false,
+        "robots_blocked_assets": [],
+        "robots_blocks_inner": false,
+        "robots_blocks_root": false,
+        "robots_state": "ok"
+      },
+      "module": "VIS",
+      "name": "¿Google puede mostrar el sitio?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "critical",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "El sitio aparece cuando lo buscan",
+        "found": "Google puede mostrar la página principal y las internas",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "robots.txt",
+        "sitemap-hijo.xml",
+        "sitemap.xml"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-02",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "declared": true,
+        "declared_count": 1,
+        "kind": "sitemapindex",
+        "n_locs": 6,
+        "n_locs_canonical": 8,
+        "robots_state": "ok",
+        "systems": 1
+      },
+      "module": "VIS",
+      "name": "¿El sitio le da a Google el mapa de sus páginas?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Google encuentra las páginas nuevas sin esperar",
+        "found": "El sitio le da a Google el mapa de sus páginas",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "interna.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-03",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "home_problem": null,
+        "inner_checked": true,
+        "inner_problem": null
+      },
+      "module": "VIS",
+      "name": "¿Cada página tiene una sola dirección oficial?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Google no se confunde entre copias",
+        "found": "Cada página indica su propia dirección oficial",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "interna.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-05",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "n_h1_home": 1,
+        "n_h1_inner": 1,
+        "skips_home": false,
+        "skips_inner": false
+      },
+      "module": "VIS",
+      "name": "¿La página tiene un solo título principal?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Google y los lectores de pantalla entienden la estructura",
+        "found": "Cada página tiene un solo título principal y sus subtítulos en orden",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-07",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "blocks": 1,
+        "has_address": true,
+        "invalid_blocks": 0,
+        "organizations": 1
+      },
+      "module": "VIS",
+      "name": "¿El sitio le da a Google sus datos de contacto y ubicación en el formato que Google lee?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": "validez para Google no probada",
+      "sentence": {
+        "action": "Pasarlos por la prueba de resultados enriquecidos de Google",
+        "consequence": "Sin esa prueba no se sabe si Google los usa",
+        "found": "Los datos del colegio están escritos una sola vez en el formato que lee Google; falta comprobar que Google los acepte",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "pass_with_note",
+      "traces": {}
+    },
+    {
+      "colour": "hidden",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "hidden",
+      "evidence": [],
+      "evidence_ok": false,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-08",
+      "internal_note": null,
+      "label": "",
+      "measured": {},
+      "module": "VIS",
+      "name": "Si el sitio es bilingüe, ¿Google entiende qué versión mostrar?",
+      "not_verified_reason": "sitio en un solo idioma",
+      "note": null,
+      "priority": "low",
+      "reason": "sitio en un solo idioma",
+      "sentence": null,
+      "shape": "",
+      "state": "not_applicable",
+      "traces": {}
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "enlaces.json",
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-09",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "broken": [
+          "/novedades/acto-25-de-mayo/"
+        ],
+        "broken_addresses": [
+          "www.colegio.test/novedades/acto-25-de-mayo/"
+        ],
+        "capped": false,
+        "n404": 1,
+        "n5xx": 0,
+        "n_chains": 1,
+        "n_other_errors": 0,
+        "n_private": 0,
+        "n_selected": 8,
+        "n_verified": 8
+      },
+      "module": "VIS",
+      "name": "¿Hay links rotos o que dan vueltas antes de llegar?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Corregir cada enlace o su redirección",
+        "consequence": "Las familias encuentran un error y Google pierde confianza en el sitio",
+        "found": "Uno de los 8 enlaces revisados de la página principal lleva a una página que no existe; otro da más de una vuelta antes de llegar",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "fail",
+      "traces": {
+        "{n404}": "checks[VIS-09].measured.n404",
+        "{n_probados}": "checks[VIS-09].measured.n_verified"
+      }
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "psi-mobile-1.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-10",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "contrast_failing": 2,
+        "contrast_score": 0.0
+      },
+      "module": "VIS",
+      "name": "¿Se lee bien y se ve dónde está el foco al navegar con teclado?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Ajustar colores en el tema hijo",
+        "consequence": "Cuesta leerlos con sol, en pantallas chicas o con la vista cansada",
+        "found": "2 textos de la página principal tienen poco contraste con su fondo",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "fail",
+      "traces": {
+        "{n}": "checks[VIS-10].measured.contrast_failing"
+      }
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-11",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "n_img": 3,
+        "n_missing_alt": 1,
+        "psi_image_alt_score": 0.0
+      },
+      "module": "VIS",
+      "name": "¿Las imágenes tienen descripción para quien no las ve?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "Completar la descripción en la biblioteca de medios",
+        "consequence": "Las personas que usan lector de pantalla no saben qué muestran",
+        "found": "1 de las 3 imágenes de la página principal no tiene descripción",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "fail",
+      "traces": {
+        "{n}": "checks[VIS-11].measured.n_missing_alt",
+        "{total}": "checks[VIS-11].measured.n_img"
+      }
+    },
+    {
+      "colour": "grey",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "grey",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": false,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-12",
+      "internal_note": null,
+      "label": "No se pudo ver",
+      "measured": {
+        "maximum_scale": null,
+        "user_scalable": null,
+        "viewport_present": true
+      },
+      "module": "VIS",
+      "name": "¿Se puede usar en un celular angosto y con zoom al 200 %?",
+      "not_verified_reason": "el ajuste a 320 píxeles y el zoom al 200 % requieren una prueba en navegador",
+      "note": null,
+      "priority": "medium",
+      "reason": "el ajuste a 320 píxeles y el zoom al 200 % requieren una prueba en navegador",
+      "sentence": {
+        "action": "",
+        "consequence": "",
+        "found": "Cómo se ve en un celular angosto y con el zoom al doble requiere una prueba en navegador, que se hace aparte",
+        "who": ""
+      },
+      "shape": "○",
+      "state": "not_verified",
+      "traces": {}
+    },
+    {
+      "colour": "grey",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "grey",
+      "evidence": [
+        "psi-mobile-1.json"
+      ],
+      "evidence_ok": false,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-13",
+      "internal_note": null,
+      "label": "No se pudo ver",
+      "measured": {
+        "fields": 0,
+        "fields_without_label_html": 0,
+        "form_page": "home",
+        "forms": 0,
+        "label_failing": null,
+        "label_score": null,
+        "target_size_failing": null,
+        "target_size_score": 1.0
+      },
+      "module": "VIS",
+      "name": "¿Los formularios se entienden y los botones se pueden tocar?",
+      "not_verified_reason": "la página principal no tiene formularios para revisar; los de otras páginas se revisan en navegador",
+      "note": null,
+      "priority": "medium",
+      "reason": "la página principal no tiene formularios para revisar; los de otras páginas se revisan en navegador",
+      "sentence": {
+        "action": "",
+        "consequence": "",
+        "found": "la página principal no tiene formularios para revisar; los de otras páginas se revisan en navegador",
+        "who": ""
+      },
+      "shape": "○",
+      "state": "not_verified",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-14",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "content_spanish": true,
+        "generic_title": false,
+        "lang": "es-ar"
+      },
+      "module": "VIS",
+      "name": "¿La página declara su idioma y tiene título propio?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Los lectores de pantalla la leen bien",
+        "found": "La página declara que está en castellano y tiene título propio",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-15",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "footer_found": true,
+        "in_footer": 1,
+        "phone_plain_text": false,
+        "plugin_marker": "joinchat",
+        "tel_links": 1,
+        "whatsapp_links": 1
+      },
+      "module": "VIS",
+      "name": "¿Se puede escribir o llamar en un toque desde el celular?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Las familias llegan en un toque",
+        "found": "Hay botones para llamar y para escribir por WhatsApp en la página principal, y uno de ellos en el pie",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "tls.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-07",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "calendar_days": 58,
+        "days_left": 58,
+        "host": "www.colegio.test",
+        "inconclusive": false,
+        "not_after": "2026-12-11T13:00:00+00:00",
+        "not_measured": "no medido",
+        "strict_only_failure": false,
+        "tls_version": "TLSv1.3",
+        "verify_code": null
+      },
+      "module": "EXT",
+      "name": "¿El candado es válido y no está por vencer?",
+      "not_verified_reason": null,
+      "note": "la calificación y los protocolos viejos no se midieron",
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Nadie ve advertencias en el navegador y los datos de los formularios viajan protegidos",
+        "found": "La conexión segura es válida y vence el 11 de diciembre de 2026, en 58 días",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {
+        "{dias}": "checks[EXT-07].measured.calendar_days",
+        "{fecha_larga}": "checks[EXT-07].measured.not_after"
+      }
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "rdap.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-13",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "calendar_days": 200,
+        "days_left": 200,
+        "error": null,
+        "expiration": "2027-05-02T13:00:00+00:00",
+        "server": "127.0.0.1",
+        "status": [
+          "client transfer prohibited"
+        ],
+        "tld": "test"
+      },
+      "module": "EXT",
+      "name": "¿El dominio está por vencer?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Hay tiempo para confirmar la renovación antes de que venza",
+        "found": "El dominio vence el 2 de mayo de 2027",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {
+        "{fecha_larga}": "checks[EXT-13].measured.expiration"
+      }
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "variantes.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-17",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "broken": 0,
+        "canonical": "https://www.colegio.test/",
+        "http_open": 0,
+        "max_hops": 1,
+        "temporary_redirects": 0,
+        "two_copies": 0,
+        "variants": 4
+      },
+      "module": "EXT",
+      "name": "¿Entra siempre al mismo sitio con candado, con o sin www?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Las familias y Google llegan siempre al mismo sitio protegido",
+        "found": "Con o sin www, y aunque se escriba sin la s de seguro, el sitio lleva siempre a una sola dirección con conexión segura",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "interna.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-16",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "home_mixed": 0,
+        "http_link_hosts": [],
+        "http_links_off_site": 0,
+        "inner_mixed": 0,
+        "types": []
+      },
+      "module": "EXT",
+      "name": "¿Hay partes del sitio que cargan sin candado?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "El candado se ve completo",
+        "found": "Todo lo que carga la página viaja con conexión segura",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "headers-home.txt"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-01",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "hsts_max_age": 31536000,
+        "https": true,
+        "missing": [
+          "content-security-policy",
+          "referrer-policy",
+          "x-frame-options|frame-ancestors",
+          "permissions-policy"
+        ],
+        "n_missing": 4,
+        "n_protections": 2,
+        "nosniff": true,
+        "observatory_grade": null,
+        "present": [
+          "strict-transport-security",
+          "x-content-type-options"
+        ]
+      },
+      "module": "EXT",
+      "name": "¿El sitio le dice al navegador cómo protegerse?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": "activa 2 de las 6 protecciones",
+      "sentence": {
+        "action": "Agregar las 4 protecciones que faltan (la que impide mostrar el sitio dentro de otro, la que limita qué contenido carga la página, la que fija qué se comparte con otros sitios y la que limita los permisos del navegador) y probar que nada se rompa",
+        "consequence": "Es más fácil incrustar el sitio en otro o inyectarle contenido; el sitio no indica qué parte de sus direcciones ven los sitios que enlaza; el sitio no limita qué funciones del navegador, como la cámara o la ubicación, pueden usar sus páginas",
+        "found": "El servidor activa 2 de las 6 protecciones que ofrecen los navegadores; la que obliga a usar la conexión segura está activa",
+        "who": "Quien mantiene el sitio"
+      },
+      "shape": "■",
+      "state": "pass_with_note",
+      "traces": {
+        "{n_faltan}": "checks[EXT-01].measured.n_missing",
+        "{n}": "checks[EXT-01].measured.n_protections"
+      }
+    },
+    {
+      "colour": "red",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "red",
+      "evidence": [
+        "dns.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-05",
+      "internal_note": null,
+      "label": "Arreglar ya",
+      "measured": {
+        "dkim_found": false,
+        "dkim_selectors_checked": [
+          "google"
+        ],
+        "dmarc_count": 0,
+        "dmarc_org_domain": null,
+        "dmarc_org_p": null,
+        "dmarc_org_queried": false,
+        "dmarc_org_valid": false,
+        "dmarc_p": null,
+        "dmarc_pct": null,
+        "dmarc_present": false,
+        "dmarc_rua": false,
+        "dmarc_sp": null,
+        "mail_case": 8,
+        "mx_count": 2,
+        "provider": "google",
+        "resolver": "dns.google",
+        "spf_all": "~",
+        "spf_count": 1,
+        "spf_redirect": false
+      },
+      "module": "EXT",
+      "name": "¿Pueden mandar mails falsos con el nombre del dominio?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "high",
+      "reason": null,
+      "sentence": {
+        "action": "Configurar los registros que faltan en el dominio",
+        "consequence": "Se pueden enviar mails que parezcan del colegio y llegar, y los mails reales pueden caer más seguido en spam",
+        "found": "El correo del dominio no tiene la regla que les dice a Gmail y a Outlook qué hacer con los mails falsos",
+        "who": "Quien administra el dominio"
+      },
+      "shape": "▲",
+      "state": "fail",
+      "traces": {
+        "case": "checks[EXT-05].measured.mail_case",
+        "{dominio}": "meta.domain"
+      }
+    },
+    {
+      "colour": "grey",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "grey",
+      "evidence": [
+        "dbl.json"
+      ],
+      "evidence_ok": false,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-23",
+      "internal_note": null,
+      "label": "No se pudo ver",
+      "measured": {
+        "categories": [],
+        "codes": [],
+        "control_ok": true,
+        "google": "no consultado (se revisa a mano)",
+        "verdict": "not-listed"
+      },
+      "module": "EXT",
+      "name": "¿Google o las listas de correo marcan al sitio como peligroso?",
+      "not_verified_reason": "la consulta de Google se revisa a mano; la lista de Spamhaus no marca el dominio",
+      "note": null,
+      "priority": "critical",
+      "reason": "la consulta de Google se revisa a mano; la lista de Spamhaus no marca el dominio",
+      "sentence": {
+        "action": "",
+        "consequence": "",
+        "found": "La lista de Spamhaus no marca el dominio; la de Google no se consultó en este chequeo",
+        "who": ""
+      },
+      "shape": "○",
+      "state": "not_verified",
+      "traces": {}
+    },
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "home.html",
+        "wp-stable-check.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-02",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "age_years": 3,
+        "branch_release": "2022-11-01",
+        "cms": "wordpress",
+        "highest_branch": "6.1.15",
+        "highest_of_branch": false,
+        "latest": "7.1.3",
+        "version": "6.1.1",
+        "version_source": "generator",
+        "wp_status": "insecure"
+      },
+      "module": "EXT",
+      "name": "¿Se ve qué versión de WordPress usa?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Actualizar en un entorno de prueba primero, con copia, y después ocultar la versión",
+        "consequence": "Alguien puede buscar fallas conocidas de esa versión y entrar",
+        "found": "El sitio funciona con WordPress 6.1.1, de la rama de noviembre de 2022, y la versión se ve desde afuera",
+        "who": "Quien mantiene el sitio, con acceso al panel"
+      },
+      "shape": "■",
+      "state": "fail",
+      "traces": {
+        "{mes_anio}": "checks[EXT-02].measured.branch_release",
+        "{version}": "checks[EXT-02].measured.version"
+      }
+    },
+    {
+      "colour": "yellow",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "yellow",
+      "evidence": [
+        "headers-home.txt"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-09",
+      "internal_note": null,
+      "label": "Revisar",
+      "measured": {
+        "exact_versions": 2,
+        "other_versions": 1,
+        "values": [
+          "FakeSite/1.0",
+          "Apache/2.4.41 (Ubuntu)",
+          "PHP/7.4.33"
+        ]
+      },
+      "module": "EXT",
+      "name": "¿El servidor cuenta qué software y versión corre?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "Pedirle al hosting que oculte las versiones",
+        "consequence": "Le ahorra un paso a quien busca fallas conocidas",
+        "found": "El servidor anuncia qué programa usa y su versión exacta (Apache/2.4.41 (Ubuntu); PHP/7.4.33)",
+        "who": "Quien mantiene el sitio, con el hosting"
+      },
+      "shape": "■",
+      "state": "fail",
+      "traces": {
+        "{valor}": "checks[EXT-09].measured.values"
+      }
+    },
+    {
+      "colour": "grey",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "grey",
+      "evidence": [],
+      "evidence_ok": false,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-24",
+      "internal_note": null,
+      "label": "No se pudo ver",
+      "measured": {
+        "examples": [],
+        "foreign_script": false,
+        "outbound_spam_links": 0,
+        "prose_terms_ignored": [],
+        "sitemap_foreign_urls": 0,
+        "sitemap_spam_urls": 0,
+        "sitemap_url": null,
+        "sources": [],
+        "terms": []
+      },
+      "module": "EXT",
+      "name": "¿Google muestra páginas ajenas dentro del sitio?",
+      "not_verified_reason": "la búsqueda en Google se corre a mano: site:colegio.test viagra OR casino OR replica",
+      "note": null,
+      "priority": "critical",
+      "reason": "la búsqueda en Google se corre a mano: site:colegio.test viagra OR casino OR replica",
+      "sentence": {
+        "action": "",
+        "consequence": "",
+        "found": "Lo que Google muestra del sitio no se consultó en este chequeo",
+        "who": ""
+      },
+      "shape": "○",
+      "state": "not_verified",
+      "traces": {}
+    },
+    {
+      "colour": "blue",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "blue",
+      "evidence": [
+        "home.html",
+        "feed.xml"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-16",
+      "internal_note": null,
+      "label": "Mejora opcional",
+      "measured": {
+        "cycle_outside_footer": true,
+        "cycle_word": "inscripciones",
+        "cycle_year": 2027,
+        "default_content": false,
+        "feed_month_year": "mayo de 2024",
+        "footer_located": true,
+        "footer_year": 2019,
+        "latest_news": "2024-05-20",
+        "n_months": 28,
+        "sample_text": null,
+        "sample_text_place": null,
+        "signals": [
+          "pie",
+          "feed"
+        ],
+        "sitemap_lastmod_max": "2024-05-20"
+      },
+      "module": "VIS",
+      "name": "Señales de desactualización",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "Actualizar el pie, la portada y publicar novedades, o quitar la sección si no se usa",
+        "consequence": "Quien visita el sitio piensa que nadie lo mira, y eso pesa al elegir colegio",
+        "found": "El pie dice 2019 y la última novedad es de hace 28 meses",
+        "who": "El colegio, con quien mantiene el sitio"
+      },
+      "shape": "◆",
+      "state": "fail",
+      "traces": {
+        "{anio_pie}": "checks[VIS-16].measured.footer_year",
+        "{n_meses}": "checks[VIS-16].measured.n_months"
+      }
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-17",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "access_paths": [
+          "/inscripciones/"
+        ],
+        "n_access": 2,
+        "target_statuses": [
+          200
+        ]
+      },
+      "module": "VIS",
+      "name": "Inscripciones a la vista",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Las familias interesadas llegan directo",
+        "found": "La página principal lleva a inscripciones en un toque",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html",
+        "enlaces.json"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "EXT-25",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "data_forms": 0,
+        "forms": 0,
+        "https": true,
+        "n_links": 1,
+        "same_site": 1,
+        "target_status": 200
+      },
+      "module": "EXT",
+      "name": "Política de privacidad",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Las familias saben para qué se usan sus datos",
+        "found": "El sitio publica su política de privacidad",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-18",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "distinct_numbers": 1,
+        "has_prefilled_text": true,
+        "numbers": [
+          {
+            "last4": "6789",
+            "pages": [
+              "inicio"
+            ],
+            "reason": "ok",
+            "source": "enlace",
+            "verdict": "ok"
+          }
+        ]
+      },
+      "module": "VIS",
+      "name": "Botón de WhatsApp con el número bien escrito",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Las familias escriben en un toque",
+        "found": "El botón de WhatsApp lleva a un número bien escrito",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-19",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "dead_social_icons": 0,
+        "signals": [],
+        "vendor_icons": 0
+      },
+      "module": "VIS",
+      "name": "Restos de fábrica del tema y de WordPress",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "low",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "El sitio se ve terminado",
+        "found": "No quedan textos ni enlaces de ejemplo de la plantilla",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-20",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "flash": false,
+        "flash_code": false,
+        "flash_with_emulator": false,
+        "ie": false,
+        "ie_version": null,
+        "markers": []
+      },
+      "module": "VIS",
+      "name": "¿El código del sitio está hecho para navegadores que ya no se usan?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "El código de la portada no arrastra partes para navegadores que ya no se usan",
+        "found": "El código de la página principal no tiene partes para Internet Explorer ni contenido para Flash",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    },
+    {
+      "colour": "green",
+      "colour_exception": null,
+      "colour_reason": null,
+      "derived_colour": "green",
+      "evidence": [
+        "dominios-correo.json",
+        "home.html"
+      ],
+      "evidence_ok": true,
+      "gate_note": null,
+      "hack_signal": false,
+      "id": "VIS-21",
+      "internal_note": null,
+      "label": "Bien",
+      "measured": {
+        "domains": [
+          {
+            "address": "info@colegio.test",
+            "delivery_verdict": "recibe-mx",
+            "domain": "colegio.test",
+            "pages": [
+              "inicio"
+            ]
+          }
+        ],
+        "free_mail": 0,
+        "over_cap": 0
+      },
+      "module": "VIS",
+      "name": "¿Las direcciones de correo que publica el sitio pueden recibir mails?",
+      "not_verified_reason": null,
+      "note": null,
+      "priority": "medium",
+      "reason": null,
+      "sentence": {
+        "action": "",
+        "consequence": "Lo que escriben tiene a dónde llegar; cada casilla en sí no se puede comprobar desde afuera",
+        "found": "Los dominios de las direcciones de correo publicadas tienen dónde recibir mails",
+        "who": ""
+      },
+      "shape": "●",
+      "state": "pass",
+      "traces": {}
+    }
+  ],
+  "hack_signals": [],
+  "header": {
+    "desktop": {
+      "accessibility": {
+        "label": "A mejorar",
+        "reason": null,
+        "score": 88,
+        "shape": "■"
+      },
+      "best-practices": {
+        "label": "Bien",
+        "reason": null,
+        "score": 92,
+        "shape": "●"
+      },
+      "performance": {
+        "label": "A mejorar",
+        "reason": null,
+        "score": 78,
+        "shape": "■"
+      },
+      "seo": {
+        "label": "A mejorar",
+        "reason": null,
+        "score": 85,
+        "shape": "■"
+      }
+    },
+    "mobile": {
+      "accessibility": {
+        "label": "A mejorar",
+        "reason": null,
+        "score": 88,
+        "shape": "■"
+      },
+      "best-practices": {
+        "label": "Bien",
+        "reason": null,
+        "score": 92,
+        "shape": "●"
+      },
+      "performance": {
+        "label": "Bajo",
+        "reason": null,
+        "score": 45,
+        "shape": "▲"
+      },
+      "seo": {
+        "label": "A mejorar",
+        "reason": null,
+        "score": 85,
+        "shape": "■"
+      }
+    },
+    "reason": null
+  },
+  "meta": {
+    "api_key": "present",
+    "budget_exhausted": false,
+    "canonical_url": "https://www.colegio.test/",
+    "challenge_events": [],
+    "conditions": "celular, tres corridas con el valor del medio, y computadora, una corrida; tiempo del servidor medido tres veces, con un sitio de control en el mismo momento",
+    "cut_notice": null,
+    "domain": "colegio.test",
+    "errors": [],
+    "excluded": null,
+    "expat_version": "pinned",
+    "finished_local": "2026-10-14T10:00:00-03:00",
+    "finished_utc": "2026-10-14T13:00:00+00:00",
+    "home_reason": null,
+    "home_unreachable": false,
+    "home_wrapper": null,
+    "inner_source": "auto",
+    "inner_url": "https://www.colegio.test/contacto/",
+    "input_url": "https://www.colegio.test/",
+    "kind": "colegio",
+    "kind_explicit": true,
+    "lighthouse_notice": null,
+    "lighthouse_version": "13.5.0",
+    "max_requests": 90,
+    "no_pagespeed": false,
+    "openssl_version": "pinned",
+    "organisation": "Colegio Ejemplo",
+    "pagespeed_notice": null,
+    "pause_seconds": 3.0,
+    "previous_runs": [],
+    "psi_runs": {
+      "desktop_valid": true,
+      "requested": 3,
+      "status": "ok",
+      "valid": 3
+    },
+    "python_version": "pinned",
+    "requests": {
+      "api": 17,
+      "control": 3,
+      "dns": 2,
+      "error": 0,
+      "external": 0,
+      "ok": 44,
+      "refused-scope": 0,
+      "site": 22,
+      "skipped-blocked": 0,
+      "skipped-budget": 0,
+      "skipped-no-contact": 0,
+      "tls": 0,
+      "total": 44
+    },
+    "scope": {
+      "admitted": [
+        {
+          "purpose": "home",
+          "source": "final URL of the input chain",
+          "url": "https://www.colegio.test/"
+        },
+        {
+          "purpose": "sitemap",
+          "source": "robots.txt Sitemap:",
+          "url": "https://www.colegio.test/sitemap_index.xml"
+        },
+        {
+          "purpose": "sitemap-child",
+          "source": "first <loc> of the sitemap index",
+          "url": "https://www.colegio.test/page-sitemap.xml"
+        },
+        {
+          "purpose": "feed",
+          "source": "home <link rel=alternate>",
+          "url": "https://www.colegio.test/feed/"
+        },
+        {
+          "purpose": "interna",
+          "source": "home <a href> (auto)",
+          "url": "https://www.colegio.test/contacto/"
+        },
+        {
+          "purpose": "og-image",
+          "source": "home <meta property=og:image>",
+          "url": "https://www.colegio.test/wp-content/uploads/2024/03/portada.png"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/institucional/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/niveles/inicial/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/inscripciones/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "http://www.colegio.test/historia/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/novedades/acto-25-de-mayo/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/viejo-enlace/"
+        },
+        {
+          "purpose": "link-check",
+          "source": "home <a href>",
+          "url": "https://www.colegio.test/politica-de-privacidad/"
+        }
+      ],
+      "canonical_url": "https://www.colegio.test/",
+      "domain": "colegio.test",
+      "input_url": "https://www.colegio.test/",
+      "observatory": false,
+      "refused": [],
+      "standard_sitemaps": false
+    },
+    "shared_domain": null,
+    "site_cut": false,
+    "site_minutes": 1,
+    "site_requests": 24,
+    "skipped": [],
+    "started_local": "2026-10-14T10:00:00-03:00",
+    "started_utc": "2026-10-14T13:00:00+00:00",
+    "test_mode": true,
+    "to": "Dirección",
+    "tool_version": "1.0.0",
+    "tools": [
+      "la herramienta de velocidad de Google (PageSpeed)",
+      "la lectura de las respuestas del servidor",
+      "la consulta del DNS del dominio",
+      "la consulta pública del registro del dominio",
+      "la lista de bloqueo de Spamhaus",
+      "la lista pública de versiones de WordPress"
+    ],
+    "user_agent": "Mozilla/5.0 (compatible; site-check/1.0; +https://github.com/Fedemedinilla/applied-ai-toolkit)",
+    "wordpress_notice": null
+  },
+  "output": {
+    "code": 0,
+    "deleted": [],
+    "name": "OK",
+    "text_control": []
+  },
+  "schema_version": 2,
+  "summary": {
+    "applicable": 36,
+    "by_colour": {
+      "blue": 6,
+      "green": 19,
+      "grey": 4,
+      "red": 1,
+      "yellow": 6
+    },
+    "by_state": {
+      "fail": 10,
+      "not_applicable": 1,
+      "not_verified": 4,
+      "pass": 19,
+      "pass_with_note": 3
+    },
+    "not_applicable": 1,
+    "total": 37
+  },
+  "tables": {
+    "mail": {
+      "not_applicable_note": null,
+      "rows": [
+        {
+          "meaning": "Solo los servicios de correo autorizados por el dominio",
+          "value": "configurada",
+          "what": "Quién puede enviar en nombre del dominio"
+        },
+        {
+          "meaning": "Se revisa en el panel de correo",
+          "value": "no se pudo confirmar desde afuera",
+          "what": "Firma de los mensajes"
+        },
+        {
+          "meaning": "Hoy nadie le dice a Gmail o a Outlook que rechacen un mail falso",
+          "value": "falta",
+          "what": "Qué hacer con los mensajes falsos"
+        }
+      ]
+    },
+    "speed": {
+      "attribution": "Datos de usuarios reales: Chrome UX Report (Google), CC BY 4.0",
+      "intro": "Las tres primeras filas son de quienes visitaron la página principal desde un celular en los últimos 28 días, según Google; las otras dos se midieron el 14/10/2026.",
+      "lab_note": null,
+      "rows": [
+        {
+          "meaning": "Google considera bien hasta 2,5 segundos",
+          "value": "4,8 segundos",
+          "what": "Cuánto tarda en aparecer lo principal de la página"
+        },
+        {
+          "meaning": "Bien hasta 0,2 segundos",
+          "value": "0,2 segundos",
+          "what": "Cuánto tarda en responder cuando se toca algo"
+        },
+        {
+          "meaning": "Bien hasta 0,1",
+          "value": "0,05",
+          "what": "Cuánto se mueve la página mientras carga"
+        },
+        {
+          "meaning": "Bien hasta 0,8 segundos; un sitio de control medido en el mismo momento dio menos de una décima de segundo",
+          "value": "menos de una décima de segundo",
+          "what": "Cuánto tarda el servidor en empezar a responder"
+        },
+        {
+          "meaning": "Google aconseja no pasar de 1,6 MB",
+          "value": "2,9 MB",
+          "what": "Cuánto pesa la página principal"
+        }
+      ]
+    }
+  }
+}

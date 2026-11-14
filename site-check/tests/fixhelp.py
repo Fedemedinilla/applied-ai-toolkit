@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import support  # noqa: F401
-from support import TEST_KEY, patched_env, run_cli, temp_dir
+from support import TEST_KEY, patched_env, run_cli, temp_dir, read_run
 
 from fakeapis import FakeApis, FakeApisConfig
 from fakesite import FakeSite, Route, Scenario
@@ -33,7 +33,7 @@ class RunResult:
     evidence: dict[str, bytes] = field(default_factory=dict)  # evidencia/<name> -> bytes
 
     def check(self, cid: str) -> dict[str, Any]:
-        assert self.datos is not None, "no datos.json"
+        assert self.datos is not None, "no run.json"
         return next(c for c in self.datos["checks"] if c["id"] == cid)
 
     def log_lines(self) -> list[dict[str, Any]]:
@@ -75,12 +75,12 @@ def run_e2e(
         if runs:
             rd = runs[0]
             result.folder = rd.parent.name
-            if (rd / "datos.json").exists():
-                result.datos = json.loads((rd / "datos.json").read_text(encoding="utf-8"))
+            if (rd / "run.json").exists():
+                result.datos = read_run(rd / "run.json")
             for p in rd.iterdir():
                 if p.is_file() and p.suffix in (".md", ".txt"):
                     result.files[p.name] = p.read_text(encoding="utf-8")
-            ev = rd / "evidencia"
+            ev = rd / "evidence"
             if ev.is_dir():
                 for p in ev.iterdir():
                     if p.is_file():

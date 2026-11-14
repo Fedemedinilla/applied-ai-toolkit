@@ -3,7 +3,7 @@
 The fixtures are the fictional school as measured into examples/ (before) and
 the same school after the fixes of tests/comparefixtures.py, measured into
 examples/after/ by examples/make_compare_example.py. Expected sentences and
-numbers are typed by hand from those two datos.json files, never computed with
+numbers are typed by hand from those two run.json files, never computed with
 the code under test.
 """
 
@@ -19,19 +19,19 @@ from pathlib import Path
 from typing import Any
 
 import support  # noqa: F401  (path setup and the network guard)
-from support import run_cli, temp_dir
+from support import read_comparison, read_run, run_cli, temp_dir
 
 from sitecheck import compare
 from sitecheck.exitcodes import ExitCode
 from sitecheck.outputs import dumps_datos
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
-BEFORE = EXAMPLES / "datos.json"
-AFTER = EXAMPLES / "after" / "datos.json"
+BEFORE = EXAMPLES / "run.json"
+AFTER = EXAMPLES / "after" / "run.json"
 
 
 def _load(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_run(path)
 
 
 def _check(datos: dict[str, Any], check_id: str) -> dict[str, Any]:
@@ -72,7 +72,7 @@ class _Runs:
     def write(self) -> None:
         for folder, datos in ((self.before_dir, self.before), (self.after_dir, self.after)):
             folder.mkdir(parents=True, exist_ok=True)
-            (folder / "datos.json").write_text(dumps_datos(datos), encoding="utf-8")
+            (folder / "run.json").write_text(dumps_datos(datos), encoding="utf-8")
 
     def run(self) -> tuple[int, str, str]:
         self.write()
@@ -86,14 +86,14 @@ class _Runs:
 
     @property
     def data(self) -> dict[str, Any]:
-        return _load(self.after_dir / compare.DATA)
+        return read_comparison(self.after_dir / compare.DATA)
 
     def row(self, key: str) -> dict[str, Any]:
         return next(r for r in self.data["filas"] if r["clave"] == key)
 
 
 class ExampleComparisonTest(unittest.TestCase):
-    """The committed example: values typed by hand from the two datos.json files."""
+    """The committed example: values typed by hand from the two run.json files."""
 
     def setUp(self) -> None:
         self._tmp = temp_dir()
@@ -236,15 +236,15 @@ class RefusalTest(unittest.TestCase):
             for expected in (
                 "the BEFORE run does not record the domain",
                 "the AFTER run does not record the site-check version",
-                "the BEFORE run does not record the measured page (meta.url_canonica)",
+                "the BEFORE run does not record the measured page (meta.canonical_url)",
                 "the AFTER run does not record test mode",
-                "the BEFORE run does not record the Lighthouse version (meta.version_lighthouse)",
+                "the BEFORE run does not record the Lighthouse version (meta.lighthouse_version)",
             ):
                 self.assertIn(expected, err)
             self.assertFalse((runs.after_dir / compare.REPORT).exists())
 
     def test_missing_psi_counts_are_refused(self) -> None:
-        self._refused(lambda b, a: a["meta"].pop("corridas_psi"), "the AFTER run does not record validas in meta.corridas_psi")
+        self._refused(lambda b, a: a["meta"].pop("corridas_psi"), "the AFTER run does not record valid in meta.psi_runs")
 
     def test_pagespeed_off_in_one_run(self) -> None:
         self._refused(lambda b, a: a["meta"].update(sin_pagespeed=True), "PageSpeed on or off")
@@ -466,7 +466,7 @@ class ControlAndCountsTest(unittest.TestCase):
             phrase["que_se_encontro"] = "Un texto inseguro que no tendría que llegar al lector"
             code, _, err = runs.run()
             self.assertEqual(code, int(ExitCode.TEXT_CONTROL))
-            self.assertIn("palabra-prohibida", err)
+            self.assertIn("forbidden-word", err)
             self.assertTrue((runs.after_dir / compare.REPORT).exists())
             self.assertEqual(runs.data["salida"]["control_texto"][0]["regla"], "palabra-prohibida")
 
@@ -476,7 +476,7 @@ class CompareCliTest(unittest.TestCase):
         with temp_dir() as root:
             runs = _Runs(root)
             runs.write()
-            code, out, err = run_cli(["--compare", str(runs.before_dir), str(runs.after_dir / "datos.json")])
+            code, out, err = run_cli(["--compare", str(runs.before_dir), str(runs.after_dir / "run.json")])
             self.assertEqual(code, 0, err)
             self.assertIn("Checks passed: 19/36 before, 25/36 after; 8 colour changes.", out)
 
@@ -498,7 +498,7 @@ class CompareCliTest(unittest.TestCase):
         self.assertIn("the --compare AFTER run does not exist", err)
 
     def test_the_same_run_twice(self) -> None:
-        code, _, err = run_cli(["--compare", str(EXAMPLES), str(EXAMPLES / "datos.json")])
+        code, _, err = run_cli(["--compare", str(EXAMPLES), str(EXAMPLES / "run.json")])
         self.assertEqual(code, 2)
         self.assertIn("--compare needs two different runs", err)
 
@@ -522,7 +522,7 @@ class CompareExampleIsReproducibleTest(unittest.TestCase):
         with temp_dir() as root:
             before = root / "antes"
             before.mkdir()
-            shutil.copyfile(BEFORE, before / "datos.json")
+            shutil.copyfile(BEFORE, before / "run.json")
             fresh = root / "after"
             code, _, err = module.build(before, fresh)
             self.assertEqual(code, 0, err)

@@ -214,7 +214,7 @@ class KindTest(unittest.TestCase):
     def test_e2e_company_report_has_no_school_words(self) -> None:
         options = SchoolOptions(name="Ferretería Ejemplo", title="Ferretería Ejemplo | Herramientas y materiales en Buenos Aires")
         r = run_e2e(school_scenario(options), default_apis(), nombre="Ferretería Ejemplo", extra=("--kind", "empresa"))
-        for name in ("informe.md", "anexo-tecnico.md"):
+        for name in ("report.md", "technical-annex.md"):
             text = r.files.get(name, "")
             for bad in ("del empresa", "el empresa", "El empresa", "familias", "Familias", "inscripciones"):
                 self.assertNotIn(bad, text, f"{name}: {bad}")
@@ -377,14 +377,14 @@ class SiteTextInjectionTest(unittest.TestCase):
     def test_textlint_rejects_markdown_links_and_tags(self) -> None:
         from sitecheck.textlint import lint_text
 
-        rules = {i.rule for i in lint_text("- Título «[promo](https://phish.example/x)» y <img src=x>", name="informe.md")}
+        rules = {i.rule for i in lint_text("- Título «[promo](https://phish.example/x)» y <img src=x>", name="report.md")}
         self.assertIn("enlace-o-etiqueta", rules)
-        self.assertEqual(lint_text("<details><summary>● 3 cosas bien</summary>\n</details>", name="informe.md"), [])
+        self.assertEqual(lint_text("<details><summary>● 3 cosas bien</summary>\n</details>", name="report.md"), [])
 
     def test_textlint_rejects_replacement_characters(self) -> None:
         from sitecheck.textlint import lint_text
 
-        issues = lint_text("- En Google aparece «Colegio Ejemplo Peque\ufffdo».", name="informe.md")
+        issues = lint_text("- En Google aparece «Colegio Ejemplo Peque\ufffdo».", name="report.md")
         self.assertEqual([i.rule for i in issues], ["caracter-roto"])
 
 
@@ -403,18 +403,18 @@ class ReportConsistencyTest(unittest.TestCase):
         self.assertEqual(r.code, 3)
         self.assertEqual(r.check("EXT-08")["estado"], "FALLA")
         self.assertEqual(r.check("EXT-05")["estado"], "FALLA")
-        self.assertNotIn("La medición de velocidad de Google no se pudo completar", r.files["informe.md"])
-        self.assertNotIn("● 0 bien", r.files["informe.md"].replace("**", ""))
+        self.assertNotIn("La medición de velocidad de Google no se pudo completar", r.files["report.md"])
+        self.assertNotIn("● 0 bien", r.files["report.md"].replace("**", ""))
 
     def test_internal_notes_stay_out_of_the_report(self) -> None:
         r = run_e2e(school_scenario(), default_apis(), nombre=None)
-        self.assertNotIn("no se indicó el nombre", r.files["informe.md"])
+        self.assertNotIn("no se indicó el nombre", r.files["report.md"])
         self.assertIsNotNone(r.check("VIS-04").get("nota_interna"))
 
     def test_annex_is_a_separate_file(self) -> None:
         r = run_e2e(school_scenario(), default_apis())
-        self.assertNotIn("## Anexo técnico", r.files["informe.md"])
-        self.assertIn("## Anexo técnico", r.files["anexo-tecnico.md"])
+        self.assertNotIn("## Anexo técnico", r.files["report.md"])
+        self.assertIn("## Anexo técnico", r.files["technical-annex.md"])
 
 
 if __name__ == "__main__":

@@ -93,10 +93,10 @@ class IntroListsTest(unittest.TestCase):
 
     def test_e2e_spamhaus_grey_as_under_warp(self) -> None:
         warp = run_e2e(school_scenario(), default_apis(dbl_codes=["127.255.255.254"]))
-        self.assertNotIn("listas de sitios peligrosos", warp.files["informe.md"])
-        self.assertEqual(intro(warp.files["informe.md"]), self.NONE)
+        self.assertNotIn("listas de sitios peligrosos", warp.files["report.md"])
+        self.assertEqual(intro(warp.files["report.md"]), self.NONE)
         calm = run_e2e(school_scenario(), default_apis())
-        self.assertIn("y si el dominio figura en la lista de bloqueo de Spamhaus.", intro(calm.files["informe.md"]))
+        self.assertIn("y si el dominio figura en la lista de bloqueo de Spamhaus.", intro(calm.files["report.md"]))
 
 
 # ---------------------------------------------------------------------------
@@ -235,11 +235,11 @@ class PlatformWordingTest(unittest.TestCase):
         r = run_e2e(sc, default_apis(), nombre="Ferretería Ejemplo", extra=("--kind", "empresa"))
         self.assertEqual(r.check("EXT-02")["estado"], "NO_APLICA", "control: not WordPress")
         self.assertEqual(r.check("VIS-06")["estado"], "FALLA", "control: the shop has an action to read")
-        informe = r.files["informe.md"]
+        informe = r.files["report.md"]
         for word in WP_WORDS:
             self.assertNotIn(word, informe, word)
         school = run_e2e(school_scenario(), default_apis())
-        self.assertIn("en el tema hijo", school.files["informe.md"], "control: the WordPress school keeps its words")
+        self.assertIn("en el tema hijo", school.files["report.md"], "control: the WordPress school keeps its words")
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ class SelfCheckTest(unittest.TestCase):
         ext20 = r.check("EXT-20")
         self.assertEqual(ext20["mediciones"]["control_samples"], [])
         self.assertEqual(ext20["estado"], "APROBADO")
-        self.assertNotIn("sitio de control", r.files["informe.md"])
+        self.assertNotIn("sitio de control", r.files["report.md"])
         site_lines = [line for line in lines if line["kind"] == "site"]
         # In test mode the TLS handshakes go to the fake API (/tls); in production they are "tls" lines.
         tls_lines = [line for line in lines if line["kind"] == "tls" or "/tls?host=" in line["url"]]
@@ -404,7 +404,7 @@ class HomeUnreachableTest(unittest.TestCase):
 class KeylessReasonTest(unittest.TestCase):
     def test_plain_reason_for_the_reader_and_detail_for_the_operator(self) -> None:
         r = run_e2e(school_scenario(), default_apis(psi_status=429), key="")
-        informe = r.files["informe.md"]
+        informe = r.files["report.md"]
         for word in ("cuota", "sin clave"):
             self.assertNotIn(word, informe, word)
         self.assertIn("○ No se pudo medir: la herramienta de velocidad de Google no dio resultados.", informe)
@@ -452,9 +452,9 @@ class Vis13GreyTest(unittest.TestCase):
         self.assertIn(
             "¿Los formularios se entienden y los botones se pueden tocar? La página principal no tiene formularios para "
             "revisar; los de otras páginas se revisan en navegador.",
-            r.files["informe.md"],
+            r.files["report.md"],
         )
-        self.assertNotIn("Los formularios están en otras páginas", r.files["informe.md"])
+        self.assertNotIn("Los formularios están en otras páginas", r.files["report.md"])
 
 
 # ---------------------------------------------------------------------------

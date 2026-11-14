@@ -601,7 +601,7 @@ def mail_domain_verdict(check: "MailDomainCheck") -> str:
 def institutional_addresses(findings: "list[Finding]") -> frozenset[str]:
     """The institutional role addresses VIS-21 measured in this run, lowercased.
 
-    They are the only addresses of the site that a report or datos.json may
+    They are the only addresses of the site that a report or run.json may
     carry. A person's address is never in
     measured, so it is never here.
     """
@@ -618,7 +618,7 @@ def institutional_addresses(findings: "list[Finding]") -> frozenset[str]:
 
 
 def _page_key(page: str, survey: "MailDomainSurvey") -> str:
-    """Where an address was found, as datos.json names it: "inicio", "contacto" or "otra"."""
+    """Where an address was found, as run.json names it: "inicio", "contacto" or "otra"."""
     if page == "inicio":
         return "inicio"
     return "contacto" if survey.interna_kind == "contacto" else "otra"

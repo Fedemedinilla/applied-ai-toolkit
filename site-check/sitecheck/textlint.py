@@ -1,8 +1,8 @@
 """Control of every text a reader of the report gets.
 
-Applied to informe.md and anexo-tecnico.md before the run ends. Any issue makes
+Applied to report.md and technical-annex.md before the run ends. Any issue makes
 the run end with exit 4 (TEXT_CONTROL); the files stay, and the issues are
-printed and stored in datos.json salida.control_texto. Rules:
+printed and stored in run.json salida.control_texto. Rules:
 
 * forbidden words (accent- and case-insensitive, whole words): FORBIDDEN_WORDS.
   "certificado" is out because a non-technical reader takes it for a legal
@@ -27,7 +27,7 @@ A forbidden word inside the organisation's own name or title (rare) also fails:
 a person fixes it by hand, which is the safe outcome.
 
 Excerpts never carry a secret (scrubbed by the Redactor) nor an e-mail address
-(replaced by "[correo]"), because they are printed and stored in datos.json.
+(replaced by "[correo]"), because they are printed and stored in run.json.
 """
 
 from __future__ import annotations
@@ -110,7 +110,7 @@ class LintIssue:
     excerpt: str  # at most 60 chars around the hit, secrets redacted
 
     def to_datos(self) -> dict[str, object]:
-        """JSON-ready form for datos.json salida.control_texto."""
+        """JSON-ready form for run.json salida.control_texto."""
         return {"archivo": self.file, "linea": self.line, "regla": self.rule, "extracto": self.excerpt}
 
 

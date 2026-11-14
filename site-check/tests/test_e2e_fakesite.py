@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from support import TEST_KEY, patched_env, run_cli, temp_dir
+from support import TEST_KEY, patched_env, run_cli, temp_dir, read_run
 
 from fakeapis import FakeApis
 from fakesite import FakeSite
@@ -57,7 +57,7 @@ def run_dir(salidas: Path) -> Path:
 
 
 def datos(rd: Path) -> dict:
-    return json.loads((rd / "datos.json").read_text(encoding="utf-8"))
+    return read_run(rd / "run.json")
 
 
 def check(d: dict, cid: str) -> dict:
@@ -71,11 +71,11 @@ class EndToEndTest(unittest.TestCase):
             code, out, err = cli(site, apis, salidas)
             self.assertEqual(code, 0, err)
             rd = run_dir(salidas)
-            for name in ("datos.json", "informe.md", "anexo-tecnico.md", "00-tiempo.txt", "evidencia/requests.log", "evidencia/home.html"):
+            for name in ("run.json", "report.md", "technical-annex.md", "00-time.txt", "evidence/requests.log", "evidence/home.html"):
                 self.assertTrue((rd / name).exists(), name)
-            self.assertEqual(sorted(p.name for p in rd.iterdir() if p.is_file()), ["00-tiempo.txt", "anexo-tecnico.md", "datos.json", "informe.md"])
+            self.assertEqual(sorted(p.name for p in rd.iterdir() if p.is_file()), ["00-time.txt", "report.md", "run.json", "technical-annex.md"])
 
-            informe = (rd / "informe.md").read_text(encoding="utf-8")
+            informe = (rd / "report.md").read_text(encoding="utf-8")
             self.assertTrue(informe.startswith("**Colegio Ejemplo · Estado del sitio colegio.test**\n\nFecha: "))
             self.assertIn(
                 "**36 chequeos aplicables:** ▲ 1 para arreglar ya · ■ 6 para revisar · ◆ 6 mejoras opcionales · "
@@ -97,13 +97,13 @@ class EndToEndTest(unittest.TestCase):
                 informe,
             )
             self.assertIn("Se hicieron 24 pedidos a su sitio en 1 minuto, de a uno por vez y con pausas.", informe)
-            annex = (rd / "anexo-tecnico.md").read_text(encoding="utf-8")
+            annex = (rd / "technical-annex.md").read_text(encoding="utf-8")
             self.assertIn("## Enlaces de la página principal que llevan a páginas que no existen", annex)
             self.assertIn("| EXT-05 | FALLA | ▲ Arreglar ya |", annex)
             self.assertIn("Report: ", out)
 
             d = datos(rd)
-            self.assertEqual(d["schema_version"], 1)
+            self.assertEqual(d["schema_version"], 2)
             self.assertEqual(d["meta"]["clave"], "presente")
             self.assertEqual(d["salida"]["codigo"], 0)
             self.assertEqual(d["senales_hackeo"], [])
@@ -124,26 +124,26 @@ class EndToEndTest(unittest.TestCase):
             cli(site, apis, salidas)
             rd = run_dir(salidas)
             site_email = r"[\w.+-]+@[\w-]+\.[\w.]+"
-            for name in ("informe.md", "anexo-tecnico.md"):
+            for name in ("report.md", "technical-annex.md"):
                 text = (rd / name).read_text(encoding="utf-8")
                 self.assertNotIn("info@colegio.test", text, name)
                 self.assertNotIn("5491123456789", text, name)
                 self.assertNotIn("Juana Titular", text, name)
                 self.assertIsNone(re.search(site_email, text), name)
-            # datos.json: the institution's role address info@ is VIS-21's measured data, and nothing else of the
+            # run.json: the institution's role address info@ is VIS-21's measured data, and nothing else of the
             # site is an address.
-            text = (rd / "datos.json").read_text(encoding="utf-8")
+            text = (rd / "run.json").read_text(encoding="utf-8")
             self.assertEqual(re.findall(site_email, text), ["info@colegio.test"])
             self.assertNotIn("5491123456789", text)
             self.assertNotIn("Juana Titular", text)
-            d = json.loads(text)
+            d = read_run(rd / "run.json")
             vis21 = next(c for c in d["checks"] if c["id"] == "VIS-21")
             self.assertEqual(vis21["estado"], "APROBADO")
             self.assertEqual(
                 vis21["mediciones"]["dominios"],
                 [{"dominio": "colegio.test", "paginas": ["inicio"], "veredicto": "recibe-mx", "direccion": "info@colegio.test"}],
             )
-            # Control: without that one value, datos.json carries no address of the site.
+            # Control: without that one value, run.json carries no address of the site.
             del vis21["mediciones"]["dominios"][0]["direccion"]
             self.assertIsNone(re.search(site_email, json.dumps(d, ensure_ascii=False)))
             for f in rd.rglob("*"):
@@ -154,7 +154,7 @@ class EndToEndTest(unittest.TestCase):
         with FakeSite(school_scenario()) as site, FakeApis(default_apis()) as apis, temp_dir() as salidas:
             cli(site, apis, salidas)
             rd = run_dir(salidas)
-            for name in ("informe.md", "anexo-tecnico.md"):
+            for name in ("report.md", "technical-annex.md"):
                 text = (rd / name).read_text(encoding="utf-8")
                 for bad in ("\u2014", "\u2013", "certificado", "Certificado", "pendiente", "insecure", "tenés", "podés"):
                     self.assertNotIn(bad, text, f"{name}: {bad!r}")
@@ -190,7 +190,7 @@ class EndToEndTest(unittest.TestCase):
             self.assertEqual(code, 3)
             self.assertEqual(len(site.requests), 2, "first request plus one retry")
             rd = run_dir(salidas)
-            self.assertTrue((rd / "datos.json").exists())
+            self.assertTrue((rd / "run.json").exists())
             d = datos(rd)
             self.assertTrue(d["meta"]["sitio_cortado"])
             kept = {"EXT-08", "EXT-21", "EXT-05", "EXT-13", "EXT-23", "EXT-07"}  # measured without the home
@@ -227,7 +227,7 @@ class EndToEndTest(unittest.TestCase):
             rd = run_dir(salidas)
             d = datos(rd)
             self.assertEqual(d["senales_hackeo"], ["EXT-23: Spamhaus DBL 127.0.1.4"])
-            informe = (rd / "informe.md").read_text(encoding="utf-8")
+            informe = (rd / "report.md").read_text(encoding="utf-8")
             self.assertIn(
                 "**Próximo paso recomendado:** Revisar el sitio a fondo, con acceso autorizado, antes de cualquier otro "
                 "cambio, porque el dominio está en la lista de bloqueo de Spamhaus.",
@@ -239,26 +239,26 @@ class EndToEndTest(unittest.TestCase):
         with FakeSite(school_scenario()) as site, FakeApis(default_apis()) as apis, temp_dir() as salidas:
             code1, _, _ = cli(site, apis, salidas)
             rd = run_dir(salidas)
-            before = {n: (rd / n).read_bytes() for n in ("informe.md", "anexo-tecnico.md")}
+            before = {n: (rd / n).read_bytes() for n in ("report.md", "technical-annex.md")}
             n_site, n_api = len(site.requests), len(apis.requests)
-            code2, _, err = run_cli(["--rerender", str(rd / "datos.json"), "--out", str(salidas)])
+            code2, _, err = run_cli(["--rerender", str(rd / "run.json"), "--out", str(salidas)])
             self.assertEqual(code2, code1, err)
             self.assertEqual((len(site.requests), len(apis.requests)), (n_site, n_api))
             for name, data in before.items():
                 self.assertEqual((rd / name).read_bytes(), data, name)
-            self.assertTrue(any(p.name.startswith("datos-") for p in rd.iterdir()), "the previous datos.json is kept")
-            self.assertFalse(any("anterior" in p.name for p in rd.iterdir()), "an unchanged report is not backed up")
+            self.assertTrue(any(p.name.startswith("run-") for p in rd.iterdir()), "the previous run.json is kept")
+            self.assertFalse(any("previous" in p.name for p in rd.iterdir()), "an unchanged report is not backed up")
 
     def test_rerender_with_an_override_keeps_the_old_report(self) -> None:
         with FakeSite(school_scenario()) as site, FakeApis(default_apis()) as apis, temp_dir() as salidas:
             cli(site, apis, salidas)
             rd = run_dir(salidas)
-            before = (rd / "informe.md").read_text(encoding="utf-8")
+            before = (rd / "report.md").read_text(encoding="utf-8")
             overrides = salidas / "ajustes.json"
             overrides.write_text(json.dumps({"EXT-09": {"color": "azul", "motivo": "el hosting ya lo tiene en su plan"}}), encoding="utf-8")
-            code, _, err = run_cli(["--rerender", str(rd / "datos.json"), "--overrides", str(overrides)])
+            code, _, err = run_cli(["--rerender", str(rd / "run.json"), "--overrides", str(overrides)])
             self.assertEqual(code, 0, err)
-            self.assertEqual((rd / "informe-anterior-1.md").read_text(encoding="utf-8"), before)
+            self.assertEqual((rd / "report-previous-1.md").read_text(encoding="utf-8"), before)
             self.assertEqual(check(datos(rd), "EXT-09")["color_final"], "azul")
             self.assertEqual(check(datos(rd), "EXT-09")["motivo_ajuste"], "el hosting ya lo tiene en su plan")
 

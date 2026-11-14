@@ -60,7 +60,7 @@ class RunConfig:
     production (test mode keeps its zero waits).
     """
 
-    url: str  # "" with --rerender: pipeline.rerender takes meta.url_entrada from datos.json
+    url: str  # "" with --rerender: pipeline.rerender takes meta.url_entrada from run.json
     institution: str | None = None  # --name
     kind: str = DEFAULT_KIND  # --kind
     para: str = DEFAULT_PARA  # --to
@@ -69,7 +69,7 @@ class RunConfig:
     psi_runs: int = DEFAULT_PSI_RUNS  # --psi-runs
     observatory: bool = False  # --observatory
     overrides: Path | None = None  # --overrides: colour overrides {ID: {color, motivo}}
-    rerender_from: Path | None = None  # --rerender: path to an existing datos.json
+    rerender_from: Path | None = None  # --rerender: path to an existing run.json
     out_root: Path = field(default_factory=default_output_root)  # --out
     exclude: Path | None = None  # --exclude (or SITE_CHECK_EXCLUDE): extra exclusion list
     test_loopback: str | None = None
@@ -77,8 +77,8 @@ class RunConfig:
     psi_enabled: bool = True  # --no-pagespeed sets False: no PSI and no CrUX call
     pace_seconds: float = DEFAULT_PACE_SECONDS  # --pause (>= 3, <= 60)
     site_budget: int = DEFAULT_SITE_BUDGET  # --max-requests (1..90)
-    kind_explicit: bool = False  # True when --kind was given (datos.json meta.tipo_explicito)
-    compare: tuple[Path, Path] | None = None  # --compare BEFORE AFTER: two run folders or datos.json files
+    kind_explicit: bool = False  # True when --kind was given (run.json meta.tipo_explicito)
+    compare: tuple[Path, Path] | None = None  # --compare BEFORE AFTER: two run folders or run.json files
 
     @property
     def test_mode(self) -> bool:

@@ -6,8 +6,8 @@
   are never followed, nothing else is ever deleted.
 * Time bombs: a WordPress branch missing from the release table, a Lighthouse
   major the audit names were not verified for, the VIS-16 year gate; each is
-  warned on the console and recorded in datos.json.
-* A --rerender whose datos.json carries a foreign e-mail fails the control.
+  warned on the console and recorded in run.json.
+* A --rerender whose run.json carries a foreign e-mail fails the control.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 from unittest import mock
 
 import support  # noqa: F401
-from support import TEST_KEY, patched_env, run_cli, temp_dir
+from support import TEST_KEY, patched_env, run_cli, temp_dir, read_run
 
 from sitecheck import config, doh, domains, outputs, pipeline, psi, wpversions
 from sitecheck.checks import content, security
@@ -214,7 +214,7 @@ class LighthouseMajorTest(unittest.TestCase):
 
 
 class TimeBombRunTest(unittest.TestCase):
-    """The two warnings end to end: on the console and in datos.json meta."""
+    """The two warnings end to end: on the console and in run.json meta."""
 
     WP_LINE = (
         "Note: La tabla de versiones de WordPress no tiene la rama 7.2: actualizar wpversions.py (se verificó por "
@@ -232,7 +232,7 @@ class TimeBombRunTest(unittest.TestCase):
         apis_cfg.wp_stable = {"6.1.1": "insecure", "7.2.0": "latest"}
         with temp_dir() as salidas, FakeSite(school_scenario()) as site, FakeApis(apis_cfg) as apis:
             _, out, _ = cli(site, apis, salidas)
-            meta = json.loads((only_run(salidas) / "datos.json").read_text(encoding="utf-8"))["meta"]
+            meta = read_run(only_run(salidas) / "run.json")["meta"]
         self.assertIn(self.WP_LINE, out.splitlines())
         self.assertIn(self.LH_LINE, out.splitlines())
         self.assertEqual(
@@ -250,7 +250,7 @@ class TimeBombRunTest(unittest.TestCase):
     def test_control_the_default_run_has_no_warning(self) -> None:
         with temp_dir() as salidas, FakeSite(school_scenario()) as site, FakeApis(default_apis()) as apis:
             _, out, _ = cli(site, apis, salidas)
-            meta = json.loads((only_run(salidas) / "datos.json").read_text(encoding="utf-8"))["meta"]
+            meta = read_run(only_run(salidas) / "run.json")["meta"]
         self.assertIsNone(meta["aviso_wordpress"])
         self.assertIsNone(meta["aviso_lighthouse"])
         self.assertNotIn("Atención: la tabla de versiones", out)
@@ -286,13 +286,13 @@ class RerenderDatosProblemTest(unittest.TestCase):
             code, _, err = cli(site, apis, salidas)
             self.assertEqual(code, 0, err)
             rd = only_run(salidas)
-            path = rd / "datos.json"
+            path = rd / "run.json"
             if add_email:
                 d = json.loads(path.read_text(encoding="utf-8"))
-                d["meta"]["errores"] = ["contacto: alguien@otro.test"]
+                d["meta"]["errors"] = ["contacto: alguien@otro.test"]  # the file on disk, with its English names
                 path.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
             code, _, _ = run_cli(["--rerender", str(path)])
-            new = json.loads(path.read_text(encoding="utf-8"))
+            new = read_run(path)
             names = {p.name for p in rd.iterdir()}
         return code, names, new
 
@@ -357,14 +357,14 @@ class TestFilesTest(unittest.TestCase):
 
 
 def make_run(root: Path, domain: str, name: str, *, markers: bool = True) -> Path:
-    """A run folder as the tool leaves it: datos.json, informe.md and evidencia/ with two files."""
+    """A run folder as the tool leaves it: run.json, report.md and evidencia/ with two files."""
     run = root / domain / name
-    (run / "evidencia").mkdir(parents=True)
-    (run / "evidencia" / "home.html").write_text("<html></html>", encoding="utf-8")
+    (run / "evidence").mkdir(parents=True)
+    (run / "evidence" / "home.html").write_text("<html></html>", encoding="utf-8")
     if markers:
-        (run / "datos.json").write_text("{}", encoding="utf-8")
-        (run / "evidencia" / "requests.log").write_text("{}\n", encoding="utf-8")
-    (run / "informe.md").write_text("informe", encoding="utf-8")
+        (run / "run.json").write_text("{}", encoding="utf-8")
+        (run / "evidence" / "requests.log").write_text("{}\n", encoding="utf-8")
+    (run / "report.md").write_text("informe", encoding="utf-8")
     return run
 
 
@@ -394,14 +394,14 @@ class RetentionTest(unittest.TestCase):
             (root / "exclude.txt").write_text("lista.test\n", encoding="utf-8")
             (root / "colegio.test" / "notas.txt").write_text("notas", encoding="utf-8")
             result = outputs.prune_old_evidence(root, DAY)
-            self.assertEqual(sorted(result.removed), sorted([old / "evidencia", old_n / "evidencia"]))
+            self.assertEqual(sorted(result.removed), sorted([old / "evidence", old_n / "evidence"]))
             self.assertEqual(result.failed, [])
             for run in (old, old_n):
-                self.assertFalse((run / "evidencia").exists())
-                for name in ("datos.json", "informe.md"):
+                self.assertFalse((run / "evidence").exists())
+                for name in ("run.json", "report.md"):
                     self.assertTrue((run / name).is_file(), (run, name))
             for run in (edge, recent):
-                self.assertTrue((run / "evidencia" / "home.html").is_file(), run)
+                self.assertTrue((run / "evidence" / "home.html").is_file(), run)
             self.assertEqual((root / "exclude.txt").read_text(encoding="utf-8"), "lista.test\n")
             self.assertTrue((root / "colegio.test" / "notas.txt").is_file())
 
@@ -417,16 +417,16 @@ class RetentionTest(unittest.TestCase):
             ]
             as_file = root / "colegio.test" / "2026-01-03"
             as_file.mkdir(parents=True)
-            (as_file / "datos.json").write_text("{}", encoding="utf-8")
-            (as_file / "evidencia").write_text("un archivo", encoding="utf-8")
+            (as_file / "run.json").write_text("{}", encoding="utf-8")
+            (as_file / "evidence").write_text("un archivo", encoding="utf-8")
             result = outputs.prune_old_evidence(root, DAY)
             self.assertEqual(result.removed, [])
             for run in kept:
-                self.assertTrue((run / "evidencia" / "home.html").is_file(), run)
-            self.assertEqual((as_file / "evidencia").read_text(encoding="utf-8"), "un archivo")
+                self.assertTrue((run / "evidence" / "home.html").is_file(), run)
+            self.assertEqual((as_file / "evidence").read_text(encoding="utf-8"), "un archivo")
             # Control: the same tree with one well-formed old run loses only that evidence.
             good = make_run(root, "colegio.test", "2026-01-04")
-            self.assertEqual(outputs.prune_old_evidence(root, DAY).removed, [good / "evidencia"])
+            self.assertEqual(outputs.prune_old_evidence(root, DAY).removed, [good / "evidence"])
 
     def test_links_are_never_followed(self) -> None:
         with temp_dir() as tmp:
@@ -436,42 +436,42 @@ class RetentionTest(unittest.TestCase):
             # 1. An old run whose evidencia is a link to a folder outside the root.
             run = root / "colegio.test" / "2026-01-01"
             run.mkdir(parents=True)
-            (run / "datos.json").write_text("{}", encoding="utf-8")
-            if not directory_link(outside_run / "evidencia", run / "evidencia"):
+            (run / "run.json").write_text("{}", encoding="utf-8")
+            if not directory_link(outside_run / "evidence", run / "evidence"):
                 self.skipTest("directory links cannot be created here")
             # 2. A domain folder that is a link to another tree with old runs.
             directory_link(outside / "lejos.test", root / "lejos.test")
-            # 3. A link inside an old evidencia folder: the folder goes, the target stays.
+            # 3. A link inside an old evidence folder: the folder goes, the target stays.
             inner = make_run(root, "otro.test", "2026-01-01")
-            directory_link(outside / "lejos.test", inner / "evidencia" / "enlace")
+            directory_link(outside / "lejos.test", inner / "evidence" / "enlace")
             result = outputs.prune_old_evidence(root, DAY)
-            self.assertEqual(result.removed, [inner / "evidencia"])
-            self.assertTrue((outside_run / "evidencia" / "home.html").is_file())
-            self.assertTrue((outside_run / "evidencia" / "requests.log").is_file())
-            self.assertTrue((run / "evidencia").exists(), "the link itself is not deleted either")
+            self.assertEqual(result.removed, [inner / "evidence"])
+            self.assertTrue((outside_run / "evidence" / "home.html").is_file())
+            self.assertTrue((outside_run / "evidence" / "requests.log").is_file())
+            self.assertTrue((run / "evidence").exists(), "the link itself is not deleted either")
 
     def test_a_run_prunes_before_measuring(self) -> None:
         with temp_dir() as salidas, FakeSite(school_scenario()) as site, FakeApis(default_apis()) as apis:
             old = make_run(salidas, "colegio.test", "2026-09-01")
             code, out, err = cli(site, apis, salidas)
             self.assertEqual(code, 0, err)
-            self.assertIn("Evidence older than 30 days: deleted 1 evidencia folder.", err.splitlines())
-            self.assertFalse((old / "evidencia").exists())
-            self.assertTrue((old / "informe.md").is_file())
+            self.assertIn("Evidence older than 30 days: deleted 1 evidence folder.", err.splitlines())
+            self.assertFalse((old / "evidence").exists())
+            self.assertTrue((old / "report.md").is_file())
             new = salidas / "colegio.test" / "2026-10-14"
-            self.assertTrue((new / "evidencia" / "requests.log").is_file(), "the new run keeps its evidence")
+            self.assertTrue((new / "evidence" / "requests.log").is_file(), "the new run keeps its evidence")
             # Control: a --rerender deletes no evidence, even of a run that is now old.
-            code, _, err = run_cli(["--rerender", str(new / "datos.json")])
+            code, _, err = run_cli(["--rerender", str(new / "run.json")])
             self.assertEqual(code, 0, err)
             self.assertNotIn("Evidence older than", err)
 
     def test_the_console_line(self) -> None:
         r = outputs.PruneResult
         self.assertEqual(outputs.prune_message(r()), "Evidence older than 30 days: nothing to delete.")
-        self.assertEqual(outputs.prune_message(r(removed=[Path("a")])), "Evidence older than 30 days: deleted 1 evidencia folder.")
+        self.assertEqual(outputs.prune_message(r(removed=[Path("a")])), "Evidence older than 30 days: deleted 1 evidence folder.")
         self.assertEqual(
             outputs.prune_message(r(removed=[Path("a"), Path("b")], failed=[Path("c")])),
-            "Evidence older than 30 days: deleted 2 evidencia folders. 1 could not be deleted; the next run tries again.",
+            "Evidence older than 30 days: deleted 2 evidence folders. 1 could not be deleted; the next run tries again.",
         )
 
 

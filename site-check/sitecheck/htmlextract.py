@@ -22,7 +22,7 @@ class as spam, and ``data_forms`` counts the forms that ask for
 personal data (an e-mail, a phone, a name or a document; never a search box),
 which is what the privacy law is about.
 
-Personal data: anchors keep their href, but nothing here is copied to datos.json
+Personal data: anchors keep their href, but nothing here is copied to run.json
 by default. Phone numbers are never stored whole (VIS-18 keeps the last 4
 digits); e-mail addresses are never stored.
 """

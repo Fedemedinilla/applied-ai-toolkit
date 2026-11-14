@@ -5,13 +5,13 @@ Steps:
     the registrable domain D of the URL, --inner-page/--form-page on D -> exit 2;
  1. exclusion list on the input host and D (exclusions.load): a match -> exit 10
     with ZERO requests and no folder created; an unreadable line -> exit 2;
- 1b. evidence retention (outputs.prune_old_evidence): the evidencia/ folders of
+ 1b. evidence retention (outputs.prune_old_evidence): the evidence/ folders of
     run folders more than 30 days old under the output root, and nothing else;
  2. dedupe warning (exclusions.prior_runs);
  3. run folder (outputs.create_run_dir) and services (services.build_services);
     --no-pagespeed swaps the PSI and CrUX clients for stubs that never send;
  4. collect (collect.collect) with the exclusion callback for the canonical host;
-    ScopeError -> abort, write datos.json with what exists, exit 50 (only a
+    ScopeError -> abort, write run.json with what exists, exit 50 (only a
     request the tool itself built; a redirect the site issues to a denied path
     is refused without raising);
     home_unreachable -> every check that needs the site NO_VERIFICADO (the ones
@@ -20,19 +20,19 @@ Steps:
     anti-bot check, "bajar el ritmo", an inconclusive TLS check);
  5. evaluate (evaluate.evaluate_all) with EvalContext(run_date, institution, kind,
     artifacts_written, pages) and the --overrides colours;
- 6. render informe.md and anexo-tecnico.md; 00-tiempo.txt;
+ 6. render report.md and technical-annex.md; 00-time.txt;
  7. text control (textlint.lint_files) and output sweeps (outputs.sweep_secrets,
-    outputs.foreign_emails); a problem is exit 4 and is listed in datos.json;
- 8. datos.json last (it records the exit code and the control issues); e-mail
+    outputs.foreign_emails); a problem is exit 4 and is listed in run.json;
+ 8. run.json last (it records the exit code and the control issues); e-mail
     addresses and the key are masked in it before writing (either counts as a
     control failure);
  9. print a short summary on stdout (folder, counts, outcome) and return.
 
---rerender: steps 5 (recolour only), 6, 7 and 8 from an existing datos.json.
+--rerender: steps 5 (recolour only), 6, 7 and 8 from an existing run.json.
 No Services are built, no request is made, the evidence folder is read-only and
-00-tiempo.txt is kept. A report file whose text changes is kept as
-"<name>-anterior-<n><ext>" before being replaced: nothing edited by hand is lost.
-The same datos.json always renders the same report: that is the determinism
+00-time.txt is kept. A report file whose text changes is kept as
+"<name>-previous-<n><ext>" before being replaced: nothing edited by hand is lost.
+The same run.json always renders the same report: that is the determinism
 the tests pin down.
 """
 
@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
-from . import SCHEMA_VERSION, __version__, fmt, outputs
+from . import SCHEMA_VERSION, __version__, fmt, outputs, runformat
 from .exitcodes import DESCRIPTION, ExitCode, OutcomeFlags, resolve
 from .fmt import ART
 
@@ -74,7 +74,7 @@ REASON_HOME_TLS = (
 )
 REASON_HOME_MOVED = "la dirección redirige a {target}, que es otro dominio; hay que volver a medir con esa dirección"
 
-# A wrapper home (gate.home_wrapper): for the operator (console, datos.json),
+# A wrapper home (gate.home_wrapper): for the operator (console, run.json),
 # never a report sentence. What it is, then what to measure instead. The tool
 # measures only home pages without a path (cli.py): a target with a path is
 # checked in a browser.
@@ -111,7 +111,7 @@ WRAPPER_TODO_SPA = (
 # PageSpeed (its own load), the domain's DNS, RDAP and DBL, and the TLS probe.
 SITE_INDEPENDENT_CHECKS: frozenset[str] = frozenset({"EXT-08", "EXT-21", "EXT-05", "EXT-13", "EXT-23", "EXT-07"})
 REASON_PSI_SKIPPED = "la medición de velocidad no se pidió en esta corrida"
-REASON_SUMMARY_UNREADABLE = "el resumen de Google no se pudo releer de datos.json"
+REASON_SUMMARY_UNREADABLE = "el resumen de Google no se pudo releer de run.json"
 
 _CONSOLE_CONTROL_RE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 
@@ -252,7 +252,7 @@ def _disable_psi(services: "Services") -> None:
 
 
 # ---------------------------------------------------------------------------
-# Derived facts for the report and datos.json
+# Derived facts for the report and run.json
 # ---------------------------------------------------------------------------
 
 
@@ -352,7 +352,7 @@ def _sanitize_raw(obj: Any) -> Any:
     """Raw diagnostic data (URL lists, error lines): e-mails and phone-like digit runs masked.
 
     Expected content there (a refused mailto: link, a wa.me/549... link), so the
-    masking is silent; e-mails anywhere else in datos.json are a control failure.
+    masking is silent; e-mails anywhere else in run.json are a control failure.
     Every string also goes through artifacts.mask_personal_data, so an
     /author/<user>/ path never reaches meta.alcance.
     """
@@ -374,7 +374,7 @@ def _sanitize_raw(obj: Any) -> Any:
 
 
 def _runtime_versions() -> dict[str, str]:
-    """The interpreter and library versions recorded in datos.json (meta)."""
+    """The interpreter and library versions recorded in run.json (meta)."""
     import pyexpat
 
     return {
@@ -489,7 +489,7 @@ _CATEGORY_ALIASES = {
 
 
 def _summary_from_datos(enc: Any) -> "GoogleSummary":
-    """Rebuild the report header from datos.json "encabezado" (GoogleSummary.to_datos) for --rerender.
+    """Rebuild the report header from run.json "encabezado" (GoogleSummary.to_datos) for --rerender.
 
     Tolerant on purpose: GoogleSummary has no from_datos in the contract, so
     English (dataclass) and Spanish key spellings are both read.
@@ -620,7 +620,7 @@ def _grey_findings(reason: str) -> list["Finding"]:
 
 
 # ---------------------------------------------------------------------------
-# Rendering, control and datos.json (shared by run and rerender)
+# Rendering, control and run.json (shared by run and rerender)
 # ---------------------------------------------------------------------------
 
 
@@ -631,7 +631,7 @@ class _Rendered:
 
 
 def _preserve(path: Path, new_text: str | None) -> None:
-    """--rerender: keep a changed or obsolete report file as <stem>-anterior-<n><suffix>."""
+    """--rerender: keep a changed or obsolete report file as <stem>-previous-<n><suffix>."""
     if not path.exists():
         return
     if new_text is not None:
@@ -640,7 +640,7 @@ def _preserve(path: Path, new_text: str | None) -> None:
             return
     n = 1
     while True:
-        target = path.with_name(f"{path.stem}-anterior-{n}{path.suffix}")
+        target = path.with_name(f"{path.stem}-previous-{n}{path.suffix}")
         if not target.exists():
             path.rename(target)
             return
@@ -707,19 +707,19 @@ def _control(
 def _finalize_datos(
     datos: dict[str, Any], redactor: "Redactor | None", allowed_emails: frozenset[str] = frozenset()
 ) -> tuple[dict[str, Any], list[str]]:
-    """Mask foreign e-mails (and the key) in datos.json; return the problems found (English).
+    """Mask foreign e-mails (and the key) in run.json; return the problems found (English).
 
     ``allowed_emails``: the run's institutional role addresses (_allowed_emails), never masked.
     """
     problems: list[str] = []
     masked, emails = outputs.mask_foreign_emails(datos, allowed_emails)
     if emails:
-        problems.append(f"{len(emails)} foreign e-mail address(es) masked in datos.json")
+        problems.append(f"{len(emails)} foreign e-mail address(es) masked in run.json")
     if redactor is not None:
         try:
             if redactor.contains_secret(outputs.dumps_datos(masked)):
                 masked = redactor.scrub_json(masked)
-                problems.append("a secret was scrubbed from datos.json")
+                problems.append("a secret was scrubbed from run.json")
         except Exception:  # noqa: BLE001
             pass
     return masked, problems
@@ -756,7 +756,6 @@ def _summary_lines(
     if hack_reasons:
         lines.append("Warning: signs that the site was compromised (" + "; ".join(hack_reasons) + ").")
     if clave is not None:
-        # datos.json keeps the Spanish value; the console says it in English.
         shown = {"presente": "present", "ausente": "absent"}.get(str(clave), str(clave))
         lines.append(f"PageSpeed key: {shown}.")
     for note in notes or []:
@@ -838,7 +837,7 @@ def _run(
         )
         return RunOutcome(ExitCode.EXCLUDED, messages=con.messages)
 
-    # 1b. Evidence retention: the evidencia/ folders of runs more than 30 days
+    # 1b. Evidence retention: the evidence/ folders of runs more than 30 days
     # old, and nothing else, before measuring.
     run_date = state.started.astimezone(ART).date()
     pruned = outputs.prune_old_evidence(config.out_root, run_date)
@@ -942,7 +941,7 @@ def _run(
     wrapper_info: dict[str, Any] | None = None
     wrapper = None if home_unreachable else _home_wrapper(obs)
     if wrapper is not None:
-        # Not the page the visitor sees: the console and datos.json say what to measure instead.
+        # Not the page the visitor sees: the console and run.json say what to measure instead.
         w_reason, w_todo = _wrapper_texts(wrapper, state.domain)
         wrapper_info = {"tipo": wrapper.kind, "destino": wrapper.target, "motivo": w_reason, "que_hacer": w_todo}
 
@@ -983,9 +982,9 @@ def _run(
     allowed_emails = _allowed_emails(findings)
     control = _control(paths, services.redactor, sweep=True, allowed_emails=allowed_emails)
     if not paths.requests_log.exists():
-        state.errors.append("evidencia/requests.log was not written")
+        state.errors.append("evidence/requests.log was not written")
 
-    # 8. datos.json, last.
+    # 8. run.json, last.
     extra = {
         "pedidos_sitio": n_site,
         "minutos_sitio": minutes,
@@ -1024,7 +1023,7 @@ def _run(
 
     # 9. Summary.
     for issue in issues:
-        con.warn(f"Text control: {issue['archivo']}:{issue['linea']} {issue['regla']}: {issue['extracto']}")
+        con.warn(f"Text control: {issue['archivo']}:{issue['linea']} {runformat.TEXT_RULES.get(issue['regla'], issue['regla'])}: {issue['extracto']}")
     if wrapper_info:
         con.warn(f"Note: {wrapper_info['motivo']}. {wrapper_info['que_hacer']}")
     clave = datos["meta"].get("clave")
@@ -1042,7 +1041,7 @@ def _psi_key_note(obs: "Observations") -> str | None:
 
 
 def _lighthouse_note(obs: "Observations", config: "RunConfig") -> str | None:
-    """psi.lighthouse_note of the run's Lighthouse version (the one datos.json records), or None."""
+    """psi.lighthouse_note of the run's Lighthouse version (the one run.json records), or None."""
     from .psi import lighthouse_note
 
     return lighthouse_note(_psi_facts(obs, config)[1])
@@ -1170,7 +1169,7 @@ def _abort_scope(state: _State, con: _Console, exc: Exception) -> RunOutcome:
 
 
 def _unexpected(state: _State, con: _Console, exc: BaseException) -> RunOutcome:
-    """Any uncaught error: redacted message and traceback on stderr, datos.json if possible, exit 1."""
+    """Any uncaught error: redacted message and traceback on stderr, run.json if possible, exit 1."""
     code = ExitCode.UNEXPECTED
     redactor = state.services.redactor if state.services is not None else None
     message = _scrub(redactor, f"{type(exc).__name__}: {exc}")
@@ -1183,7 +1182,7 @@ def _unexpected(state: _State, con: _Console, exc: BaseException) -> RunOutcome:
             datos, _ = _finalize_datos(_minimal_datos(state, code, message), redactor)
             outputs.write_datos(paths, datos)
         except Exception as inner:  # noqa: BLE001
-            con.warn(f"datos.json could not be written either: {type(inner).__name__}")
+            con.warn(f"run.json could not be written either: {type(inner).__name__}")
     return RunOutcome(code, run_dir=paths.root if paths else None, messages=con.messages)
 
 
@@ -1198,7 +1197,7 @@ def rerender(
     stdout: IO[str] | None = None,
     stderr: IO[str] | None = None,
 ) -> RunOutcome:
-    """Re-render the report from config.rerender_from (a datos.json) without any request."""
+    """Re-render the report from config.rerender_from (a run.json) without any request."""
     con = _Console(stdout, stderr)
     try:
         return _rerender(config, con)
@@ -1221,7 +1220,7 @@ def _local_date(meta: dict[str, Any]) -> dt.date:
             if moment.tzinfo is None:
                 moment = moment.replace(tzinfo=dt.timezone.utc)
             return moment.astimezone(ART).date()
-    raise ValueError("datos.json has no measurement date (meta.inicio_local)")
+    raise ValueError("the stored run has no measurement date (meta.started_local)")
 
 
 def _local_moment(meta: dict[str, Any], key: str, fallback: dt.datetime) -> dt.datetime:
@@ -1246,6 +1245,7 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
     assert config.rerender_from is not None
     source = Path(config.rerender_from)
     try:
+        legacy = runformat.is_legacy(outputs.read_document(source))
         old = outputs.read_datos(source)
     except ValueError as exc:
         return _usage(con, f"--rerender: {exc}")
@@ -1330,12 +1330,17 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         "errores_rehacer": errors,
         "rehecho": {"fecha_local": _iso_local(now), "desde": source.name},
     }
+    if legacy:
+        con.warn(
+            f"Note: {source.name} is a run in the earlier format (schema_version 1). It is left as it is; "
+            f"the run is written again as {outputs.DATOS}, with {outputs.INFORME} and {outputs.ANEXO} next to it."
+        )
     if source.name != outputs.DATOS and paths.datos.exists():
-        con.warn(f"Note: rerendered from {source.name}; the current datos.json is kept under another name.")
+        con.warn(f"Note: rerendered from {source.name}; the current run.json is kept under another name.")
     outputs.write_datos(paths, new, rerender=True)
 
     for issue in issues:
-        con.warn(f"Text control: {issue['archivo']}:{issue['linea']} {issue['regla']}: {issue['extracto']}")
+        con.warn(f"Text control: {issue['archivo']}:{issue['linea']} {runformat.TEXT_RULES.get(issue['regla'], issue['regla'])}: {issue['extracto']}")
     cut_note = _cut_note(bool(meta.get("sitio_cortado")) and not home_unreachable, findings)
     notes = [cut_note, *(meta.get(k) for k in ("aviso_pagespeed", "aviso_lighthouse", "aviso_wordpress"))]
     notes = [n if isinstance(n, str) else None for n in notes]

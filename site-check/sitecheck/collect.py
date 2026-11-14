@@ -38,7 +38,7 @@ Budget exhausted or host blocked: the remaining steps are recorded in
 ``Observations.skipped`` with the reason, never silently dropped. ScopeError is
 never caught here: it propagates to the pipeline (exit 50). Before it
 propagates, the partial Observations are attached to the exception as
-``exc.observations`` so the pipeline can write datos.json with what exists.
+``exc.observations`` so the pipeline can write run.json with what exists.
 
 The canonical host is checked against the exclusion list right after step 3a
 (``no_contact_check``): a match stops the site phase (final_host_no_contact).

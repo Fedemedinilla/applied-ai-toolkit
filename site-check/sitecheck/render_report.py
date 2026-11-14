@@ -1,4 +1,4 @@
-"""informe.md and anexo-tecnico.md: the report in the reading order of the colours.
+"""report.md and technical-annex.md: the report in the reading order of the colours.
 
 Layout:
 
@@ -24,7 +24,7 @@ Layout:
 
 The technical annex (counts by state; ID | ESTADO verbatim | shape label |
 evidence; the broken link addresses; the manual checks) is a file of its own,
-anexo-tecnico.md (render_annex), so the report stays short for a non-technical
+technical-annex.md (render_annex), so the report stays short for a non-technical
 reader.
 
 Every manual check (the Transparency Report and Spamhaus links, the site:
@@ -607,7 +607,7 @@ def _how_section(ctx: ReportContext) -> list[str]:
 
 
 def render_annex(ctx: ReportContext) -> str:
-    """anexo-tecnico.md: the header and the technical annex of the run."""
+    """technical-annex.md: the header and the technical annex of the run."""
     out = [
         f"**{ctx.institution} · Anexo técnico del estado del sitio {ctx.domain}**",
         "",
@@ -678,7 +678,7 @@ def _annex(findings: list["Finding"]) -> list[str]:
 
 
 def render_report(ctx: ReportContext) -> str:
-    """The whole informe.md text (UTF-8, '\\n' newlines), ready for textlint."""
+    """The whole report.md text (UTF-8, '\\n' newlines), ready for textlint."""
     findings = list(ctx.findings)
     counts = count_colours(findings)
     by_id = {f.id: f for f in findings}

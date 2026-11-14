@@ -22,7 +22,7 @@ Documented exceptions (Finding.colour_exception, set by the evaluator):
   a contact path that does not work must not read as "Mejora opcional".
 
 Then the --overrides file ({ID: {"color": "...", "motivo": "..."}}), whose motivo
-is mandatory. datos.json keeps color_derivado (table), color_final and the
+is mandatory. run.json keeps color_derivado (table), color_final and the
 motivo. New IDs follow the same table: VIS-16..19 FALLA -> Azul; EXT-25 (Media)
 FALLA -> Amarillo.
 """

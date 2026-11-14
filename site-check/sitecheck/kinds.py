@@ -7,7 +7,7 @@ article forms and the people who use the site ("las familias" for schools, "los
 clientes" for a company). VIS-17 (inscripciones) applies only to the
 educational kinds.
 
-A value outside the set is exit 2 in the CLI. --rerender on a datos.json with
+A value outside the set is exit 2 in the CLI. --rerender on a run.json with
 another value falls back to the neutral "institución".
 """
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Kind:
-    key: str  # the --kind value as stored in datos.json
+    key: str  # the --kind value as stored in run.json
     el: str  # "el colegio" / "la escuela"
     del_: str  # "del colegio" / "de la escuela"
     El: str  # "El colegio" / "La escuela" (start of a sentence)

@@ -2,7 +2,7 @@
 
 Options:
   URL                     the home of the site, http(s), root path ("/" or empty);
-                          required, except with --rerender (then it is read from datos.json)
+                          required, except with --rerender (then it is read from run.json)
   --name NAME             the organisation's name (VIS-04 title test; report header)
   --kind KIND             kind of organisation, for the wording of the report:
                           colegio, escuela, instituto, jardín, empresa or institución
@@ -16,9 +16,9 @@ Options:
   --pause SECONDS         pause between site requests, 3 (default) to 60; never below 3
   --max-requests N        site request budget, 1 to 90 (default 90); never above 90
   --overrides FILE        colour overrides {ID: {"color", "motivo"}}, each with its reason
-  --rerender DATOS_JSON   rebuild the report of an earlier run from its datos.json, no requests
-  --compare BEFORE AFTER  compare two stored runs (folders or datos.json files), no requests;
-                          writes comparacion.md and comparacion.json into the AFTER folder
+  --rerender RUN_JSON   rebuild the report of an earlier run from its run.json, no requests
+  --compare BEFORE AFTER  compare two stored runs (folders or run.json files), no requests;
+                          writes comparison.md and comparison.json into the AFTER folder
   --out DIR               output root (default $SITE_CHECK_OUT, else ./site-check-runs)
   --exclude FILE          an exclusion list (default $SITE_CHECK_EXCLUDE); <out>/exclude.txt is read too
   --version               print the version
@@ -98,7 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="site-check",
         description=(
             "Passive, outside-in website check: reads only what the site serves to any visitor, plus public "
-            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes datos.json, informe.md and anexo-tecnico.md."
+            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes run.json, report.md and technical-annex.md."
         ),
         epilog=(
             "Example: SITE_CHECK_CONTROL_DOMAIN=your-own-site.example "
@@ -127,10 +127,10 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"site request budget, 1 to {DEFAULT_SITE_BUDGET} (default: {DEFAULT_SITE_BUDGET})",
     )
     p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"color", "motivo"}}')
-    p.add_argument("--rerender", metavar="DATOS_JSON", help="rebuild the report from a datos.json, without requests")
+    p.add_argument("--rerender", metavar="RUN_JSON", help="rebuild the report from a run.json, without requests")
     p.add_argument(
         "--compare", nargs=2, metavar=("BEFORE", "AFTER"),
-        help="compare two stored runs (folders or datos.json files) without requests; writes into the AFTER folder",
+        help="compare two stored runs (folders or run.json files) without requests; writes into the AFTER folder",
     )
     p.add_argument("--out", metavar="DIR", help="output root (default: $SITE_CHECK_OUT, else ./site-check-runs)")
     p.add_argument("--exclude", metavar="FILE", help=f"exclusion list, one domain per line (default: ${EXCLUDE_ENV_VAR})")
@@ -257,7 +257,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
     SystemExit(2) through argparse.error.
 
     With --rerender, no URL is accepted, and --to and --kind stay empty unless
-    given (the values recorded in datos.json are used then).
+    given (the values recorded in run.json are used then).
     """
     parser = build_parser()
     args = parser.parse_args(list(argv))
@@ -327,7 +327,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
 
     if args.rerender:
         if args.url:
-            parser.error("--rerender takes no URL: it is read from datos.json")
+            parser.error("--rerender takes no URL: it is read from run.json")
         if test_hooks:
             parser.error("--rerender makes no requests: no test options")
         rerender_from = Path(args.rerender).absolute()
@@ -346,7 +346,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         )
 
     if not args.url:
-        parser.error("missing the URL of the home page (or --rerender DATOS_JSON)")
+        parser.error("missing the URL of the home page (or --rerender RUN_JSON)")
     url = args.url.strip()
     problem = _check_home_url(url, test_hooks=test_hooks)
     if problem:

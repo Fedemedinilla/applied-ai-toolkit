@@ -31,7 +31,7 @@ The list never fails open:
   the run before any request (exit 2, the console names the file and the line).
 
 Dedupe lives here too: ``prior_runs`` lists the dated run folders the domain
-already has, for a console warning and datos.json meta.corridas_previas.
+already has, for a console warning and run.json meta.corridas_previas.
 """
 
 from __future__ import annotations

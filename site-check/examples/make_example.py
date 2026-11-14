@@ -4,7 +4,12 @@
 
 It starts the same local fake site and fake APIs the tests use, runs the real
 CLI against ``https://www.colegio.test/`` and copies the report, the annex and
-datos.json here. No request leaves 127.0.0.1.
+run.json here. No request leaves 127.0.0.1.
+
+It also writes datos.json: the same run in the earlier layout
+(schema_version 1, Spanish names). The checklist app imports that layout, and
+the tests use the pair as the fixture of the migration: datos.json must
+migrate to exactly run.json.
 
 Three inputs would otherwise come from the machine and change between runs:
 
@@ -13,7 +18,7 @@ Three inputs would otherwise come from the machine and change between runs:
   dates the fake TLS and RDAP answers are built from;
 - the time to first byte. On loopback it is about a millisecond and jitters, so
   the samples are pinned to 1 ms;
-- the Python, OpenSSL and expat versions that datos.json records. They are
+- the Python, OpenSSL and expat versions that run.json records. They are
   pinned to fixed labels (the fake site's Server header is fixed in
   tests/fakesite.py for the same reason).
 
@@ -39,11 +44,12 @@ from fakesite import FakeSite, Scenario  # noqa: E402
 from sitefixtures import default_apis, school_scenario  # noqa: E402
 from support import TEST_KEY, patched_env, run_cli, temp_dir  # noqa: E402
 
-from sitecheck import collect, fmt, pipeline  # noqa: E402
+from sitecheck import collect, fmt, outputs, pipeline  # noqa: E402
 
 # 10:00 in Buenos Aires: the date printed in the example.
 FIXED = dt.datetime(2026, 10, 14, 13, 0, tzinfo=dt.timezone.utc)
-FILES = ("informe.md", "anexo-tecnico.md", "datos.json")
+FILES = ("report.md", "technical-annex.md", "run.json")
+LEGACY = "datos.json"  # the same run as schema_version 1; examples/ only
 PINNED_TTFB_MS = 1.0
 PINNED_VERSIONS = {"version_python": "pinned", "version_openssl": "pinned", "version_expat": "pinned"}
 
@@ -63,8 +69,11 @@ def build(
     scenario: Scenario | None = None,
     apis_config: FakeApisConfig | None = None,
     now: dt.datetime = FIXED,
+    legacy: bool = False,
 ) -> tuple[int, str, str]:
     """Run the CLI against the fake school and copy FILES into ``dest``.
+
+    With ``legacy``, LEGACY is written too: the run in the schema_version 1 layout.
 
     ``scenario``, ``apis_config`` and ``now`` default to the school as it is in
     examples/; examples/make_compare_example.py passes the improved school.
@@ -90,11 +99,14 @@ def build(
         dest.mkdir(parents=True, exist_ok=True)
         for name in FILES:
             shutil.copyfile(run_dir / name, dest / name)
+        if legacy:
+            text = outputs.dumps_legacy(outputs.read_datos(run_dir / outputs.DATOS))
+            (dest / LEGACY).write_bytes(text.encode("utf-8"))
     return code, stdout, stderr
 
 
 def main() -> int:
-    code, stdout, stderr = build(HERE)
+    code, stdout, stderr = build(HERE, legacy=True)
     print(stdout, end="")
     if code != 0:
         print(stderr, file=sys.stderr)

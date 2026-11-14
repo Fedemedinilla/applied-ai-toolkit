@@ -3,8 +3,8 @@
 Measures a site from the outside, with only what any visitor gets (the pages
 the site serves and links, plus public DNS, RDAP, Spamhaus and PageSpeed
 answers), applies fixed rules and leaves, under <out>/<registrable-domain>/<date>/,
-the measured data (datos.json), the report (informe.md), the technical annex
-(anexo-tecnico.md) and the evidence folder.
+the measured data (run.json), the report (report.md), the technical annex
+(technical-annex.md) and the evidence folder.
 
 Entry points: ``python3 -m sitecheck`` and site_check.py next to this package.
 
@@ -14,8 +14,10 @@ imported here, no network, no file access.
 
 __version__ = "1.0.0"
 
-# Version of the datos.json layout. Bump it on any incompatible change, because
-# --rerender reads old files.
-SCHEMA_VERSION = 1
+# Version of the stored run (run.json; schema/run.schema.json). Bump it on any
+# incompatible change, because --rerender and --compare read old files:
+# runformat.py holds the migration of each older version. Version 1 was
+# datos.json, with Spanish names.
+SCHEMA_VERSION = 2
 
 __all__ = ["__version__", "SCHEMA_VERSION"]

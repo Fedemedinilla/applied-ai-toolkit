@@ -1,7 +1,7 @@
 """The per-run REQUEST LOG.
 
 Every connection attempt of the run, allowed or refused, becomes one JSON line in
-``evidencia/requests.log``, written and flushed immediately (a crash keeps what
+``evidence/requests.log``, written and flushed immediately (a crash keeps what
 was already done). It answers exactly "¿qué le hicieron a nuestro sitio?" and
 feeds the report sentence about how many requests were made and in how long.
 
