@@ -272,7 +272,7 @@ export const isCustomId = (id: string): boolean => id.startsWith(CUSTOM_PREFIX);
  * reported with no budget, and level 3 is a context word: it passes in a sentence with an anchor
  * and otherwise joins the Tier 2 budget, as the built-in level 3 rules do.
  */
-export function toRule(custom: CustomRuleConfig, origin: string = CONFIG_FILE): PatternRule {
+export function toRule(custom: CustomRuleConfig, origin: string = 'config file'): PatternRule {
   const langs: Lang[] = custom.lang === 'both' ? ['en', 'es'] : [custom.lang];
   return {
     kind: 'pattern',
@@ -313,7 +313,7 @@ export const DEFAULT_SUPPRESSIONS: Required<SuppressionConfig> = { allowDisquali
  * and `format` replace, `anchors` are added to the top-level ones, and a rule's setting replaces
  * the earlier setting of that rule as a whole.
  */
-export function settingsFor(config: Config, path: string | undefined, origin: string = CONFIG_FILE): Settings {
+export function settingsFor(config: Config, path: string | undefined, origin: string = 'config file'): Settings {
   let lang = config.lang;
   let format = config.format;
   const anchors = [...(config.anchors ?? [])];

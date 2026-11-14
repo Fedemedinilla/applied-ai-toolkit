@@ -121,6 +121,7 @@ describe('custom rules', () => {
     expect(toRule(HOUSE)).toMatchObject({ kind: 'pattern', id: 'X-CIRCLE-BACK', name: 'X-CIRCLE-BACK', patterns: { en: HOUSE.pattern }, flags: 'giu' });
     expect(Object.keys(toRule({ ...HOUSE, lang: 'both' }).patterns)).toEqual(['en', 'es']);
     expect(toRule({ ...HOUSE, name: 'Banned word' }, 'docs/slop-lint.config.json')).toMatchObject({ name: 'Banned word', source: { ref: 'docs/slop-lint.config.json' } });
+    expect(toRule(HOUSE).source.ref).toBe('config file');
   });
 
   it('is reported by lint() like a built-in rule, at its level and severity', () => {
