@@ -156,7 +156,8 @@ const fences = folderFences({
 export default defineConfig({
   root: '..',
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**'],
+  // .claude/worktrees/ (gitignored locally) holds whole checkouts while coding agents work.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },
