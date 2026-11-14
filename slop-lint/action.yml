@@ -13,14 +13,19 @@ inputs:
     description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that matches no file fails the step.
     required: true
   lang:
-    description: Language of the text, en or es.
-    required: true
+    description: Language of the text, en or es. Empty leaves it to the config file, which may set it per folder; with neither, the step fails.
+    required: false
+    default: ''
   format:
     description: text or markdown. Empty reads a .md file as Markdown and anything else as text.
     required: false
     default: ''
   anchors:
     description: Comma-separated extra anchor terms, such as tool names written in lowercase.
+    required: false
+    default: ''
+  config:
+    description: Path of a slop-lint config file. Empty looks for slop-lint.config.json from the workspace root. The values of lang, format and anchors, when set here, win over it.
     required: false
     default: ''
   sarif-file:
@@ -54,6 +59,7 @@ runs:
         SLOP_LANG: ${{ inputs.lang }}
         SLOP_FORMAT: ${{ inputs.format }}
         SLOP_ANCHORS: ${{ inputs.anchors }}
+        SLOP_CONFIG: ${{ inputs.config }}
         SLOP_SARIF_FILE: ${{ inputs.sarif-file }}
         SLOP_FAIL: ${{ inputs.fail }}
       run: |
@@ -81,9 +87,13 @@ runs:
           (( matched )) || fail "no file matches $pattern"
         done
 
-        args=(--lang "$SLOP_LANG")
+        [[ "$SLOP_CONFIG" != *$'\n'* ]] || fail "config must be one path"
+        args=()
+        if [[ -n "$SLOP_LANG" ]]; then args+=(--lang "$SLOP_LANG"); fi
         if [[ -n "$SLOP_FORMAT" ]]; then args+=(--format "$SLOP_FORMAT"); fi
         if [[ -n "$SLOP_ANCHORS" ]]; then args+=(--anchors "$SLOP_ANCHORS"); fi
+        # --config=value keeps a value that starts with - from reading as another option.
+        if [[ -n "$SLOP_CONFIG" ]]; then args+=("--config=$SLOP_CONFIG"); fi
         cli="$GITHUB_ACTION_PATH/cli.ts"
 
         code=0

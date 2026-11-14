@@ -152,9 +152,10 @@ Inputs:
 | input | required | what |
 |---|---|---|
 | `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders, skips hidden ones and does not skip `node_modules`. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
-| `lang` | yes | `en` or `es`. |
+| `lang` | no | `en` or `es`. Empty, the default, leaves the language to the config file, which can set it per folder. With neither, the step fails. |
 | `format` | no | `text` or `markdown`. Empty, the default, reads a `.md` file as Markdown and anything else as text. |
 | `anchors` | no | Comma-separated anchor terms, passed to `--anchors`. |
+| `config` | no | Path of a config file, passed to `--config`. Empty, the default, looks for `slop-lint.config.json` from the workspace root (see Config file). `lang`, `format` and `anchors`, when set, win over it. |
 | `sarif-file` | no | A path to write the SARIF log to, as well as the text output. Its folder is created. |
 | `fail` | no | `true` (the default) fails the step on a level 1 finding. `false` never fails on findings. |
 

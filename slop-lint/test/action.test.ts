@@ -78,7 +78,7 @@ describe('action.yml', () => {
 
   it('documents every input and output in the README', () => {
     const inputs = keysOf('inputs');
-    expect(inputs).toEqual(['files', 'lang', 'format', 'anchors', 'sarif-file', 'fail']);
+    expect(inputs).toEqual(['files', 'lang', 'format', 'anchors', 'config', 'sarif-file', 'fail']);
     const outputs = keysOf('outputs');
     expect(outputs).toEqual(['sarif-file', 'exit-code']);
     const at = readme.indexOf('\n## Use it in CI\n');
@@ -116,6 +116,7 @@ describe('the action script', () => {
       SLOP_LANG: 'en',
       SLOP_FORMAT: '',
       SLOP_ANCHORS: '',
+      SLOP_CONFIG: '',
       SLOP_SARIF_FILE: '',
       SLOP_FAIL: 'true',
       ...inputs,
@@ -169,8 +170,41 @@ describe('the action script', () => {
       expect(anchors.status).toBe(0);
       const lang = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_LANG: value });
       expect(lang.status).toBe(2);
+      const config = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_CONFIG: value, SLOP_FAIL: 'false' });
+      expect(config.status).toBe(2);
     }
     expect(existsSync(pwned)).toBe(false);
+  });
+
+  it('passes config to the CLI, and finds slop-lint.config.json in the workspace without it', () => {
+    const team = JSON.stringify({ lang: 'en', ruleSettings: { 'LEX-03': 'off', 'ESP-04': 'off' } });
+    const named = workspace({ 'letter.txt': BANNED, 'config/team.json': team });
+    expect(runAction(named, { SLOP_FILES: 'letter.txt' }).status).toBe(1);
+    expect(runAction(named, { SLOP_FILES: 'letter.txt', SLOP_CONFIG: 'config/team.json' })).toMatchObject({ status: 0, outputs: { 'exit-code': '0' } });
+    const found = workspace({ 'letter.txt': BANNED, 'slop-lint.config.json': team, '.git/HEAD': '' });
+    expect(runAction(found, { SLOP_FILES: 'letter.txt' }).status).toBe(0);
+  });
+
+  it('lets the config set the language, per folder, when lang is empty', () => {
+    const config = JSON.stringify({ lang: 'en', overrides: [{ files: ['docs/es/**'], lang: 'es' }] });
+    const ws = workspace({ 'slop-lint.config.json': config, '.git/HEAD': '', 'docs/a.md': CLEAN, 'docs/es/a.md': 'Uso airflow con el equipo. Me gusta el equipo.\n' });
+    const r = runAction(ws, { SLOP_FILES: 'docs/**/*.md', SLOP_LANG: '' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^docs\/es\/a\.md:1:\d+ +L3 \w+ +LEX-07/mu);
+    // With lang set, the input wins over the config for every file.
+    expect(runAction(ws, { SLOP_FILES: 'docs/**/*.md', SLOP_LANG: 'en' }).stdout).not.toMatch(/LEX-07/u);
+    const none = runAction(workspace({ 'letter.txt': BANNED, '.git/HEAD': '' }), { SLOP_FILES: 'letter.txt', SLOP_LANG: '', SLOP_FAIL: 'false' });
+    expect(none).toMatchObject({ status: 2, outputs: { 'exit-code': '2' } });
+    expect(none.stderr).toMatch(/--lang must be en or es/u);
+  });
+
+  it('fails with exit 2 on a config it cannot use, even with fail: false', () => {
+    const ws = workspace({ 'letter.txt': BANNED, 'bad.json': '{ "langs": "en" }' });
+    const bad = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_CONFIG: 'bad.json', SLOP_FAIL: 'false' });
+    expect(bad).toMatchObject({ status: 2, outputs: { 'exit-code': '2' } });
+    expect(bad.stderr).toMatch(/^bad\.json: langs: unknown key/u);
+    expect(runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_CONFIG: 'missing.json', SLOP_FAIL: 'false' }).status).toBe(2);
+    expect(runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_CONFIG: 'a.json\nb.json', SLOP_FAIL: 'false' }).stderr).toBe('slop-lint: config must be one path\n');
   });
 
   it('reads a file whose name starts with - as a file', () => {
