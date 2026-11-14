@@ -60,5 +60,6 @@ export {
   type RegistryPriceRow,
   type SupportedModel,
 } from './models.ts';
+export { createPostgresStores, type PgQueryable, type PostgresStores } from './postgres-store.ts';
 export { jsonLinesLog, systemClock, type Clock, type ConfigStore, type EventLog, type PriceStore, type UsageRow, type UsageStore, type UsageWindows } from './ports.ts';
 export { structuredFormat, toApiJsonSchema } from './schema.ts';

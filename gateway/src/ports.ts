@@ -107,6 +107,15 @@ export interface UsageStore {
    * what a cut call spent is recorded anyway.
    */
   record(row: UsageRow): Promise<void>;
+  /**
+   * Optional. Appends a reservation row and returns the totals for the caps without it (what
+   * totalsForCaps returns with excludeId set to the row's id), as one step ordered against every
+   * other reserve: each caller sees all the reservations made before its own and none made after.
+   * With it the gateway makes one store call where it would make two (record, then totalsForCaps),
+   * and calls that race near a cap are decided in order instead of refusing each other. The same
+   * id twice writes one row and returns the totals both times. Called without the call's signal.
+   */
+  reserve?(row: UsageRow, windows: UsageWindows): Promise<unknown>;
 }
 
 export interface PriceStore {

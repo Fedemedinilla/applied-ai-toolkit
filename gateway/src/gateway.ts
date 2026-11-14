@@ -261,6 +261,11 @@ interface Reservation {
   readonly id: string;
   /** Text size plus the attachment bound: the input if message_start never arrives. */
   readonly estimatedInput: number;
+  /**
+   * The totals without this reservation, when the store wrote it and read them in one step
+   * (UsageStore.reserve). Null: the store has no such step, and the second cap check reads them.
+   */
+  readonly totals: { readonly raw: unknown } | null;
 }
 
 interface Deadline {
@@ -533,31 +538,40 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
 
   /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
   async function reserve(prepared: Prepared<M>): Promise<Reservation> {
-    const reservation: Reservation = { id: crypto.randomUUID(), estimatedInput: estimateInputTokens(prepared.params) + prepared.attachmentBound };
+    const id = crypto.randomUUID();
+    const estimatedInput = estimateInputTokens(prepared.params) + prepared.attachmentBound;
+    const row: UsageRow = {
+      ...prepared.row,
+      ...NO_TOKEN_COLUMNS,
+      id,
+      reservation: true,
+      replaces: null,
+      modelResponded: null,
+      thinkingTokens: null,
+      costUsd: null,
+      stopReason: null,
+      refusalCategory: null,
+      attempts: null,
+      requestId: null,
+      durationMs: null,
+      incomplete: true,
+      estimatedInputTokens: estimatedInput,
+      errorCode: null,
+    };
     try {
-      await insert({
-        ...prepared.row,
-        ...NO_TOKEN_COLUMNS,
-        id: reservation.id,
-        reservation: true,
-        replaces: null,
-        modelResponded: null,
-        thinkingTokens: null,
-        costUsd: null,
-        stopReason: null,
-        refusalCategory: null,
-        attempts: null,
-        requestId: null,
-        durationMs: null,
-        incomplete: true,
-        estimatedInputTokens: reservation.estimatedInput,
-        errorCode: null,
-      });
+      const atomic = deps.usage.reserve?.bind(deps.usage);
+      if (atomic === undefined) {
+        await insert(row);
+        return { id, estimatedInput, totals: null };
+      }
+      // One step in the store: the row and the totals without it, ordered against other reservations.
+      const { windows, userId, jobId } = prepared.caps;
+      const raw = await twice(id, () => atomic(row, { ...windows, userId, jobId }));
+      return { id, estimatedInput, totals: { raw } };
     } catch (error) {
-      deps.failures.log('reservation_failed', { usageId: reservation.id, task: prepared.row.task, error: errorName(error) });
-      throw new ReservationError(reservation.id, { cause: error });
+      deps.failures.log('reservation_failed', { usageId: id, task: prepared.row.task, error: errorName(error) });
+      throw new ReservationError(id, { cause: error });
     }
-    return reservation;
   }
 
   /**
@@ -573,7 +587,9 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
   async function recheckCaps(prepared: Prepared<M>, reservation: Reservation, signal: AbortSignal): Promise<CapError | ConfigError | null> {
     const { windows, ...caps } = prepared.caps;
     try {
-      const totals = parseUsageTotals(await deps.usage.totalsForCaps({ ...windows, userId: caps.userId, jobId: caps.jobId, excludeId: reservation.id }, signal));
+      // With an atomic reserve the totals came back with the reservation and nothing is read here.
+      const raw = reservation.totals ? reservation.totals.raw : await deps.usage.totalsForCaps({ ...windows, userId: caps.userId, jobId: caps.jobId, excludeId: reservation.id }, signal);
+      const totals = parseUsageTotals(raw);
       checkCaps({ ...caps, totals });
       return null;
     } catch (error) {
@@ -839,16 +855,21 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
 
   /** One retry with the same id: if the first insert reached the store, the second does not double the cost. */
   async function insert(row: UsageRow): Promise<void> {
+    await twice(row.id, () => deps.usage.record(row));
+  }
+
+  async function twice<T>(rowId: string, write: () => Promise<T>): Promise<T> {
     try {
-      await deps.usage.record(row);
-      return;
+      return await write();
     } catch (first) {
+      let result: T;
       try {
-        await deps.usage.record(row);
+        result = await write();
       } catch (second) {
-        throw new AggregateError([first, second], `Could not insert ledger row ${row.id}`);
+        throw new AggregateError([first, second], `Could not insert ledger row ${rowId}`);
       }
-      deps.notices.log('record_retried', { usageId: row.id, error: errorName(first) });
+      deps.notices.log('record_retried', { usageId: rowId, error: errorName(first) });
+      return result;
     }
   }
 

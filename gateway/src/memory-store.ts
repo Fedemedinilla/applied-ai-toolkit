@@ -118,6 +118,19 @@ export class MemoryUsageStore implements UsageStore {
   }
 
   async record(row: UsageRow): Promise<void> {
+    this.#insert(row);
+  }
+
+  /**
+   * reserve_usage in SQL. The insert and the totals run with no await between them, which in one
+   * process is what the advisory lock is in Postgres: no other reservation can land in between.
+   */
+  async reserve(row: UsageRow, windows: UsageWindows): Promise<unknown> {
+    this.#insert(row);
+    return computeTotals(this.rows, { ...windows, excludeId: row.id }, this.#prices.inForce(this.#clock.now()));
+  }
+
+  #insert(row: UsageRow): void {
     // Same id twice: the first insert went through and its response was lost. Not an error.
     if (this.rows.some((existing) => existing.id === row.id)) return;
     this.#check(row);
