@@ -45,7 +45,7 @@
             {
               "id": "464de430-37df-4778-8439-e7d8ddedcfcb",
               "leftValue": "={{ String($json.body.email || '').trim() }}",
-              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"
@@ -148,9 +148,10 @@
     {
       "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID",
-        "text": "=New lead\n\nName: {{ $('Normalize fields').item.json.name }}\nEmail: {{ $('Normalize fields').item.json.email }}\nMessage: {{ $('Normalize fields').item.json.message }}",
+        "text": "=New lead\n\nName: {{ String($('Normalize fields').item.json.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\nEmail: {{ String($('Normalize fields').item.json.email).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\nMessage: {{ String($('Normalize fields').item.json.message).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "type": "n8n-nodes-base.telegram",
@@ -226,7 +227,7 @@
     },
     {
       "parameters": {
-        "content": "## 3. Connect Telegram\n\n1. Create a bot with **@BotFather**. It gives you a *token*: put it in the Telegram credential.\n2. Send any message to your bot, then open `https://api.telegram.org/bot<token>/getUpdates`. Your chat id is `message.chat.id`.\n3. Replace `YOUR_TELEGRAM_CHAT_ID` in *Alert on Telegram*.\n\nThe message is plain text (no parse mode), so names with `_` or `*` do not break it.",
+        "content": "## 3. Connect Telegram\n\n1. Create a bot with **@BotFather**. It gives you a *token*: put it in the Telegram credential.\n2. Send any message to your bot, then open `https://api.telegram.org/bot<token>/getUpdates`. Your chat id is `message.chat.id`.\n3. Replace `YOUR_TELEGRAM_CHAT_ID` in *Alert on Telegram*.\n\nThe node always sends a parse mode, and its default is Markdown, where a single `_` or `*` in a name makes Telegram reject the message. This one is set to **HTML** and the three fields are escaped (`&`, `<`, `>`), so submitted text is shown as written and never becomes a link or markup.",
         "height": 375,
         "width": 320,
         "color": 4
