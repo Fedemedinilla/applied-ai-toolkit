@@ -21,6 +21,9 @@ Options:
   --observatory           also ask MDN Observatory for its header grade (off by default)
   --pause SECONDS         pause between site requests, 3 (default) to 60; never below 3
   --max-requests N        site request budget, 1 to 90 (default 90); never above 90
+  --json                  print the stored run (the text of run.json) on stdout; the
+                          console summary goes to stderr
+  --sarif FILE            also write the rules that did not pass as SARIF 2.1.0 (sarif.py)
   --overrides FILE        colour overrides {ID: {"colour", "reason"}}, each with its reason
   --rerender RUN_JSON   rebuild the report of an earlier run from its run.json, no requests
   --compare BEFORE AFTER  compare two stored runs (folders or run.json files), no requests;
@@ -143,6 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-requests", dest="max_requests", type=int, default=DEFAULT_SITE_BUDGET, metavar="N",
         help=f"site request budget, 1 to {DEFAULT_SITE_BUDGET} (default: {DEFAULT_SITE_BUDGET})",
     )
+    p.add_argument("--json", dest="json_out", action="store_true", help="print the stored run (run.json) on stdout; the summary goes to stderr")
+    p.add_argument("--sarif", metavar="FILE", help="also write the rules that did not pass as SARIF 2.1.0 (red: error, yellow: warning, blue: note)")
     p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"colour", "reason"}}')
     p.add_argument("--rerender", metavar="RUN_JSON", help="rebuild the report from a stored run (run.json, or a datos.json of an earlier version), without requests")
     p.add_argument(
@@ -298,6 +303,9 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         args.kind = kind_key
 
     out_root = Path(args.out).absolute() if args.out else default_output_root()
+    sarif = Path(args.sarif).absolute() if args.sarif else None
+    if sarif is not None and (sarif.is_dir() or not sarif.parent.is_dir()):
+        parser.error(f"--sarif needs a file path in a folder that exists: {sarif}")
     overrides = Path(args.overrides).absolute() if args.overrides else None
     if overrides is not None and not overrides.is_file():
         parser.error(f"the --overrides file does not exist: {overrides}")
@@ -322,7 +330,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             option
             for option, value in (
                 ("a URL", args.url), ("--rerender", args.rerender), ("--overrides", args.overrides),
-                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--lang", args.lang), ("--out", args.out),
+                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--lang", args.lang), ("--json", args.json_out), ("--sarif", args.sarif), ("--out", args.out),
                 ("--exclude", args.exclude),
             )
             if value
@@ -358,6 +366,8 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             kind_explicit=args.kind is not None,
             para=args.to.strip() if args.to else "",
             lang=args.lang,
+            json_out=args.json_out,
+            sarif=sarif,
             overrides=overrides,
             rerender_from=rerender_from,
             out_root=out_root,
@@ -387,6 +397,8 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         kind_explicit=args.kind is not None,
         para=args.to.strip() if args.to else catalog(args.lang or DEFAULT_LANG)["default_to"],
         lang=args.lang,
+        json_out=args.json_out,
+        sarif=sarif,
         interna=args.inner_page.strip() if args.inner_page else None,
         form_page=args.form_page.strip() if args.form_page else None,
         psi_runs=args.psi_runs,
@@ -477,9 +489,38 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from . import pipeline
 
+    # With --json stdout carries the run and nothing else: the summary moves to stderr.
+    summary_out = sys.stderr if config.json_out else sys.stdout
     try:
-        outcome = pipeline.rerender(config) if config.rerender_from is not None else pipeline.run(config)
+        if config.rerender_from is not None:
+            outcome = pipeline.rerender(config, stdout=summary_out)
+        else:
+            outcome = pipeline.run(config, stdout=summary_out)
     except KeyboardInterrupt:
         print("Run interrupted by hand.", file=sys.stderr)
         return int(ExitCode.UNEXPECTED)
+    _machine_outputs(config, outcome.datos_path)
     return int(outcome.exit_code)
+
+
+def _machine_outputs(config: RunConfig, run_path: Path | None) -> None:
+    """--json and --sarif: both are the stored run, read back from the file the run just wrote."""
+    if not (config.json_out or config.sarif is not None):
+        return
+    if run_path is None or not run_path.is_file():
+        print("Note: no run was stored, so --json and --sarif have nothing to write.", file=sys.stderr)
+        return
+    text = run_path.read_text(encoding="utf-8")
+    if config.sarif is not None:
+        import json
+
+        from .i18n import normalize_lang
+        from .outputs import dumps_json
+        from .sarif import to_sarif
+
+        run = json.loads(text)
+        lang = normalize_lang(config.lang or (run.get("meta") or {}).get("report_language"))
+        config.sarif.write_bytes(dumps_json(to_sarif(run, catalog(lang))).encode("utf-8"))
+        print(f"SARIF: {config.sarif}", file=sys.stderr)
+    if config.json_out:
+        sys.stdout.write(text)

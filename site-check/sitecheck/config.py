@@ -79,6 +79,8 @@ class RunConfig:
     site_budget: int = DEFAULT_SITE_BUDGET  # --max-requests (1..90)
     kind_explicit: bool = False  # True when --kind was given (run.json meta.tipo_explicito)
     lang: str | None = None  # --lang: report language; None is Spanish, or with --rerender the run's own
+    json_out: bool = False  # --json: print run.json on stdout; the console lines go to stderr
+    sarif: Path | None = None  # --sarif FILE: also write the run as SARIF 2.1.0
     compare: tuple[Path, Path] | None = None  # --compare BEFORE AFTER: two run folders or run.json files
 
     @property
