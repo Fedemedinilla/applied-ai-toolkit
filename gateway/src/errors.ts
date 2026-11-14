@@ -11,9 +11,9 @@ type RefusalCategory = NonNullable<Anthropic.Beta.BetaRefusalStopDetails['catego
 /** The catalog. A code keeps one meaning; tests check that every error class uses a listed code. */
 export const ERROR_CODES = {
   // Before calling
-  invalid_setup: 'A value the gateway or client was built with is unusable: an empty key, a timeout that is not a positive integer, an unknown time zone.',
+  invalid_setup: 'A value the gateway or client was built with is unusable: an empty key, a timeout that is not a positive integer, an unknown time zone, a model entry that fails its schema.',
   invalid_request: 'The request breaks a gateway rule (prefill, too many cache breakpoints, an unsupported schema). A bug in the caller; the API is not called.',
-  invalid_config: 'Task or cap configuration read from the store is missing or fails its schema, for example a model the gateway was not verified with.',
+  invalid_config: 'Task or cap configuration read from the store is missing or fails its schema, for example a model outside the registry or an effort level its model does not take.',
   unknown_account: 'The user has no account caps row, so the gateway cannot tell which caps apply. Fails closed.',
   invalid_usage_totals: 'The usage totals for the caps failed their schema, came back null where a sum was requested, or could not be read for the second check after the reservation. A cap that did not sum cannot stop anything.',
   cap_monthly_global: 'Spend this month across all users reached the global monthly cap.',

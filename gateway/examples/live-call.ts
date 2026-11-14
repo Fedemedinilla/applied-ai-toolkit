@@ -9,7 +9,7 @@
  * environment.
  */
 import { z } from 'zod';
-import { createClaudeClient, createGateway, createMemoryStores, GatewayError, jsonLinesLog, systemClock } from '../src/index.ts';
+import { createClaudeClient, createGateway, createMemoryStores, createModelRegistry, GatewayError, jsonLinesLog, systemClock } from '../src/index.ts';
 
 const apiKey = process.env['ANTHROPIC_API_KEY'] ?? '';
 if (apiKey.trim() === '') {
@@ -29,9 +29,9 @@ const stores = createMemoryStores({
   tasks: [{ task: 'triage', model: 'claude-sonnet-5-5', effort: 'low', hardCaseEffort: null }],
   globalCaps: { perJobUsd: 1, dailyPerUserUsd: 1, monthlyUsd: 5 },
   accounts: { [USER]: { perJobUsd: null, dailyPerUserUsd: null } },
-  // US$ per million tokens as listed when this was written. Check the current pricing page before
-  // relying on the computed cost.
-  prices: [{ model: 'claude-sonnet-5-5', validFrom: '2026-10-23T00:00:00Z', input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4 }],
+  // The built-in registry's list prices, in US$ per million tokens, as listed on 2026-11-03. Check
+  // the current pricing page before relying on the computed cost.
+  prices: createModelRegistry().priceRows(),
 });
 
 const gateway = createGateway({
