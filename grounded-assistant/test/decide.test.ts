@@ -154,3 +154,60 @@ describe('services', () => {
     expect(decide(b({}), TODAY)).toMatchObject({ ok: true, card: { service: 'Balayage', price: 78_000, minutes: 180 } });
   });
 });
+
+// Cases added after the mutation run of 2026-11-14 (see "Mutation testing" in the README): each one
+// fails against a mutant that the tests above let through.
+describe('the words of a refusal, in full', () => {
+  it('English refusals write the service in lower case inside the sentence', () => {
+    expect(decide(b({ date: '2026-11-10' }), TODAY, 'en')).toMatchObject({ reason: 'nobody', say: 'Nobody does balayage on Tuesdays. Shall we look at another day?' });
+    expect(decide(b({ service: "Men's cut (clippers and scissors)", stylist: 'Vanina' }), TODAY, 'en')).toMatchObject({
+      reason: 'wrong_stylist',
+      say: "On Saturdays, men's cut (clippers and scissors) is done by Rubén or Damián, not Vanina.",
+    });
+    expect(decide(b({ stylist: 'Lucía' }), TODAY, 'en')).toMatchObject({ reason: 'unknown_stylist', say: 'The team here is Rubén, Damián, Carla and Vanina. Balayage is done by Carla.' });
+    expect(decide(b({ time: '12:30' }), TODAY, 'en')).toMatchObject({
+      reason: 'late_start',
+      say: "That time doesn't work: balayage takes 180 minutes, and the last start that day is 12:00 pm.",
+    });
+  });
+
+  it('an ambiguous service lists the rows it could be, by name', () => {
+    expect(decide(b({ service: 'corte' }), TODAY)).toMatchObject({
+      say: '"corte" me da para varios: Corte de hombre (máquina y tijera), Corte al ras, una sola guía, Corte de nene (hasta doce años), Corte de mujer (lavado, corte y secado), Corte + barba. ¿Cuál de esos?',
+    });
+    expect(decide(b({ service: 'cut' }), TODAY, 'en')).toMatchObject({
+      say: '"cut" could be more than one service: Men\'s cut (clippers and scissors); Buzz cut, single guard; Boy\'s cut (up to age twelve); Women\'s cut (wash, cut and blow-dry); Cut + beard. Which one?',
+    });
+  });
+});
+
+describe('a date or a time with something around it', () => {
+  it('a date is the whole string, not a date somewhere inside it', () => {
+    expect(reason(decide(b({ date: 'x2026-11-07' }), TODAY))).toBe('bad_date');
+    expect(reason(decide(b({ date: '2026-11-07x' }), TODAY))).toBe('bad_date');
+  });
+
+  it('a time is the whole string, not a time somewhere inside it', () => {
+    expect(reason(decide(b({ time: 'x10:00' }), TODAY))).toBe('bad_time');
+    expect(reason(decide(b({ time: '10:00x' }), TODAY))).toBe('bad_time');
+  });
+});
+
+describe('timeEn24, case by case', () => {
+  const cases: Array<[string, string]> = [
+    ['5pm', '17:00'],
+    ['1 pm', '13:00'],
+    ['12:15 PM', '12:15'],
+    ['5 p. m.', '17:00'],
+    [' 5 pm ', '17:00'],
+    [' 9:30 ', '09:30'],
+    // Not a 12-hour time, or not only a time: returned as written, for decide() to refuse.
+    ['0 pm', '0 pm'],
+    ['x5 pm', 'x5 pm'],
+    ['5 pm today', '5 pm today'],
+    ['a9:30', 'a9:30'],
+    ['9:305', '9:305'],
+    ['19:30', '19:30'],
+  ];
+  it.each(cases)('%j reads as %j', (raw, read) => expect(timeEn24(raw)).toBe(read));
+});

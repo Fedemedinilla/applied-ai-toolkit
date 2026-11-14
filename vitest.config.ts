@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     include: ['**/*.test.ts'],
     // .claude/worktrees/ holds full checkouts while coding agents work; their tests are not this tree's.
-    exclude: ['node_modules/**', 'dist/**', '**/dist/**', '.claude/**'],
+    exclude: ['node_modules/**', 'dist/**', '**/dist/**', '.claude/**', '.stryker-tmp/**', 'reports/**'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },

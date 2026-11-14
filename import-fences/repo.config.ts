@@ -157,7 +157,8 @@ export default defineConfig({
   root: '..',
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
   // .claude/worktrees/ (gitignored locally) holds whole checkouts while coding agents work.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**'],
+  // .stryker-tmp/ holds StrykerJS's copies of the repository during a mutation run, reports/ its output.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**', '.stryker-tmp/**', 'reports/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },

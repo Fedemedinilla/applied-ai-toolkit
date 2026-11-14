@@ -15,5 +15,5 @@
     "types": ["node"]
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist", "site-check", "**/dist", ".claude"]
+  "exclude": ["node_modules", "dist", "site-check", "**/dist", ".claude", ".stryker-tmp", "reports"]
 }

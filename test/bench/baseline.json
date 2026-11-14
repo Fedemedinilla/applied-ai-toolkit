@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "calibrationVersion": 1,
+  "date": "2026-11-14T19:34:02.359Z",
+  "machine": {
+    "node": "24.22.1",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+    "cores": 4
+  },
+  "benches": {
+    "amount-parser/parse-corpus": {
+      "medianMs": 3.3029,
+      "meanMs": 3.6715,
+      "rmePercent": 3.97,
+      "samples": 273,
+      "calibrationMs": 4.507,
+      "ratio": 0.7328
+    },
+    "gateway/concurrent-50-at-cap": {
+      "medianMs": 9.8637,
+      "meanMs": 12.4017,
+      "rmePercent": 10.12,
+      "samples": 81,
+      "calibrationMs": 4.655,
+      "ratio": 2.1189
+    },
+    "gateway/concurrent-50-under-cap": {
+      "medianMs": 17.1259,
+      "meanMs": 19.6888,
+      "rmePercent": 9.81,
+      "samples": 64,
+      "calibrationMs": 4.655,
+      "ratio": 3.679
+    },
+    "safe-markdown/render-long-reply": {
+      "medianMs": 0.616,
+      "meanMs": 0.7785,
+      "rmePercent": 4.07,
+      "samples": 1287,
+      "calibrationMs": 4.5855,
+      "ratio": 0.1343
+    },
+    "slop-lint/lint-long-en": {
+      "medianMs": 17.9173,
+      "meanMs": 18.5733,
+      "rmePercent": 2.91,
+      "samples": 64,
+      "calibrationMs": 4.6233,
+      "ratio": 3.8754
+    },
+    "slop-lint/lint-long-es": {
+      "medianMs": 13.6685,
+      "meanMs": 14.7963,
+      "rmePercent": 5.74,
+      "samples": 68,
+      "calibrationMs": 4.6233,
+      "ratio": 2.9564
+    }
+  }
+}

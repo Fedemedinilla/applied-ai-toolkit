@@ -107,7 +107,53 @@ The two source versions of the corpus did not disagree. The earlier 126 phrases 
 | `test/limits.test.ts` | The known limits below, pinned as they behave today |
 | `test/package.test.ts` | The CLI on stdin and arguments, with one set of keys for every answer; `src/` imports only its own files (static, side-effect and dynamic imports), uses no Node API and no regex lookbehind, for Safari before 16.4 |
 
-480 tests, all offline.
+484 tests, all offline.
+
+## Mutation testing
+
+```sh
+npm run mutation:amount-parser   # StrykerJS over src/money.ts, numbers.ts and tokens.ts; 7 to 9 minutes on 4 cores
+```
+
+Stryker changes the code one small edit at a time and runs this folder's tests against each mutant; a mutant that survives is a line a bug could change with no test failing. `vocabulary.ts` is left out: it is tables of words, and the corpus is its test. The report goes to `reports/mutation/amount-parser/`.
+
+Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+
+| File | Mutants | Killed | Timeout | Survived | Not covered | Score |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/money.ts` | 1100 | 769 | 0 | 313 | 18 | 69.91% |
+| `src/numbers.ts` | 169 | 132 | 1 | 34 | 2 | 78.70% |
+| `src/tokens.ts` | 391 | 299 | 10 | 77 | 5 | 79.03% |
+| All three | 1660 | 1200 | 11 | 424 | 25 | 72.95% |
+
+A timeout counts as detected: the mutant made a loop run forever. That run took 9 minutes with other jobs on the same cores; the first one, at 72.65% before the new cases below, took 6.6 minutes alone.
+
+The run showed four untested separator rules in `parseNumber`, each now a test: a comma at the start, a dot at the start before a comma, more than one dot, and three digits after a dot that is not the last group.
+
+The survivors are not claimed as equivalent. The corpus pins the reading of 165 sentences end to end, and a sentence checks the branches it goes through together, not one at a time. What that leaves open, by area:
+
+- **`money.ts`.** About 220 of its survivors are a single condition, comparison or `&&` inside the rules that pick among several figures in a sentence. A mutant there changes the reading of a sentence shape the corpus does not have. About 45 are strings: the `literal` of a result and the role of a span, which few tests compare.
+- **`numbers.ts`.** `readWordNumber` after a million ("un millón doscientos"): the conditions that treat the next group as thousands survive, so that reading rests on few corpus sentences.
+- **`tokens.ts`.** Offsets of spans after a normalization that changes the length of the text, and the tokenizer's handling of signs that the corpus rarely uses.
+
+The way to raise the score is more corpus sentences per family, not unit tests of private branches: a new sentence is also a new line of the spec.
+
+`thresholds.break` in `stryker.config.json` is 70: a run below it exits non-zero. The weekly workflow `.github/workflows/quality.yml` runs it.
+
+## Benchmarks
+
+```sh
+npm run bench            # every bench of the repository, about 15 seconds; writes reports/bench/result.json
+npm run bench:compare    # compares the run with test/bench/baseline.json; exit 1 on a regression beyond 50%
+```
+
+| Bench | One iteration | Median |
+| --- | --- | --- |
+| `amount-parser/parse-corpus` | `parseAmount` over the 165 corpus phrases | 3.30 ms (20 µs per phrase) |
+
+Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container (Intel Xeon at 2.30 GHz). The milliseconds are that machine's on that day; [`test/bench/README.md`](../test/bench/README.md) explains how a run is compared with the baseline on another machine, and the limits of that comparison.
+
+`test/parse.bench.ts` is the bench the comparison reads. `node amount-parser/bench.ts` is the older standalone script, kept for a number without Vitest; the 27 µs per phrase quoted above is its number, from an earlier run.
 
 ## Limits
 
