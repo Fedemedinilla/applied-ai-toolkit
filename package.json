@@ -14,7 +14,7 @@
     "check": "tsc --noEmit",
     "test:python": "cd site-check && python3 -m unittest discover -s tests -q",
     "test:php": "cd wp-hardening && composer install --no-interaction --no-progress --quiet && find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && vendor/bin/phpunit",
-    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md SECURITY.md CONTRIBUTING.md .github/pull_request_template.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md",
+    "lint:docs": "node slop-lint/cli.ts --lang en --format markdown README.md SECURITY.md CONTRIBUTING.md .github/pull_request_template.md */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md test/bench/README.md",
     "build:caja": "vite build apps/caja",
     "build:chat-widget": "vite build --config apps/chat-widget/vite.config.ts",
     "build:checklist": "vite build --config apps/checklist/vite.config.ts",
@@ -33,6 +33,9 @@
     "mutation:grounded-assistant": "stryker run grounded-assistant/stryker.config.json",
     "mutation:amount-parser": "stryker run amount-parser/stryker.config.json",
     "mutation": "npm run mutation:gateway && npm run mutation:grounded-assistant && npm run mutation:amount-parser",
+    "bench": "node test/bench/cli.ts clean && vitest bench --config vitest.bench.config.ts --run && node test/bench/cli.ts collect",
+    "bench:compare": "node test/bench/cli.ts compare",
+    "bench:baseline": "node test/bench/cli.ts collect --out test/bench/baseline.json",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "release": "npm run pack:check && changeset publish"
