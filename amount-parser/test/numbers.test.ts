@@ -36,3 +36,23 @@ describe('parseNumber', () => {
     expect(parseNumber('$3.500')).toBe(3500);
   });
 });
+
+// Cases added after the mutation run of 2026-11-14 (see "Mutation testing" in the README): each one
+// fails against a mutant that the tests above let through.
+describe('parseNumber, separators at the edges', () => {
+  it('a comma at the start is a decimal separator', () => {
+    expect(parseNumber(',5')).toBe(0.5);
+  });
+
+  it('a dot at the start still counts as a dot when a comma follows', () => {
+    expect(parseNumber('.500,5')).toBe(500.5);
+  });
+
+  it('more than one dot means thousands, whatever follows the last one', () => {
+    expect(parseNumber('1.2.3')).toBe(123);
+  });
+
+  it('three digits after the dot mean thousands only at the end of the number', () => {
+    expect(parseNumber('1.2345')).toBe(1.2345);
+  });
+});
