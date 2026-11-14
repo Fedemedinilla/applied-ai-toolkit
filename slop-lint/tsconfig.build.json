@@ -3,8 +3,8 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
+    "inlineSources": true,
     "rewriteRelativeImportExtensions": true,
     "rootDir": ".",
     "outDir": "dist",

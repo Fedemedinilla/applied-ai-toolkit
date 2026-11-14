@@ -12,7 +12,9 @@
  *    working tree is never written to.
  * 2. Reads the tarball's file list: only package.json, README.md, LICENSE and dist/, no test,
  *    fixture or `.ts` source, and every file that exports, types and bin point at. A package that
- *    declares a license must ship the LICENSE file, so the root must have one.
+ *    declares a license must ship the LICENSE file, so the root must have one. Every source map
+ *    holds the text of each source the tarball leaves out, and every sourceMappingURL names a map
+ *    the tarball holds, so no tool goes looking for a `.ts` file that is not there.
  * 3. Installs the tarball in a fresh project outside the repository. slop-lint has no
  *    dependencies, so `npm install --offline` installs it and links its bin. The gateway's two
  *    dependencies would need the registry, so its tarball is extracted into node_modules and its
@@ -196,6 +198,34 @@ function pointedAt(manifest: Record<string, unknown>): string[] {
   return out;
 }
 
+/**
+ * Every map in an unpacked tarball either holds the text of each source the tarball leaves out
+ * (sourcesContent) or points only at files it ships, and every sourceMappingURL comment names a map
+ * that is there. Returns the number of maps.
+ */
+function checkSourceMaps(unpacked: string, paths: readonly string[]): number {
+  const shipped = new Set(paths);
+  let count = 0;
+  for (const path of paths) {
+    if (path.endsWith('.map')) {
+      count += 1;
+      const map = JSON.parse(readFileSync(join(unpacked, path), 'utf8')) as { sources?: unknown; sourcesContent?: unknown };
+      const sources = Array.isArray(map.sources) ? (map.sources as unknown[]) : [];
+      const contents = Array.isArray(map.sourcesContent) ? (map.sourcesContent as unknown[]) : [];
+      sources.forEach((source, i) => {
+        const target = relative(unpacked, join(unpacked, dirname(path), String(source))).split(/[\\/]/).join('/');
+        if (!shipped.has(target) && typeof contents[i] !== 'string') fail(`${path} points at ${String(source)}, which the tarball does not hold, and carries no sourcesContent for it`);
+      });
+    } else if (/\.(js|d\.ts)$/.test(path)) {
+      const url = /\/\/# sourceMappingURL=(\S+)\s*$/.exec(readFileSync(join(unpacked, path), 'utf8'))?.[1];
+      if (url === undefined || url.startsWith('data:')) continue;
+      const target = relative(unpacked, join(unpacked, dirname(path), url)).split(/[\\/]/).join('/');
+      if (!shipped.has(target)) fail(`${path} names the source map ${url}, which the tarball does not hold`);
+    }
+  }
+  return count;
+}
+
 async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
   const say = (message: string): void => console.log(`${spec.name}: ${message}`);
   const packageDir = join(ROOT, spec.folder);
@@ -244,6 +274,11 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
     fail(hasLicense ? 'the repository has a LICENSE and the tarball does not' : 'the tarball has a LICENSE the repository does not');
   }
   say(`${paths.length} files, all under dist/ or package.json, README.md${hasLicense ? ', LICENSE' : ' (no root LICENSE yet, so none packed)'}`);
+  const unpacked = join(work, 'unpacked', spec.folder);
+  mkdirSync(unpacked, { recursive: true });
+  mustRun('tar', ['-xzf', tarball, '--strip-components=1', '-C', unpacked], { cwd: work });
+  const maps = checkSourceMaps(unpacked, paths);
+  say(`${maps} source maps, each with the text of every source the tarball leaves out`);
 
   // 3. Install it in a fresh project outside the repository.
   const consumer = join(work, 'consumer', spec.folder);
