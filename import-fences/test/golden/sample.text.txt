@@ -1,0 +1,11 @@
+import-fences.config.ts  empty-group  group "workers" matches no file, so its rules check nothing (include: src/workers/**)
+import-fences.config.ts  stale-allow  allow entry src/server/gone.ts matches no file of group "all". Why: every call goes through the spending cap
+src/client/app.ts:1:1  relative-extension  imports ../shared/format without a file extension; Node does not resolve it (write ../shared/format.ts)
+src/client/app.ts:2:1  forbidden-import  imports node:fs, forbidden in group "client". Why: client code ships to the browser
+src/client/app.ts:3:1  forbidden-import  imports src/server/db.ts, a path forbidden in group "client". Why: client code ships to the browser
+src/client/app.ts:4:39  dynamic-import  import() with a computed argument: a bundler turns it into a glob and bundles every file that matches
+src/client/app.ts:4:39  unresolved-import  import() with a computed argument: a bundler turns it into a glob and bundles every file that matches; the walk for group "client" cannot follow it. Why: client code ships to the browser
+src/server/report.ts:1:1  single-importer  imports values from @vendor/sdk; only src/server/llm.ts, src/server/gone.ts may. Why: every call goes through the spending cap
+src/server/report.ts:3:25  single-reader  reads VENDOR_API_KEY (process.env['VENDOR_API_KEY']); only src/server/llm.ts may
+src/shared/label.ts:1:1  forbidden-import  imports src/server/secret.ts, a path forbidden in group "client", reached from src/client/widget.ts. Why: client code ships to the browser
+import-fences: 10 violations in 9 files, 5 rules

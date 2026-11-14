@@ -2,6 +2,27 @@
 
 A config-driven checker that turns architecture rules about imports into a failing test. A rule in a contributing guide can be broken by a new teammate who never read it, or by a coding agent that lost it from context, and nothing fails. Here the build fails with the file, the line, the rule and the reason. Typical rules: browser code never reaches a Node built-in, even three files away; one file imports the API client and nobody re-exports it; one file reads the API key. I extracted it from production work, where each of these rules was a hand-written test over the import graph.
 
+## Install
+
+```sh
+npm install --save-dev @fedemedinilla/import-fences
+npx import-fences --config import-fences.config.json
+```
+
+```ts
+import { check, defineConfig, diskSource, loadConfig, NODE_BUILTINS, toSarif } from '@fedemedinilla/import-fences';
+```
+
+The package entry is built from `src/index.ts`, and the `import-fences` bin is built from `cli.ts` and takes the same arguments as `node import-fences/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+
+- **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps that carry the text of the `.ts` sources, which are not shipped.
+- **`typescript` is a dependency, pinned to 5.9.3, and not a peer.** The checker parses files with the compiler API and reads `importClause.phaseModifier` to tell `import type` from a value import. That field exists since 5.9. An older compiler would leave it undefined, and every `import type` would count as code with no error to show for it. The project's own TypeScript can be any version, since this copy is only a parser and is installed next to it. The cost is a second copy on disk, about 23 MB, when the versions differ.
+- **`zod` is a dependency, pinned to 4.6.7.** It validates the config. A caller never passes a zod schema in, so nothing has to be shared with the project's copy.
+- **A config written in TypeScript still works.** The config is the project's own file, outside `node_modules`, so Node 24 strips its types when the installed bin imports it. It can import `defineConfig` and `NODE_BUILTINS` from `@fedemedinilla/import-fences`. It has to be erasable TypeScript (no `enum`, no `namespace`), and anything it imports must be something Node can load. A project on an older Node, or one that prefers no code in its config, uses the JSON form.
+- **`import` and `require()` both load it.** Each `exports` entry pairs `types` with `default`, and Node 24 loads an ES module through `require()`.
+- **Node 24 or newer** (`engines`). That is the only version the tests and CI run.
+- **The build is checked as installed.** [`test/packaging/pack-check.ts`](../test/packaging/pack-check.ts) packs the package, installs the tarball in an empty project, compares its exports with the source, and runs the installed bin and `node import-fences/cli.ts` on the same inputs to compare output and exit code. One of those inputs is a `.ts` config in that project that imports the installed package.
+
 ## Run it
 
 From the repository root:
@@ -20,11 +41,11 @@ web/a.ts:2:1  forbidden-import  imports node:fs, forbidden in group "browser". W
 import-fences: 2 violations in 3 files, 2 rules
 ```
 
-`--json` prints the same as JSON. Exit codes: 0 no violation, 1 at least one, 2 bad usage or an invalid config. Without `--config` the CLI loads `import-fences.config.ts` from the current folder. Node 24 runs the TypeScript sources directly (type stripping), so there is no build step, and the only dependencies are `typescript` (the parser) and `zod` (the config check).
+`--json` prints the same as JSON, and `--sarif` prints a SARIF 2.1.0 log (see SARIF for code scanning). Exit codes: 0 no violation, 1 at least one, 2 bad usage or an invalid config. Without `--config` the CLI loads `import-fences.config.ts` from the current folder, or `import-fences.config.json` when there is no `.ts` one. Node 24 runs the TypeScript sources directly (type stripping), so there is no build step, and the only dependencies are `typescript` (the parser) and `zod` (the config check).
 
 ## The config
 
-A config is a TypeScript module. Groups name sets of files by glob; each rule applies to one group.
+A config is a TypeScript module or a JSON file. Groups name sets of files by glob; each rule applies to one group.
 
 ```ts
 import { defineConfig, NODE_BUILTINS } from './import-fences/src/config.ts';
@@ -47,6 +68,33 @@ export default defineConfig({
 
 Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
 
+### A JSON config, and a minimal example
+
+A path that ends in `.json` is read as JSON, with the same keys. A project that has `src/client`, `src/server` and one module that creates the SDK client can start from this file, saved as `import-fences.config.json` at its root:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/import-fences/schema/config.schema.json",
+  "groups": {
+    "client": { "include": ["src/client/**"] },
+    "source": { "include": ["src/**"], "exclude": ["**/*.test.ts"] }
+  },
+  "rules": [
+    { "rule": "forbidden-import", "group": "client", "specifiers": ["node:*"], "paths": ["src/server/**"], "why": "client code ships to the browser" },
+    { "rule": "single-importer", "group": "source", "package": "@vendor/sdk", "allow": ["src/server/llm/client.ts"], "why": "every call goes through one client" },
+    { "rule": "single-reader", "group": "source", "variable": "VENDOR_API_KEY", "allow": ["src/server/llm/client.ts"] }
+  ]
+}
+```
+
+It says three things. No file under `src/client` reaches a `node:` built-in or a file under `src/server`, however many imports away. Only `src/server/llm/client.ts` imports values from `@vendor/sdk`. Only that file reads `VENDOR_API_KEY`. `test/schema.test.ts` runs this exact block over a tree with that layout and expects zero violations.
+
+- **`$schema` is for the editor.** [`schema/config.schema.json`](schema/config.schema.json) is a JSON Schema (draft 2020-12) generated from the zod schema the CLI validates with, by `node import-fences/scripts/write-schema.ts`; a test fails when the two differ. An editor that reads it completes rule names and flags an unknown key while typing. The CLI ignores the key and validates the rest itself, so a config without `$schema` works the same.
+- **The schema cannot say everything.** Three checks compare one part of the config with another: a rule names a group that exists, a `forbidden-import` rule has `specifiers` or `paths`, and `except` comes with `paths`. JSON Schema has no clean way to write them, so the editor accepts those mistakes and the CLI stops on them with exit code 2.
+- **JSON has no `NODE_BUILTINS`.** `"node:*"` covers every import written with the prefix. The bare spellings (`fs`, `path`) have to be listed one by one in JSON; a `.ts` config spreads `NODE_BUILTINS`, which holds both.
+- **JSON cannot compute.** This repository's own config lists the folders on disk and builds one rule per folder, so it is a `.ts` module. A config that is a fixed list fits in JSON.
+- **Add `relative-extension` only where Node runs the sources.** A project whose bundler resolves `./x` to `./x.ts` would get one violation per import.
+
 ## Rule reference
 
 | Rule | Options | Reports |
@@ -59,6 +107,93 @@ Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alter
 | `dynamic-import` | none | `import()`, `require()` and `new URL(x, import.meta.url)` with a computed argument, and `import.meta.glob()`. |
 
 Two more ids come from the config itself. `empty-group` reports a group that matches no file (set `allowEmpty: true` for a group kept for code that does not exist yet). `stale-allow` reports an `allow` entry that matches no file of the group, or matches files that no longer do what it allows, and an `except` entry that no import of the group uses.
+
+## SARIF for code scanning
+
+`--sarif` prints one SARIF 2.1.0 log to stdout, the format GitHub code scanning reads. It replaces the text output. It cannot be combined with `--json`; asking for both is a usage error with exit code 2 and nothing on stdout. The exit codes do not change, so a job can upload the log and still fail on a violation.
+
+```sh
+node import-fences/cli.ts --config import-fences/repo.config.ts --sarif > import-fences.sarif
+node ../import-fences/cli.ts --sarif --sarif-base .. > import-fences.sarif   # run inside a package of a monorepo
+```
+
+What the log holds:
+
+- One run. `tool.driver` names import-fences and lists the ten rule ids of the rule reference, always all of them and in the same order, each with a name, a short and a full description, and a link to the rule reference.
+- One result per violation, with level `error`, since every violation fails the CLI. `ruleId` is the id the text report prints, such as `forbidden-import`. The message is the reason, followed by the rule's `why` when it has one, exactly as in the text report.
+- A violation in code points at the file that holds the import, with the line and the column of the statement. Columns count UTF-16 code units, and `columnKind` says so. For a crossing reached through other files, that is the file whose import crosses the fence, and the message names the chain.
+- `stale-allow` and `empty-group` are results too, since they fail the run. They point at the config file and carry no line: the checker knows which entry is stale, not where in the file it is written.
+- `artifactLocation.uri` is relative to `--sarif-base` (default: the current folder), with forward slashes and each segment percent-encoded. Code scanning resolves it against the repository root, so run the CLI from there or pass the root as `--sarif-base`. A file outside the base gets an absolute `file:` URI instead of a `../` path. `--sarif-base` without `--sarif` is a usage error.
+- `partialFingerprints` holds one value under `importFencesViolation/v1`: a SHA-256 of the rule id, the uri and the reason, cut to 32 hex digits, plus `:1`, `:2` for the same violation repeated in one file. No line, column or `why` goes in, so code added above an import, or a reworded `why`, keeps its alert instead of closing it and opening a new one. Renaming the file, or a change in the chain that reaches it, makes a new alert.
+- Results are sorted by uri, line, column, rule id and message, compared by code unit. The same tree gives the same bytes on any machine. No timestamp, host name, absolute path or tool version goes in.
+
+## Use it in CI
+
+The folder is also a composite GitHub Action, [`action.yml`](action.yml). It installs Node 24 with `actions/setup-node`, then `typescript` and `zod` into the action's own folder, and runs the checker over the workspace twice. The first run prints the text report to the job log. The second writes the SARIF log, with paths relative to the workspace. This workflow checks the fences on every pull request, uploads the violations to code scanning and then fails the job if a fence is broken:
+
+```yaml
+name: Import fences
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  fences:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only if a forbidden-import rule has to tell an installed package from a typo; see below.
+      - run: npm ci --ignore-scripts
+
+      - id: fences
+        # Pin a full commit SHA of this repository, not a branch.
+        uses: Fedemedinilla/applied-ai-toolkit/import-fences@<commit SHA>
+        with:
+          config: import-fences.config.json
+          fail: false
+
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ steps.fences.outputs.sarif-file }}
+          category: import-fences
+
+      - name: Fail on a broken fence
+        if: steps.fences.outputs.exit-code != '0'
+        run: exit 1
+```
+
+With `fail: false` the action reports exit code 1 instead of failing, so the upload still runs and the last step fails the job. Exit code 2 (bad usage, a missing or invalid config) fails the action whatever `fail` says, and no SARIF is written. `security-events: write` is what the upload needs; in a private repository, upload-sarif also needs `actions: read`. A pull request from a fork gets a read-only token, so the upload fails there.
+
+| Input | Meaning |
+|---|---|
+| `config` | Required. The config file, `.json` or `.ts`, relative to the workspace. |
+| `sarif-file` | Where to write the SARIF log. Default: `import-fences.sarif` in the runner's temporary folder. A path that names a folder, or a log that cannot be written, is exit code 2. |
+| `fail` | `true` (default) fails the step when a fence is broken. `false` only sets `exit-code`. |
+
+| Output | Meaning |
+|---|---|
+| `sarif-file` | The path of the SARIF log, empty after exit code 2. |
+| `exit-code` | 0, 1 or 2, as for the CLI. |
+
+How it behaves, and why:
+
+- **Inputs are data, never code.** They reach the shell only as quoted environment variables, never as `${{ inputs.* }}` inside a `run:` script, so a value such as `$(...)` is a file name and nothing else. `test/action.test.ts` reads `action.yml` and fails if that changes, and runs its shell step with hostile inputs.
+- **Exit code 2 always fails the step.** A config that does not load means no fence was checked. `fail: false` is for violations; a broken config that passed would hide every violation from then on.
+- **The config is the only input.** Which files are read comes from the config's `root`, groups and `ignore`, so the action and a local run check the same set.
+- **`npm ci` is needed only for `unresolved-import`.** A `forbidden-import` rule reports a bare specifier that is neither a built-in nor a package under `node_modules`. Without an install step every package import of the group is reported that way. The other rules read source files alone.
+- **A `.ts` config must be self-contained here.** It runs through Node's type stripping, which needs erasable TypeScript only (no `enum`, no `namespace`). The action is not installed in the workspace, so the config cannot import `defineConfig` from it. Export the plain object, or install the npm package and import from that.
+- **Paths are relative to the workspace.** A repository checked out into a subfolder (the `path` input of `actions/checkout`) gets paths that code scanning cannot map. Run the CLI with `--sarif-base` set to that subfolder instead.
+- **The checker runs twice**, once per output, so the step takes twice as long as one CLI run. The CLI prints one format per run, which kept the text and JSON outputs unchanged.
+- **setup-node stays set up.** The composite step changes the job's Node to 24 for the steps after it too.
 
 ## Design decisions
 
@@ -105,18 +240,26 @@ The same test removes `gateway/src/client.ts` from the SDK exception and checks 
 | `test/rules.test.ts` | One small in-memory tree per case: built-ins in both spellings, the transitive chain, type-only allowed or forbidden, files reached only through types, `export * from`, `?raw`, `new URL()`, bundler-style resolution, unresolved imports and `external`, deduplication, `except` (the public entry passes, the internal file next to it does not, an unused entry is stale), the single-importer and re-export cases, stale allow entries, readers and strings, extension hints, computed imports, empty groups |
 | `test/config.test.ts` | Defaults; eight malformed configs that must stop the run; specifier patterns and `NODE_BUILTINS` |
 | `test/cli.test.ts` | Exact text output and exit code 1, JSON and exit code 0, exit code 2 for bad usage, a missing config and an invalid one, on trees written to a temporary folder |
+| `test/sarif.test.ts` | The log against a zod schema of what code scanning requires; one result per violation at the same file, line and column; config violations at the config file; order and byte-identical reruns; `--sarif-base`, a config in a subfolder and paths that need encoding; fingerprints that survive moved lines and a reworded `why`; the usage errors |
+| `test/output-regression.test.ts` | The text and JSON output of a tree with eight of the ten rule ids, and of a clean one, byte for byte against `test/golden/`, written by the CLI before `--sarif` existed |
+| `test/schema.test.ts` | The committed JSON Schema equals the generated one; a JSON config gives the result of the same config as a module; default lookup; malformed JSON configs; the README's JSON example on the layout it describes |
+| `test/action.test.ts` | `action.yml` read as text: no expression in a run block, inputs only through `env:`, the pinned setup-node, the dependency versions; the run step executed in bash on passing, failing, invalid and hostile inputs |
 | `test/glob.test.ts` | `**`, `*`, `?`, alternation, escaping and the folder matched by a trailing `/**` |
 | `test/repo.test.ts` | This repository's fences, the witness and the folder-fence tree described above |
 
 ## Adopting it
 
-1. Copy the folder; it needs `typescript` and `zod`.
+1. Install the package, or copy the folder; a copy needs `typescript` 5.9 and `zod`.
 2. Write a config with one group and one rule you already follow, and run the CLI. Fix or allow what it reports. An `allow` entry is an exception with a name, and `stale-allow` removes it from the list once the code no longer needs it.
-3. Add a test like `test/repo.test.ts` so the suite enforces it, or run the CLI as a CI step; exit code 1 fails the job.
+3. Add a test like `test/repo.test.ts` so the suite enforces it, or run the CLI or the action as a CI step; exit code 1 fails the job.
 4. Add `why` to every rule. The reason in the output is what a teammate or an agent reads at the moment they break the fence.
 
-## Limits
+## What it does not do
 
+- It does not type-check, lint style or find unused code. It reads imports, the names of environment variables and string literals, and nothing else.
+- It does not prove that code cannot reach something at runtime. A fence holds for what is written as an import; the items below list what gets around one.
+- It does not draw the dependency graph or find cycles.
+- It does not upload SARIF. The action writes the file, and the workflow uploads it.
 - No `.svelte`, `.vue` or `.astro` files. The source handled them with `svelte/compiler` and by splitting Astro frontmatter from `<script>` tags; both need a dependency or a parser this folder does not have. A component that imports a module is invisible, though the modules it imports are still checked if they belong to a group.
 - `no-reexport` does not follow a value through a function. `export function make() { return new Client(); }` is not reported, and this repository's gateway does exactly that on purpose. Aliases are followed only at the top level of the file. The single-importer rule still reports any other file that imports the package.
 - Symbolic links are not followed when the CLI lists files. A linked file or folder is not checked.

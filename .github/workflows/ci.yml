@@ -148,14 +148,24 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
 
+      # This repository's own fences, the same config as the Import fences step of the test job.
+      - id: fences
+        name: import-fences action over the repository
+        uses: ./import-fences
+        with:
+          config: import-fences/repo.config.ts
+          sarif-file: ${{ runner.temp }}/sarif/import-fences.sarif
+          fail: true
+
       - name: Check the SARIF files
         env:
           SLOP_SARIF: ${{ steps.slop.outputs.sarif-file }}
           GUARD_SARIF: ${{ steps.guard.outputs.sarif-file }}
+          FENCES_SARIF: ${{ steps.fences.outputs.sarif-file }}
         run: |
           node -e '
             const { readFileSync } = require("node:fs");
-            for (const [file, tool] of [[process.env.SLOP_SARIF, "slop-lint"], [process.env.GUARD_SARIF, "csp-build-guard"]]) {
+            for (const [file, tool] of [[process.env.SLOP_SARIF, "slop-lint"], [process.env.GUARD_SARIF, "csp-build-guard"], [process.env.FENCES_SARIF, "import-fences"]]) {
               if (!file) throw new Error(`${tool}: the action reported no SARIF file`);
               const log = JSON.parse(readFileSync(file, "utf8"));
               if (log.version !== "2.1.0") throw new Error(`${file}: version is ${log.version}, not 2.1.0`);

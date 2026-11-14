@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/import-fences/schema/config.schema.json",
+  "title": "import-fences config",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The address of this schema, for editors. The CLI ignores it."
+    },
+    "root": {
+      "type": "string"
+    },
+    "ignore": {
+      "default": [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/dist/**",
+        "**/coverage/**"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "groups": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "exclude": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "allowEmpty": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "include"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rules": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "forbidden-import"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "specifiers": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "paths": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "except": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "typeOnly": {
+                "default": "forbid",
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "forbid"
+                ]
+              },
+              "transitive": {
+                "default": true,
+                "type": "boolean"
+              },
+              "external": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "single-importer"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "package": {
+                "type": "string",
+                "minLength": 1
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "typeOnly": {
+                "default": "allow",
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "forbid"
+                ]
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group",
+              "package",
+              "allow"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "single-reader"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "variable": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group",
+              "variable",
+              "allow"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "single-string"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group",
+              "text",
+              "allow"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "relative-extension"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "const": "dynamic-import"
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rule",
+              "group"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "groups",
+    "rules"
+  ],
+  "additionalProperties": false
+}
