@@ -1,0 +1,88 @@
+{
+ "model": "claude-opus-5-5",
+ "max_tokens": 4000,
+ "output_config": {
+  "effort": "medium",
+  "format": {
+   "type": "json_schema",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "lines": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "line": {
+         "type": "integer"
+        },
+        "support": {
+         "type": "string",
+         "enum": [
+          "fact-sheet",
+          "brief",
+          "arithmetic",
+          "no-claim",
+          "invented"
+         ]
+        },
+        "note": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "line",
+        "support",
+        "note"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "voice": {
+      "type": "string",
+      "enum": [
+       "on",
+       "off"
+      ]
+     },
+     "robotic": {
+      "type": "boolean"
+     },
+     "quality": {
+      "type": "integer",
+      "enum": [
+       1,
+       2,
+       3,
+       4,
+       5
+      ]
+     },
+     "note": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "lines",
+     "voice",
+     "robotic",
+     "quality",
+     "note"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ "system": [
+  {
+   "type": "text",
+   "text": "You judge short pieces of business writing against a fact sheet. You do not know who or what wrote each piece, and it does not matter.\n\nFor every numbered line, decide where its content comes from:\n- \"fact-sheet\": every fact in the line (price, hour, date, name, address, phone, channel, rule, procedure) appears in the fact sheet, copied exactly.\n- \"brief\": the fact comes from the brief the writer was given.\n- \"arithmetic\": a sum of loaded figures, or a loaded unit figure times a quantity the brief gives, with the unit figure shown.\n- \"no-claim\": the line states no fact (a greeting, a signature, a question to the reader, a sentence of tone).\n- \"invented\": at least one fact in the line is in neither the sheet nor the brief. This includes things that are usually true of this kind of business, a procedure (how to book, who to ask, what happens to something already arranged, when someone will call), and a yes or no about whether the business has, sells or does something the sheet does not mention. Rounding or rewording a loaded number is invented too.\n\nWhen you mark a line \"invented\", say in the note which claim is not loaded. A plausible claim is still invented.\n\nThen judge the piece as a whole:\n- voice: \"on\" if it follows the TONE lines of the sheet (greeting, signature, person, sentence length), \"off\" if it breaks one of them. Name the broken line in the note.\n- robotic: true if the piece talks about its own data or limits instead of talking as the business (\"I can't confirm that here\", \"I don't have that information\", \"according to my records\").\n- quality: 1 to 5. 5 is a piece the owner would send unchanged. 4 needs one small edit. 3 needs a rewrite of one sentence. 2 is wrong in a way a customer would notice. 1 is unusable. A piece with an invented fact is never above 2.\n\nJudge only what is written. Do not reward length."
+  }
+ ],
+ "messages": [
+  {
+   "role": "user",
+   "content": "FACT SHEET\nBUSINESS: Taller Rayo, a bicycle repair workshop. It writes to its customers.\n\nTONE:\n- Plain English with contractions: we're, you'll, don't.\n- Notices and replies open with the fact, no greeting. The email opens with \"Hi,\" and nothing more.\n- Sentences of 6 to 14 words. Fourteen is the ceiling: split anything longer.\n- No exclamation marks, no emoji.\n- Always signed the same way, on its own line: \"Nora, Taller Rayo\".\n\nFACTS:\n- Open Tuesday to Saturday, 9 am to 1 pm and 3 pm to 7 pm. Closed Sunday and Monday.\n- Address: the 900 block of Calle Falsa.\n- WhatsApp: 11 0000-0142. It is the only channel for questions.\n- Nora owns the shop and runs the counter. Tito does wheels and brakes.\n- Basic tune-up: $18,000. A bike dropped off before 10 am is ready the same day.\n- Full service: $42,000.\n- Flat tyre repair: $6,500.\n- Brake adjustment: $9,000 per wheel.\n- Bikes are taken in order of arrival. There are no appointments.\n- Payment: cash or bank transfer.\n\nTODAY: Wednesday, March 4, 2026\n\nBRIEF\nWe are closed next Thursday for a family matter.\n\nPIECE (8 lines)\n1. Subject: Closed next Thursday\n2. Hi,\n3. We're closed on Thursday 12 March for a family matter.\n4. We open again on Friday at 9 am!\n5. Bikes left before then stay safe in the shop, and we'll call you when yours is ready.\n6. Is a $18,000 tune-up what you need?\n7. Write to us on WhatsApp at 11 0000-0142.\n8. Nora, Taller Rayo"
+  }
+ ]
+}
