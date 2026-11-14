@@ -39,6 +39,8 @@
     "bench": "node test/bench/cli.ts clean && vitest bench --config vitest.bench.config.ts --run && node test/bench/cli.ts collect",
     "bench:compare": "node test/bench/cli.ts compare",
     "bench:baseline": "node test/bench/cli.ts collect --out test/bench/baseline.json",
+    "evals:gate": "node evals/scripts/gate.ts",
+    "evals:report": "node evals/scripts/report.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "release": "npm run pack:check && changeset publish"
