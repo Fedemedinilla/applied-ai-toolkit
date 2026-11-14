@@ -18,7 +18,7 @@ import { lint } from '@fedemedinilla/slop-lint';
 import type { LintOptions, LintResult } from '@fedemedinilla/slop-lint/types';
 ```
 
-The package entry is `src/lint.ts` (`lint`, `RULES`, `appliesTo`, `rawMatches`), and `@fedemedinilla/slop-lint/types` holds the types of `src/types.ts`. The `slop-lint` bin is `cli.ts` and takes the same arguments as `node slop-lint/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+The package entry is built from `src/lint.ts` (`lint`, `RULES`, `appliesTo`, `rawMatches`), and `@fedemedinilla/slop-lint/types` holds the types of `src/types.ts`. The `slop-lint` bin is built from `cli.ts` and takes the same arguments as `node slop-lint/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
 
 - **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps. Its `rewriteRelativeImportExtensions` turns each `./x.ts` import into `./x.js`. The `.d.ts` files keep the `.ts` specifiers, which TypeScript resolves to the `.d.ts` next to them; `npm run pack:check` typechecks a strict consumer against them with TypeScript 5.9.
 - **No runtime dependencies**, as in the repository.

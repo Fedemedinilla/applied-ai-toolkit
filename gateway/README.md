@@ -12,7 +12,7 @@ npm install @fedemedinilla/claude-gateway zod
 import { createClaudeClient, createGateway, createMemoryStores } from '@fedemedinilla/claude-gateway';
 ```
 
-The package entry is `src/index.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and apps import `gateway/src/index.ts` as before.
+The package entry is built from `src/index.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and apps import `gateway/src/index.ts` as before.
 
 - **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps. Its `rewriteRelativeImportExtensions` turns each `./x.ts` import into `./x.js`. The `.d.ts` files keep the `.ts` specifiers, which TypeScript resolves to the `.d.ts` next to them; `npm run pack:check` typechecks a strict consumer against them with TypeScript 5.9.
 - **zod is a peer dependency** (`^4.6.7`). The caller builds the schemas it passes to `structured()`, and the gateway turns them into a JSON schema with `z.toJSONSchema` and validates the reply with them. Two copies of zod in one application would mean schemas from one copy handled by the other. As a peer, the application's own zod is the one the gateway uses. 4.6.7 is the version the tests run.
