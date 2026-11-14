@@ -29,7 +29,7 @@
         "filters": {}
       },
       "type": "n8n-nodes-base.gmailTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.3,
       "position": [
         0,
         400
