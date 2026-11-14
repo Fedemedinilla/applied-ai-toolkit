@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { staticImports } from '../src/checks/js-budget.ts';
+import { findLookbehind } from '../src/checks/lookbehind.ts';
 import { needlesFor } from '../src/checks/secrets.ts';
 import { ConfigError, parseConfig } from '../src/config.ts';
 import { normalizeHash } from '../src/csp.ts';
@@ -105,6 +106,14 @@ describe('lookbehind targets', () => {
   it('fails for a target one minor version short, and names it as written', () => {
     const report = guard(files, { lookbehind: { targets: { safari: '16.3', ios: '16.4' } } });
     expect(messages(report, 'lookbehind')).toEqual([expect.stringContaining('which Safari 16.3 cannot parse')]);
+  });
+
+  it('does not count a byte order mark as a column on line 1', () => {
+    const plain = guard(files, {});
+    const bom = guard({ ...files, 'a.js': `\uFEFF${files['a.js']}` }, {});
+    expect(messages(plain, 'lookbehind')).toEqual([expect.stringMatching(/^a\.js:1:10: /)]);
+    expect(messages(bom, 'lookbehind')).toEqual(messages(plain, 'lookbehind'));
+    expect(findLookbehind('\uFEFFx\n/(?<!a)b/')).toEqual({ count: 1, line: 2, column: 2 });
   });
 
   it('rejects a fractional number, which would read 16.10 as 16.1', () => {

@@ -16,14 +16,19 @@ const BROWSER_NAMES: Record<Browser, string> = {
   chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', safari: 'Safari', ios: 'Safari on iOS', opera: 'Opera', samsung: 'Samsung Internet',
 };
 
-/** Count and position (1-based line and column) of the first lookbehind in a text. */
+/**
+ * Count and position (1-based line and column) of the first lookbehind in a text. A leading byte
+ * order mark is not counted: editors do not show it, so it would push every column on line 1 one
+ * place to the right.
+ */
 export function findLookbehind(text: string): { count: number; line: number; column: number } | null {
   const matches = [...text.matchAll(LOOKBEHIND)];
   const first = matches[0];
   if (first === undefined) return null;
   const before = text.slice(0, first.index);
   const line = before.split('\n').length;
-  return { count: matches.length, line, column: first.index - before.lastIndexOf('\n') };
+  const bom = line === 1 && text.startsWith('\uFEFF') ? 1 : 0;
+  return { count: matches.length, line, column: first.index - before.lastIndexOf('\n') - bom };
 }
 
 export function checkLookbehind(ctx: Context): CheckResult {

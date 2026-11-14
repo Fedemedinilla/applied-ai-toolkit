@@ -60,6 +60,19 @@ describe('cli --sarif', () => {
     expect(twice).toEqual(once);
   });
 
+  it('does not count a byte order mark as a column, from a file or from stdin', () => {
+    const letter = "In today's fast-paced world, we ship.\n";
+    const tmp = mkdtempSync(join(tmpdir(), 'slop-lint-bom-'));
+    const file = join(tmp, 'letter.md');
+    writeFileSync(file, `\uFEFF${letter}`);
+    for (const r of [run([file, '--lang', 'en', '--sarif']), run(['-', '--lang', 'en', '--sarif'], `\uFEFF${letter}`)]) {
+      const lex = parse(r.stdout).runs[0]?.results.find((x) => x.ruleId === 'LEX-03');
+      expect(lex?.locations[0]?.physicalLocation.region).toEqual({ startLine: 1, startColumn: 1, endLine: 1, endColumn: 28 });
+    }
+    expect(run([file, '--lang', 'en']).stdout).toContain('letter.md:1:1 ');
+    expect(run([file, '--lang', 'en', '--json']).stdout).toBe(run(['-', '--lang', 'en', '--json', '--format', 'markdown'], letter).stdout);
+  });
+
   it('writes the uri relative, with forward slashes and no leading ./', () => {
     expect(uris(parse(run([`./${FIXTURE}`, '--lang', 'en', '--sarif']).stdout))).toEqual([FIXTURE]);
     expect(uris(parse(run([join(dir, FIXTURE), '--lang', 'en', '--sarif']).stdout))).toEqual([FIXTURE]);

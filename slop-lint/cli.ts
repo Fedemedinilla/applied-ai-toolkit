@@ -99,7 +99,8 @@ function main(): number {
   for (const file of args.files) {
     let text: string;
     try {
-      text = readFileSync(file === '-' ? 0 : file, 'utf8');
+      // A leading byte order mark is not text: editors do not show it, so it is no column either.
+      text = readFileSync(file === '-' ? 0 : file, 'utf8').replace(/^\uFEFF/u, '');
     } catch (error) {
       process.stderr.write(`cannot read ${file}: ${(error as Error).message}\n`);
       return 2;

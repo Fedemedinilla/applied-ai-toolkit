@@ -82,7 +82,7 @@ A server-only value can end up in a client bundle through one wrong import, and 
 
 ### 4. Regex lookbehind (`lookbehind`)
 
-Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a module and the whole module fails to load, with no error the visitor can see. In the source site two interactive demos did nothing on an iPhone running iOS 15 for exactly this reason. The check scans the configured browser files and every inline script and reports file, line and column. Named groups, `(?<name>`, are fine since Safari 11.1 and are not flagged. With `targets`, it runs only when a target predates support: Chrome 62, Edge 79, Firefox 78, Safari and Safari on iOS 16.4, Opera 49, Samsung Internet 8.2 (MDN compatibility data).
+Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a module and the whole module fails to load, with no error the visitor can see. In the source site two interactive demos did nothing on an iPhone running iOS 15 for exactly this reason. The check scans the configured browser files and every inline script and reports file, line and column. A byte order mark at the start of a file takes no column, as in an editor. Named groups, `(?<name>`, are fine since Safari 11.1 and are not flagged. With `targets`, it runs only when a target predates support: Chrome 62, Edge 79, Firefox 78, Safari and Safari on iOS 16.4, Opera 49, Samsung Internet 8.2 (MDN compatibility data).
 
 ### 5. JavaScript budget (`js-budget`)
 
