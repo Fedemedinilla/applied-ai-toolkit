@@ -63,20 +63,29 @@ export class AggregateError extends Error {
 
 const sample = (ids: readonly string[]) => ids.slice(0, 5).join(', ') + (ids.length > 5 ? ', ...' : '');
 
+/** How one stored verdict is read and checked against its piece. Each throws with the reason. */
+export type VerdictReader<J> = {
+  /** Validates the shape of one stored verdict. */
+  read(raw: unknown): J;
+  /** The completeness check against the piece the verdict is about. */
+  check(verdict: J, piece: BlindPiece): void;
+};
+
 /**
- * Joins verdicts to the key and groups by variant and language, plus one "all"
- * row per variant. Refuses, rather than silently dropping, anything that would
- * give one variant a different denominator from another: a verdict for an
- * unknown piece, a piece with no verdict or fewer judges than the rest, a
- * judge counted twice, a verdict that does not cover the piece's lines, a key
- * entry with no piece, a failed call, or variants with different row counts.
+ * Joins stored verdicts to the pieces and the key, for any rubric. Refuses,
+ * rather than silently dropping, anything that would give one variant a
+ * different denominator from another: a verdict for an unknown piece, a piece
+ * with no verdict or fewer judges than the rest, a judge counted twice, a
+ * verdict that does not cover its piece, a key entry with no piece, a failed
+ * call, or variants with different row counts.
  */
-export function aggregate(
+export function joinVerdicts<J extends { id: string; judge: number }>(
   pieces: readonly BlindPiece[],
   key: BlindKey,
   verdicts: readonly unknown[],
-  opts: AggregateOptions = {},
-): ResultRow[] {
+  opts: AggregateOptions,
+  reader: VerdictReader<J>,
+): { entries: [string, KeyEntry][]; byId: Map<string, J[]>; pieceById: Map<string, BlindPiece> } {
   const pieceById = new Map(pieces.map((p) => [p.id, p]));
   for (const p of pieces) {
     const entry = key[p.id];
@@ -88,14 +97,17 @@ export function aggregate(
     .map(([id]) => id);
   if (lost.length) throw new AggregateError(`${lost.length} key entr(ies) have no piece: ${sample(lost)}`);
 
-  const byId = new Map<string, JudgedPiece[]>();
+  const byId = new Map<string, J[]>();
   verdicts.forEach((raw, i) => {
-    const parsed = JudgedPiece.safeParse(raw);
-    if (!parsed.success) throw new AggregateError(`verdict ${i + 1} has the wrong shape: ${parsed.error.issues[0]?.message}`);
-    const v = parsed.data;
+    let v: J;
+    try {
+      v = reader.read(raw);
+    } catch (e) {
+      throw new AggregateError(`verdict ${i + 1} has the wrong shape: ${(e as Error).message}`);
+    }
     const p = pieceById.get(v.id);
     if (!p) throw new AggregateError(`verdict for unknown piece ${v.id}`);
-    checkLineCoverage(v, numberedLines(p.text).length);
+    reader.check(v, p);
     const list = byId.get(v.id) ?? [];
     if (list.some((x) => x.judge === v.judge)) throw new AggregateError(`piece ${v.id} has two verdicts from judge ${v.judge}`);
     list.push(v);
@@ -121,6 +133,29 @@ export function aggregate(
       throw new AggregateError(`variants have different row counts (${counts}): the run was cut or mixed; pass allowMissing to report anyway`);
     }
   }
+  return { entries, byId, pieceById };
+}
+
+const groundednessReader: VerdictReader<JudgedPiece> = {
+  read(raw) {
+    const parsed = JudgedPiece.safeParse(raw);
+    if (!parsed.success) throw new Error(String(parsed.error.issues[0]?.message));
+    return parsed.data;
+  },
+  check: (v, p) => checkLineCoverage(v, numberedLines(p.text).length),
+};
+
+/**
+ * Joins groundedness verdicts to the key and groups by variant and language,
+ * plus one "all" row per variant. Every refusal of `joinVerdicts` applies.
+ */
+export function aggregate(
+  pieces: readonly BlindPiece[],
+  key: BlindKey,
+  verdicts: readonly unknown[],
+  opts: AggregateOptions = {},
+): ResultRow[] {
+  const { entries, byId } = joinVerdicts(pieces, key, verdicts, opts, groundednessReader);
 
   type Item = { entry: KeyEntry; c?: Consensus };
   const groups = new Map<string, { variant: string; lang: string; items: Item[] }>();
