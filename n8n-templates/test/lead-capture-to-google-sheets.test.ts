@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { applySet, ifPasses } from '../harness/nodes.ts';
 import { loadTemplate, mainTargets, nodeNamed, reachableSideEffects } from '../harness/workflow.ts';
-import { BAD_EMAILS, webhookItem } from './helpers/webhook.ts';
+import { BAD_EMAILS, LONGEST_EMAIL, webhookItem } from './helpers/webhook.ts';
 
 const { workflow } = loadTemplate('lead-capture-to-google-sheets.json');
 const CHECK = 'Has a valid email?';
@@ -13,7 +13,8 @@ const normalize = nodeNamed(workflow, 'Normalize fields');
 
 describe('Has a valid email?', () => {
   it('accepts a well-formed address, with spaces around it', () => {
-    for (const email of ['ana@example.com', '  Ana.Test+tag@Mail.Example.com  ', 'a@b.co']) {
+    expect(LONGEST_EMAIL).toHaveLength(254);
+    for (const email of ['ana@example.com', '  Ana.Test+tag@Mail.Example.com  ', 'a@b.co', LONGEST_EMAIL]) {
       expect(ifPasses(check, { json: webhookItem({ email }) }), email).toBe(true);
     }
   });

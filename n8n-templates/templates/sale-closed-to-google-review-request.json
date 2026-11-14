@@ -80,7 +80,7 @@
             {
               "id": "c4974a45-9fde-473b-8e48-201b4feb3db5",
               "leftValue": "={{ $json.email }}",
-              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"

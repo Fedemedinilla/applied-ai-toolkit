@@ -30,4 +30,10 @@ export const BAD_EMAILS: unknown[] = [
   { address: 'ana@example.com' },
   42,
   true,
+  // 255 characters: one more than an address can have. Unbounded, it would
+  // overflow a sheet cell or the 4,096 characters of a Telegram message.
+  `${'a'.repeat(243)}@example.com`,
 ];
+
+/** The longest address the checks accept: 254 characters. */
+export const LONGEST_EMAIL = `${'a'.repeat(242)}@example.com`;

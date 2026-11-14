@@ -45,7 +45,7 @@
             {
               "id": "841b21ab-100b-4a98-8f3b-8b07545d7f73",
               "leftValue": "={{ String($json.body.email || '').trim() }}",
-              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"
