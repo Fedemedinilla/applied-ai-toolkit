@@ -16,9 +16,11 @@
  *    holds the text of each source the tarball leaves out, and every sourceMappingURL names a map
  *    the tarball holds, so no tool goes looking for a `.ts` file that is not there.
  * 3. Installs the tarball in a fresh project outside the repository. slop-lint has no
- *    dependencies, so `npm install --offline` installs it and links its bin. The gateway's two
- *    dependencies would need the registry, so its tarball is extracted into node_modules and its
- *    dependencies are linked to the repository's copies, the versions the lockfile pins.
+ *    dependencies, so `npm install --offline` installs it and links its bin. The dependencies of
+ *    the other packages would need the registry, so each tarball is extracted into node_modules
+ *    and its dependencies are linked to the repository's copies, the versions the lockfile pins.
+ *    The bin of such a package is linked into node_modules/.bin and made executable by hand, the
+ *    two things npm does on install.
  * 4. In a child process started in that project, imports each entry by package name and compares
  *    its runtime exports with the source module's, then does the same with require() from
  *    CommonJS: the types resolve for a CommonJS consumer too, so the runtime must as well.
@@ -27,13 +29,17 @@
  * 5. Typechecks a small consumer against the installed package with the repository's strict
  *    options and `skipLibCheck: false`. A `@ts-expect-error` line in it fails if the types
  *    collapse to `any`.
- * 6. For slop-lint, runs the installed bin and `node slop-lint/cli.ts` on the same inputs and
- *    compares stdout, stderr and the exit code.
+ * 6. For a package with a bin, runs the installed bin and the source CLI (`node <folder>/cli.ts`)
+ *    on the same inputs and compares stdout, stderr and the exit code. A run may state the exit
+ *    code it expects, so two identical failures do not pass as agreement. Runs marked `consumer`
+ *    start in the fresh project, over files written there: for import-fences that is a config
+ *    written in TypeScript that imports the installed package, which Node loads by stripping its
+ *    types because the file is the user's own, outside node_modules.
  *
  * Set PACK_CHECK_KEEP=1 to keep the temporary folder and print its path.
  */
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -58,9 +64,44 @@ interface PackageSpec {
   readonly linkDependencies?: readonly string[];
   /** A consumer typechecked against the installed package. */
   readonly consumer: string;
-  /** Arguments run through the installed bin and through the source CLI, for a package with a bin. */
-  readonly binRuns?: ReadonlyArray<readonly string[]>;
+  /** The bin's name in package.json, for a package with one. Its source is <folder>/cli.ts. */
+  readonly bin?: string;
+  /** Arguments run through the installed bin and through the source CLI, from the repository root. */
+  readonly binRuns?: ReadonlyArray<readonly string[] | BinRun>;
+  /** Files written into the fresh project before the bin runs, for the runs marked `consumer`. */
+  readonly consumerFiles?: Readonly<Record<string, string>>;
+  /** Environment variables added to every bin run. */
+  readonly binEnv?: Readonly<Record<string, string>>;
 }
+
+interface BinRun {
+  readonly args: readonly string[];
+  /** The exit code both runs must give. */
+  readonly exit: number;
+  /** Run in the fresh project where the package is installed, not in the repository root. */
+  readonly consumer?: boolean;
+}
+
+const GUARD_FIXTURES = 'csp-build-guard/fixtures';
+const guardFixture = (name: string): string[] => ['--dir', `${GUARD_FIXTURES}/${name}/site`, '--config', `${GUARD_FIXTURES}/${name}/csp-guard.config.json`];
+
+/** A user's config in TypeScript, with a type annotation and an import of the installed package. */
+const FENCES_TS_CONFIG = `import { defineConfig, type FencesConfigInput } from '@fedemedinilla/import-fences';
+
+const groups: FencesConfigInput['groups'] = {
+  client: { include: ['src/client/**'] },
+  all: { include: ['src/**'] },
+};
+
+export default defineConfig({
+  groups,
+  rules: [
+    { rule: 'forbidden-import', group: 'client', specifiers: ['node:*'], paths: ['src/server/**'], why: 'client code ships to the browser' },
+    { rule: 'relative-extension', group: 'all' },
+  ],
+});
+`;
+const FENCES_JSON_CONFIG = `${JSON.stringify({ groups: { all: { include: ['src/**'] } }, rules: [{ rule: 'dynamic-import', group: 'all' }] }, null, 2)}\n`;
 
 const SLOP_FIXTURES = join(ROOT, 'slop-lint', 'fixtures', 'cover-letters');
 
@@ -72,6 +113,7 @@ const PACKAGES: readonly PackageSpec[] = [
       { subpath: '.', source: 'src/lint.ts' },
       { subpath: './types', source: 'src/types.ts' },
     ],
+    bin: 'slop-lint',
     consumer: `import { lint, RULES } from '@fedemedinilla/slop-lint';
 import type { LintOptions, LintResult } from '@fedemedinilla/slop-lint/types';
 
@@ -112,6 +154,78 @@ export async function wrong(): Promise<string> {
   return result.data.points;
 }
 `,
+  },
+  {
+    folder: 'import-fences',
+    name: '@fedemedinilla/import-fences',
+    entries: [{ subpath: '.', source: 'src/index.ts' }],
+    linkDependencies: ['typescript', 'zod'],
+    consumer: `import { check, defineConfig, memorySource, parseConfig, toSarif, type CheckResult, type FencesConfigInput, type SarifLog } from '@fedemedinilla/import-fences';
+
+const input: FencesConfigInput = defineConfig({ groups: { all: { include: ['src/**'] } }, rules: [{ rule: 'dynamic-import', group: 'all' }] });
+const result: CheckResult = check(parseConfig(input), memorySource({ 'src/a.ts': '' }));
+export const count: number = result.violations.length;
+export const log: SarifLog = toSarif(result, { root: '.', configPath: 'fences.config.json' });
+// @ts-expect-error nope is not a rule; this line fails if the types collapse to any.
+defineConfig({ groups: {}, rules: [{ rule: 'nope', group: 'all' }] });
+`,
+    bin: 'import-fences',
+    consumerFiles: {
+      'fences.config.ts': FENCES_TS_CONFIG,
+      'fences.config.json': FENCES_JSON_CONFIG,
+      'src/client/app.ts': "import { rows } from '../server/db';\nimport { readFileSync } from 'node:fs';\nexport const app = [rows, readFileSync];\n",
+      'src/server/db.ts': 'export const rows = [];\n',
+    },
+    binRuns: [
+      { args: ['--config', 'import-fences/repo.config.ts'], exit: 0 },
+      { args: ['--config', 'import-fences/repo.config.ts', '--sarif'], exit: 0 },
+      { args: ['--config', 'fences.config.ts'], exit: 1, consumer: true },
+      { args: ['--config', 'fences.config.ts', '--json'], exit: 1, consumer: true },
+      { args: ['--config', 'fences.config.ts', '--sarif'], exit: 1, consumer: true },
+      { args: ['--config', 'fences.config.json'], exit: 0, consumer: true },
+      { args: ['--json', '--sarif'], exit: 2, consumer: true },
+    ],
+  },
+  {
+    folder: 'csp-build-guard',
+    name: '@fedemedinilla/csp-build-guard',
+    entries: [
+      { subpath: '.', source: 'src/run.ts' },
+      { subpath: './config', source: 'src/config.ts' },
+      { subpath: './report', source: 'src/report.ts' },
+      { subpath: './sarif', source: 'src/sarif.ts' },
+      { subpath: './site', source: 'src/site.ts' },
+      { subpath: './types', source: 'src/types.ts' },
+    ],
+    linkDependencies: ['zod'],
+    consumer: `import { runGuard, type RunOptions } from '@fedemedinilla/csp-build-guard';
+import { ConfigError, loadConfig, type GuardConfig } from '@fedemedinilla/csp-build-guard/config';
+import { formatReport } from '@fedemedinilla/csp-build-guard/report';
+import { toSarif, type SarifLog } from '@fedemedinilla/csp-build-guard/sarif';
+import { InputError } from '@fedemedinilla/csp-build-guard/site';
+import type { GuardReport } from '@fedemedinilla/csp-build-guard/types';
+
+export async function audit(dir: string): Promise<string> {
+  const config: GuardConfig = await loadConfig('csp-guard.config.json');
+  const options: RunOptions = { dir, config };
+  const report: GuardReport = runGuard(options);
+  const log: SarifLog = toSarif(report, { configPath: 'csp-guard.config.json' });
+  return log.runs.length > 0 ? formatReport(report, dir) : '';
+}
+export const known = (error: unknown): boolean => error instanceof ConfigError || error instanceof InputError;
+declare const report: GuardReport;
+// @ts-expect-error ok is a boolean; this line fails if the types collapse to any.
+export const wrong: string = report.ok;
+`,
+    bin: 'csp-build-guard',
+    binEnv: { FIXTURE_SECRET: 'fixture-secret-value-0001' },
+    binRuns: [
+      { args: guardFixture('pass'), exit: 0 },
+      { args: [...guardFixture('pass'), '--json'], exit: 0 },
+      { args: guardFixture('lookbehind'), exit: 1 },
+      { args: [...guardFixture('lookbehind'), '--sarif'], exit: 1 },
+      { args: ['--dir', `${GUARD_FIXTURES}/nope`, '--config', `${GUARD_FIXTURES}/pass/csp-guard.config.json`], exit: 2 },
+    ],
   },
 ];
 
@@ -297,6 +411,12 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
       mkdirSync(dirname(link), { recursive: true });
       symlinkSync(join(NODE_MODULES, ...dependency.split('/')), link, 'junction');
     }
+    // What npm install does for a bin: a link in node_modules/.bin and the executable bit.
+    for (const [name, target] of Object.entries((manifest['bin'] ?? {}) as Record<string, string>)) {
+      mkdirSync(join(consumer, 'node_modules', '.bin'), { recursive: true });
+      chmodSync(join(installed, target), 0o755);
+      symlinkSync(relative(join(consumer, 'node_modules', '.bin'), join(installed, target)), join(consumer, 'node_modules', '.bin', name));
+    }
   }
   // The consumer's typecheck needs Node's types; linked after npm install, which would prune them.
   mkdirSync(join(consumer, 'node_modules', '@types'), { recursive: true });
@@ -352,17 +472,28 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
   say('a strict consumer typechecks against the installed declarations');
 
   // 6. The installed bin against the source CLI.
-  if (spec.binRuns !== undefined) {
-    const bin = join(consumer, 'node_modules', '.bin', 'slop-lint');
-    const first = readFileSync(join(installed, 'dist', 'cli.js'), 'utf8').split('\n')[0];
-    if (first !== '#!/usr/bin/env node') fail(`dist/cli.js starts with ${String(first)}, not the shebang`);
-    for (const args of spec.binRuns) {
-      const viaBin = run(bin, args, { cwd: ROOT, input: '' });
-      const viaSource = run(process.execPath, [join(ROOT, 'slop-lint', 'cli.ts'), ...args], { cwd: ROOT, input: '' });
-      if (viaBin.status !== viaSource.status) fail(`slop-lint ${args.join(' ')} exited ${String(viaBin.status)} installed and ${String(viaSource.status)} from source`);
-      if (viaBin.stdout !== viaSource.stdout) fail(`slop-lint ${args.join(' ')} printed different stdout installed and from source`);
-      if (viaBin.stderr !== viaSource.stderr) fail(`slop-lint ${args.join(' ')} printed different stderr installed and from source`);
-      say(`bin and source CLI agree on ${args.map((a) => (isAbsolute(a) ? relative(ROOT, a) : a)).join(' ')} (exit ${String(viaBin.status)})`);
+  if (spec.bin !== undefined && spec.binRuns !== undefined) {
+    const declared = (manifest['bin'] as Record<string, string> | undefined)?.[spec.bin] ?? fail(`package.json has no bin named ${spec.bin}`);
+    const bin = join(consumer, 'node_modules', '.bin', spec.bin);
+    const first = readFileSync(join(installed, declared), 'utf8').split('\n')[0];
+    if (first !== '#!/usr/bin/env node') fail(`${declared} starts with ${String(first)}, not the shebang`);
+    for (const [path, content] of Object.entries(spec.consumerFiles ?? {})) {
+      mkdirSync(dirname(join(consumer, path)), { recursive: true });
+      writeFileSync(join(consumer, path), content);
+    }
+    const sourceCli = join(ROOT, spec.folder, 'cli.ts');
+    const env = { ...process.env, ...spec.binEnv };
+    for (const binRun of spec.binRuns) {
+      const { args, exit, consumer: inConsumer }: { args: readonly string[]; exit?: number; consumer?: boolean } = 'args' in binRun ? binRun : { args: binRun };
+      const cwd = inConsumer === true ? consumer : ROOT;
+      const viaBin = run(bin, args, { cwd, input: '', env });
+      const viaSource = run(process.execPath, [sourceCli, ...args], { cwd, input: '', env });
+      const shown = args.map((a) => (isAbsolute(a) ? relative(ROOT, a) : a)).join(' ');
+      if (viaBin.status !== viaSource.status) fail(`${spec.bin} ${shown} exited ${String(viaBin.status)} installed and ${String(viaSource.status)} from source\n${viaBin.stderr}`);
+      if (exit !== undefined && viaBin.status !== exit) fail(`${spec.bin} ${shown} exited ${String(viaBin.status)}, expected ${exit}\n${viaBin.stderr}`);
+      if (viaBin.stdout !== viaSource.stdout) fail(`${spec.bin} ${shown} printed different stdout installed and from source`);
+      if (viaBin.stderr !== viaSource.stderr) fail(`${spec.bin} ${shown} printed different stderr installed and from source`);
+      say(`bin and source CLI agree on ${shown}${inConsumer === true ? ' (in the fresh project)' : ''} (exit ${String(viaBin.status)})`);
     }
   }
 }
