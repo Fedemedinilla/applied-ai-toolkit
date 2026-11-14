@@ -138,6 +138,55 @@ The second case needed a fetch wrapper. The SDK treats any fetch error whose tex
 
 `test/helpers/fake-claude.ts` is the fake API. It answers the real client with JSON or server-sent events in the API's format. It can cut a stream after any event, send an error event, hang until aborted or fail the connection. No test touches the network or needs a key.
 
+## Mutation testing
+
+```sh
+npm run mutation:gateway   # StrykerJS over src/caps.ts and src/cost.ts with this folder's tests; about 50 seconds on 4 cores
+```
+
+Stryker changes the code one small edit at a time (a `>=` into a `>`, a condition into `true`) and runs the tests against each mutant. A mutant that survives is a line a bug could change with no test failing. The report goes to `reports/mutation/gateway/`.
+
+Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+
+| File | Mutants | Killed | Survived | Score |
+| --- | --- | --- | --- | --- |
+| `src/caps.ts` | 90 | 89 | 1 | 98.89% |
+| `src/cost.ts` | 184 | 183 | 1 | 99.46% |
+| Both | 274 | 272 | 2 | 99.27% |
+
+The first run scored 90.15%, with 23 survivors and 4 mutants no test reached. The gaps it showed, each now a test:
+
+- A job without a user, or a user without an account row, has no own cap. With the fallback to the global cap removed, the comparison ran against `NaN` and no cap ever stopped the call.
+- The first pass of the DST correction was only tested west of UTC, where stepping forward or back by the offset gives the same midnight. Berlin on the day its clocks change tells them apart.
+- The error for a null total was checked for two of its seven field names.
+- A price whose `validFrom` is exactly the call time, and price rows that arrive out of order.
+- `advisor_message` and `compaction` iterations were never split.
+- `countAttachments` over `null`, a null `source` and a `source` that is a string, which threw with the type checks removed.
+- The filter that blanks base64 data also blanked the `data` of a plain-text document when its type check was removed.
+
+Two mutants survive and are equivalent, so no test can kill them:
+
+- `caps.ts`, `parts.find(...)?.value` without the `?.`: `Intl.DateTimeFormat.formatToParts` returns every part the formatter asks for, so the lookup never misses.
+- `cost.ts`, `from > current.from` as `>=` in `pricesInForce`: the two differ only for two rows of one model with the same `validFrom`, which the primary key `(model, valid_from)` of `model_prices` rules out.
+
+`thresholds.break` in `stryker.config.json` is 97: a run below it exits non-zero. The weekly workflow `.github/workflows/quality.yml` runs it.
+
+## Benchmarks
+
+```sh
+npm run bench            # every bench of the repository, about 15 seconds; writes reports/bench/result.json
+npm run bench:compare    # compares the run with test/bench/baseline.json; exit 1 on a regression beyond 50%
+```
+
+| Bench | One iteration | Median |
+| --- | --- | --- |
+| `gateway/concurrent-50-under-cap` | 50 concurrent `structured` calls, all sent and settled | 17.13 ms (0.34 ms per call) |
+| `gateway/concurrent-50-at-cap` | 50 concurrent calls at the daily cap, all refused before any request | 9.86 ms (0.20 ms per call) |
+
+Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container (Intel Xeon at 2.30 GHz). The milliseconds are that machine's on that day; [`test/bench/README.md`](../test/bench/README.md) explains how a run is compared with the baseline on another machine, and the limits of that comparison.
+
+`test/concurrency.bench.ts` runs the real SDK client over the fake wire of `test/helpers/fake-claude.ts`, which answers at once, and the in-memory stores. So the time is the gateway's own work around a request: the config reads, both cap checks, the reservation, the request and its parsing, and the closing row. With a real database each of those reads and writes adds a round trip that this bench does not have. After every burst, outside the timed part, the bench checks the ledger: under the cap all 50 calls settled, the recorded spend is 50 times the call cost and no reservation is open; at the cap all 50 were refused with `cap_daily_user`, no request left and the spend did not move. A burst that breaks one of these fails the bench.
+
 ## Layout
 
 ```

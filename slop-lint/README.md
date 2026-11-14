@@ -270,6 +270,22 @@ The shared budget is spent in reading order, so context words without an anchor 
 - `cli-sarif.test.ts`: `--sarif` as a child process. The log validates, the exit codes stay, the bytes repeat and columns are code points. Several files share one run, uris are relative, and stdin is `stdin` or the `--sarif-uri` value. `--json` with `--sarif`, a misused `--sarif-uri`, an unreadable file or a Windows path exit 2 with nothing on stdout.
 - `action.test.ts`: `action.yml` as text (no expression in the run block, every input through `env:`, setup-node pinned to the SHA in ci.yml, every input and output in this README), then its script, run with bash in a temporary workspace, against `**` globs, space and newline separators, `fail: false`, exit 2 on a pattern with no match or an unwritable SARIF file even with `fail: false`, inputs that look like shell code, a file named `-letter.txt`, the SARIF file and the outputs, and a `sarif-file` with a line break.
 
+## Benchmarks
+
+```sh
+npm run bench            # every bench of the repository, about 15 seconds; writes reports/bench/result.json
+npm run bench:compare    # compares the run with test/bench/baseline.json; exit 1 on a regression beyond 50%
+```
+
+| Bench | One iteration | Median |
+| --- | --- | --- |
+| `slop-lint/lint-long-en` | `lint` of an English document of 29,000 characters | 17.92 ms |
+| `slop-lint/lint-long-es` | `lint` of a Spanish document of 33,000 characters | 13.67 ms |
+
+Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container (Intel Xeon at 2.30 GHz). The milliseconds are that machine's on that day; [`test/bench/README.md`](../test/bench/README.md) explains how a run is compared with the baseline on another machine, and the limits of that comparison.
+
+`test/lint.bench.ts` builds each document by repeating the "before" cover letter of the fixtures 40 times, so every repetition has findings and reporting them is part of the time. It lints as plain text; Markdown mode adds the masking pass and is not benched.
+
 ## The section 15 letters
 
 The report ends with three pairs of cover letters for one fictional candidate, Lucía Ferreyra, a data analyst in Rosario. She applies to three companies, one per variety: a fintech (Rioplatense Spanish), a regional distributor (neutral Spanish) and a US analytics firm hiring remotely (English). The "before" letter of each pair is what a model writes with no instructions; the "after" letter is the rewrite that passes the rubric. They are the fixtures, with two changes. Every company is renamed to one of Microsoft's sample names (Woodgrove Pagos, Distribuidora Fabrikam, Northwind Analytics, and Contoso Agro as her employer), so no name can belong to a real business. The contact lines keep only an example.com address.

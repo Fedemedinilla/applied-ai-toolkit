@@ -60,6 +60,21 @@ Exports: `renderMarkdown`, `renderInline` (one line, no blocks), `linkTag` (one 
 
 `test/helpers/inspect.ts` is the checker. It reads the DOM jsdom builds, so an attribute that only appears after the browser's parsing would still be caught. It also reads the string before parsing. Every tag must close in order, and no block element may open inside a paragraph or an inline element, since a parser would silently repair either.
 
+## Benchmarks
+
+```sh
+npm run bench            # every bench of the repository, about 15 seconds; writes reports/bench/result.json
+npm run bench:compare    # compares the run with test/bench/baseline.json; exit 1 on a regression beyond 50%
+```
+
+| Bench | One iteration | Median |
+| --- | --- | --- |
+| `safe-markdown/render-long-reply` | `renderMarkdown` of a reply of 19,000 characters: paragraphs, lists, tables, code blocks, links and escaped HTML | 0.62 ms |
+
+Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container (Intel Xeon at 2.30 GHz). The milliseconds are that machine's on that day; [`test/bench/README.md`](../test/bench/README.md) explains how a run is compared with the baseline on another machine, and the limits of that comparison.
+
+`test/render.bench.ts` builds the reply by repeating one section with every construct of the subset until it is just under the default cut of 20,000 characters, and checks that every table and code block of the input is in the output.
+
 ## Limits
 
 - The subset is small on purpose. Headings, ordered lists, images, blockquotes and nested lists come out as text.
