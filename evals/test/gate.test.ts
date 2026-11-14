@@ -73,6 +73,11 @@ describe('the decision rule', () => {
     expect([decide(108, 120, 96, 120), decide(72, 80, 64, 80)]).toEqual(['fail', 'inconclusive']);
   });
 
+  it('cannot pass two runs with the same results below 35 per run', () => {
+    for (let n = 1; n < 35; n++) for (let k = 0; k <= n; k++) expect(decide(k, n, k, n)).toBe('inconclusive');
+    expect(decide(35, 35, 35, 35)).toBe('pass');
+  });
+
   it('fails every pair the "intervals do not overlap" rule fails', () => {
     let disjoint = 0;
     for (const n of [5, 12, 30, 75, 200]) {

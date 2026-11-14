@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createWriterTarget } from '../example/business.ts';
@@ -180,5 +181,14 @@ describe('blinding is enforced for every judge rubric, not left to it', () => {
     expect(Object.keys(sent.piece).sort()).toEqual(['brief', 'case', 'lang', 'now', 'text']);
     const whole = JSON.stringify(req);
     for (const secret of ['zz9', 'V4', 'stop_sequence', 'output_tokens', '812', 'sample']) expect(whole).not.toContain(secret);
+  });
+});
+
+describe('the README', () => {
+  it('prints the sample rubric exactly as the file that is tested here', () => {
+    const file = readFileSync(new URL('../example/plain-language-rubric.ts', import.meta.url), 'utf8');
+    const code = file.slice(file.indexOf("import { z } from 'zod';"));
+    expect(code.length).toBeGreaterThan(1500);
+    expect(readFileSync(new URL('../README.md', import.meta.url), 'utf8')).toContain('```ts\n' + code + '```');
   });
 });
