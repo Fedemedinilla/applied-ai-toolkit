@@ -29,6 +29,10 @@
     "guard:pages": "node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/receipt --config apps/receipt/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/replay-lab --config apps/replay-lab/csp-guard.config.json && node csp-build-guard/cli.ts --dir dist/apps/checklist --config apps/checklist/csp-guard.config.json",
     "build:packages": "npm run build --workspace gateway --workspace slop-lint",
     "pack:check": "node test/packaging/pack-check.ts",
+    "mutation:gateway": "stryker run gateway/stryker.config.json",
+    "mutation:grounded-assistant": "stryker run grounded-assistant/stryker.config.json",
+    "mutation:amount-parser": "stryker run amount-parser/stryker.config.json",
+    "mutation": "npm run mutation:gateway && npm run mutation:grounded-assistant && npm run mutation:amount-parser",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "release": "npm run pack:check && changeset publish"
@@ -36,6 +40,8 @@
   "devDependencies": {
     "@changesets/cli": "3.0.3",
     "@electric-sql/pglite": "0.5.9",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@supabase/supabase-js": "2.118.0",
     "@types/node": "24.19.2",
     "@types/web-push": "3.6.4",

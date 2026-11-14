@@ -156,7 +156,8 @@ const fences = folderFences({
 export default defineConfig({
   root: '..',
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**'],
+  // .stryker-tmp/ holds StrykerJS's copies of the repository during a mutation run, reports/ its output.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.stryker-tmp/**', 'reports/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },

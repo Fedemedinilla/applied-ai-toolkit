@@ -11,7 +11,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'dist/**', '**/dist/**'],
+    exclude: ['node_modules/**', 'dist/**', '**/dist/**', '.stryker-tmp/**', 'reports/**'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },
