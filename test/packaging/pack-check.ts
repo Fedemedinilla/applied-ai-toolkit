@@ -20,8 +20,10 @@
  *    dependencies would need the registry, so its tarball is extracted into node_modules and its
  *    dependencies are linked to the repository's copies, the versions the lockfile pins.
  * 4. In a child process started in that project, imports each entry by package name and compares
- *    its runtime exports with the source module's. Compares the declared exports (values and
- *    types) of each `.d.ts` entry with the source module's, through the TypeScript compiler API.
+ *    its runtime exports with the source module's, then does the same with require() from
+ *    CommonJS: the types resolve for a CommonJS consumer too, so the runtime must as well.
+ *    Compares the declared exports (values and types) of each `.d.ts` entry with the source
+ *    module's, through the TypeScript compiler API.
  * 5. Typechecks a small consumer against the installed package with the repository's strict
  *    options and `skipLibCheck: false`. A `@ts-expect-error` line in it fails if the types
  *    collapse to `any`.
@@ -308,13 +310,17 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
     const runtime = JSON.parse(mustRun(process.execPath, ['--input-type=module', '-e', script], { cwd: consumer })) as string[];
     const source = Object.keys((await import(pathToFileURL(join(packageDir, entry.source)).href)) as Record<string, unknown>);
     sameList(`the runtime exports of ${specifier} and ${spec.folder}/${entry.source}`, runtime, source);
+    const cjs = `console.log(JSON.stringify(Object.keys(require(${JSON.stringify(specifier)}))));`;
+    const required = run(process.execPath, ['--input-type=commonjs', '-e', cjs], { cwd: consumer });
+    if (required.status !== 0) fail(`require(${JSON.stringify(specifier)}) from CommonJS failed:\n${required.stderr}`);
+    sameList(`the exports require() returns for ${specifier} and ${spec.folder}/${entry.source}`, JSON.parse(required.stdout) as string[], source);
 
     const exportsField = (manifest['exports'] as Record<string, { types: string }>)[entry.subpath] ?? fail(`exports has no ${entry.subpath}`);
     const declarationFile = join(installed, exportsField.types);
     const declared = declaredExports(declarationFile, { ...SOURCE_OPTIONS, allowImportingTsExtensions: false });
     const sourceDeclared = declaredExports(join(packageDir, entry.source), SOURCE_OPTIONS);
     sameList(`the declared exports of ${specifier} and ${spec.folder}/${entry.source}`, declared, sourceDeclared);
-    say(`entry ${entry.subpath}: ${runtime.length} runtime exports and ${declared.length} declared exports match the source`);
+    say(`entry ${entry.subpath}: ${runtime.length} runtime exports, through import and require(), and ${declared.length} declared exports match the source`);
   }
 
   // 5. A strict consumer typechecks against the installed declarations.

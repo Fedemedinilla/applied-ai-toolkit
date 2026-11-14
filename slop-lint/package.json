@@ -30,11 +30,11 @@
   "exports": {
     ".": {
       "types": "./dist/src/lint.d.ts",
-      "import": "./dist/src/lint.js"
+      "default": "./dist/src/lint.js"
     },
     "./types": {
       "types": "./dist/src/types.d.ts",
-      "import": "./dist/src/types.js"
+      "default": "./dist/src/types.js"
     },
     "./package.json": "./package.json"
   },
