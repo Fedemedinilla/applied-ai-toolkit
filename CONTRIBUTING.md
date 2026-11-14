@@ -18,9 +18,18 @@ npm run guard:apps     # csp-build-guard over each app build, with its own confi
 npm run test:python    # site-check's unittest suite
 npm run test:php       # wp-hardening: composer install from the lock, php -l, PHPUnit
 npm run lint:docs      # slop-lint in Markdown mode over every README and doc a reader opens
+npm run build:docs     # the docs site, generated from the READMEs; a broken relative link fails it
 ```
 
-One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request.
+One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request, except `build:docs`, which the Pages workflow runs on `main`.
+
+Two slower checks run weekly in `.github/workflows/quality.yml` and by hand when a change touches their targets:
+
+```sh
+npm run mutation       # StrykerJS over gateway, grounded-assistant and amount-parser; fails below each threshold
+npm run bench          # the benches, into reports/bench/result.json
+npm run bench:compare  # compares that result with test/bench/baseline.json; exit 1 on a regression
+```
 
 ## Rules for a change
 
