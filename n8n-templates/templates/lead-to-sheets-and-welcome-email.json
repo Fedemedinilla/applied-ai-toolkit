@@ -150,7 +150,7 @@
         "sendTo": "={{ $('Normalize fields').item.json.email }}",
         "subject": "Thanks for your message",
         "emailType": "text",
-        "message": "=Hi {{ $('Normalize fields').item.json.name }},\n\nThanks for writing to us. We got your message and will reply soon.\n\nBest regards",
+        "message": "=Hi {{ String($('Normalize fields').item.json.name || '').replace(/[^A-Za-z\\u00C0-\\u024F' -]/g, '').trim().slice(0, 40) || 'there' }},\n\nThanks for writing to us. We got your message and will reply soon.\n\nBest regards",
         "options": {
           "appendAttribution": false
         }
@@ -193,7 +193,7 @@
     },
     {
       "parameters": {
-        "content": "### Validation and abuse\n\nSubmissions without a well-formed email are discarded, so no row and no failed send.\n\nThe email does not quote the submitted message. Anyone who finds the webhook URL can make it send mail to any address, so the text they control stays out of it. Protect the webhook (Header Auth, a captcha on the form) before going live.",
+        "content": "### Validation and abuse\n\nSubmissions without a well-formed email are discarded, so no row and no failed send.\n\nThe email does not quote the submitted message. Anyone who finds the webhook URL can make it send mail to any address, so the text they control stays out of it: the greeting keeps only the letters of the name, 40 at most, and falls back to \"Hi there\". Protect the webhook (Header Auth, a captcha on the form) before going live.",
         "height": 333,
         "width": 320,
         "color": 6
