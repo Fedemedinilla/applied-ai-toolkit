@@ -24,6 +24,15 @@ export interface WorkflowPolicy {
   readonly allowWrite?: readonly string[];
   /** Deployment environments this workflow may name, such as `github-pages`. Empty by default. */
   readonly allowEnvironments?: readonly string[];
+  /**
+   * Permissions from the never-write set below that this workflow may still set to write. Empty by
+   * default, and only RELEASE_POLICY lists any. Each one is allowed in a job's own permissions
+   * block only: at the top level it would reach every job. And never in a job that also holds
+   * `id-token: write`, so the job that can publish cannot push to the repository.
+   */
+  readonly allowRepositoryWrite?: readonly string[];
+  /** When true, every write permission at the top level is a finding, whatever the lists allow. */
+  readonly writeInJobsOnly?: boolean;
 }
 
 export const DEFAULT_WORKFLOW_POLICY: WorkflowPolicy = { placeholder: /^ci-placeholder-[\w-]+$/ };
@@ -35,7 +44,24 @@ export const PAGES_DEPLOY_POLICY: WorkflowPolicy = {
   allowEnvironments: ['github-pages'],
 };
 
-/** Never allowed to write, even when a policy lists them: each one can change the repository. */
+/**
+ * The policy for .github/workflows/release.yml, which versions and publishes the npm packages with
+ * Changesets. Its version job pushes a branch and opens the "Version Packages" pull request
+ * (`contents` and `pull-requests`); its publish job holds `id-token`, for npm trusted publishing
+ * and provenance. No secret and no environment: the actions take the job token as their default
+ * input, so the workflow never writes a secrets or github.token expression.
+ */
+export const RELEASE_POLICY: WorkflowPolicy = {
+  ...DEFAULT_WORKFLOW_POLICY,
+  allowWrite: ['id-token'],
+  allowRepositoryWrite: ['contents', 'pull-requests'],
+  writeInJobsOnly: true,
+};
+
+/**
+ * Never allowed to write, even when a policy lists them in allowWrite: each one can change the
+ * repository. A policy can allow some of them only through allowRepositoryWrite.
+ */
 const NEVER_WRITE = new Set(['contents', 'packages', 'actions', 'pull-requests', 'deployments', 'security-events', 'statuses', 'checks', 'issues']);
 
 export interface Finding {
@@ -122,11 +148,19 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
     const permissions = /^\s*permissions\s*:(.*)$/.exec(code)?.[1];
     if (permissions !== undefined && unquote(permissions) === 'write-all') add(line, 'write-permission');
     if (permissions !== undefined && permissions.trim() === '') {
+      const writes: Array<{ name: string; entry: Line }> = [];
       for (const entry of blockUnder(all, i)) {
         const pair = /^\s*([\w-]+)\s*:(.*)$/.exec(entry.code);
         const [name, value] = [pair?.[1], pair?.[2]];
         if (name === undefined || value === undefined || unquote(value) !== 'write') continue;
-        if (NEVER_WRITE.has(name) || !(policy.allowWrite ?? []).includes(name)) add(entry, 'write-permission');
+        writes.push({ name, entry });
+      }
+      const holdsIdToken = writes.some((w) => w.name === 'id-token');
+      for (const { name, entry } of writes) {
+        const allowed = NEVER_WRITE.has(name)
+          ? (policy.allowRepositoryWrite ?? []).includes(name) && line.indent > 0 && !holdsIdToken
+          : (policy.allowWrite ?? []).includes(name);
+        if (!allowed || (policy.writeInJobsOnly === true && line.indent === 0)) add(entry, 'write-permission');
       }
     }
 

@@ -1,0 +1,2 @@
+# The prepack script copies the repository LICENSE here so the package ships it.
+/LICENSE

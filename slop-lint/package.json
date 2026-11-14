@@ -1,0 +1,59 @@
+{
+  "name": "@fedemedinilla/slop-lint",
+  "version": "0.1.0",
+  "description": "Flags the patterns that make a cover letter or a README read as generated, in English and Spanish. A pure function and a CLI with no runtime dependencies.",
+  "license": "MIT",
+  "author": "Federico Medinilla",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fedemedinilla/applied-ai-toolkit.git",
+    "directory": "slop-lint"
+  },
+  "homepage": "https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/slop-lint#readme",
+  "bugs": {
+    "url": "https://github.com/Fedemedinilla/applied-ai-toolkit/issues"
+  },
+  "keywords": [
+    "lint",
+    "linter",
+    "writing",
+    "cover-letter",
+    "markdown",
+    "llm",
+    "ai-text",
+    "spanish"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/lint.d.ts",
+      "import": "./dist/src/lint.js"
+    },
+    "./types": {
+      "types": "./dist/src/types.d.ts",
+      "import": "./dist/src/types.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/src/lint.d.ts",
+  "bin": {
+    "slop-lint": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepack": "node -e \"const fs=require('node:fs');if(fs.existsSync('../LICENSE'))fs.copyFileSync('../LICENSE','LICENSE')\" && npm run build"
+  }
+}
