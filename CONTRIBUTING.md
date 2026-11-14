@@ -42,7 +42,7 @@ Keep a commit to one verified step. Write the subject in the imperative. The bod
 
 ## Releasing a package
 
-Two folders are released to npm under the `@fedemedinilla` scope: `@fedemedinilla/slop-lint` from `slop-lint/` and `@fedemedinilla/claude-gateway` from `gateway/`. Their release flow uses [Changesets](https://github.com/changesets/changesets). A pull request that changes what one of these packages does adds a changeset:
+Four folders are released to npm under the `@fedemedinilla` scope: `@fedemedinilla/slop-lint` from `slop-lint/`, `@fedemedinilla/claude-gateway` from `gateway/`, `@fedemedinilla/import-fences` from `import-fences/` and `@fedemedinilla/csp-build-guard` from `csp-build-guard/`. Their release flow uses [Changesets](https://github.com/changesets/changesets). A pull request that changes what one of these packages does adds a changeset:
 
 ```sh
 npx changeset

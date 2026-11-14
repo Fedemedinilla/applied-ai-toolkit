@@ -189,21 +189,9 @@ defineConfig({ groups: {}, rules: [{ rule: 'nope', group: 'all' }] });
   {
     folder: 'csp-build-guard',
     name: '@fedemedinilla/csp-build-guard',
-    entries: [
-      { subpath: '.', source: 'src/run.ts' },
-      { subpath: './config', source: 'src/config.ts' },
-      { subpath: './report', source: 'src/report.ts' },
-      { subpath: './sarif', source: 'src/sarif.ts' },
-      { subpath: './site', source: 'src/site.ts' },
-      { subpath: './types', source: 'src/types.ts' },
-    ],
+    entries: [{ subpath: '.', source: 'src/index.ts' }],
     linkDependencies: ['zod'],
-    consumer: `import { runGuard, type RunOptions } from '@fedemedinilla/csp-build-guard';
-import { ConfigError, loadConfig, type GuardConfig } from '@fedemedinilla/csp-build-guard/config';
-import { formatReport } from '@fedemedinilla/csp-build-guard/report';
-import { toSarif, type SarifLog } from '@fedemedinilla/csp-build-guard/sarif';
-import { InputError } from '@fedemedinilla/csp-build-guard/site';
-import type { GuardReport } from '@fedemedinilla/csp-build-guard/types';
+    consumer: `import { ConfigError, InputError, formatReport, loadConfig, runGuard, toSarif, type GuardConfig, type GuardReport, type RunOptions, type SarifLog } from '@fedemedinilla/csp-build-guard';
 
 export async function audit(dir: string): Promise<string> {
   const config: GuardConfig = await loadConfig('csp-guard.config.json');

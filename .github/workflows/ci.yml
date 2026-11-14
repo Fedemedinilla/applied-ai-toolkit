@@ -1,13 +1,13 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
 # the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest
 # suite, slop-lint over the repository's own docs, and the wp-hardening PHPUnit suite in a job of
-# its own. A third job runs the repository's two composite actions (./slop-lint and
-# ./csp-build-guard) as a user's workflow would, and checks the SARIF each one writes. It does not
+# its own. A third job runs the repository's three composite actions (./slop-lint,
+# ./csp-build-guard and ./import-fences) as a user's workflow would, and checks the SARIF each one writes. It does not
 # upload SARIF: that needs security-events: write, which no job here has. Tests make no network
 # call; the only downloads are the locked npm and Composer packages, and zod for the guard action.
 # No job has secrets. Actions are pinned to the commit SHA of their release tag, with the version
-# in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml and
-# csp-build-guard/action.yml, and their tests fail until the three SHAs match.
+# in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml,
+# csp-build-guard/action.yml and import-fences/action.yml, and their tests fail until the SHAs match.
 name: CI
 
 # Pushes to main, and pull requests. A push to a PR branch runs once, through pull_request.

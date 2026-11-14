@@ -10,13 +10,10 @@ npx csp-build-guard --dir dist --config csp-guard.config.json
 ```
 
 ```ts
-import { runGuard } from '@fedemedinilla/csp-build-guard';
-import { loadConfig } from '@fedemedinilla/csp-build-guard/config';
-import { formatReport } from '@fedemedinilla/csp-build-guard/report';
-import { toSarif } from '@fedemedinilla/csp-build-guard/sarif';
+import { formatReport, loadConfig, runGuard, toSarif } from '@fedemedinilla/csp-build-guard';
 ```
 
-The `csp-build-guard` bin is built from `cli.ts` and takes the same arguments as `node csp-build-guard/cli.ts`. The package entry is built from `src/run.ts`. The folder has no index module, so the rest comes through subpaths named after the source files: `/config`, `/report`, `/sarif`, `/site` (for `InputError`) and `/types`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+The `csp-build-guard` bin is built from `cli.ts` and takes the same arguments as `node csp-build-guard/cli.ts`. The package has one entry, built from [`src/index.ts`](src/index.ts): `runGuard`, the config loader and its schema, the text report, the SARIF log, the two error classes and the report types. The helpers the checks share stay internal, so they can change without a breaking release. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
 
 - **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps that carry the text of the `.ts` sources, which are not shipped.
 - **`zod` is the one dependency, pinned to 4.6.7.** It validates the config. A caller never passes a zod schema in, so nothing has to be shared with the project's copy.
