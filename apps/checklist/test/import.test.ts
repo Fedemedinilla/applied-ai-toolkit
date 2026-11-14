@@ -114,8 +114,11 @@ describe('what an import does not touch', () => {
     const run = runWith(catalogue, 'wordpress');
     expect(importSiteCheck(catalogue, run, 'nope', at(1))).toMatchObject({ ok: false, reason: 'not_json' });
     expect(importSiteCheck(catalogue, run, '{"checks": []}', at(1))).toMatchObject({ ok: false, reason: 'not_site_check' });
-    const v2 = JSON.stringify({ ...JSON.parse(datos), schema_version: 2 });
-    expect(importSiteCheck(catalogue, run, v2, at(1))).toMatchObject({ ok: false, reason: 'unsupported_version' });
+    const v3 = JSON.stringify({ ...JSON.parse(datos), schema_version: 3 });
+    expect(importSiteCheck(catalogue, run, v3, at(1))).toMatchObject({ ok: false, reason: 'unsupported_version', detail: '3' });
+    // The names of version 1 under the number of version 2 are neither format.
+    const mislabelled = JSON.stringify({ ...JSON.parse(datos), schema_version: 2 });
+    expect(importSiteCheck(catalogue, run, mislabelled, at(1))).toMatchObject({ ok: false, reason: 'not_site_check' });
     expect(importSiteCheck(catalogue, { ...run, closedAt: at(0).toISOString() }, datos, at(1))).toMatchObject({ ok: false, reason: 'run_closed' });
   });
 });
@@ -130,5 +133,27 @@ describe("site-check's own example run", () => {
     expect(result.summary.applied).toHaveLength(37);
     expect(result.summary).toMatchObject({ domain: 'colegio.test', unknown: [], outsideProfile: [], invalid: 0, kept: [] });
     expect(result.run.marks['VIS-08']?.state).toBe('not_applicable');
+  });
+});
+
+describe("site-check's example run in the current format (run.json, schema_version 2)", () => {
+  // site-check writes run.json with English names since its schema_version 2; datos.json is the same run in version 1.
+  const v1 = readFileSync(new URL('../../../site-check/examples/datos.json', import.meta.url), 'utf8');
+  const v2 = readFileSync(new URL('../../../site-check/examples/run.json', import.meta.url), 'utf8');
+
+  it('imports to exactly the run that the version 1 file of the same run gives', () => {
+    const run = runWith(catalogue, 'wordpress', ['own-mail', 'forms', 'bilingual']);
+    const fromV1 = imported(importSiteCheck(catalogue, run, v1, at(1)));
+    const fromV2 = imported(importSiteCheck(catalogue, run, v2, at(1)));
+    expect(fromV2.summary.applied).toHaveLength(37);
+    expect(fromV2).toEqual(fromV1);
+  });
+
+  it('counts a state that version 2 does not define as an unreadable entry', () => {
+    const data = JSON.parse(v2);
+    data.checks[0].state = 'APROBADO';
+    const result = imported(importSiteCheck(catalogue, runWith(catalogue, 'wordpress', ['own-mail', 'forms', 'bilingual']), JSON.stringify(data), at(1)));
+    expect(result.summary.invalid).toBe(1);
+    expect(result.summary.applied).toHaveLength(36);
   });
 });

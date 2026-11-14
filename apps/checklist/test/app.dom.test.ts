@@ -264,7 +264,7 @@ describe('reports and data', () => {
   it('refuses a file that is not a datos.json', async () => {
     await mount();
     await upload('#import-sitecheck', '{"hello": 1}');
-    expect(text('#status')).toBe('Not imported. The file does not look like a site-check datos.json (no checks list or no domain).');
+    expect(text('#status')).toBe('Not imported. The file does not look like a site-check run.json or datos.json (no checks list or no domain).');
   });
 
   it('exports the check report, the run JSON, and the before and after report only after "before"', async () => {

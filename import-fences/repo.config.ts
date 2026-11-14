@@ -42,7 +42,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'pdf-receipt': ['pdf-receipt/src/index.ts'],
   'safe-markdown': ['safe-markdown/src/index.ts'],
   // The example run that the report and the checklist app agree on; read by the checklist's tests.
-  'site-check': ['site-check/examples/datos.json'],
+  'site-check': ['site-check/examples/datos.json', 'site-check/examples/run.json'],
 };
 
 /**
@@ -54,7 +54,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
 export const APP_USES: Readonly<Record<string, readonly string[]>> = {
   caja: ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json', 'gateway/src/index.ts'],
   'chat-widget': ['gateway/src/index.ts'],
-  checklist: ['site-check/examples/datos.json'],
+  checklist: ['site-check/examples/datos.json', 'site-check/examples/run.json'],
   receipt: ['pdf-receipt/src/index.ts'],
   'replay-lab': ['deterministic-sim/src/index.ts'],
   'salon-assistant': ['gateway/src/index.ts', 'grounded-assistant/src/index.ts', 'safe-markdown/src/index.ts'],
