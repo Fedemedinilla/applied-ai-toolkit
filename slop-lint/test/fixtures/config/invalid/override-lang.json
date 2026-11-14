@@ -1,0 +1,10 @@
+{
+  "overrides": [
+    {
+      "files": [
+        "docs/**"
+      ],
+      "lang": "pt"
+    }
+  ]
+}

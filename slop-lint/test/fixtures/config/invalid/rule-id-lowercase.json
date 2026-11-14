@@ -1,0 +1,13 @@
+{
+  "rules": [
+    {
+      "id": "X-synergy",
+      "message": "House style bans this word.",
+      "suggestion": "Say what the two teams did together.",
+      "lang": "en",
+      "level": 1,
+      "severity": "high",
+      "pattern": "(?<![\\p{L}\\p{N}])synerg(?:y|ies)(?![\\p{L}\\p{N}])"
+    }
+  ]
+}

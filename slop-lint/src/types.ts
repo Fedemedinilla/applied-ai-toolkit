@@ -125,6 +125,12 @@ export interface LintOptions {
    * (for example "pandas" or "dbt", which are written in lowercase).
    */
   anchors?: readonly string[];
+  /**
+   * The rules to apply, in order. The catalog (RULES) when left out. A config file's settings
+   * arrive this way: settingsFor() in config.ts drops the rules set to "off", changes levels
+   * and severities, and adds the custom rules after the catalog's.
+   */
+  rules?: readonly Rule[];
 }
 
 export interface LintStats {

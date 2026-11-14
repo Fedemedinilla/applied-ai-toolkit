@@ -1,9 +1,9 @@
 import { compile } from './regex.ts';
-import { PATTERN_RULES, RULES, STRUCTURAL_RULES, TIER2_BUDGET } from './rules.ts';
+import { RULES, TIER2_BUDGET } from './rules.ts';
 import { blockSentences, maskMarkdown } from './markdown.ts';
 import { coefficientOfVariation, runStructural } from './structural.ts';
 import { countAnchors, isProse, lineColumn, lineStarts, quotedRanges, splitSentences, words, type Span } from './text.ts';
-import type { Finding, Lang, LintOptions, LintResult, PatternRule, Rule, Severity } from './types.ts';
+import type { Finding, Lang, LintOptions, LintResult, PatternRule, Rule, Severity, StructuralRule } from './types.ts';
 
 interface Hit {
   rule: Rule;
@@ -135,6 +135,10 @@ interface Mode {
 /** `text` is what the rules read; `source` is the input, which findings quote. Both have the same length. */
 function run(source: string, text: string, sentences: Span[], options: LintOptions, mode: Mode): LintResult {
   const { lang } = options;
+  // The catalog unless the caller passes its own list, as the CLI does for a config file.
+  const rules = options.rules ?? RULES;
+  const patternRules = rules.filter((r): r is PatternRule => r.kind === 'pattern');
+  const structuralRules = rules.filter((r): r is StructuralRule => r.kind === 'structural');
   const extraAnchors = options.anchors ?? [];
   const active = (rule: Rule): boolean => !(mode.markdown && rule.plainTextOnly);
   const anchorCache = new Map<number, number>();
@@ -150,7 +154,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
   const inQuotes = (start: number, end: number): boolean => quotes.some(([a, b]) => start >= a && end <= b);
 
   const hits: Hit[] = [];
-  PATTERN_RULES.forEach((rule, order) => {
+  patternRules.forEach((rule, order) => {
     if (!active(rule)) return;
     for (const m of rawMatches(rule, text, lang, sentences)) {
       if (rule.quoteExempt && inQuotes(m.start, m.end)) continue;
@@ -189,10 +193,10 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
   }
 
   const ctx = { text, lang, sentences, anchorsIn, longSentenceScope: mode.longSentenceScope };
-  STRUCTURAL_RULES.forEach((rule, i) => {
+  structuralRules.forEach((rule, i) => {
     if (!appliesTo(rule, lang) || !active(rule)) return;
     for (const s of runStructural(rule.id, ctx)) {
-      const hit: Hit = { rule, order: PATTERN_RULES.length + i, start: s.start, end: s.end };
+      const hit: Hit = { rule, order: patternRules.length + i, start: s.start, end: s.end };
       if (s.detail !== undefined) hit.detail = s.detail;
       reported.push(hit);
     }
