@@ -40,7 +40,7 @@ Each app builds with `npm run build:<app>` into `dist/apps/<app>/`. Caja, Receip
 | [`apps/caja/`](apps/caja/) | Type "vendí 5 tortas a 8000" into an offline cash book and answer its question: price each or total. An optional model mode adds the kind, category and date; the amount still comes from the parser. | `amount-parser`, `gateway` | `npx vitest run apps/caja` |
 | [`apps/receipt/`](apps/receipt/) | Edit an order, load the sample with emoji and right-to-left names, and download its PDF. Built in the tab, with no server. | `pdf-receipt` | `npx vitest run apps/receipt` |
 | [`apps/replay-lab/`](apps/replay-lab/) | Play a seed, export the run, edit and re-import it to see the hash fail, or run 1,000 runs in a worker with a histogram. Offline. | `deterministic-sim` | `npx vitest run apps/replay-lab` |
-| [`apps/checklist/`](apps/checklist/) | Pick a platform, mark a check Fails then Fixed (refused until the pre-change list is acknowledged), load site-check's example [`datos.json`](https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/site-check/examples/datos.json) (save it first), and export the before and after report. | none (its tests read site-check's published example run) | `npx vitest run apps/checklist` |
+| [`apps/checklist/`](apps/checklist/) | Pick a platform, mark a check Fails then Fixed (refused until the pre-change list is acknowledged), load site-check's example run (save it first): a `run.json`, or a [`datos.json`](https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/site-check/examples/datos.json) of its earlier versions, and export the before and after report. | none (its tests read site-check's published example run) | `npx vitest run apps/checklist` |
 | [`apps/writer/`](apps/writer/) | Pick a role and a category at a fictional school, describe a message, and get titles and a draft with the missing facts marked `[COMPLETAR: ...]`. Needs a key for the drafts. | `gateway`, `evals` | `npx vitest run apps/writer` |
 | [`apps/chat-widget/`](apps/chat-widget/) | Paste one script tag into a page and chat with a demo tenant, then edit what it knows in the owner panel. Many businesses, one deploy. Needs a key for replies; run `node apps/chat-widget/server/serve.ts` after the build. | `gateway` | `npx vitest run apps/chat-widget` |
 | [`apps/salon-assistant/`](apps/salon-assistant/) | Ask a fictional salon for an appointment and get a booking card whose price, time and stylist come from its tables, never from the model. Needs a key for replies. | `gateway`, `grounded-assistant`, `safe-markdown` | `npx vitest run apps/salon-assistant` |
@@ -56,8 +56,8 @@ Each folder has its own README, tests and public entry.
 
 | Folder | What it is | What it demonstrates | Test |
 |---|---|---|---|
-| [`gateway/`](gateway/) | The only code allowed to call the Claude API. Each call reserves its worst-case cost before it goes out. | Spending caps that hold through failed ledger inserts, cut streams and concurrent calls; output validated with zod; error codes that say whether a call was billed | `npx vitest run gateway` |
-| [`evals/`](evals/) | A variant runner, blinding, a line-by-line judge, Wilson intervals, and a red-team runner. | On about 60 pieces per variant written from briefs built to provoke invention, the shipped variant invented a fact in 3% against 47% for the old prompt ([CASE-STUDY.md](evals/CASE-STUDY.md)) | `npx vitest run evals` |
+| [`gateway/`](gateway/) | The only code allowed to call the Claude API. Each call reserves its worst-case cost before it goes out. Models come from a registry of four built-in entries plus validated custom ones. The stores are in memory or in Postgres, through any client with `query(text, params)`. An optional observer gets one span per call, with an OpenTelemetry adapter. | Spending caps that hold through failed ledger inserts, cut streams and concurrent calls; a reservation the Postgres adapter writes in one atomic step; output validated with zod; error codes that say whether a call was billed | `npx vitest run gateway` |
+| [`evals/`](evals/) | A variant runner, blinding, pluggable rubrics (a line-by-line judge for groundedness, plus classification and extraction scored in code), Wilson intervals, and a red-team runner. A CI gate compares a baseline run with a candidate run, and a single-file HTML report shows either. | On about 60 pieces per variant written from briefs built to provoke invention, the shipped variant invented a fact in 3% against 47% for the old prompt ([CASE-STUDY.md](evals/CASE-STUDY.md)); a gate where "inconclusive" has its own exit code and is never a pass | `npx vitest run evals` |
 | [`content-forge/`](content-forge/) | An LLM writes catalogue entries for a fictional card game as structured output; each candidate must pass the catalogue's zod schemas, range rules and cross-references before it is promoted. | Per-candidate verdicts, so one bad candidate does not void the batch; pass rate per prompt version with Wilson intervals; a promote that never overwrites hand-written files | `npx vitest run content-forge` |
 | [`grounded-assistant/`](grounded-assistant/) | The code between a booking assistant's model and the visitor: `decide()` and a money guard over every `$` figure. | A booking card only after five checks against the salon's tables; a 55-reply corpus with 19 pinned known misses; signed conversation history | `npx vitest run grounded-assistant` |
 
@@ -65,13 +65,13 @@ Each folder has its own README, tests and public entry.
 
 | Folder | What it is | What it demonstrates | Test |
 |---|---|---|---|
-| [`csp-build-guard/`](csp-build-guard/) | A CLI that audits a built site before deploy. It runs over every app here, and is also a composite GitHub Action. | A Content-Security-Policy compared as sets; inlined secrets; lookbehind for older Safari; a JavaScript budget per page; a check that cannot run fails; `--sarif` output for code scanning | `npx vitest run csp-build-guard` |
-| [`import-fences/`](import-fences/) | A config-driven checker that turns import rules into a failing test. | This repository's own fences: one SDK importer, one key reader per app server, browser code with no Node built-ins, apps that use only a library's public entry | `npx vitest run import-fences` |
+| [`csp-build-guard/`](csp-build-guard/) | A CLI that audits a built site before deploy. It runs over every app here, and is also a composite GitHub Action and the npm package `@fedemedinilla/csp-build-guard`, with one public entry. | A Content-Security-Policy compared as sets; inlined secrets; lookbehind for older Safari; a JavaScript budget per page; a check that cannot run fails; `--sarif` output for code scanning | `npx vitest run csp-build-guard` |
+| [`import-fences/`](import-fences/) | A config-driven checker that turns import rules into a failing test. The config is TypeScript or JSON with a JSON Schema. Also a composite GitHub Action and the npm package `@fedemedinilla/import-fences`. | This repository's own fences: one SDK importer, one key reader per app server, browser code with no Node built-ins, apps that use only a library's public entry; `--sarif` output for code scanning | `npx vitest run import-fences` |
 | [`supabase-auth-hardening/`](supabase-auth-hardening/) | SQL that closes four gaps Supabase Auth leaves open: open sign-ups, pre-registered passwords, email changes, unlimited code guesses. | Each control tested in PGlite against Supabase's default grants, next to a test that reproduces the gap without it; a read-only audit of RLS, grants and `search_path` | `npx vitest run supabase-auth-hardening` |
 | [`safe-markdown/`](safe-markdown/) | An escape-first Markdown renderer for model replies shown with `innerHTML`. One file, no dependencies. | Every tag in the output written by the renderer; an XSS battery; a fast-check property test in jsdom | `npx vitest run safe-markdown` |
 | [`safe-contact-form/`](safe-contact-form/) | A contact endpoint whose acknowledgment to the visitor cannot carry their links. | A honeypot, a skew-tolerant clock, an origin check behind proxies, a destination never taken from the request | `npx vitest run safe-contact-form` |
 | [`wp-hardening/`](wp-hardening/) | A WordPress plugin with the hardening controls that can be set from PHP, each with a toggle, a Site Health test and `wp harden`, plus a read-only audit. | A guard per control that keeps it from breaking a site (REST stays up, HSTS without preload, CSP in Report-Only); server rules generated and checked, never written | `npm run test:php` |
-| [`site-check/`](site-check/) | A passive website audit with a plain-language report. 37 fixed rules, no model, Python standard library only. `--compare` turns two stored runs into a before and after report and refuses runs that are not comparable. | A scope guard in the network layer; every printed number traced to its measurement | `npm run test:python` |
+| [`site-check/`](site-check/) | A passive website audit with a plain-language report. 37 fixed rules, no model, Python standard library only. `--compare` turns two stored runs into a before and after report and refuses runs that are not comparable. The stored run is `run.json`, with a published JSON Schema, and the `datos.json` of earlier versions is still read. `--lang en` writes the report in English, and `--json` and `--sarif` give machine output. | A scope guard in the network layer; every printed number traced to its measurement; a `pyproject.toml` for PyPI, not published yet | `npm run test:python` |
 
 ### Data and correctness
 
@@ -87,8 +87,8 @@ Each folder has its own README, tests and public entry.
 | Folder | What it is | What it demonstrates | Test |
 |---|---|---|---|
 | [`fake-supabase-auth/`](fake-supabase-auth/) | A fetch function that answers like Supabase Auth and PostgREST, for the real `@supabase/supabase-js` client. | Faking the wire instead of mocking `supabase.auth`; real ES256 and HS256 JWTs with a JWKS | `npx vitest run fake-supabase-auth` |
-| [`slop-lint/`](slop-lint/) | A linter for the patterns that make writing read as generated, in English and Spanish. 52 rules, each with its source. Also a composite GitHub Action and the npm package `@fedemedinilla/slop-lint`. | A deterministic pass before a model judge; every doc in this repository passes it in CI; `--sarif` output for code scanning | `npx vitest run slop-lint` |
-| [`n8n-templates/`](n8n-templates/) | Thirteen n8n workflows for small businesses, the English versions of the ones I publish at [kyndredai.com/templates](https://kyndredai.com/templates). | Payment signature checks, idempotency where a repeat costs money, tests that run the Code nodes | `npx vitest run n8n-templates` |
+| [`slop-lint/`](slop-lint/) | A linter for the patterns that make writing read as generated, in English and Spanish. 52 rules, each with its source. A `slop-lint.config.json`, with a JSON Schema, sets rules per project and adds custom pattern rules, and `--list-rules` prints what applies. Also a composite GitHub Action and the npm package `@fedemedinilla/slop-lint`. | A deterministic pass before a model judge; every doc in this repository passes it in CI; inline suppression by rule id, with the reason kept in the output; `--sarif` output for code scanning | `npx vitest run slop-lint` |
+| [`n8n-templates/`](n8n-templates/) | Thirteen n8n workflows for small businesses, the English versions of the ones I publish at [kyndredai.com/templates](https://kyndredai.com/templates). | Payment signature checks and idempotency where a repeat costs money; a test file per workflow that runs its nodes in an offline harness, which found six bugs; tables and Mermaid diagrams generated from the JSON files | `npx vitest run n8n-templates` |
 | [`agent-playbook/`](agent-playbook/) | How coding agents work in a repository without real credentials: session hook, test environment isolation, a CI-has-no-secrets check, edit hooks, a read-only reviewer, a CLAUDE.md template. | A pinned Node verified by SHA-256; a test that fails if a workflow reads a secret or can write beyond its policy; protected paths the agent cannot edit with the file tools | `npx vitest run agent-playbook` |
 
 ## Client work
@@ -111,6 +111,8 @@ Each practice points to a file where it can be read.
 - **A model only where a step needs judgment.** The model proposes a booking, and code decides whether it can happen and checks every price it wrote ([grounded-assistant/src/decide.ts](grounded-assistant/src/decide.ts)).
 - **A fix comes with the test that reproduces the gap.** Each Supabase Auth control has a test that shows the hole without it ([supabase-auth-hardening/test/closed-signups.test.ts](supabase-auth-hardening/test/closed-signups.test.ts)).
 - **Rules are tests.** The import fences, the no-secrets check on every workflow and the purity test of the simulation core fail the suite instead of relying on review ([agent-playbook/README.md](agent-playbook/README.md), [import-fences/repo.config.ts](import-fences/repo.config.ts)).
+- **The tests are tested.** Stryker mutates the cap and cost code, and a run that scores below the threshold exits non-zero ([gateway/stryker.config.json](gateway/stryker.config.json)).
+- **Too small to tell is not a pass.** The eval gate gives a small sample its own exit code instead of passing it ([evals/src/gate.ts](evals/src/gate.ts)).
 - **Departures from the source are written down.** When a rule differs from the research report it came from, the rule carries a `deviation` field ([slop-lint/src/rules.ts](slop-lint/src/rules.ts)).
 
 ## Run everything
@@ -120,41 +122,52 @@ npm ci                 # exact versions from package-lock.json
 npm run check          # tsc --noEmit over every TypeScript folder (strict)
 npm test               # Vitest suites of every TypeScript folder
 node import-fences/cli.ts --config import-fences/repo.config.ts   # the import fences
-npm run build:packages # compiles gateway and slop-lint to their dist/ folders, as npm pack does
-npm run pack:check     # packs gateway and slop-lint as npm would, installs each tarball and checks it
+npm run build:packages # compiles the four npm packages to their dist/ folders, as npm pack does
+npm run pack:check     # packs each of the four as npm would, installs the tarball and checks it
 npm run build:apps     # production build of each app under apps/, into dist/apps/
 npm run guard:apps     # csp-build-guard over each app build, with its own config
 npm run test:python    # site-check's unittest suite
 npm run test:php       # wp-hardening: composer install from the lock, php -l, PHPUnit
 npm run lint:docs      # slop-lint in Markdown mode over every README and doc a reader opens
+npm run build:docs     # the docs site: npm ci in docs-site/, sync from the READMEs, astro build, link check
+npm run mutation       # StrykerJS over gateway, grounded-assistant and amount-parser; several minutes
+npm run bench          # the six benches, into reports/bench/result.json
+npm run bench:compare  # compares that result with test/bench/baseline.json; exit 1 on a regression
+npm run evals:gate -- baseline.json candidate.json            # exit 0 pass, 1 fail, 2 refused, 3 inconclusive
+npm run evals:report -- baseline.json candidate.json out.html # the two stored runs as one HTML file
 
-# SARIF 2.1.0 logs for code scanning, from the two CLIs that write them
+# SARIF 2.1.0 logs for code scanning, from three of the CLIs that write them (site-check has --sarif too)
 node slop-lint/cli.ts --lang en --format markdown --sarif README.md > slop-lint.sarif
 node csp-build-guard/cli.ts --dir dist/apps/caja --config apps/caja/csp-guard.config.json --sarif --sarif-base . > caja.sarif
+node import-fences/cli.ts --config import-fences/repo.config.ts --sarif > import-fences.sarif
 ```
 
-On 2026-11-14, `npm test` ran 3,255 tests in 158 files, `npm run test:python` ran 639 (one skipped) and `npm run test:php` ran 171 (one skipped). The fences checked 37 rules in 520 files with no violation. Tests never call a real API and never need a key. Live runs are opt-in scripts listed in each folder's README. The ones that call the Claude API read `ANTHROPIC_API_KEY` and exit before any call when it is missing, and the app servers start without it and answer "not available". [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same commands on every push to `main` and every pull request, with no secrets and with placeholder values for the apps' secret variables, so the guard searches each build for them. A separate job runs the two actions from this checkout (`uses: ./slop-lint` on the docs, `uses: ./csp-build-guard` on the Caja build) and checks that each SARIF file parses. It does not upload them, since that would need `security-events: write`.
+On 2026-11-14, `npm test` ran 4,097 tests in 194 files, `npm run test:python` ran 693 (two skipped) and `npm run test:php` ran 171 (one skipped). The fences checked 38 rules in 598 files with no violation. Tests never call a real API and never need a key. Live runs are opt-in scripts listed in each folder's README. The ones that call the Claude API read `ANTHROPIC_API_KEY` and exit before any call when it is missing, and the app servers start without it and answer "not available". [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same commands on every push to `main` and every pull request, with no secrets and with placeholder values for the apps' secret variables, so the guard searches each build for them. A separate job runs the three actions from this checkout and checks that each SARIF file parses. They are `uses: ./slop-lint` on the docs, `uses: ./csp-build-guard` on the Caja build and `uses: ./import-fences` on the repository. It does not upload them, since that would need `security-events: write`.
+
+Mutation testing and the benchmarks are not part of `npm test`. [.github/workflows/quality.yml](.github/workflows/quality.yml) runs both every week. On 2026-11-14, with StrykerJS 10.1.1, the mutation score was 99.27% for `gateway`, 78.38% for `grounded-assistant` and 72.95% for `amount-parser`. Each of those READMEs lists what survives, and [test/bench/README.md](test/bench/README.md) gives the method of the benchmarks.
 
 ## Requirements
 
-Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Node 24 runs the TypeScript sources directly (type stripping), so working in the repository needs no build. The apps under `apps/` build with Vite, and the two npm packages (`gateway` as `@fedemedinilla/claude-gateway`, `slop-lint` as `@fedemedinilla/slop-lint`) compile to JavaScript only when they are packed, because Node does not strip types inside `node_modules`.
+Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. Node 24 runs the TypeScript sources directly (type stripping), so working in the repository needs no build. The apps under `apps/` build with Vite, and the four npm packages (listed under Packages) compile to JavaScript only when they are packed, because Node does not strip types inside `node_modules`. The docs site in `docs-site/` has its own `package.json` and lockfile, which `npm run build:docs` installs.
 
 ## Packages
 
-Two folders are prepared as npm packages. Neither is published yet.
+Four folders are prepared as npm packages. None is published yet.
 
 | Package | Folder | What it ships |
 |---|---|---|
 | `@fedemedinilla/claude-gateway` | [`gateway/`](gateway/) | The gateway's public entry, compiled to JavaScript with declarations |
-| `@fedemedinilla/slop-lint` | [`slop-lint/`](slop-lint/) | `lint`, the rules and their types, and the `slop-lint` bin |
+| `@fedemedinilla/slop-lint` | [`slop-lint/`](slop-lint/) | `lint`, the rules and their types, the config validator and its JSON Schema, and the `slop-lint` bin |
+| `@fedemedinilla/import-fences` | [`import-fences/`](import-fences/) | `check`, the config loader, the SARIF log, and the `import-fences` bin |
+| `@fedemedinilla/csp-build-guard` | [`csp-build-guard/`](csp-build-guard/) | One entry with `runGuard`, the config loader, the text report and the SARIF log, and the `csp-build-guard` bin |
 
 Each README has an Install section. Releases go through Changesets and the `release.yml` workflow with npm trusted publishing, so no npm token is stored; [.changeset/README.md](.changeset/README.md) gives the steps. `npm run pack:check` installs each tarball outside the repository and checks it, in CI on every run.
 
-`slop-lint/` and `csp-build-guard/` are also composite GitHub Actions (`uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<commit SHA>`). Each writes a SARIF file that `github/codeql-action/upload-sarif` can send to code scanning. Their READMEs document the inputs and give a full workflow.
+`slop-lint/`, `csp-build-guard/` and `import-fences/` are also composite GitHub Actions (`uses: Fedemedinilla/applied-ai-toolkit/slop-lint@<commit SHA>`). Each writes a SARIF file that `github/codeql-action/upload-sarif` can send to code scanning. Their READMEs document the inputs and give a full workflow.
 
 ## Dependencies
 
-Runtime: `@anthropic-ai/sdk` 1.1.0 and `zod` 4.6.7, plus `pdf-lib` 1.17.1 for `pdf-receipt` and `web-push` 3.6.7 for the push-lab server. Development: TypeScript 5.9.3, Vitest 5.0.5, `@types/node` 24.19.2 and `@changesets/cli` 3.0.3 for releases. Vite 8.3.4 builds the apps, and jsdom 30.1.2 runs the DOM tests. fast-check 4.10.2 drives property tests in `amount-parser`, `pdf-receipt`, `idempotent-orders`, `deterministic-sim`, `safe-markdown` and Caja. `@electric-sql/pglite` 0.5.9 runs real Postgres in process for `idempotent-orders`, `supabase-auth-hardening` and the chat widget's store test. `fake-supabase-auth` is tested through the real `@supabase/supabase-js` 2.118.0 client, and `@types/web-push` 3.6.4 types the push-lab server. Versions are exact (`.npmrc` sets `save-exact`). wp-hardening's dev dependencies (PHPUnit 10.5.66, Brain Monkey 2.7.0, Mockery 1.6.15) are locked in `wp-hardening/composer.lock`. site-check, slop-lint, safe-markdown and deterministic-sim have no runtime dependencies.
+Runtime: `@anthropic-ai/sdk` 1.1.0 and `zod` 4.6.7, plus `pdf-lib` 1.17.1 for `pdf-receipt` and `web-push` 3.6.7 for the push-lab server. Development: TypeScript 5.9.3, Vitest 5.0.5, `@types/node` 24.19.2 and `@changesets/cli` 3.0.3 for releases. `@stryker-mutator/core` and `@stryker-mutator/vitest-runner` 10.1.1 run the mutation tests. Vite 8.3.4 builds the apps, and jsdom 30.1.2 runs the DOM tests. fast-check 4.10.2 drives property tests in `amount-parser`, `pdf-receipt`, `idempotent-orders`, `deterministic-sim`, `safe-markdown` and Caja. `@electric-sql/pglite` 0.5.9 runs real Postgres in process for `idempotent-orders`, `supabase-auth-hardening` and the chat widget's store test. `fake-supabase-auth` is tested through the real `@supabase/supabase-js` 2.118.0 client, and `@types/web-push` 3.6.4 types the push-lab server. Versions are exact (`.npmrc` sets `save-exact`). wp-hardening's dev dependencies (PHPUnit 10.5.66, Brain Monkey 2.7.0, Mockery 1.6.15) are locked in `wp-hardening/composer.lock`. site-check, slop-lint, safe-markdown and deterministic-sim have no runtime dependencies. The docs site keeps Astro 7.4.12 and `@astrojs/starlight` 0.43.1 in `docs-site/package.json`, out of the root lockfile.
 
 ## Fixtures and data
 
