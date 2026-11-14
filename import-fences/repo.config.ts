@@ -156,7 +156,10 @@ const fences = folderFences({
 export default defineConfig({
   root: '..',
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**'],
+  // docs-site/ has its own package.json and lockfile: its Astro config and content config import
+  // packages that exist only after `npm ci` inside it, and .astro/ is generated. Its scripts/ import
+  // Node built-ins alone and stay under the fences.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', 'docs-site/astro.config.mjs', 'docs-site/src/**', 'docs-site/.astro/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },

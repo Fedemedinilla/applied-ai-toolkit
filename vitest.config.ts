@@ -11,7 +11,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'dist/**', '**/dist/**'],
+    // docs-site/ has its own node_modules (it is not a workspace), and packages there ship tests.
+    exclude: ['node_modules/**', '**/node_modules/**', 'dist/**', '**/dist/**'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },

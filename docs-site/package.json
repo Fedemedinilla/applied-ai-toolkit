@@ -1,0 +1,18 @@
+{
+  "name": "applied-ai-toolkit-docs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "sync": "node scripts/sync.ts",
+    "build": "node scripts/sync.ts && astro build && node scripts/check-links.ts",
+    "dev": "node scripts/sync.ts && astro dev",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.43.1",
+    "astro": "7.4.12"
+  }
+}
