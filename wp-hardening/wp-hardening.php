@@ -7,6 +7,8 @@
  * Requires PHP:      8.1
  * Author:            Federico Medinilla
  * Author URI:        https://federicomedinilla.com
+ * License:           MIT
+ * License URI:       https://opensource.org/license/mit
  * Text Domain:       wp-hardening
  */
 
