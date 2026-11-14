@@ -11,7 +11,8 @@
  *    `npm pack` there. The package's own prepack script copies LICENSE and builds dist/, so the
  *    working tree is never written to.
  * 2. Reads the tarball's file list: only package.json, README.md, LICENSE and dist/, no test,
- *    fixture or `.ts` source, and every file that exports, types and bin point at.
+ *    fixture or `.ts` source, and every file that exports, types and bin point at. A package that
+ *    declares a license must ship the LICENSE file, so the root must have one.
  * 3. Installs the tarball in a fresh project outside the repository. slop-lint has no
  *    dependencies, so `npm install --offline` installs it and links its bin. The gateway's two
  *    dependencies would need the registry, so its tarball is extracted into node_modules and its
@@ -201,6 +202,9 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
   const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as Record<string, unknown>;
   if (manifest['name'] !== spec.name) fail(`${spec.folder}/package.json is named ${String(manifest['name'])}, not ${spec.name}`);
   const hasLicense = existsSync(join(ROOT, 'LICENSE'));
+  if (typeof manifest['license'] === 'string' && manifest['license'] !== 'UNLICENSED' && !hasLicense) {
+    fail(`${spec.folder}/package.json declares the ${manifest['license']} license and the repository has no LICENSE to ship with it`);
+  }
 
   // 1. Pack from a copy, so prepack runs as it would on publish without writing to the tree.
   const stage = join(work, 'repo');
