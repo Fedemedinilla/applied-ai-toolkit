@@ -222,7 +222,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 ## What the tests cover
 
-141 tests in 8 files, all offline.
+151 tests in 9 files, all offline.
 
 | File | Covers |
 |---|---|
