@@ -6,7 +6,7 @@ Each test reproduces one confirmed finding and failed before its fix.
 from __future__ import annotations
 
 import json
-import shutil
+import time
 import unittest
 from pathlib import Path
 from typing import Any
@@ -162,6 +162,32 @@ class RerenderKindTest(unittest.TestCase):
             code, _, err = run_cli(["--rerender", str(path), "--kind", "kindergarten"])
             self.assertEqual(code, 0, err)
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["meta"]["kind"], "jardín")
+
+
+class CssUrlParsingTimeTest(unittest.TestCase):
+    """The CSS url() pattern runs in linear time on a hostile <style> or style attribute."""
+
+    def test_style_element_of_open_url_fragments(self) -> None:
+        from sitecheck.htmlextract import extract_page
+
+        t0 = time.perf_counter()
+        extract_page("<html><head><style>" + "url(" * 20_000 + "</style></head><body></body></html>", f"{BASE}/")
+        self.assertLess(time.perf_counter() - t0, 1.0)
+
+    def test_style_attribute_of_open_url_fragments(self) -> None:
+        from sitecheck.htmlextract import extract_page
+
+        t0 = time.perf_counter()
+        extract_page('<html><body><div style="' + "url(" * 20_000 + '"></div></body></html>', f"{BASE}/")
+        self.assertLess(time.perf_counter() - t0, 1.0)
+
+    def test_ordinary_css_urls_are_still_read(self) -> None:
+        from sitecheck.htmlextract import extract_page
+
+        css = "body{background:url('/img/a.png')} .b{background-image: url( \"/x.png\" )} .c{background:url(/y.png)}"
+        page = extract_page(f"<html><head><style>{css}</style></head><body></body></html>", f"{BASE}/")
+        urls = [u for kind, _, u in page.subresources if kind == "style"]
+        self.assertEqual(urls, [f"{BASE}/img/a.png", f"{BASE}/x.png", f"{BASE}/y.png"])
 
 
 if __name__ == "__main__":
