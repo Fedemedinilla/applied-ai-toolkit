@@ -178,3 +178,5 @@ Every fixture is fictional, and no client data, real diagnostic run, conversatio
 MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Federico Medinilla.
 
 To report a vulnerability, read [SECURITY.md](SECURITY.md); to send a change, read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+How the repository is kept up between releases (audits, Dependabot, the quarterly review and the release checklist) is in [MAINTENANCE.md](MAINTENANCE.md).

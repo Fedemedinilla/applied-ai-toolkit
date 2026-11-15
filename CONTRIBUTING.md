@@ -25,13 +25,16 @@ npm run build:docs     # the docs site, generated from the READMEs; a broken rel
 
 One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request, with `build:packages` inside `pack:check`. The Pages workflow builds the docs again on `main` and publishes them.
 
-Two slower checks run weekly in `.github/workflows/quality.yml` and by hand when a change touches their targets:
+The slower checks run weekly in `.github/workflows/quality.yml` and by hand when a change touches their targets:
 
 ```sh
 npm run mutation       # StrykerJS over gateway, grounded-assistant and amount-parser; fails below each threshold
 npm run bench          # the benches, into reports/bench/result.json
 npm run bench:compare  # compares that result with test/bench/baseline.json; exit 1 on a regression
+npm audit --omit=dev --audit-level=low   # the audit gate on runtime dependencies; also from docs-site/
 ```
+
+The routines that run between releases (the diff-scoped audit, Dependabot and the npm audit job, the quarterly review and the release checklist) are in [MAINTENANCE.md](MAINTENANCE.md).
 
 ## Rules for a change
 
