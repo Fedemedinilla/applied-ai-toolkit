@@ -141,11 +141,13 @@ function segments(line: string): Array<{ text: string; code: boolean }> {
 }
 
 const FENCE = /^\s*(`{3,}|~{3,})/;
+/** A closing fence carries no info string: a line such as ```md inside a block is code. */
+const FENCE_CLOSE = /^\s*(`{3,}|~{3,})\s*$/;
 const SCHEME = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 /** The target of an inline link or image, after its label: `](target)` or `](target "title")`. */
 const INLINE_TARGET = /\]\(([^()\s]+)(\s+"[^"]*")?\)/g;
-/** A reference definition: `[label]: target`. */
-const DEFINITION = /^(\s{0,3}\[[^\]]+\]:\s+)(\S+)/;
+/** A reference definition: `[label]: target`. A footnote, `[^label]: text`, is not one. */
+const DEFINITION = /^(\s{0,3}\[(?!\^)[^\]]+\]:\s+)(\S+)/;
 
 /**
  * One link target as the docs site needs it, or null when it does not exist. Absolute URLs and
@@ -185,11 +187,12 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
   };
   let fence: string | undefined;
   const lines = markdown.split('\n').map((line) => {
-    const marker = FENCE.exec(line)?.[1];
     if (fence !== undefined) {
-      if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) fence = undefined;
+      const close = FENCE_CLOSE.exec(line)?.[1];
+      if (close !== undefined && close[0] === fence[0] && close.length >= fence.length) fence = undefined;
       return line;
     }
+    const marker = FENCE.exec(line)?.[1];
     if (marker !== undefined) {
       fence = marker;
       return line;

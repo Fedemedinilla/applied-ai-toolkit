@@ -113,6 +113,18 @@ describe('rewriteLinks', () => {
     expect(text).toBe(markdown.replace('(../evals/)', `(${BASE}/evals/)`));
   });
 
+  it('closes a fence only on a marker with no info string', () => {
+    const markdown = ['```', '```md', '[f](../evals/README.md)', '```', '[g](../evals/)'].join('\n');
+    const { text, broken } = rewrite(markdown);
+    expect(broken).toEqual([]);
+    expect(text).toBe(markdown.replace('(../evals/)', `(${BASE}/evals/)`));
+  });
+
+  it('leaves a footnote definition alone, and still rewrites a reference definition', () => {
+    const markdown = 'Text.[^1]\n\n[^1]: Measured on 2026-10-02.\n[e]: ../evals/';
+    expect(rewrite(markdown)).toEqual({ text: markdown.replace('../evals/', `${BASE}/evals/`), broken: [] });
+  });
+
   it('reports each link whose file does not exist, and keeps it as written', () => {
     const { text, broken } = rewrite('[a](src/missing.ts) and [b](../nowhere/README.md#x) and [c](src/caps.ts)');
     expect(broken).toEqual(['src/missing.ts', '../nowhere/README.md#x']);
