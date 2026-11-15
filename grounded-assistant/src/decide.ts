@@ -196,6 +196,8 @@ export function decide(b: ProposedBooking, today: string, lang: Lang = 'es', now
     possible = doable.filter((s) => fits(s, service, weekday, time));
     if (!possible.length) {
       const lastStart = Math.max(...doable.map((s) => window(s).closes - service.minutes));
+      // A last start that has gone by today is not an alternative to offer.
+      if (now && b.date === today && lastStart <= toMin(now)) return no('too_late_today', say.too_late_today(name));
       return no('late_start', say.late_start(name, service.minutes, toHHMM(lastStart)));
     }
   } else if (now && b.date === today) {

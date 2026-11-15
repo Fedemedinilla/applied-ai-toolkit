@@ -101,6 +101,15 @@ describe('time', () => {
     expect(decide(b({ date: '2026-11-05' }), TODAY, 'es', '19:50').ok).toBe(true);
   });
 
+  it('a time today that does not fit, once the last start has gone by, is too late today', () => {
+    // Saturday balayage: the last start is 12:00. At 13:00 a 14:00 request must not offer 12:00.
+    const sat = '2026-11-07';
+    expect(decide(b({ time: '14:00' }), sat, 'es', '13:00')).toMatchObject({ ok: false, reason: 'too_late_today', say: 'Hoy ya no llega a entrar Balayage antes del cierre. ¿Vemos otro día?' });
+    expect(reason(decide(b({ time: '14:00' }), sat, 'en', '12:00'))).toBe('too_late_today');
+    // Before the last start, the refusal still names it.
+    expect(decide(b({ time: '14:00' }), sat, 'es', '11:00')).toMatchObject({ reason: 'late_start', say: expect.stringContaining('arranca 12:00') });
+  });
+
   it('today with no time lists only the people who can still start', () => {
     // Wednesday men's cut: Rubén until 15:00, Damián until 20:00. At 16:00 only Damián is left.
     const d = decide(b({ service: 'Corte de hombre (máquina y tijera)', date: TODAY }), TODAY, 'es', '16:00');
