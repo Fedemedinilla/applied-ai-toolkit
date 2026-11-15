@@ -60,7 +60,7 @@ jobs:
           ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
 
       # The same guard CI runs, over the builds that are about to be published, with the same
-      # placeholder: the secrets check searches Caja's build for it.
+      # placeholder: the secrets check searches every published build for it.
       - name: Guard the published builds
         run: npm run guard:pages
         env:
