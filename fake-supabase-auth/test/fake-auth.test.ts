@@ -445,6 +445,11 @@ describe('PostgREST', () => {
     expect(fake.requests.at(-1)?.headers.get('accept-profile')).toBe('private');
   });
 
+  it('eq.null matches the string null only, never a SQL NULL, as in PostgREST', async () => {
+    fake.knobs.rest = restTables({ notes: [{ id: 1, owner: null }, { id: 2, owner: 'null' }] });
+    expect((await clientFor(fake).from('notes').select('id').eq('owner', 'null')).data).toEqual([{ id: 2 }]);
+  });
+
   it('a GET that gets 503 is retried three times by postgrest-js, honoring Retry-After; Auth failWith does not touch it', async () => {
     fake.knobs.failWith = 503;
     fake.knobs.rest = () => new Response('schema cache loading', { status: 503, headers: { 'retry-after': '0' } });

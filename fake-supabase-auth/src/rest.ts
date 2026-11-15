@@ -66,7 +66,7 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
       }
     }
 
-    let result = rows.filter((row) => filters.every(([column, expected]) => row[column] !== undefined && String(row[column]) === expected));
+    let result = rows.filter((row) => filters.every(([column, expected]) => row[column] !== undefined && row[column] !== null && String(row[column]) === expected));
     if (limit !== null) result = result.slice(0, limit);
     const projected = result.map((row) => project(row, columns));
 
