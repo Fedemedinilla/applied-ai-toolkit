@@ -84,6 +84,16 @@ describe('applyTestEnv', () => {
     expect(envLeaks(root, POLICY, env)).toEqual([]);
   });
 
+  it('reads a test file saved with a byte order mark and CRLF line ends', () => {
+    writeFileSync(join(root, '.env.test'), '\uFEFFAPP_ANTHROPIC_KEY=placeholder-test\r\nSUPABASE_SECRET_KEY=placeholder-test\r\n');
+    const env = session();
+    applyTestEnv(root, POLICY, env);
+    expect(env['APP_ANTHROPIC_KEY']).toBe('placeholder-test');
+    expect(env['SUPABASE_SECRET_KEY']).toBe('placeholder-test');
+    expect(Object.keys(env).filter((name) => name.includes('\uFEFF'))).toEqual([]);
+    expect(envLeaks(root, POLICY, env)).toEqual([]);
+  });
+
   it('throws without the test file, because the suite would run on the session values', () => {
     rmSync(join(root, '.env.test'));
     expect(() => applyTestEnv(root, POLICY, session())).toThrow(/Missing .*\.env\.test/);
