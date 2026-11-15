@@ -135,6 +135,17 @@ describe('gitScope and the CLI on a temporary repository', () => {
     expect(scope.mergeBase).toBe(git('merge-base', 'base', 'HEAD').trim());
   });
 
+  it('lists every tracked file as changed with all, and --all on the CLI, for a review of whole units', () => {
+    const tracked = git('ls-files').trim().split('\n');
+    const scope = gitScope({ cwd: repo, base: 'base', all: true });
+    // Every tracked file, the ones the branch never touched included, plus the untracked one.
+    expect(scope.files).toEqual([...new Set([...tracked, 'pdf-receipt/src/new.ts'])].sort());
+    expect(scope.units.find((u) => u.id === 'gateway')?.files).toEqual(['gateway/src/caps.ts', 'gateway/src/index.ts', 'gateway/test/caps.test.ts']);
+    const run = spawnSync(process.execPath, [CLI, '--base', 'base', '--all', '--json'], { cwd: repo, encoding: 'utf8' });
+    expect(run.status).toBe(0);
+    expect((JSON.parse(run.stdout) as Scope).files).toEqual(scope.files);
+  });
+
   it('prints JSON with --json and writes it with --out', () => {
     const run = spawnSync(process.execPath, [CLI, '--base', 'base', '--json'], { cwd: repo, encoding: 'utf8' });
     expect(run.status).toBe(0);

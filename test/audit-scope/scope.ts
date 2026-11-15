@@ -174,14 +174,18 @@ function git(cwd: string, args: readonly string[]): string {
 
 const list = (out: string) => out.split('\0').filter(Boolean);
 
-/** The scope of the branch checked out at `cwd` against `base`: base...HEAD plus uncommitted work. */
-export function gitScope({ cwd, base }: { readonly cwd: string; readonly base: string }): Scope {
+/**
+ * The scope of the branch checked out at `cwd` against `base`: base...HEAD plus uncommitted work.
+ * With `all`, every tracked file counts as changed instead of base...HEAD, for a review of whole
+ * units (the quarterly review in MAINTENANCE.md); uncommitted and untracked files still count.
+ */
+export function gitScope({ cwd, base, all = false }: { readonly cwd: string; readonly base: string; readonly all?: boolean }): Scope {
   const root = git(cwd, ['rev-parse', '--show-toplevel']).trim();
   const head = git(root, ['rev-parse', 'HEAD']).trim();
   const mergeBase = git(root, ['merge-base', base, 'HEAD']).trim();
   // --no-renames: a rename counts as a deletion plus an addition, so the old path, its unit and the
   // units that import it stay in the scope.
-  const committed = list(git(root, ['diff', '-z', '--name-only', '--no-renames', `${base}...HEAD`]));
+  const committed = all ? list(git(root, ['ls-files', '-z'])) : list(git(root, ['diff', '-z', '--name-only', '--no-renames', `${base}...HEAD`]));
   const uncommitted = [...list(git(root, ['diff', '-z', '--name-only', '--no-renames', 'HEAD'])), ...list(git(root, ['ls-files', '-z', '--others', '--exclude-standard']))];
   return buildScope({
     root,

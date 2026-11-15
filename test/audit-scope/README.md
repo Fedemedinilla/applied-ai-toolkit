@@ -10,13 +10,14 @@ From the repository root:
 npm run audit:scope                          # short summary against origin/main
 npm run -s audit:scope -- --json > scope.json  # the scope as JSON (-s keeps npm's banner out of the file)
 npm run audit:scope -- --base main --out scope.json   # another base; writes the JSON, prints the summary
+npm run audit:scope -- --all                 # every tracked file counts as changed
 ```
 
 Exit code 0 on success, 2 when an option is wrong or git cannot answer, for example a base that does not exist. `scope.json` at the root is gitignored, so writing it does not add itself to the next scope.
 
 ## What counts as changed
 
-The files of `git diff --name-only --no-renames <base>...HEAD`, which are the changes since the merge base and not the base's own later commits, plus uncommitted changes to tracked files and untracked files that git does not ignore. Uncommitted work sets `dirty: true` in the JSON. Rename detection is off (`--no-renames`), so a renamed file counts as a deletion of the old path plus an addition of the new one. The unit of the old path stays changed, and the units that import the old path become dependents.
+The files of `git diff --name-only --no-renames <base>...HEAD`, which are the changes since the merge base and not the base's own later commits, plus uncommitted changes to tracked files and untracked files that git does not ignore. Uncommitted work sets `dirty: true` in the JSON. With `--all`, every file of `git ls-files` counts as changed instead of the diff, for a review of whole units such as the quarterly review in MAINTENANCE.md. Rename detection is off (`--no-renames`), so a renamed file counts as a deletion of the old path plus an addition of the new one. The unit of the old path stays changed, and the units that import the old path become dependents.
 
 ## Units
 
