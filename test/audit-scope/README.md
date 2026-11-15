@@ -30,4 +30,4 @@ Imports are read with the extractor of import-fences, from its public entry, so 
 
 ## Output
 
-The JSON has `base`, `mergeBase`, `head`, `branch`, `dirty`, `files`, `units` (each with `id`, `kind`, `reason` changed or dependent, `files`, `paths` and `context`), `dependents` (each with the imports in `because`) and `unmapped`.
+The JSON has `root` (the absolute path of the checkout), `base`, `mergeBase`, `head`, `branch`, `dirty`, `files`, `units` (each with `id`, `kind`, `reason` changed or dependent, `files`, `paths` and `context`), `dependents` (each with the imports in `because`) and `unmapped`.

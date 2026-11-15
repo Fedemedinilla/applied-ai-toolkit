@@ -39,7 +39,7 @@ describe('importEdges', () => {
 });
 
 describe('buildScope', () => {
-  const base = { base: 'origin/main', mergeBase: 'b'.repeat(40), head: 'h'.repeat(40), branch: 'work', dirty: false };
+  const base = { root: '/repo', base: 'origin/main', mergeBase: 'b'.repeat(40), head: 'h'.repeat(40), branch: 'work', dirty: false };
   const edges = importEdges(Object.keys(files), read);
 
   it('adds the units that import a changed file, through the import that reaches it', () => {
@@ -82,7 +82,7 @@ describe('buildScope', () => {
 
 describe('repoEdges on this repository', () => {
   it('finds every app and library that imports the gateway entry', () => {
-    const scope = buildScope({ base: 'x', mergeBase: 'x', head: 'x', branch: 'x', dirty: false, changed: ['gateway/src/index.ts'], edges: repoEdges(ROOT) });
+    const scope = buildScope({ root: ROOT, base: 'x', mergeBase: 'x', head: 'x', branch: 'x', dirty: false, changed: ['gateway/src/index.ts'], edges: repoEdges(ROOT) });
     const dependents = scope.dependents.map((d) => d.unit);
     // The users of gateway/src/index.ts named in import-fences/repo.config.ts (APP_USES, LIBRARY_USES).
     for (const unit of ['apps-caja', 'apps-chat-widget', 'apps-salon-assistant', 'apps-writer', 'content-forge']) expect(dependents).toContain(unit);
@@ -129,6 +129,7 @@ describe('gitScope and the CLI on a temporary repository', () => {
     expect(scope.files).toEqual(['README.md', 'gateway/src/caps.ts', 'pdf-receipt/src/new.ts']);
     expect(scope.units.map((u) => u.id)).toEqual(['gateway', 'pdf-receipt', 'root-docs-truth', 'content-forge', 'apps-caja', 'apps-writer']);
     expect(scope.branch).toBe('work');
+    expect(scope.root).toBe(git('rev-parse', '--show-toplevel').trim());
     expect(scope.dirty).toBe(true);
     expect(scope.head).toBe(git('rev-parse', 'HEAD').trim());
     expect(scope.mergeBase).toBe(git('merge-base', 'base', 'HEAD').trim());

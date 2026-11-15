@@ -9,8 +9,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { posix } from 'node:path';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { moduleRefs, parse } from '../../import-fences/src/index.ts';
 import { AREAS, type Area, type AreaKind, unitsOf } from './units.ts';
 
@@ -44,6 +43,8 @@ export interface ScopedUnit {
 
 export interface Scope {
   readonly version: 1;
+  /** Absolute path of the repository's main checkout, where the audit-diff workflow works. */
+  readonly root: string;
   readonly base: string;
   readonly mergeBase: string;
   readonly head: string;
@@ -90,6 +91,7 @@ export function repoEdges(cwd: string): ImportEdge[] {
 }
 
 export interface ScopeInput {
+  readonly root: string;
   readonly base: string;
   readonly mergeBase: string;
   readonly head: string;
@@ -146,6 +148,7 @@ export function buildScope(input: ScopeInput, areas: readonly Area[] = AREAS): S
   const dependentAreas = areas.filter((a) => because.has(a.id));
   return {
     version: 1,
+    root: input.root,
     base: input.base,
     mergeBase: input.mergeBase,
     head: input.head,
@@ -179,6 +182,7 @@ export function gitScope({ cwd, base }: { readonly cwd: string; readonly base: s
   const committed = list(git(root, ['diff', '-z', '--name-only', `${base}...HEAD`]));
   const uncommitted = [...list(git(root, ['diff', '-z', '--name-only', 'HEAD'])), ...list(git(root, ['ls-files', '-z', '--others', '--exclude-standard']))];
   return buildScope({
+    root,
     base,
     mergeBase,
     head,
