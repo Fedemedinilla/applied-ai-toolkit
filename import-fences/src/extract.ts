@@ -140,8 +140,73 @@ export function hasOnlyInlineTypes(node: ts.ImportDeclaration | ts.ExportDeclara
   );
 }
 
+const MODULE_MODULE = new Set(['module', 'node:module']);
+const requireCalleeCache = new WeakMap<ts.SourceFile, (callee: ts.Expression) => boolean>();
+
+function unwrap(node: ts.Expression): ts.Expression {
+  let current = node;
+  while (ts.isParenthesizedExpression(current)) current = current.expression;
+  return current;
+}
+
+/**
+ * Whether a callee calls Node's require in this file: `require` or `(require)`, a variable set to
+ * `createRequire(...)`, or `createRequire(...)` called directly. createRequire counts when it comes
+ * from `module` or `node:module`: imported by name or renamed, through a namespace, or destructured
+ * from `require('node:module')`.
+ */
+function requireCallee(file: ts.SourceFile): (callee: ts.Expression) => boolean {
+  const cached = requireCalleeCache.get(file);
+  if (cached !== undefined) return cached;
+  const names = new Set(['require']);
+  const creators = new Set<string>();
+  const namespaces = new Set<string>();
+  const isCreator = (callee: ts.Expression): boolean => {
+    const c = unwrap(callee);
+    if (ts.isIdentifier(c)) return creators.has(c.text);
+    return ts.isPropertyAccessExpression(c) && c.name.text === 'createRequire' && ts.isIdentifier(c.expression) && namespaces.has(c.expression.text);
+  };
+  const isRequire = (callee: ts.Expression): boolean => {
+    const c = unwrap(callee);
+    if (ts.isIdentifier(c)) return names.has(c.text);
+    return ts.isCallExpression(c) && isCreator(c.expression);
+  };
+  requireCalleeCache.set(file, isRequire);
+  if (!file.text.includes('createRequire')) return isRequire;
+  for (const node of file.statements) {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && MODULE_MODULE.has(node.moduleSpecifier.text)) {
+      const clause = node.importClause;
+      const bindings = clause?.namedBindings;
+      if (clause?.name !== undefined) namespaces.add(clause.name.text);
+      if (bindings !== undefined && ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text);
+      if (bindings !== undefined && ts.isNamedImports(bindings)) {
+        for (const e of bindings.elements) if ((e.propertyName ?? e.name).text === 'createRequire') creators.add(e.name.text);
+      }
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && MODULE_MODULE.has(literalText(node.moduleReference.expression) ?? '')) {
+      namespaces.add(node.name.text);
+    }
+  }
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+      const init = unwrap(node.initializer);
+      if (ts.isCallExpression(init) && ts.isObjectBindingPattern(node.name) && isRequire(init.expression) && MODULE_MODULE.has(literalText(init.arguments[0]) ?? '')) {
+        for (const e of node.name.elements) {
+          const key = e.propertyName ?? e.name;
+          if (ts.isIdentifier(key) && key.text === 'createRequire' && ts.isIdentifier(e.name)) creators.add(e.name.text);
+        }
+      } else if (ts.isCallExpression(init) && ts.isIdentifier(node.name) && isCreator(init.expression)) {
+        names.add(node.name.text);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return isRequire;
+}
+
 /** Every module reference in the file, in source order. */
 export function moduleRefs(file: ts.SourceFile): ModuleRef[] {
+  const isRequire = requireCallee(file);
   const refs: ModuleRef[] = [];
   const add = (kind: RefKind, node: ts.Node, arg: ts.Node | undefined, typeOnly: boolean, inlineTypesOnly = false) => {
     refs.push({ kind, specifier: literalText(arg), typeOnly, inlineTypesOnly, ...position(file, node) });
@@ -158,7 +223,7 @@ export function moduleRefs(file: ts.SourceFile): ModuleRef[] {
       add('import-type', node, arg, true);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       add('dynamic', node, node.arguments[0], false);
-    } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require' && node.arguments.length > 0) {
+    } else if (ts.isCallExpression(node) && node.arguments.length > 0 && isRequire(node.expression)) {
       add('require', node, node.arguments[0], false);
     } else if (
       ts.isNewExpression(node) &&
@@ -190,10 +255,10 @@ const isExported = (node: ts.Node) =>
   ts.canHaveModifiers(node) && (ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false);
 
 /** `require('x')`, possibly behind a member access: `require('x').Client`. */
-function requiredSpecifier(node: ts.Expression | undefined): string | null {
+function requiredSpecifier(node: ts.Expression | undefined, isRequire: (callee: ts.Expression) => boolean): string | null {
   let current = node;
   while (current !== undefined && (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current))) current = current.expression;
-  if (current === undefined || !ts.isCallExpression(current) || !ts.isIdentifier(current.expression) || current.expression.text !== 'require') return null;
+  if (current === undefined || !ts.isCallExpression(current) || !isRequire(current.expression)) return null;
   return literalText(current.arguments[0]);
 }
 
@@ -225,6 +290,7 @@ function isCommonJsExport(node: ts.Expression): boolean {
  * they create nothing at runtime. A function that returns the value is not followed.
  */
 export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => boolean): Located[] {
+  const isRequire = requireCallee(file);
   const bound = new Set<string>();
   for (const node of file.statements) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && isTarget(node.moduleSpecifier.text)) {
@@ -254,7 +320,7 @@ export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => 
     if (expression !== undefined && ts.isArrayLiteralExpression(expression)) {
       return expression.elements.some((e) => leaks(ts.isSpreadElement(e) ? e.expression : e));
     }
-    const required = requiredSpecifier(expression);
+    const required = requiredSpecifier(expression, isRequire);
     if (required !== null) return isTarget(required);
     const root = rootIdentifier(expression);
     return root !== undefined && bound.has(root);

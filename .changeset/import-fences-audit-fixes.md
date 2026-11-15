@@ -17,3 +17,5 @@ A JSON config saved with a UTF-8 byte order mark now loads; before, it failed as
 The CLI no longer skips a whole folder when an `ignore` glob only matches its name: `src/*` keeps `src/a/x.ts` and `**/*.js` keeps the files of a folder named `chart.js`. A glob ending in `/**`, or one that names the folder with no wildcard (`**/vendor`), still drops it, and the disk and in-memory sources now list the same files.
 
 `no-reexport` now reports a value of the package that leaves inside an object or array literal (`module.exports = { Client }`, `export default { Client }`, `export const api = { Client }`), through `export import x = require()`, or through `export import C = sdk.Client`.
+
+`require` calls written `(require)('x')`, made through a variable set to `createRequire(...)` from `module` or `node:module`, or as `createRequire(...)('x')` are now read as imports by every rule.

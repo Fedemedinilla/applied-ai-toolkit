@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { moduleRefs, namesOf, parse, reexports, stringsContaining } from '../src/extract.ts';
 
+const leaksOf = (code: string) => reexports(parse('a.ts', code), (s) => s === 'sdk').map((l) => l.text);
 const refs = (code: string, path = 'a.ts') => moduleRefs(parse(path, code)).map((r) => ({ kind: r.kind, specifier: r.specifier, typeOnly: r.typeOnly }));
 
 describe('moduleRefs', () => {
@@ -48,6 +49,25 @@ describe('moduleRefs', () => {
       { kind: 'require', specifier: 'deep', typeOnly: false },
       { kind: 'dynamic', specifier: 'lazy', typeOnly: false },
     ]);
+  });
+
+  it('reads require() behind parentheses and through createRequire', () => {
+    expect(refs("const fs = (require)('node:fs');")).toEqual([{ kind: 'require', specifier: 'node:fs', typeOnly: false }]);
+    const viaCreate = [
+      "import { createRequire } from 'node:module';",
+      'const req = createRequire(import.meta.url);',
+      "export const sdk = req('sdk');",
+    ].join('\n');
+    expect(refs(viaCreate)).toEqual([
+      { kind: 'import', specifier: 'node:module', typeOnly: false },
+      { kind: 'require', specifier: 'sdk', typeOnly: false },
+    ]);
+    expect(refs("import { createRequire as cr } from 'module';\nlet r;\nr = 1;\nconst load = cr(import.meta.url);\nload('a');")[1]).toEqual({ kind: 'require', specifier: 'a', typeOnly: false });
+    expect(refs("import * as m from 'node:module';\nconst r = m.createRequire(import.meta.url);\nr('b');")[1]).toEqual({ kind: 'require', specifier: 'b', typeOnly: false });
+    expect(refs("import { createRequire } from 'node:module';\ncreateRequire(import.meta.url)('c');")[1]).toEqual({ kind: 'require', specifier: 'c', typeOnly: false });
+    expect(refs("const { createRequire } = require('node:module');\nconst r = createRequire(__filename);\nr(name);")[1]).toEqual({ kind: 'require', specifier: null, typeOnly: false });
+    expect(refs("import { createRequire } from './local.ts';\nconst r = createRequire(1);\nr('d');")).toHaveLength(1);
+    expect(leaksOf("import { createRequire } from 'node:module';\nconst req = createRequire(import.meta.url);\nexport const C = req('sdk').Client;")).toEqual(["C = req('sdk').Client"]);
   });
 
   it('treats a template without ${} as a literal and one with ${} as computed', () => {
