@@ -9,7 +9,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import { fixedDicePolicy, reportHash, runBatch, type Distribution } from './src/index.ts';
+import { batchSeed, fixedDicePolicy, MAX_RUNS, MAX_SEED_LENGTH, reportHash, runBatch, type Distribution, type Policy } from './src/index.ts';
 
 const { values } = parseArgs({
   options: {
@@ -20,21 +20,33 @@ const { values } = parseArgs({
   },
 });
 
+function usage(name: string, message: string): never {
+  console.error(`--${name} ${message}`);
+  process.exit(2);
+}
+
+// Digits only: Number() would also take "1e1", "0x10" and " 5".
 function integer(name: string, text: string): number {
-  const n = Number(text);
-  if (!Number.isInteger(n)) {
-    console.error(`--${name} must be an integer, got "${text}"`);
-    process.exit(2);
-  }
-  return n;
+  if (!/^-?\d+$/u.test(text)) usage(name, `must be an integer, got "${text}"`);
+  return Number(text);
+}
+
+// Bad arguments are checked here, so they exit 2 with one line instead of a stack trace from the core.
+const runs = integer('runs', values.runs);
+if (runs < 1 || runs > MAX_RUNS) usage('runs', `must be an integer from 1 to ${MAX_RUNS}, got ${runs}`);
+const seedPrefix = values['seed-prefix'];
+const longestSeed = batchSeed(seedPrefix, runs - 1).length;
+if (longestSeed > MAX_SEED_LENGTH) usage('seed-prefix', `makes seeds of ${longestSeed} characters; a seed has at most ${MAX_SEED_LENGTH}`);
+let policy: Policy;
+try {
+  policy = fixedDicePolicy(integer('dice', values.dice));
+} catch (error) {
+  if (!(error instanceof RangeError)) throw error;
+  usage('dice', error.message.replace(/^fixedDicePolicy: dice /u, ''));
 }
 
 const started = performance.now();
-const report = runBatch({
-  runs: integer('runs', values.runs),
-  seedPrefix: values['seed-prefix'],
-  policy: fixedDicePolicy(integer('dice', values.dice)),
-});
+const report = runBatch({ runs, seedPrefix, policy });
 const elapsed = performance.now() - started;
 
 if (values.json) {

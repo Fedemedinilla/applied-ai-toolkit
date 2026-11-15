@@ -2,10 +2,12 @@
  * PreToolUse hook: refuses an agent's edit to a protected path. Claude Code passes the tool call as
  * JSON on stdin; exit code 2 blocks the call and shows stderr to the agent.
  *
- * Protected: the glob patterns in .claude/protected-paths.json, any JSON file whose top level has
- * `"handwritten": true`, and this folder itself, so the guard cannot be switched off by editing its
- * own config. The override is the environment variable DSIM_ALLOW_PROTECTED=1, which a person sets
- * when starting the session. It is not a file the agent could create with a shell command.
+ * Protected: the glob patterns in .claude/protected-paths.json, the files matching its
+ * "publishedPatterns" once they are committed at HEAD (a new ruleset file stays editable until a
+ * person commits it), any JSON file whose top level has `"handwritten": true`, and this folder
+ * itself, so the guard cannot be switched off by editing its own config. The override is the
+ * environment variable DSIM_ALLOW_PROTECTED=1, which a person sets when starting the session. It is
+ * not a file the agent could create with a shell command.
  *
  * Bash commands are checked too, by a heuristic: a write (the target of a redirect, or an argument of
  * tee, sed -i, mv, cp, rm and the like) that resolves to a protected path, relative or absolute, is
@@ -13,12 +15,18 @@
  * review is still needed. Input that is not a tool call the guard can read is refused.
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export interface GuardConfig {
   readonly patterns: readonly string[];
+  /**
+   * Patterns that protect a file only once it is published, that is, committed at HEAD. A new
+   * ruleset version can then be written and reworked until a person commits it.
+   */
+  readonly publishedPatterns?: readonly string[];
   readonly markerKey: string;
   /** Compare paths without case, for the case-insensitive filesystems of macOS and Windows. */
   readonly foldCase: boolean;
@@ -70,13 +78,52 @@ function hasMarker(root: string, rel: string, key: string): boolean {
 
 // File descriptor duplications ("2>&1", ">&2") write nothing; they are removed before looking for redirects.
 const FD_DUP = /\d*>&\d*-?/gu;
-// A redirect and the word it writes to: "> f", ">> f", "2> f", "&> f", ">| f".
-const REDIRECT = /(?:^|[^<>0-9&])(?:\d+|&)?>>?\|?\s*([^\s;|&()<>]+)/gu;
+// A redirect and the word it writes to: "> f", ">> f", "2> f", "&> f", ">| f", '> "f"', "> 'f'".
+const REDIRECT = /(?:^|[^<>0-9&])(?:\d+|&)?>>?\|?\s*("[^"]*"|'[^']*'|[^\s;|&()<>]+)/gu;
 // Commands whose arguments may be written, moved or deleted. Every word of such a command counts.
 const WRITE_COMMAND = /\btee\b|\bsed\s+(?:-[a-zA-Z]*\s+)*-i|\bperl\s+-[a-zA-Z]*i|\b(?:mv|cp|rm|rmdir|truncate|touch|install|ln|chmod|dd|unlink)\b|\bgit\s+(?:checkout|restore|rm|mv|apply|clean|reset)\b|writeFile|\bpython3?\s+-c|\bnode\s+-e/u;
 // Commands that remove or replace a whole folder: naming a folder that holds a protected path counts.
 const TREE_COMMAND = /\b(?:mv|rm|rmdir)\b|\bgit\s+(?:checkout|restore|rm|mv|clean|reset)\b/u;
 const SPLIT = /[\s'"`;|&()<>=]+/u;
+const CHANGE_DIR = /\b(?:cd|pushd|popd)\b/u;
+
+/**
+ * The simple commands of a command list: the text split on ;, newlines, &&, || and |, outside
+ * quotes, so `sed -i 's/a;b/c/' f` stays one part. A write command's words count only in its part,
+ * and `cat protected.ts; rm /tmp/x` is a read followed by an unrelated write.
+ */
+function commandParts(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charAt(i);
+    const next = text.charAt(i + 1);
+    if (quote !== '') {
+      if (c === '\\' && quote !== "'") {
+        current += c + next;
+        i++;
+      } else {
+        if (c === quote) quote = '';
+        current += c;
+      }
+      continue;
+    }
+    if (c === '\\') {
+      current += c + next;
+      i++;
+    } else if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      current += c;
+    } else if (c === ';' || c === '\n' || (c === '&' && next === '&') || (c === '|' && text.charAt(i - 1) !== '>')) {
+      parts.push(current);
+      current = '';
+      if (next === c) i++;
+    } else current += c;
+  }
+  parts.push(current);
+  return parts;
+}
 
 /** The fixed folder of a pattern like "test/golden/**": the part before a final "/**" with no glob in it. */
 function protectedFolder(pattern: string): string | null {
@@ -104,6 +151,32 @@ function holdsProtected(root: string, rel: string, config: GuardConfig, budget =
   return false;
 }
 
+const committedCache = new Map<string, ReadonlySet<string> | null>();
+
+/** The files committed at HEAD, relative to `root`, or null when git cannot say (no repository, no commit). */
+function committedFiles(root: string, config: GuardConfig): ReadonlySet<string> | null {
+  const key = `${root}\0${config.foldCase}`;
+  if (!committedCache.has(key)) {
+    let files: ReadonlySet<string> | null = null;
+    try {
+      const out = execFileSync('git', ['-C', root, 'ls-tree', '-r', '-z', '--name-only', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      files = new Set(out.split('\0').filter(Boolean).map((f) => fold(f, config)));
+    } catch {
+      files = null;
+    }
+    committedCache.set(key, files);
+  }
+  return committedCache.get(key) ?? null;
+}
+
+/** Whether `rel` matches a published-only pattern and is committed. When git cannot say, every match counts as published. */
+function isPublished(root: string, rel: string, config: GuardConfig): boolean {
+  const path = fold(rel, config);
+  if (!(config.publishedPatterns ?? []).some((p) => globToRegExp(fold(p, config)).test(path))) return false;
+  const committed = committedFiles(root, config);
+  return committed === null || committed.has(path);
+}
+
 function fold(path: string, config: GuardConfig): string {
   return config.foldCase ? path.toLowerCase() : path;
 }
@@ -116,7 +189,8 @@ export function isProtected(root: string, rel: string, config: GuardConfig): boo
       const folder = protectedFolder(p);
       return folder !== null && fold(folder, config) === path;
     }) ||
-    hasMarker(root, rel, config.markerKey)
+    hasMarker(root, rel, config.markerKey) ||
+    isPublished(root, rel, config)
   );
 }
 
@@ -129,22 +203,33 @@ function shellWordPath(root: string, word: string): string | null {
   return projectPath(root, full);
 }
 
+/** A redirect target without its surrounding quotes, so `> "f"` and `> 'f'` name the file f. */
+function unquote(word: string): string {
+  const q = word.charAt(0);
+  return (q === '"' || q === "'") && word.length >= 2 && word.endsWith(q) ? word.slice(1, -1) : word;
+}
+
 /**
  * Protected paths a shell command writes, by heuristic. A redirect counts only for the word it writes
  * to, so `cat rules-v1.ts > /tmp/x` and `vitest run src 2>&1` pass. Every word of a writing command
- * (sed -i, mv, cp, rm and similar) counts, after it is resolved against the project root, so absolute
- * and ./ forms match too. For commands that remove or replace a folder (rm, mv, git checkout and the
+ * (sed -i, mv, cp, rm and similar) counts, within its part of a command list, after it is resolved
+ * against the project root, so absolute and ./ forms match too. For commands that remove or replace a folder (rm, mv, git checkout and the
  * like), a folder that holds a protected file counts as well.
  */
 export function bashTargets(command: string, root: string, config: GuardConfig): string[] {
   const text = command.replace(FD_DUP, ' ');
   const candidates: string[] = [];
-  for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(match[1]);
-  const writes = WRITE_COMMAND.test(text);
-  if (writes) candidates.push(...text.split(SPLIT).filter(Boolean));
-  const tree = TREE_COMMAND.test(text);
+  for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(unquote(match[1]));
+  // A cd moves the base of every later relative word, so after one the whole command stays one part.
+  const parts = CHANGE_DIR.test(text) ? [text] : commandParts(text);
+  const words: Array<{ word: string; tree: boolean }> = candidates.map((word) => ({ word, tree: false }));
+  for (const part of parts) {
+    if (!WRITE_COMMAND.test(part)) continue;
+    const tree = TREE_COMMAND.test(part);
+    for (const word of part.split(SPLIT)) if (word !== '') words.push({ word, tree });
+  }
   const named = new Set<string>();
-  for (const word of candidates) {
+  for (const { word, tree } of words) {
     const rel = shellWordPath(root, word);
     if (rel === null) continue;
     if (rel !== '' && isProtected(root, rel, config)) {
@@ -186,10 +271,12 @@ export function loadConfig(root: string): GuardConfig {
   const record = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const patterns = record['patterns'];
   const markerKey = record['markerKey'];
-  if (!Array.isArray(patterns) || !patterns.every((p) => typeof p === 'string') || typeof markerKey !== 'string') {
-    throw new Error('.claude/protected-paths.json needs "patterns" (strings) and "markerKey" (a string)');
+  const publishedPatterns = record['publishedPatterns'] ?? [];
+  const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((p) => typeof p === 'string');
+  if (!strings(patterns) || !strings(publishedPatterns) || typeof markerKey !== 'string') {
+    throw new Error('.claude/protected-paths.json needs "patterns" (strings), "markerKey" (a string) and, if present, "publishedPatterns" (strings)');
   }
-  return { patterns, markerKey, foldCase: process.platform === 'darwin' || process.platform === 'win32' };
+  return { patterns, publishedPatterns, markerKey, foldCase: process.platform === 'darwin' || process.platform === 'win32' };
 }
 
 function main(): void {

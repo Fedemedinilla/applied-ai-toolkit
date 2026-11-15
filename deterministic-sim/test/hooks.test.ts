@@ -50,6 +50,26 @@ describe('guard-protected-paths', () => {
     }
   });
 
+  it('lets an agent create and work on a new ruleset file, and keeps the committed ones protected', () => {
+    for (const tool of ['Write', 'Edit']) {
+      expect(decide(edit('src/tournament/rules-v2.ts', tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit(join(ROOT, 'src/tournament/rules-v2.ts'), tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit('src/tournament/rules-v1.ts', tool), ROOT, config, {}).block).toBe(true);
+    }
+    expect(bashTargets('echo x > src/tournament/rules-v2.ts', ROOT, config)).toEqual([]);
+    expect(bashTargets('echo x > src/tournament/rules-v1.ts', ROOT, config)).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bashTargets('rm -rf src', ROOT, config)).toEqual(['src']);
+  });
+
+  it('protects every ruleset file when it cannot tell which ones are committed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
+    try {
+      expect(decide(edit('src/tournament/rules-v2.ts', 'Write'), dir, config, {}).block).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('blocks a JSON file marked "handwritten": true', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
     try {
@@ -83,6 +103,28 @@ describe('guard-protected-paths', () => {
     expect(bash('echo x >> ./src/tournament/rules-v1.ts')).toEqual(['src/tournament/rules-v1.ts']);
     expect(bash(`sed -i s/a/b/ ${join(ROOT, 'test/purity.test.ts')}`)).toEqual(['test/purity.test.ts']);
     expect(bash(`cd /tmp && echo x > ${join(ROOT, '../elsewhere/rules-v1.ts')}`)).toEqual([]);
+  });
+
+  it('counts the words of a writing command only in its own part of a command list', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('cat test/purity.test.ts; rm /tmp/x')).toEqual([]);
+    expect(bash('cat test/golden/runs.json && rm -f /tmp/scratch.json')).toEqual([]);
+    expect(bash('grep -n x src/tournament/rules-v1.ts | tee /tmp/out.txt')).toEqual([]);
+    expect(bash('cat /tmp/x\nrm -f /tmp/y || cat test/purity.test.ts')).toEqual([]);
+    expect(bash('npm test; rm test/golden/runs.json')).toEqual(['test/golden/runs.json']);
+    expect(bash("sed -i 's/a;b/c/' src/tournament/rules-v1.ts")).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash('sed -i "s/a|b/c/" src/tournament/rules-v1.ts')).toEqual(['src/tournament/rules-v1.ts']);
+    // After a cd the words of every part may name the same file, so the whole command counts as before.
+    expect(bash('cd src/tournament && rm rules-v1.ts')).toEqual(['src/tournament']);
+  });
+
+  it('unquotes the target of a redirect, in both quote styles', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('echo x > "src/tournament/rules-v1.ts"')).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash("echo x > 'test/golden/runs.json'")).toEqual(['test/golden/runs.json']);
+    expect(bash('cat >"test/golden/runs.json" <<EOF\n{}\nEOF')).toEqual(['test/golden/runs.json']);
+    expect(bash(`printf x >> "${join(ROOT, 'test/purity.test.ts')}"`)).toEqual(['test/purity.test.ts']);
+    expect(bash('echo x > "out file.txt"')).toEqual([]);
   });
 
   it('does not treat the rest of src/ as protected, or fd duplication as a write', () => {

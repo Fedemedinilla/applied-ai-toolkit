@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   batchSeed,
@@ -74,5 +75,41 @@ describe('runBatch', () => {
     expect(() => runBatch({ runs: 0, seedPrefix: 'p', policy: REFERENCE_POLICY })).toThrow(RangeError);
     expect(() => runBatch({ runs: 100_001, seedPrefix: 'p', policy: REFERENCE_POLICY })).toThrow(RangeError);
     expect(() => fixedDicePolicy(0)).toThrow(RangeError);
+  });
+
+  it('fixedDicePolicy refuses more dice than the ruleset allows, which would only ever rest', () => {
+    expect(() => fixedDicePolicy(6)).toThrow(/dice must be an integer from 1 to 5/u);
+    expect(() => fixedDicePolicy(6, 'dice-1')).toThrow(RangeError);
+    expect(() => fixedDicePolicy(3, 'no-such-ruleset')).toThrow(/unknown ruleset/u);
+    expect(fixedDicePolicy(5, 'dice-1').name).toBe('roll-5');
+  });
+});
+
+describe('the batch CLI', () => {
+  const CLI = new URL('../batch.ts', import.meta.url).pathname;
+  const cli = (...args: string[]) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
+
+  it.each([
+    [['--runs', '0'], '--runs'],
+    [['--runs', '100001'], '--runs'],
+    [['--runs', '1e1'], '--runs'],
+    [['--runs', '0x10'], '--runs'],
+    [['--runs', ' 5'], '--runs'],
+    [['--dice', '6'], '--dice'],
+    [['--dice', '0'], '--dice'],
+    [['--runs', '2', '--seed-prefix', 'a'.repeat(130)], '--seed-prefix'],
+  ])('exits 2 with a one-line message for %j', (args, flag) => {
+    const run = cli(...args);
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain(flag);
+    expect(run.stderr.trim().split('\n')).toHaveLength(1);
+    expect(run.stdout).toBe('');
+  });
+
+  it('runs a small batch and prints the report as JSON', () => {
+    const run = cli('--runs', '3', '--dice', '5', '--json');
+    expect(run.status).toBe(0);
+    const out = JSON.parse(run.stdout) as { report: { runs: number; policy: string } };
+    expect(out.report).toMatchObject({ runs: 3, policy: 'roll-5' });
   });
 });

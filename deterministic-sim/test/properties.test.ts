@@ -10,6 +10,13 @@ import { deepFreeze, intent, intents, legalize, play, seed } from './helpers/run
 const RUNS = { numRuns: 200 };
 
 describe('properties', () => {
+  it('the generated runs include full 20-round games, so the end of the game is under test', () => {
+    const samples = fc.sample(fc.tuple(seed, intents), { numRuns: RUNS.numRuns, seed: 1 });
+    expect(Math.max(...samples.map(([, wanted]) => wanted.length))).toBe(RULES_V1.rounds);
+    const ended = samples.filter(([s, wanted]) => play(s, wanted).states.at(-1)?.status === 'ended');
+    expect(ended.length).toBeGreaterThan(0);
+  });
+
   it('replay is byte-identical to the play that produced it, and to itself', () => {
     fc.assert(
       fc.property(seed, intents, (s, wanted) => {

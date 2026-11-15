@@ -20,6 +20,13 @@ const GLOBALS = new Map<string, string>([
   ['performance', 'no clock in the core'],
   ['setTimeout', 'no timers in the core'],
   ['setInterval', 'no timers in the core'],
+  ['setImmediate', 'no timers in the core'],
+  ['clearTimeout', 'no timers in the core'],
+  ['clearInterval', 'no timers in the core'],
+  ['clearImmediate', 'no timers in the core'],
+  ['requestAnimationFrame', 'no timers in the core'],
+  ['cancelAnimationFrame', 'no timers in the core'],
+  ['requestIdleCallback', 'no timers in the core'],
   ['queueMicrotask', 'no scheduling in the core'],
   ['crypto', 'randomness and hashing come from the core itself'],
   ['process', 'no process access in the core'],
@@ -32,6 +39,9 @@ const GLOBALS = new Map<string, string>([
   ['sessionStorage', 'no DOM in the core'],
   ['indexedDB', 'no DOM in the core'],
   ['fetch', 'no network in the core'],
+  ['XMLHttpRequest', 'no network in the core'],
+  ['WebSocket', 'no network in the core'],
+  ['EventSource', 'no network in the core'],
   ['self', 'no worker scope in the core'],
   ['structuredClone', 'states are built, not cloned'],
   ['Intl', 'no locale-dependent formatting in the core'],
@@ -63,10 +73,20 @@ function isReference(node: ts.Identifier): boolean {
   return true;
 }
 
+/** A number literal, through parentheses and a prefix `-` or `+`: `8`, `-1`, `(8)`, `+8`. */
 function isNumericLiteral(node: ts.Expression): boolean {
   if (ts.isNumericLiteral(node) || ts.isBigIntLiteral(node)) return true;
-  return ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.MinusToken && isNumericLiteral(node.operand);
+  if (ts.isParenthesizedExpression(node)) return isNumericLiteral(node.expression);
+  const sign = ts.isPrefixUnaryExpression(node) && (node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken);
+  return sign && isNumericLiteral(node.operand);
 }
+
+function isCast(node: ts.Node): node is ts.AsExpression | ts.TypeAssertion {
+  return ts.isAsExpression(node) || ts.isTypeAssertionExpression(node);
+}
+
+// `a ?? 8`, `a || 8` and their assignment forms `a ??= 8`, `a ||= 8`.
+const FALLBACK_OPERATORS = new Set([ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionEqualsToken, ts.SyntaxKind.BarBarEqualsToken]);
 
 export function scan(fileName: string, source: string): Violation[] {
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
@@ -83,6 +103,7 @@ export function scan(fileName: string, source: string): Violation[] {
     }
     if (ts.isImportEqualsDeclaration(node)) report(node, 'import = require: the core imports only its own files');
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) report(node, 'dynamic import()');
+    if (ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword) report(node, 'import.meta: no module location in the core');
     if (ts.isIdentifier(node) && node.text === 'Math' && isReference(node)) {
       const p = node.parent;
       if (!ts.isPropertyAccessExpression(p) || p.expression !== node) report(node, 'Math used other than as Math.<member>: no aliases or computed access');
@@ -92,14 +113,17 @@ export function scan(fileName: string, source: string): Violation[] {
     if (ts.isBinaryExpression(node)) {
       const op = node.operatorToken.kind;
       if (op === ts.SyntaxKind.AsteriskAsteriskToken || op === ts.SyntaxKind.AsteriskAsteriskEqualsToken) report(node, 'the ** operator: use integer products');
-      if ((op === ts.SyntaxKind.QuestionQuestionToken || op === ts.SyntaxKind.BarBarToken) && isNumericLiteral(node.right)) {
+      if (FALLBACK_OPERATORS.has(op) && isNumericLiteral(node.right)) {
         report(node, 'a fallback number: a missing value must throw, not read as a number');
       }
     }
     if (ts.isIdentifier(node) && GLOBALS.has(node.text) && isReference(node)) report(node, `${node.text}: ${GLOBALS.get(node.text) ?? ''}`);
     if (node.kind === ts.SyntaxKind.AnyKeyword) report(node, 'the any type');
-    if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.UnknownKeyword && ts.isAsExpression(node.parent)) {
-      report(node.parent, 'as unknown as');
+    // The double cast in every spelling: `x as unknown as T`, `(x as unknown) as T`, `<T><unknown>x`.
+    if (isCast(node) && node.type.kind === ts.SyntaxKind.UnknownKeyword) {
+      let outer = node.parent;
+      while (ts.isParenthesizedExpression(outer)) outer = outer.parent;
+      if (isCast(outer)) report(outer, 'as unknown as');
     }
     ts.forEachChild(node, visit);
   };
@@ -156,8 +180,22 @@ describe('the scanner itself', () => {
     ['const base = table[i] ?? 8;', 'fallback number'],
     ['const base = table[i] ?? -1;', 'fallback number'],
     ['const base = table[i] || 0;', 'fallback number'],
+    ['const b = table[i] ?? (8);', 'fallback number'],
+    ['const b = table[i] ?? +8;', 'fallback number'],
+    ['const b = table[i] ?? (-(8));', 'fallback number'],
+    ['let b = table[i]; b ??= 8;', 'fallback number'],
+    ['let b = table[i]; b ||= 0;', 'fallback number'],
+    ['setImmediate(() => 1);', 'timers'],
+    ['requestAnimationFrame(() => 1);', 'timers'],
+    ['clearTimeout(t);', 'timers'],
+    ['const u = import.meta.url;', 'import.meta'],
+    ['const r = new XMLHttpRequest();', 'network'],
+    ['const w = new WebSocket("x");', 'network'],
     ['let v: any = 1;', 'any'],
     ['const v = x as unknown as number;', 'as unknown as'],
+    ['const v = (x as unknown) as number;', 'as unknown as'],
+    ['const v = <number><unknown>x;', 'as unknown as'],
+    ['const v = <number>(x as unknown);', 'as unknown as'],
     ['// @ts-ignore\nconst v = 1;', '@ts-'],
     ['const M = Math; const r = M.random();', 'Math used other than'],
     ['const { random } = Math;', 'Math used other than'],
