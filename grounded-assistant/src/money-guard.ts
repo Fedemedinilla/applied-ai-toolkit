@@ -50,7 +50,9 @@ const MONEY_EN = /\$[\s\p{Cf}]*(?:[-\u2010-\u2015\u2212\uFE63\uFF0D][\s\p{Cf}]*)
 /** Any dash or minus a reply can put between the sign and the digits. */
 const MINUS = /[-\u2010-\u2015\u2212\uFE63\uFF0D]/;
 
-/* Quantities the reply writes: "dos cortes", "three blow-dries", "2 x". Capped at twenty. What is
+/* Quantities the reply writes: "dos cortes", "three blow-dries", "2 x". Up to twenty, MAX_QUANTITY:
+   the word table, the digit pattern and the "x" pattern all stop there, so the Math.min at the end
+   only keeps the bound if one of them grows. "veinticinco" and "21" are no quantity. What is
    not a quantity: an hour ("a las once"), a date ("sábado 10", "el doce de octubre"), a duration
    ("dos horas"). "once" is eleven only on the Spanish path. */
 const QUANTITIES: Readonly<Record<string, number>> = {

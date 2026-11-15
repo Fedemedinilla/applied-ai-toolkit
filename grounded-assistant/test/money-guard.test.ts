@@ -2,7 +2,7 @@
 // a passing case so nobody rediscovers it.
 
 import { describe, expect, it } from 'vitest';
-import { ALLOWED_MONEY, cardInWords, misstatedRows, moneyIsOurs, moneyToEn, moneyVerdict, plainText, quantityMentioned, reachable, SALON_SERVICES, withoutControls } from '../src/index.ts';
+import { ALLOWED_MONEY, cardInWords, MAX_QUANTITY, misstatedRows, moneyIsOurs, moneyToEn, moneyVerdict, plainText, quantityMentioned, reachable, SALON_SERVICES, withoutControls } from '../src/index.ts';
 
 const LIST = SALON_SERVICES.map((s) => `${s.name}: $${s.price.toLocaleString('es-AR')}`).join('\n');
 
@@ -47,7 +47,7 @@ describe('what is stopped', () => {
     ['a negative figure', 'El corte sale $16.000 y te descuento $-5.000.'],
     ['real cents are not the row', 'El corte de hombre sale $16.000,50.'],
     ['$32.000 with no quantity written', 'El corte de hombre sale $32.000.'],
-    ['twenty-five is past the cap', 'Veinticinco cortes de hombre: $400.000.'],
+    ['a number word the quantity table does not hold is no quantity', 'Veinticinco cortes de hombre: $400.000.'],
     ['the whole list does not save a figure no sum reaches', `${LIST}\nTe hago todo por $40.500.`],
   ];
   it.each(stop)('%s', (_label, reply) => expect(moneyIsOurs(reply)).toBe(false));
@@ -83,8 +83,13 @@ describe('quantityMentioned', () => {
     ['Come once a month.', 1, 'en'],
     ['Por los 11, sumando, da $121.000.', 11, 'es'],
     ['$16.000 x2', 2, 'es'],
+    // The bound is MAX_QUANTITY, twenty: the word table, the digit patterns and "x" all stop there.
+    ['Por los 20 cortes de hombre.', 20, 'es'],
+    ['Por los 21 cortes de hombre.', 1, 'es'],
+    ['$16.000 x25', 1, 'es'],
   ];
   it.each(cases)('%s is %i', (text, n, lang) => expect(quantityMentioned(text, lang)).toBe(n));
+  it('the largest quantity read is MAX_QUANTITY', () => expect(MAX_QUANTITY).toBe(20));
 });
 
 describe('misstated rows and the verdict', () => {
