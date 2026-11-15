@@ -27,6 +27,18 @@ describe('parseConfig', () => {
     expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: ['x'], except: ['a.ts'] }] })).toThrow(/except narrows paths/);
   });
 
+  it('stops on a misspelled optional rule key, which would otherwise fall back to its default', () => {
+    const misspelled = [
+      { rule: 'single-importer', group: 'src', package: 'x', allow: [], typeonly: 'forbid' },
+      { rule: 'forbidden-import', group: 'src', paths: ['a/**'], transitve: false },
+      { rule: 'forbidden-import', group: 'src', paths: ['a/**'], excpet: ['a/index.ts'] },
+      { rule: 'single-reader', group: 'src', variable: 'KEY', allow: [], whyy: 'typo' },
+    ];
+    for (const rule of misspelled) {
+      expect(() => parseConfig({ ...base, rules: [rule] }), JSON.stringify(rule)).toThrow(/^invalid config:\n {2}rules\.0: Unrecognized key: "\w+"$/);
+    }
+  });
+
   it('rejects a specifier pattern with a * anywhere but at the end, since it would match nothing', () => {
     for (const pattern of ['node:**', '@vendor/*-internal', '*x*']) {
       expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: [pattern] }] }), pattern).toThrow(/rules\.0\.specifiers\.0: only a trailing \*/);
