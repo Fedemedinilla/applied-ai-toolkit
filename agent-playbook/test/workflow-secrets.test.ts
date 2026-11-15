@@ -84,6 +84,16 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test\n', '      - uses: ./.github/actions/release\n        with:\n          token: ${{ github.token }}\n'))).toEqual(['19:secret-expression']);
   });
 
+  it('reads the whole expression, so a format string or the index form cannot hide a secret', () => {
+    const step = (expr: string) => CLEAN.replace('      - run: npm test', `      - run: echo "\${{ ${expr} }}"`);
+    expect(rules(step("format('{0}', secrets.DEPLOY_TOKEN)"))).toEqual(['17:secret-expression']);
+    expect(rules(step("github['token']"))).toEqual(['17:secret-expression']);
+    expect(rules(step('github[ "token" ]'))).toEqual(['17:secret-expression']);
+    expect(rules(step("format('{0}', github.token)"))).toEqual(['17:secret-expression']);
+    expect(rules(step("format('{0}', github.sha)"))).toEqual([]);
+    expect(rules(CLEAN.replace('      - run: npm test', '      - run: echo "${{ github.sha }}" "${{ secrets.X }}"'))).toEqual(['17:secret-expression']);
+  });
+
   it('reports a real-looking value in a credential-shaped variable, and leaves other variables alone', () => {
     const found = workflowFindings(CLEAN.replace('ci-placeholder-app-0001', 'sk-live-0000'));
     expect(found).toEqual([{ line: 10, rule: 'credential-value', text: 'APP_API_KEY: sk-live-0000' }]);

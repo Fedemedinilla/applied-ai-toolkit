@@ -128,6 +128,18 @@ const PERMISSIONS = /^\s*(['"]?)permissions\1\s*:(.*)$/;
 /** One `name: value` entry of a permissions block or flow mapping, the name quoted or not. */
 const KEY_VALUE = /^\s*(['"]?)([\w-]+)\1\s*:(.*)$/;
 
+/**
+ * True when a ${{ }} expression on the line reads a secret or the job token. Each expression runs
+ * to its closing braces, so a '}' inside it, as in format('{0}', secrets.X), hides nothing. The
+ * token is matched as github.token and as github['token'].
+ */
+function readsSecret(code: string): boolean {
+  for (const [, body = ''] of code.matchAll(/\$\{\{(.*?)(?:\}\}|$)/g)) {
+    if (/\bsecrets\b/.test(body) || /\bgithub\s*(?:\.\s*token\b|\[\s*(['"])token\1\s*\])/.test(body)) return true;
+  }
+  return false;
+}
+
 export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_WORKFLOW_POLICY): Finding[] {
   const all = lines(text);
   const findings: Finding[] = [];
@@ -138,7 +150,7 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
   let topPermissions = false;
   all.forEach((line, i) => {
     const code = line.code;
-    if (/\$\{\{[^}]*\b(secrets|github\.token)\b/.test(code) || /^\s*secrets\s*:/.test(code)) add(line, 'secret-expression');
+    if (readsSecret(code) || /^\s*secrets\s*:/.test(code)) add(line, 'secret-expression');
     const environment = /^\s*environment\s*:(.*)$/.exec(code)?.[1];
     if (environment !== undefined) {
       // `environment: name` or a block with `name: name` under it.
