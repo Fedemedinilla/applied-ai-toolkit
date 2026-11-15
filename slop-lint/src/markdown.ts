@@ -214,6 +214,8 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
   const kinds: Array<Block['kind'] | 'blank' | null> = [];
   let previous: Block['kind'] | 'blank' = 'blank';
   let previousIndent = 0;
+  // The last kind a line started (not null, not blank), kept as it goes instead of searched for.
+  let lastStart: Block['kind'] | undefined;
   for (const line of lines) {
     let t = lineText(line);
     if (t.trim() === '') {
@@ -250,11 +252,13 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
     } else if (kind === null && previous === 'blank') {
       // After a blank line, an indented line continues the list item above it.
       const indent = /^[ \t]*/u.exec(t)?.[0].length ?? 0;
-      const lastStart = [...kinds].reverse().find((k) => k !== null && k !== 'blank');
       kind = lastStart === 'list' && indent > previousIndent ? 'list' : 'paragraph';
     }
     kinds.push(kind);
-    if (kind !== null) previous = kind;
+    if (kind !== null) {
+      previous = kind;
+      lastStart = kind;
+    }
   }
 
   // Inline spans, in an order where an earlier one hides what a later one would match.

@@ -81,6 +81,19 @@ describe('maskMarkdown', () => {
   });
 });
 
+describe('maskMarkdown on a long document', () => {
+  // Each line after a blank line used to copy and reverse every block kind seen so far, so a
+  // document of N paragraphs took O(N^2): about 8 s for 40,000 paragraphs, against 0.3 s now.
+  // The bound leaves a wide margin for a slow machine and still fails on the quadratic version.
+  it('stays linear in the number of paragraphs', () => {
+    const source = 'Short line here.\n\n'.repeat(40_000);
+    const started = performance.now();
+    const view = maskMarkdown(source);
+    expect(performance.now() - started).toBeLessThan(3000);
+    expect(view.blocks).toHaveLength(40_000);
+  });
+});
+
 describe('lint in Markdown mode', () => {
   it('points every finding into the original file', () => {
     const source = '# A title\n\n```\nleverage\n```\n\n- Ultimately, I am passionate about **data**.\n';
