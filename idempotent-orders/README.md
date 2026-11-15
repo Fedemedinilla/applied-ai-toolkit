@@ -130,16 +130,17 @@ The server still decides who the customer is from the session, never from the bo
 
 ## What the tests cover
 
-92 tests, all offline.
+129 tests, all offline.
 
 | File | Covers |
 |---|---|
-| `test/place-order.test.ts` | Prices from the database; a resend; ten same-key calls sent together; a changed cart; another customer's key; the 60-minute window and `find_order`'s `within_window`; a confirmed order's key; a resend after an edit; unavailable products before and after the lookup; 22023 for every shape error; the lookup-to-insert race through the `unique_violation` handler; a violation of another constraint raised; no order without lines |
+| `test/place-order.test.ts` | Prices from the database; a resend; ten same-key calls sent together; a changed cart; another customer's key; the 60-minute window and `find_order`'s `within_window`; a confirmed order's key; a resend after an edit; unavailable products before and after the lookup; 22023 for every shape error; `find_order` refusing a NULL, empty or too long customer; the lookup-to-insert race through the `unique_violation` handler; a violation of another constraint raised; no order without lines |
 | `test/confirm-order.test.ts` | The claim and the stock; two interleaved confirms; a resend of the winning confirm; version conflicts; shortages with nothing written; a property test over random mixes of orders, each confirmed twice at once, checking stock never goes negative and equals the starting stock minus the confirmed lines; the check constraint; `edit_order` versions, races and refusals |
 | `test/privileges.test.ts` | Every function, table privilege and sequence taken back from `anon` and `authenticated` against Supabase-like default grants; `service_role` can place and confirm; RLS on every table; the schema applies again over itself |
-| `test/client.test.ts` | The client against a fake PostgREST that runs the real SQL and can drop a request before it runs, drop the response after the commit, answer 504 after the commit, cut the body, return the wrong shape, hang, or answer any status with `Retry-After`. Covers the lost response, the re-read, the 60-minute rule after a lost attempt and in the re-read, `unknown`, refusals, a refusal after a lost response, `not_deployed`, double taps in one and two processes, a joined tap not ended by another caller's abort, the retry bounds and backoff sequence, timeouts, aborts, and the same cases for confirms |
+| `test/client.test.ts` | The client against a fake PostgREST that runs the real SQL and can drop a request before it runs, drop the response after the commit, answer 504 after the commit, cut the body, return the wrong shape, hang, or answer any status with `Retry-After`. Covers the lost response, the re-read, the 60-minute rule after a lost attempt and in the re-read, `unknown`, refusals, a refusal after a lost response, `not_deployed`, double taps in one and two processes, no join across another cart or customer under one key, a joined tap not ended by another caller's abort, the retry bounds and backoff sequence, out-of-range options, malformed request shapes from an untrusted body, timeouts, aborts, and the same cases for confirms |
 | `test/lines.test.ts` | The TypeScript fingerprint equals `order_fingerprint`, and the client's line validation accepts exactly what `validate_lines` accepts (property tests against PGlite) |
-| `test/key.test.ts` | Keys across a reload, `clear()`, the lifetime, blocked storage, stored values the class did not write (jsdom) |
+| `test/key.test.ts` | Keys across a reload, `clear()`, the lifetime and its range, a clock moved back, two tabs across a `clear()`, blocked or full storage, stored values the class did not write (jsdom) |
+| `test/redirect.test.ts` | A 307 to another origin is not followed, so the `apikey` header never leaves the configured URL (two loopback servers) |
 
 PGlite has one backend, so two calls never overlap there: "concurrent" calls are interleaved whole. The race between the lookup and the insert is reproduced by `injectTwinAfterLookup` in `test/helpers/db.ts`. It turns `products` into a view whose filter inserts a twin order the first time `place_order` reads it, which falls between the lookup and the insert. A mutation check confirmed that removing the handler fails those tests. Real lock waits are what `sql/race.sh` is for. Its timing changed after its last run against a real Postgres, so a rerun of `race.sh` is pending.
 
@@ -151,7 +152,7 @@ sql/
   race.sh          the races on a real Postgres, opt-in
 src/
   client.ts        the retry protocol: placeOrder, confirmOrder
-  wire.ts          one RPC call, classified as body, refused, ambiguous or aborted
+  wire.ts          one RPC call, classified as body, refused, ambiguous or aborted; redirects not followed
   responses.ts     zod schemas of what the functions return
   key.ts           newKey and ActionKey, browser-safe
   lines.ts         line validation and the fingerprint
