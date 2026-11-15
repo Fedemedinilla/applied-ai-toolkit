@@ -404,6 +404,20 @@ describe('Auth that hangs', () => {
     await expect(fake.fetch(`${fake.url}/auth/v1/user`)).rejects.toThrow(/no AbortSignal/);
   });
 
+  it('a delay still fails when the signal aborts while the request body is read', async () => {
+    fake.knobs.delays['/auth/v1/otp'] = 300;
+    const controller = new AbortController();
+    const body = new ReadableStream<Uint8Array>({
+      pull(stream) {
+        controller.abort();
+        stream.enqueue(new TextEncoder().encode(JSON.stringify({ email: fake.user.email })));
+        stream.close();
+      },
+    });
+    const init = { method: 'POST', body, duplex: 'half', signal: controller.signal, headers: { apikey: fake.publishableKey } };
+    await expect(fake.fetch(`${fake.url}/auth/v1/otp`, init as RequestInit)).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('a signal aborted before the call sends nothing', async () => {
     const controller = new AbortController();
     controller.abort();

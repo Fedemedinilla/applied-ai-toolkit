@@ -153,6 +153,12 @@ function never(signal: AbortSignal | null): Promise<Response> {
 
 function wait(ms: number, signal: AbortSignal | null): Promise<void> {
   return new Promise((resolve, reject) => {
+    // The signal can abort while the body is read, before the wait starts; a listener added then
+    // would never fire.
+    if (signal?.aborted) {
+      reject(abortReason(signal));
+      return;
+    }
     const onAbort = (): void => {
       clearTimeout(timer);
       reject(abortReason(signal!));
