@@ -9,6 +9,12 @@ export interface Located {
   readonly text: string;
 }
 
+/** The sample logo is checked but could not be fetched, so the PDF has none. */
+export const SAMPLE_LOGO_MISSING: Located = {
+  field: 'logo-sample',
+  text: 'No se pudo cargar el logo de ejemplo; el PDF salió sin logo.',
+};
+
 const NAMES: Record<string, string> = {
   number: 'Número',
   'shop.name': 'Nombre del negocio',

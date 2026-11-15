@@ -18,7 +18,7 @@ import {
 } from '../../../pdf-receipt/src/index.ts';
 import { FIELD, toReceipt, type Draft, type DraftItem, type FieldError } from './draft.ts';
 import { parseMoney, parseQuantity } from './fields.ts';
-import { inputErrorText, warningText, type Located } from './messages.ts';
+import { inputErrorText, SAMPLE_LOGO_MISSING, warningText, type Located } from './messages.ts';
 import { EMPTY_ITEM, hostileOrder, longOrder, simpleOrder } from './samples.ts';
 
 export interface AppDeps {
@@ -295,9 +295,21 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     notices.hidden = items.length === 0;
   };
 
+  const logoChoice = (): string | undefined => form.querySelector<HTMLInputElement>('input[name="logo"]:checked')?.value;
+
   const logoBytes = async (): Promise<Uint8Array | null> => {
-    const choice = form.querySelector<HTMLInputElement>('input[name="logo"]:checked')?.value;
-    if (choice === 'sample') return (sampleLogo ??= deps.loadSampleLogo().catch(() => null));
+    const choice = logoChoice();
+    if (choice === 'sample') {
+      // Only a fetch that worked is kept: after a failure the next build asks again.
+      sampleLogo ??= deps
+        .loadSampleLogo()
+        .catch(() => null)
+        .then((bytes) => {
+          if (bytes === null) sampleLogo = null;
+          return bytes;
+        });
+      return sampleLogo;
+    }
     if (choice === 'file') return uploadedLogo;
     return null;
   };
@@ -327,8 +339,10 @@ export function mountApp(doc: Document, deps: AppDeps): App {
       if (focusOnError) doc.getElementById(result.errors[0]?.field ?? '')?.focus();
       return;
     }
+    const usesSample = logoChoice() === 'sample';
     const logo = await logoBytes();
     if (seq !== sequence) return;
+    const sampleMissing = usesSample && logo === null;
     let built;
     try {
       built = await buildReceipt(result.data, { logo });
@@ -356,7 +370,8 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     preview.src = url;
     if (currentUrl) deps.revokeUrl(currentUrl);
     currentUrl = url;
-    showNotices(built.warnings.map((w) => warningText(w, result.rows)));
+    const located = built.warnings.map((w) => warningText(w, result.rows));
+    showNotices(sampleMissing ? [SAMPLE_LOGO_MISSING, ...located] : located);
     const pages = built.pageCount === 1 ? '1 página' : `${built.pageCount} páginas`;
     const ready = `Listo: ${name}, ${pages}, ${AR_DECIMAL.format(built.bytes.length / 1000)} kB.`;
     status.textContent = ready;

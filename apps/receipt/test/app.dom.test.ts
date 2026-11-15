@@ -335,6 +335,20 @@ describe('when the sample logo cannot be fetched', () => {
     expect($('#status').textContent).toMatch(/^Listo:/u);
   });
 
+  it('says so, and fetches it again on a later build', async () => {
+    let calls = 0;
+    const h = mount({ loadSampleLogo: async () => (++calls === 1 ? Promise.reject(new Error('offline')) : logo) });
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(false);
+    expect($('#notice-list').textContent).toBe('No se pudo cargar el logo de ejemplo; el PDF salió sin logo.');
+    choose('none');
+    await h.app.settled();
+    choose('sample');
+    await h.app.settled();
+    expect(calls).toBe(2);
+    expect(await hasImage(h)).toBe(true);
+    expect($('#notices').hidden).toBe(true);
+  });
 });
 
 describe('uploaded logo files', () => {
