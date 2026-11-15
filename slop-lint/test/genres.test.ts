@@ -234,13 +234,18 @@ describe('variety', () => {
     expect(ids(text, { lang: 'es' })).not.toContain('REG-01');
     const result = lint(text, { lang: 'es', variety: 'rioplatense' });
     expect(result.findings.filter((f) => f.ruleId === 'REG-01').map((f) => f.match)).toEqual(['puedes', 'dime']);
-    expect(result.findings[0]?.detail).toBe('the variety is rioplatense, which uses voseo');
+    // Nothing is mixed in a one-register text, so the finding names the variety instead.
+    expect(result.findings[0]).toMatchObject({ message: 'The variety is rioplatense, which uses voseo.', suggestion: 'Use the voseo forms: "querés... podés".' });
+    expect('detail' in result.findings[0]!).toBe(false);
     expect(result.variety).toBe('rioplatense');
     expect('genre' in result).toBe(false);
   });
 
   it('flags every voseo form in a neutral text', () => {
     expect(lint('Si podés, avisame.', { lang: 'es', variety: 'neutral' }).findings.filter((f) => f.ruleId === 'REG-01').map((f) => f.match)).toEqual(['podés', 'avisame']);
+    expect(lint('Si podés, avisame.', { lang: 'es', variety: 'neutral' }).findings[0]).toMatchObject({ message: 'The variety is neutral, which uses tuteo.', suggestion: 'Use the tuteo forms: "quieres... puedes".' });
+    // Without a variety a mix keeps the catalog message.
+    expect(lint('Si querés lo vemos. Si puedes, dime.', { lang: 'es' }).findings.find((f) => f.ruleId === 'REG-01')?.message).toBe(ruleById('REG-01')?.message);
   });
 
   it('leaves English alone', () => {

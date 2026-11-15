@@ -9,6 +9,9 @@ export interface StructuralHit {
   start: number;
   end: number;
   detail?: string;
+  /** Wording for this hit when the rule's catalog message does not fit it. */
+  message?: string;
+  suggestion?: string;
 }
 
 export interface StructuralContext {
@@ -199,8 +202,12 @@ const checks: Record<string, Check> = {
     // With a variety, every form of the other register is wrong, even when it is the only one used.
     if (ctx.variety !== undefined) {
       const wrong = ctx.variety === 'rioplatense' ? tu : vos;
+      // The text may use one register only, so the catalog message about a mix would not fit.
       const expected = ctx.variety === 'rioplatense' ? 'voseo' : 'tuteo';
-      return wrong.map((m) => ({ ruleId: 'REG-01', start: m.index, end: m.index + m[0].length, detail: `the variety is ${ctx.variety}, which uses ${expected}` }));
+      const forms = ctx.variety === 'rioplatense' ? '"querés... podés"' : '"quieres... puedes"';
+      const message = `The variety is ${ctx.variety}, which uses ${expected}.`;
+      const suggestion = `Use the ${expected} forms: ${forms}.`;
+      return wrong.map((m) => ({ ruleId: 'REG-01', start: m.index, end: m.index + m[0].length, message, suggestion }));
     }
     if (vos.length === 0 || tu.length === 0) return [];
     // Flag the minority register; on a tie, the one that shows up later.
