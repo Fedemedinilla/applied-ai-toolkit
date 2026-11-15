@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { applySetting, DEFAULT_GENRE, GENRE_PROFILES, GENRES, guessGenre, resolveRules } from '../src/genres.ts';
-import { settingsFor } from '../src/config.ts';
+import { settingsFor, validateConfig } from '../src/config.ts';
 import { appliesTo, lint } from '../src/lint.ts';
 import { MESSAGE_VARIANTS, messageFor } from '../src/messages.ts';
 import { RULES, ruleById, TIER2_BUDGET } from '../src/rules.ts';
@@ -210,6 +210,43 @@ describe('Markdown in a mail', () => {
     expect(settings.off.filter((id) => id === 'FMT-01')).toEqual(['FMT-01']);
     const raised = settingsFor({ ruleSettings: { 'FMT-01': { level: 1, severity: 'high' } } }, undefined, 'config file', { genre: 'email' });
     expect(raised.rules.filter((r) => r.id.startsWith('FMT-01')).map((r) => [r.id, r.level])).toEqual([['FMT-01', 1], ['FMT-01-LIST', 1]]);
+  });
+
+  describe('FMT-01-LIST by name', () => {
+    const parts = (config: Parameters<typeof settingsFor>[0], genre: Genre = 'email') => {
+      const settings = settingsFor(validateConfig(config), undefined, 'config file', { genre });
+      return { rules: settings.rules.filter((r) => r.id.startsWith('FMT-01')).map((r) => [r.id, r.level, r.severity]), off: settings.off.filter((id) => id.startsWith('FMT-01')) };
+    };
+
+    it('is accepted under ruleSettings and under an override, and an unknown part is not', () => {
+      expect(() => validateConfig({ ruleSettings: { 'FMT-01-LIST': 'off' } })).not.toThrow();
+      expect(() => validateConfig({ overrides: [{ files: ['mail/**'], ruleSettings: { 'FMT-01-LIST': { severity: 'low' } } }] })).not.toThrow();
+      expect(() => validateConfig({ ruleSettings: { 'FMT-01-BOLD': 'off' } })).toThrow(/^ruleSettings\.FMT-01-BOLD: is not the id of a built-in rule/u);
+    });
+
+    it('turns only the list part off, and lists it as off', () => {
+      expect(parts({ ruleSettings: { 'FMT-01-LIST': 'off' } })).toEqual({ rules: [['FMT-01', 1, 'high']], off: ['FMT-01-LIST'] });
+    });
+
+    it('wins over the FMT-01 setting for the list part, which FMT-01 still sets otherwise', () => {
+      expect(parts({ ruleSettings: { 'FMT-01': { severity: 'disqualify' }, 'FMT-01-LIST': { severity: 'low' } } }).rules).toEqual([
+        ['FMT-01', 1, 'disqualify'],
+        ['FMT-01-LIST', 2, 'low'],
+      ]);
+      expect(parts({ ruleSettings: { 'FMT-01': 'off', 'FMT-01-LIST': { severity: 'low' } } })).toEqual({ rules: [['FMT-01-LIST', 2, 'low']], off: ['FMT-01'] });
+      expect(parts({ ruleSettings: { 'FMT-01': 'off' } })).toEqual({ rules: [], off: ['FMT-01', 'FMT-01-LIST'] });
+    });
+
+    it('keeps a top-level FMT-01-LIST setting when an override sets FMT-01', () => {
+      const config = { ruleSettings: { 'FMT-01-LIST': { severity: 'low' as const } }, overrides: [{ files: ['**'], ruleSettings: { 'FMT-01': 'off' as const } }] };
+      const settings = settingsFor(validateConfig(config), 'mail.txt', 'config file', { genre: 'email' });
+      expect(settings.rules.filter((r) => r.id.startsWith('FMT-01')).map((r) => [r.id, r.severity])).toEqual([['FMT-01-LIST', 'low']]);
+    });
+
+    it('changes nothing in a genre that does not split FMT-01', () => {
+      expect(parts({ ruleSettings: { 'FMT-01-LIST': 'off' } }, 'cover-letter')).toEqual(parts({}, 'cover-letter'));
+      expect(parts({ ruleSettings: { 'FMT-01-LIST': { severity: 'low' } } }, 'whatsapp')).toEqual(parts({}, 'whatsapp'));
+    });
   });
 });
 

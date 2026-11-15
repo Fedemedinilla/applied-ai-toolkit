@@ -77,6 +77,18 @@ describe('--genre', () => {
     expect(listed.rules.find((x) => x.id === 'EST-09')).toMatchObject({ severity: 'low', default: { level: 2, severity: 'medium' } });
   });
 
+  it('lists FMT-01-LIST with the setting a config gives it by name', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slop-list-'));
+    writeFileSync(join(tmp, 'slop-lint.config.json'), JSON.stringify({ ruleSettings: { 'FMT-01-LIST': { severity: 'low' } } }));
+    const r = run(['--list-rules', '--json', '--genre', 'email'], { cwd: tmp });
+    expect(r.status).toBe(0);
+    const listed = JSON.parse(r.stdout) as { rules: Array<{ id: string; level: number; severity: string }> };
+    expect(listed.rules.filter((x) => x.id.startsWith('FMT-01')).map((x) => [x.id, x.level, x.severity])).toEqual([
+      ['FMT-01', 1, 'high'],
+      ['FMT-01-LIST', 2, 'low'],
+    ]);
+  });
+
   it('names the genre in the SARIF run, and describes the rules with the profile', () => {
     const r = run([EMAIL, '--lang', 'es', '--genre', 'email', '--sarif']);
     const log = JSON.parse(r.stdout) as { runs: Array<{ properties?: unknown; tool: { driver: { rules: Array<{ id: string; properties: { severity: string } }> } } }> };

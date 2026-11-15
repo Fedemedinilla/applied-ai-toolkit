@@ -1,0 +1,1 @@
+{ "genre": "email", "ruleSettings": { "FMT-01": { "severity": "disqualify" }, "FMT-01-LIST": "off" } }
