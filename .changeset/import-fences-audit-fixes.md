@@ -7,3 +7,5 @@ Report lines the way git and editors count them: a U+2028 or U+2029 inside a str
 A repository glob that starts with `./` or `/`, contains a backslash or has unbalanced braces is now a config error naming its key (exit code 2), instead of matching nothing or failing later with a generic error.
 
 A `specifiers`, `external` or `package` entry with a `*` anywhere but at the end (`node:**`, `@vendor/*-internal`) is now a config error; before, it was compared literally and matched nothing.
+
+The text and JSON reports sort violations in code-unit order, as SARIF already did, so the same tree prints the same bytes under every locale.
