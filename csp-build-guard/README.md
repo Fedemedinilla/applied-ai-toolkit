@@ -82,7 +82,7 @@ A policy that allows inline scripts by hash breaks the moment the script changes
 - a listed hash matches no inline content on the pages served with that policy. A stale hash keeps allowing a script nobody ships. A hash in a directive that more specific ones shadow (`script-src` next to both `script-src-elem` and `script-src-attr`) is reported too, since it has no effect;
 - that directive holds `'unsafe-inline'`. This fails even next to hashes: CSP3 browsers then ignore it, but browsers without hash support fall back to it, and it signals that the policy was loosened;
 - an event handler (`onclick="..."`) or a `style="..."` attribute is present without `'unsafe-hashes'` and its hash, since a hash-only policy blocks it;
-- a page has no policy at all, so there is nothing to compare against.
+- a page has no policy at all, or one whose value is empty (`""`, `;`, an empty `<meta>` content), so there is nothing to compare against.
 
 JSON-LD and other data blocks are skipped, since CSP does not apply to them. Import maps are hashed, since it does. An empty `<script></script>` is skipped, since the browser runs no CSP check on it; a whitespace-only one is hashed. sha256, sha384 and sha512 hashes are all recognized. As in the browser, the algorithm can be in any case and the digest in base64 or base64url.
 

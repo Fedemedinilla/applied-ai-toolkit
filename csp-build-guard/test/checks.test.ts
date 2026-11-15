@@ -145,6 +145,20 @@ describe('inline hashes', () => {
     expect(check(report, 'inline-hashes')?.status).toBe('pass');
   });
 
+  it('fails a page whose delivered policy is empty, since it restricts nothing', () => {
+    const page = '<script>alert(1)</script>';
+    const empty = 'index.html: the Content-Security-Policy is empty, so inline content is not restricted and there is nothing to check hashes against';
+    for (const value of ['', ' ', ';']) {
+      expect(messages(guard({ 'index.html': page }, literal(value)), 'inline-hashes')).toEqual([empty]);
+    }
+    const meta = guard({ 'index.html': `<meta http-equiv="Content-Security-Policy" content="">${page}` }, { csp: { from: 'meta' } });
+    expect(messages(meta, 'inline-hashes')).toEqual([empty]);
+    const vercel = JSON.stringify({ headers: [{ source: '/(.*)', headers: [{ key: 'Content-Security-Policy', value: '' }] }] });
+    const header = guard({ 'index.html': page, 'vercel.json': vercel }, { csp: { from: 'vercel-json' } });
+    expect(messages(header, 'inline-hashes')).toEqual([empty]);
+    expect(header.ok).toBe(false);
+  });
+
   it('reports a hash left in script-src when script-src-elem and script-src-attr shadow it', () => {
     const text = 'run()';
     const policy = `script-src 'self' ${sha256(text)}; script-src-elem 'self' ${sha256(text)}; script-src-attr 'none'`;

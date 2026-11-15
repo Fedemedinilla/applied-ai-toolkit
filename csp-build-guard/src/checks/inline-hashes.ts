@@ -38,16 +38,20 @@ export function checkInlineHashes(ctx: Context): CheckResult {
     failures.push(file === undefined ? { message } : { message, file });
   };
 
-  const byHeader = groupBy(ctx.pages.filter((p) => p.csp.length), headerOf);
+  // A page counts as having a policy when its delivered value parses to one. An empty value (a
+  // header rule set to "", a <meta content="">) is delivered but restricts nothing.
+  const byHeader = groupBy(ctx.pages.filter((p) => p.policies.length), headerOf);
   const withoutPolicy = ctx.pages.filter((p) => p.csp.length === 0).map((p) => p.display);
   if (withoutPolicy.length) fail(`${pagesLabel(withoutPolicy)}: no Content-Security-Policy, so inline content is not restricted and there is nothing to check hashes against`);
+  const emptyPolicy = ctx.pages.filter((p) => p.csp.length > 0 && p.policies.length === 0).map((p) => p.display);
+  if (emptyPolicy.length) fail(`${pagesLabel(emptyPolicy)}: the Content-Security-Policy is empty, so inline content is not restricted and there is nothing to check hashes against`);
 
   // Missing hashes: grouped by hash, so one changed script on forty pages is one line.
   const blocked = new Map<string, { item: InlineItem; directive: string; pages: string[] }>();
   let inlineCount = 0;
   const distinct = new Set<string>();
   for (const page of ctx.pages) {
-    if (page.csp.length === 0) continue;
+    if (page.policies.length === 0) continue;
     const policies = page.policies;
     const items = page.parts.inline.filter((i) => kinds.includes(i.kind));
     inlineCount += items.length;
