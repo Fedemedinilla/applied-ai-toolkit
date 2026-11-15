@@ -1,10 +1,12 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
 # the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest
 # suite, slop-lint over the repository's own docs, and the wp-hardening PHPUnit suite in a job of
-# its own. A third job runs the repository's three composite actions (./slop-lint,
-# ./csp-build-guard and ./import-fences) as a user's workflow would, and checks the SARIF each one writes. It does not
-# upload SARIF: that needs security-events: write, which no job here has. Tests make no network
-# call; the only downloads are the locked npm and Composer packages, and zod for the guard action.
+# its own. Another job runs the repository's three composite actions (./slop-lint,
+# ./csp-build-guard and ./import-fences) as a user's workflow would, and checks the SARIF each
+# one writes. It does not upload SARIF: that needs security-events: write, which no job here has.
+# Tests make no network call; the only downloads are the locked npm and Composer packages, plus,
+# at exact versions but outside any lockfile, zod for the guard action and typescript and zod for
+# the fences action.
 # No job has secrets. Actions are pinned to the commit SHA of their release tag, with the version
 # in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml,
 # csp-build-guard/action.yml and import-fences/action.yml, and their tests fail until the SHAs match.
@@ -55,8 +57,9 @@ jobs:
       - name: Import fences
         run: node import-fences/cli.ts --config import-fences/repo.config.ts
 
-      # Packs the npm packages (gateway, slop-lint) as a publish would, installs each tarball in a
-      # project outside the repository and checks its exports, its types and the slop-lint bin.
+      # Packs the four npm packages (gateway, slop-lint, import-fences, csp-build-guard) as a publish
+      # would, installs each tarball in a project outside the repository and checks its exports, its
+      # types and its bin.
       # Offline. Kept out of npm test because it builds and packs, about 12 s.
       - name: Pack the npm packages
         run: npm run pack:check
