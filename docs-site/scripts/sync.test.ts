@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { brokenLinks, pageMismatch } from './check-links.ts';
 import { BASE, GROUPS, REPO_URL } from './site.ts';
-import { type LinkContext, type PathKind, plan, renderPage, REPO_ROOT, rewriteLinks, rewriteTarget, sidebar, splitDocument, sync } from './sync.ts';
+import { type LinkContext, type PathKind, plan, plainText, renderPage, REPO_ROOT, rewriteLinks, rewriteTarget, sidebar, splitDocument, sync } from './sync.ts';
 
 const TREE: Readonly<Record<string, PathKind>> = {
   '': 'dir',
@@ -132,6 +132,22 @@ describe('splitDocument and renderPage', () => {
     expect(splitDocument(`# T\n\n${long} Short one.\n`, 'x').description).toBe(long);
   });
 
+  it.each([
+    'Read the root README.md first. Then the rest.',
+    'Built on Node.js and Astro. It works.',
+    'Scripts for the demos on example.test. This is the record.',
+    'Costs US$ 1.50 per call. Cheap.',
+    'Use a short name, e.g. this one. Then more.',
+  ])('keeps a period inside a word as part of its sentence: %s', (paragraph) => {
+    const description = splitDocument(`# T\n\n${paragraph}\n`, 'x').description;
+    expect(description).toBe(paragraph);
+  });
+
+  it('cuts after a whole sentence even when the first one has an inner period', () => {
+    const long = `${'word '.repeat(50).trim()}.`;
+    expect(splitDocument(`# T\n\nSee README.md now. ${long}\n`, 'x').description).toBe('See README.md now.');
+  });
+
   it('refuses a document with no H1 or no first paragraph', () => {
     expect(() => splitDocument('Text first.\n\n# Late\n', 'x/README.md')).toThrow(/x\/README.md: the first line is not an H1/);
     expect(() => splitDocument('# Title\n\n## Section\n', 'x/README.md')).toThrow(/no paragraph after the H1/);
@@ -210,6 +226,15 @@ describe('the real repository', () => {
       expect(sync(REPO_ROOT, join(out, 'docs')).length).toBe(pages.length);
     } finally {
       rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it('gives every page a description that is the start of its first paragraph', () => {
+    for (const page of pages) {
+      const markdown = readFileSync(join(REPO_ROOT, page.source), 'utf8');
+      const { description, body } = splitDocument(markdown, page.source);
+      const first = plainText(body.split(/\n\s*\n/)[0] ?? '');
+      expect(first.startsWith(description), `${page.source}: ${description}`).toBe(true);
     }
   });
 

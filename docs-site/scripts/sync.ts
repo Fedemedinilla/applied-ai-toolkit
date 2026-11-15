@@ -206,7 +206,7 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
 }
 
 /** Markdown inline syntax removed, for a title or a description. */
-const plainText = (markdown: string): string =>
+export const plainText = (markdown: string): string =>
   markdown
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<((?:https?:)[^>]+)>/g, '$1')
@@ -216,13 +216,17 @@ const plainText = (markdown: string): string =>
 
 const DESCRIPTION_LIMIT = 200;
 
-/** The first sentences of a paragraph that fit the limit; always at least one. */
+/**
+ * The first sentences of a paragraph that fit the limit; always at least one. A sentence ends
+ * only at punctuation followed by whitespace, so README.md, Node.js or 1.50 stay whole, and the
+ * result is always a prefix of the paragraph.
+ */
 function shorten(paragraph: string): string {
-  const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [paragraph];
   let out = '';
-  for (const sentence of sentences) {
-    if (out !== '' && (out + sentence).length > DESCRIPTION_LIMIT) break;
-    out += sentence;
+  for (const sentence of paragraph.split(/(?<=[.!?])\s+/)) {
+    const next = out === '' ? sentence : `${out} ${sentence}`;
+    if (out !== '' && next.length > DESCRIPTION_LIMIT) break;
+    out = next;
   }
   return out.trim();
 }
