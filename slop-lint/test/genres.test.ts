@@ -250,12 +250,12 @@ describe('whatsapp', () => {
     expect(ids(mixed, { lang: 'es', genre: 'whatsapp' })).toContain('ORT-01');
   });
 
-  it('lowers the grammar rules to low and raises a voseo and tuteo mix to disqualify', () => {
+  it('lowers the grammar rules to low and keeps a voseo and tuteo mix at high without voiding the message', () => {
     const result = lint('Si querés lo vemos. Si puedes, dime.', { lang: 'es', genre: 'whatsapp' });
     const reg = result.findings.filter((f) => f.ruleId === 'REG-01');
     expect(reg.length).toBeGreaterThan(0);
-    expect(reg.every((f) => f.severity === 'disqualify')).toBe(true);
-    expect(result.disqualified).toBe(true);
+    expect(reg.every((f) => f.severity === 'high')).toBe(true);
+    expect(result.disqualified).toBe(false);
     expect(resolveRules(RULES, 'whatsapp').find((r) => r.id === 'SIN-05')?.severity).toBe('low');
   });
 

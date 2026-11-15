@@ -122,8 +122,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
       'SIN-08': { severity: 'low' },
       'SIN-11': { severity: 'low' },
       'SIN-EN-06': { severity: 'low' },
-      // In a chat a mix of voseo and tuteo stands out more than in a letter.
-      'REG-01': { severity: 'disqualify' },
+      // REG-01 keeps its default severity, high: a voseo and tuteo mix is flagged without voiding the message.
     },
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: { ...COVER_LETTER.thresholds, openingMarksFollowText: true },
