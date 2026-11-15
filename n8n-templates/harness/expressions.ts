@@ -10,7 +10,8 @@
 // - A parameter that is one block and nothing else yields the block's value
 //   with its type. Text mixed with blocks yields a string: each block's value
 //   is kept when it is truthy, 0 or false, replaced by "" otherwise, and the
-//   parts are joined.
+//   parts are joined. A block whose value is a function fails the node when it
+//   is the whole parameter, and joins the function's source text otherwise.
 // - An error thrown inside a block (reading a field of undefined, calling a
 //   missing method) is swallowed and the block yields undefined. Only a
 //   syntax error or a reference to a node without data fails the node.
@@ -128,7 +129,7 @@ function runBlock(code: string, scope: Scope): unknown {
   }
   // Objects built inside the context belong to another realm: hand back plain JSON.
   if (value !== null && typeof value === 'object') return JSON.parse(JSON.stringify(value)) as unknown;
-  return typeof value === 'function' ? undefined : value;
+  return value;
 }
 
 /** The value n8n would hand to the node for this parameter. Non-expressions come back unchanged. */
@@ -136,12 +137,18 @@ export function evaluate(parameter: unknown, scope: Scope): unknown {
   if (typeof parameter !== 'string' || !parameter.startsWith('=')) return parameter;
   const chunks = splitExpression(parameter.slice(1));
   const only = chunks[0];
-  if (chunks.length === 1 && only?.type === 'code') return runBlock(only.text, scope);
+  if (chunks.length === 1 && only?.type === 'code') {
+    const value = runBlock(only.text, scope);
+    // n8n refuses a parameter whose whole value is a function, such as `$json.name.trim` without ().
+    if (typeof value === 'function') throw new ExpressionHarnessError(`this is a function, please add () in: ${parameter.slice(0, 80)}`);
+    return value;
+  }
   return chunks
     .map((chunk) => {
       if (chunk.type === 'text') return chunk.text;
       const v = runBlock(chunk.text, scope);
-      return v || v === 0 || v === false ? v : '';
+      // In mixed text a function is truthy and n8n joins its source text.
+      return v || v === 0 || v === false ? String(v) : '';
     })
     .join('');
 }

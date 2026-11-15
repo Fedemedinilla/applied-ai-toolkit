@@ -155,6 +155,13 @@ describe('evaluate', () => {
     expect(() => evaluate('={{ $json.id ', scope)).toThrow(/unclosed/);
   });
 
+  it('fails on a single block that is a function and prints its source in mixed text, like n8n', () => {
+    expect(() => evaluate('={{ (() => 1) }}', scope)).toThrow(/this is a function, please add \(\)/);
+    expect(() => evaluate('={{ $json.body.email.trim }}', scope)).toThrow(ExpressionHarnessError);
+    expect(evaluate('=a{{ (()=>1) }}b', scope)).toBe('a()=>1b');
+    expect(evaluate('=Hi {{ $json.body.email.trim }}', scope)).toBe('Hi function trim() { [native code] }');
+  });
+
   it("reads earlier nodes through $('Node')", () => {
     for (const access of ['item', 'first()', 'last()', 'all()[0]']) {
       expect(evaluate(`={{ $('Earlier').${access}.json.name }}`, scope)).toBe('Ana');
