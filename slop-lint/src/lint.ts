@@ -1,10 +1,12 @@
 import { compile } from './regex.ts';
-import { RULES, TIER2_BUDGET } from './rules.ts';
+import { DEFAULT_GENRE, GENRE_PROFILES, resolveRules } from './genres.ts';
+import { messageFor } from './messages.ts';
+import { RULES } from './rules.ts';
 import { blockSentences, maskMarkdown, type MarkdownView } from './markdown.ts';
 import { applyDirectives } from './suppress.ts';
 import { coefficientOfVariation, runStructural } from './structural.ts';
 import { countAnchors, isProse, lineColumn, lineStarts, quotedRanges, splitSentences, words, type Span } from './text.ts';
-import type { Finding, Lang, LintOptions, LintResult, PatternRule, Rule, Severity, StructuralRule } from './types.ts';
+import type { Finding, Genre, Lang, LintOptions, LintResult, PatternRule, Rule, Severity, StructuralRule } from './types.ts';
 
 interface Hit {
   rule: Rule;
@@ -14,8 +16,9 @@ interface Hit {
   detail?: string;
 }
 
-export function appliesTo(rule: Rule, lang: Lang): boolean {
-  return rule.lang === lang || rule.lang === 'both';
+/** Whether the rule runs on a text of this language and genre. A rule the genre's profile turns off does not. */
+export function appliesTo(rule: Rule, lang: Lang, genre: Genre = DEFAULT_GENRE): boolean {
+  return (rule.lang === lang || rule.lang === 'both') && GENRE_PROFILES[genre].rules[rule.id] !== 'off';
 }
 
 /**
@@ -142,8 +145,12 @@ interface Mode {
 /** `text` is what the rules read; `source` is the input, which findings quote. Both have the same length. */
 function run(source: string, text: string, sentences: Span[], options: LintOptions, mode: Mode): LintResult {
   const { lang } = options;
-  // The catalog unless the caller passes its own list, as the CLI does for a config file.
-  const rules = options.rules ?? RULES;
+  const genre = options.genre ?? DEFAULT_GENRE;
+  const profile = GENRE_PROFILES[genre];
+  const tier2Budget = profile.tier2Budget;
+  // The catalog with the genre's profile, unless the caller passes its own list, as the CLI does
+  // for a config file; that list already holds the profile (settingsFor applies it) and is used as given.
+  const rules = options.rules ?? (genre === DEFAULT_GENRE ? RULES : resolveRules(RULES, genre));
   const patternRules = rules.filter((r): r is PatternRule => r.kind === 'pattern');
   const structuralRules = rules.filter((r): r is StructuralRule => r.kind === 'structural');
   const extraAnchors = options.anchors ?? [];
@@ -184,7 +191,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
     const repeated = seen.has(key);
     seen.add(key);
     if (repeated) reported.push({ ...h, detail: `"${key}" repeated; Tier 2 words may not repeat` });
-    else if (index >= TIER2_BUDGET) reported.push({ ...h, detail: `Tier 2 word ${index + 1}; the budget is ${TIER2_BUDGET} per text` });
+    else if (index >= tier2Budget) reported.push({ ...h, detail: `Tier 2 word ${index + 1}; the budget is ${tier2Budget} per text` });
   });
 
   const perRule = new Map<string, number>();
@@ -200,7 +207,15 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
     if (n >= budget) reported.push(budget > 0 ? { ...h, detail: `budget ${budget} per text` } : h);
   }
 
-  const ctx = { text, lang, sentences, anchorsIn, longSentenceScope: mode.longSentenceScope };
+  const ctx = {
+    text,
+    lang,
+    sentences,
+    anchorsIn,
+    longSentenceScope: mode.longSentenceScope,
+    thresholds: profile.thresholds,
+    ...(options.variety === undefined ? {} : { variety: options.variety }),
+  };
   structuralRules.forEach((rule, i) => {
     if (!appliesTo(rule, lang) || !active(rule)) return;
     for (const s of runStructural(rule.id, ctx)) {
@@ -224,7 +239,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
         line,
         column,
         match: source.slice(h.start, h.end),
-        message: h.rule.message,
+        message: messageFor(h.rule, genre),
         suggestion: h.rule.suggestion,
       };
       if (h.detail !== undefined) f.detail = h.detail;
@@ -259,11 +274,14 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
       emDashes: (text.match(/—/gu) ?? []).length,
       anchors: prose.reduce((n, s) => n + anchorsIn(s), 0),
       tier2Used: pool.length,
-      tier2Budget: TIER2_BUDGET,
+      tier2Budget,
     },
     ...(applied.suppressed.length > 0 ? { suppressed: applied.suppressed } : {}),
     ...(applied.problems.length > 0 ? { directiveProblems: applied.problems } : {}),
+    ...(genre === DEFAULT_GENRE ? {} : { genre }),
+    ...(options.variety === undefined ? {} : { variety: options.variety }),
   };
 }
 
 export { RULES };
+export { GENRES, GENRE_PROFILES, guessGenre, resolveRules, type GenreGuess, type GenreProfile } from './genres.ts';

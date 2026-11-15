@@ -136,6 +136,20 @@ export interface SuppressionOptions {
 /** How lint() reads its input. */
 export type Format = 'text' | 'markdown';
 
+/**
+ * The kind of text being linted. Each genre has a profile in genres.ts that turns rules off,
+ * changes their level, severity or budget, and sets the structural thresholds. 'cover-letter'
+ * is the default and its profile is the catalog as it is; the other three are experimental
+ * until a labelled set measures their false positives.
+ */
+export type Genre = 'cover-letter' | 'email' | 'follow-up' | 'whatsapp';
+
+/** The Spanish variety the text is written in. REG-01 reads it; English ignores it. */
+export type Variety = 'rioplatense' | 'neutral';
+
+/** What a genre profile does to one rule: 'off' removes it; an object changes its level, severity or pattern budget. */
+export type GenreSetting = 'off' | { level?: Level; severity?: Severity; budget?: number };
+
 export interface LintOptions {
   lang: Lang;
   /**
@@ -157,6 +171,19 @@ export interface LintOptions {
   rules?: readonly Rule[];
   /** Only read in Markdown mode; plain text has no inline directives. */
   suppressions?: SuppressionOptions;
+  /**
+   * 'cover-letter' when left out. The genre's profile applies to the catalog only when `rules`
+   * is left out; a caller's own list is used as given, and the genre then brings its thresholds,
+   * its Tier 2 budget and its messages.
+   */
+  genre?: Genre;
+  /**
+   * Spanish only. Set, REG-01 flags every verb form of the other register (tuteo in a
+   * rioplatense text, voseo in a neutral one). Left out, REG-01 flags the minority register.
+   */
+  variety?: Variety;
+  /** The text of the earlier message, for a follow-up. No rule reads it yet; it is accepted so callers can pass it now. */
+  previous?: string;
 }
 
 export interface LintStats {
@@ -200,4 +227,8 @@ export interface LintResult {
    * no points. The key is present only when there is at least one.
    */
   directiveProblems?: Finding[];
+  /** Present only when the genre is not 'cover-letter'. */
+  genre?: Genre;
+  /** Present only when a variety was given. */
+  variety?: Variety;
 }

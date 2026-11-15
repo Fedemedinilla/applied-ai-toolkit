@@ -1,0 +1,10 @@
+Asunto: Tablero de stock por sucursal para Contoso Agro
+
+Hola, equipo de Contoso Agro:
+
+¿Siguen cargando el stock de cada sucursal a mano? Vi en su sitio que abrieron una sucursal en Rosario en 2025. Tras revisar su catálogo, armé un tablero en Power BI que cruza ventas y stock por sucursal y se actualiza cada mañana a las 7.
+
+Les adjunto una captura con datos de ejemplo. Si les sirve, el jueves a las 10 puedo mostrarles cómo quedaría con sus datos.
+
+Saludos,
+Lucía Pérez

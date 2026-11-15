@@ -1,0 +1,10 @@
+Subject: Re: Stock dashboard for the Rosario branch
+
+Hi Dana,
+
+I wrote to you on 3 March about the Power BI dashboard for the Rosario branch. After reviewing the sample you sent, I cut the refresh from 40 minutes to 12.
+
+Could we look at it together on Thursday at 10? The new version is in the same shared folder.
+
+Best regards,
+Sam Rivera
