@@ -75,6 +75,19 @@ describe('inline', () => {
     );
   });
 
+  it('bold or italic around a bare URL closes outside the link', () => {
+    expect(renderInline('Book at **https://shop.example**', opts)).toBe(
+      'Book at <strong><a href="https://shop.example/">https://shop.example</a></strong>',
+    );
+    expect(renderInline('*see https://maps.example/a*', opts)).toBe(
+      '<em>see <a href="https://maps.example/a" target="_blank" rel="noopener noreferrer">https://maps.example/a</a></em>',
+    );
+    expect(renderInline('**shop.example/hours**', opts)).toBe('<strong><a href="https://shop.example/hours">shop.example/hours</a></strong>');
+    expect(renderInline('**https://shop.example/faq.**', opts)).toBe(
+      '<strong><a href="https://shop.example/faq">https://shop.example/faq</a>.</strong>',
+    );
+  });
+
   it('a bare internal host with a path becomes a link; any other bare host does not', () => {
     expect(renderInline('Go to shop.example/book, or other.example/x', opts)).toBe(
       'Go to <a href="https://shop.example/book">shop.example/book</a>, or other.example/x',

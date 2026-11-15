@@ -171,11 +171,23 @@ function inlineEscaped(s: string, r: Resolved): string {
   const stash = (html: string) => `${Z}${tokens.push(html) - 1}${Z}`;
   const bare = (m: string) => {
     // A backward scan: the regex /[.,;:!?]+$/ restarts at every character of a long run.
+    // Trailing stars are the closing emphasis of "**https://x**" when the URL has no star before
+    // them; with one ("https://x/**b**") they are part of the path.
     let end = m.length;
-    while (end > 0 && TRAILING.includes(m.charAt(end - 1))) {
-      // The ; that closes an escaped & belongs to the URL: cutting it would leave "&amp".
-      if (m.endsWith('&amp;', end)) break;
-      end--;
+    let stars = 0;
+    for (const ch of m) if (ch === '*') stars++;
+    scan: for (;;) {
+      while (end > 0 && TRAILING.includes(m.charAt(end - 1))) {
+        // The ; that closes an escaped & belongs to the URL: cutting it would leave "&amp".
+        if (m.endsWith('&amp;', end)) break scan;
+        end--;
+      }
+      let start = end;
+      while (start > 0 && m.charAt(start - 1) === '*') start--;
+      const run = end - start;
+      if (run === 0 || run < stars) break;
+      end = start;
+      stars = 0;
     }
     const trail = m.slice(end);
     const core = m.slice(0, end);
