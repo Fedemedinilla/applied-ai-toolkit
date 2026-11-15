@@ -81,16 +81,17 @@ const ESCAPE = /\\(?=[!-/:-@[-`{-~])/gu;
 
 interface Line {
   start: number;
-  /** Offset of the line's last character plus one, before the newline. */
+  /** Offset of the line's last character plus one, before the newline and a CR before it. */
   end: number;
 }
 
+/** The lines of a document. A CRLF ending is left out of the line, so the block patterns read it as with LF. */
 function splitLines(text: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
   for (let i = 0; i <= text.length; i++) {
     if (i === text.length || text[i] === '\n') {
-      lines.push({ start, end: i });
+      lines.push({ start, end: i > start && text[i - 1] === '\r' && i < text.length ? i - 1 : i });
       start = i + 1;
     }
   }

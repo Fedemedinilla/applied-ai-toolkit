@@ -94,6 +94,32 @@ describe('maskMarkdown on a long document', () => {
   });
 });
 
+describe('maskMarkdown with CRLF line endings', () => {
+  it('masks tables, link definitions, setext underlines, thematic breaks and closing hashes as with LF', () => {
+    const lf = [
+      'Title',
+      '=====',
+      '',
+      '## Notes ##',
+      '',
+      '| Tool | Note |',
+      '|------|------|',
+      '| dbt | leverage synergy |',
+      '',
+      '***',
+      '',
+      '[ref]: https://example.com/passionate-about',
+      '',
+      'I built the export in Python in 2023.',
+      '',
+    ].join('\n');
+    const crlf = lf.replace(/\n/gu, '\r\n');
+    expect(ids(lf)).toEqual([]);
+    expect(ids(crlf)).toEqual([]);
+    expect(maskMarkdown(crlf).text.replace(/\r/gu, '')).toBe(maskMarkdown(lf).text);
+  });
+});
+
 describe('lint in Markdown mode', () => {
   it('points every finding into the original file', () => {
     const source = '# A title\n\n```\nleverage\n```\n\n- Ultimately, I am passionate about **data**.\n';
