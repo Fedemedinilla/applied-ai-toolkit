@@ -113,6 +113,20 @@ describe('meta policy placement', () => {
   });
 });
 
+describe('text-only elements', () => {
+  const meta = (value: string) => `<meta http-equiv="Content-Security-Policy" content="${value}">`;
+
+  it('reads the content of <title>, <noframes> and the other text-only elements as text, not as tags', () => {
+    for (const tag of ['title', 'noframes', 'textarea', 'xmp', 'iframe', 'noembed']) {
+      const page = parsePage(`<html><head><${tag}>${meta('a')}<script>alert(1)</script></${tag}>${meta('b')}</head><body></body>`);
+      expect(page.metaPolicies, tag).toEqual(tag === 'title' || tag === 'noframes' ? ['b'] : []);
+      expect(page.inline, tag).toEqual([]);
+    }
+    expect(parsePage(`<head><TITLE lang="en">${meta('a')}</Title >${meta('b')}</head>`).metaPolicies).toEqual(['b']);
+    expect(parsePage(`<head></head><body><plaintext onclick="go()">${meta('a')}<script>x()</script></plaintext><script>y()</script>`).inline.map((i) => i.text)).toEqual(['go()']);
+  });
+});
+
 describe('helpers', () => {
   it('classifies script types by MIME essence', () => {
     expect(scriptKind(undefined)).toBe('js');

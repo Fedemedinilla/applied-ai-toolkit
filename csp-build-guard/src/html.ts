@@ -109,11 +109,13 @@ export function hashSources(text: string): InlineItem['hashes'] {
 // Elements the parser keeps in <head>. Any other start tag (and <body>) begins the body.
 const HEAD_ELEMENTS = new Set(['base', 'basefont', 'bgsound', 'link', 'meta', 'noframes', 'noscript', 'script', 'style', 'template', 'title']);
 
-// One pass over the document, in order: comments, raw-text elements with their content, other start
-// tags, end tags.
+// One pass over the document, in order: comments, raw-text and text-only elements with their
+// content, other start tags, end tags. The parser reads the content of <title>, <textarea>, <xmp>,
+// <iframe>, <noembed>, <noframes> and <plaintext> as text, so a <meta> or <script> written inside
+// one is not an element and must not be counted (only script and style content is used).
 // The raw-text tag name must end at whitespace, "/" or ">", so a custom element such as
 // <style-switcher> or <script-loader> is an ordinary tag (a \b would match before the "-").
-const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|<\/([a-zA-Z][\w:-]*)[^>]*>/gi;
+const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style|title|textarea|xmp|iframe|noembed|noframes|plaintext)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|<\/([a-zA-Z][\w:-]*)[^>]*>/gi;
 
 export function parsePage(html: string): PageParts {
   const inline: InlineItem[] = [];
@@ -160,6 +162,8 @@ export function parsePage(html: string): PageParts {
       if (/^on[a-z]+$/.test(name)) add('script-attr', value, `<${tagName} ${name}>`);
     }
     if (attrs.has('style')) add('style-attr', attrs.get('style') ?? '', `<${tagName} style>`);
+    // <plaintext> has no end tag: everything after it is text.
+    if (rawElement === 'plaintext') break;
     const isStylesheet = tagName === 'link' && (attrs.get('rel') ?? '').toLowerCase().split(/\s+/).includes('stylesheet');
     if (rawElement === 'style' || isStylesheet || (rawElement === 'script' && scriptKind(attrs.get('type')) !== 'data')) contentSeen = true;
     if (rawElement === 'script') {
