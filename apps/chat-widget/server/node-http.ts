@@ -91,7 +91,16 @@ export const SOCKET_IP = new WeakMap<Request, string>();
 export function createNodeServer(options: { readonly handler: Handler; readonly dir: string }): Server {
   return createServer((req, res) => {
     const origin = `http://${req.headers.host ?? '127.0.0.1'}`;
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname;
+    // Node's parser accepts targets such as `//[/` that the URL constructor rejects. A throw here
+    // would escape the listener and end the process, so it is answered 400 instead.
+    let pathname: string;
+    try {
+      pathname = new URL(req.url ?? '/', 'http://x').pathname;
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8', 'x-content-type-options': 'nosniff' });
+      res.end('Bad request');
+      return;
+    }
     const api = pathname.startsWith('/widget/') || pathname.startsWith('/panel/api/');
     const work = api
       ? (async () => {
