@@ -3,8 +3,8 @@
  * JSON on stdin; exit code 2 blocks the call and shows stderr to the agent.
  *
  * Protected: the glob patterns in .claude/protected-paths.json, the files matching its
- * "publishedPatterns" once they are committed at HEAD (a new ruleset file stays editable until a
- * person commits it), any JSON file whose top level has `"handwritten": true`, and this folder
+ * "publishedPatterns" once any commit holds them, at HEAD or in the history or reflog (a new ruleset
+ * file stays editable until a person commits it), any JSON file whose top level has `"handwritten": true`, and this folder
  * itself, so the guard cannot be switched off by editing its own config. The override is the
  * environment variable DSIM_ALLOW_PROTECTED=1, which a person sets when starting the session. It is
  * not a file the agent could create with a shell command.
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 export interface GuardConfig {
   readonly patterns: readonly string[];
   /**
-   * Patterns that protect a file only once it is published, that is, committed at HEAD. A new
+   * Patterns that protect a file only once it is published, that is, held by a commit. A new
    * ruleset version can then be written and reworked until a person commits it.
    */
   readonly publishedPatterns?: readonly string[];
@@ -156,14 +156,30 @@ function holdsProtected(root: string, rel: string, config: GuardConfig, budget =
 
 const committedCache = new Map<string, ReadonlySet<string> | null>();
 
-/** The files committed at HEAD, relative to `root`, or null when git cannot say (no repository, no commit). */
+/**
+ * The files matching a published pattern that any commit has touched, relative to `root`: commits
+ * reachable from a ref or from the reflog, not only HEAD. HEAD alone would not do, since an agent can
+ * move it back past the ruleset with `git reset --soft`, which names no protected path. Null when
+ * git cannot say (no repository, no commit).
+ */
 function committedFiles(root: string, config: GuardConfig): ReadonlySet<string> | null {
   const key = `${root}\0${config.foldCase}`;
   if (!committedCache.has(key)) {
     let files: ReadonlySet<string> | null = null;
     try {
-      const out = execFileSync('git', ['-C', root, 'ls-tree', '-r', '-z', '--name-only', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      files = new Set(out.split('\0').filter(Boolean).map((f) => fold(f, config)));
+      // Fails on an unborn HEAD, which keeps the fail-closed answer for a repository with no commit.
+      execFileSync('git', ['-C', root, 'rev-parse', '--verify', '-q', 'HEAD'], { stdio: ['ignore', 'ignore', 'ignore'] });
+      const magic = config.foldCase ? ':(glob,icase)' : ':(glob)';
+      const pathspecs = (config.publishedPatterns ?? []).map((p) => magic + p);
+      const out =
+        pathspecs.length === 0
+          ? ''
+          : execFileSync('git', ['-C', root, 'log', '--all', '--reflog', '--relative', '--no-renames', '--format=', '--name-only', '-z', '--', ...pathspecs], {
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+              maxBuffer: 64 << 20,
+            });
+      files = new Set(out.split(/[\0\n]/u).filter(Boolean).map((f) => fold(f, config)));
     } catch {
       files = null;
     }
@@ -172,7 +188,7 @@ function committedFiles(root: string, config: GuardConfig): ReadonlySet<string> 
   return committedCache.get(key) ?? null;
 }
 
-/** Whether `rel` matches a published-only pattern and is committed. When git cannot say, every match counts as published. */
+/** Whether `rel` matches a published-only pattern and has been committed. When git cannot say, every match counts as published. */
 function isPublished(root: string, rel: string, config: GuardConfig): boolean {
   const path = fold(rel, config);
   if (!(config.publishedPatterns ?? []).some((p) => globToRegExp(fold(p, config)).test(path))) return false;

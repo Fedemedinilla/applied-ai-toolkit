@@ -2,7 +2,7 @@
 // process Claude Code starts: JSON on stdin, exit code 2 to block.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -65,6 +65,30 @@ describe('guard-protected-paths', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
     try {
       expect(decide(edit('src/tournament/rules-v2.ts', 'Write'), dir, config, {}).block).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a ruleset protected once committed, even after HEAD is moved back past it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
+    const git = (...args: string[]) => spawnSync('git', ['-C', dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
+    const hook = (input: unknown) => spawnSync(process.execPath, [GUARD], { input: JSON.stringify(input), encoding: 'utf8', env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: dir } });
+    try {
+      mkdirSync(join(dir, '.claude'), { recursive: true });
+      mkdirSync(join(dir, 'src/t'), { recursive: true });
+      writeFileSync(join(dir, '.claude/protected-paths.json'), readFileSync(join(ROOT, '.claude/protected-paths.json')));
+      writeFileSync(join(dir, 'README.md'), 'x\n');
+      expect(git('init', '-q').status).toBe(0);
+      git('add', '.');
+      git('commit', '-q', '-m', 'start');
+      writeFileSync(join(dir, 'src/t/rules-v1.ts'), 'export const v = 1;\n');
+      git('add', '.');
+      expect(git('commit', '-q', '-m', 'ruleset').status).toBe(0);
+      writeFileSync(join(dir, 'src/t/rules-v2.ts'), 'export const v = 2;\n');
+      expect(git('reset', '-q', '--soft', 'HEAD~1').status).toBe(0);
+      expect(hook(edit(join(dir, 'src/t/rules-v1.ts'))).status).toBe(2);
+      expect(hook(edit(join(dir, 'src/t/rules-v2.ts'))).status).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
