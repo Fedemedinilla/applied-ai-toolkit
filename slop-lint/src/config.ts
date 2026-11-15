@@ -127,7 +127,9 @@ function glob(value: unknown, path: string): string {
 
 function ruleSettings(value: unknown, path: string): Record<string, RuleSetting> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(path, 'must be an object');
-  const out: Record<string, RuleSetting> = {};
+  // No prototype: JSON.parse leaves "__proto__" an own key, and on a plain object assigning it would
+  // set the prototype instead, so the key would vanish before the unknown-id check sees it.
+  const out = Object.create(null) as Record<string, RuleSetting>;
   for (const [id, raw] of Object.entries(value)) {
     const at = join(path, id);
     if (raw === 'off') {

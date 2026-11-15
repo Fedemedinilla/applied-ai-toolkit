@@ -74,6 +74,13 @@ describe('globs', () => {
 });
 
 describe('validateConfig', () => {
+  it('rejects __proto__ under ruleSettings as an unknown id, as JSON.parse leaves it an own key', () => {
+    for (const value of ['"off"', '{"level":1}', '{"severity":"low"}']) {
+      expect(problem(JSON.parse(`{"ruleSettings":{"__proto__":${value}}}`))).toMatch(/^ruleSettings\.__proto__: is not the id of a built-in rule/u);
+      expect(problem(JSON.parse(`{"overrides":[{"files":["a.md"],"ruleSettings":{"__proto__":${value}}}]}`))).toMatch(/^overrides\[0\]\.ruleSettings\.__proto__: is not the id/u);
+    }
+  });
+
   it('accepts an empty object and returns what it was given', () => {
     expect(validateConfig({})).toEqual({});
     const config = { lang: 'es', anchors: ['dbt'], ruleSettings: { 'LEX-04': 'off' }, rules: [HOUSE] };
