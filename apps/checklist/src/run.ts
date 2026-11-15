@@ -194,6 +194,24 @@ export function ackPreChange(catalogue: Catalogue, run: Run, rowId: string, on: 
   return { ok: true, run: { ...run, preChange: next } };
 }
 
+/** The Fixed marks that keep the pre-change list acknowledged, and whether each is on screen. */
+export function fixedBlocking(catalogue: Catalogue, run: Run): { readonly id: string; readonly inProfile: boolean }[] {
+  return Object.entries(run.marks)
+    .filter(([, m]) => m.state === 'fixed')
+    .map(([id]) => {
+      const item = catalogue.items.find((i) => i.id === id);
+      return { id, inProfile: item !== undefined && applies(item, run.profile) };
+    });
+}
+
+/** One sentence naming the Fixed checks behind a fixed_items_exist refusal, empty when there are none. */
+export function fixedBlockingText(catalogue: Catalogue, run: Run): string {
+  const blocking = fixedBlocking(catalogue, run);
+  if (!blocking.length) return '';
+  const names = blocking.map((b) => (b.inProfile ? b.id : `${b.id} (outside the current site profile; change the profile back to see it)`));
+  return `Marked Fixed: ${names.join(', ')}.`;
+}
+
 export function ackPostChange(catalogue: Catalogue, run: Run, rowId: string, on: boolean, now: Date): Result {
   if (run.closedAt) return refuse('run_closed');
   if (!catalogue.postChange.some((r) => r.id === rowId)) return refuse('unknown_item');
@@ -294,6 +312,13 @@ export function repairRun(catalogue: Catalogue, run: Run): Repair {
   const preDone = preChangeDone(catalogue, run);
   for (const [id, mark] of Object.entries(run.marks)) {
     if (mark.state !== 'fixed') continue;
+    // A Fixed check this catalogue does not list cannot be shown or changed, and would keep the
+    // pre-change list locked for good.
+    if (!catalogue.items.some((i) => i.id === id)) {
+      marks[id] = { state: null, evidence: mark.evidence, at: mark.at };
+      dropped.push(`${id} was Fixed but is not in this catalogue; it is unmarked now.`);
+      continue;
+    }
     const earned = run.baseline?.states[id] === 'fail' || mark.fixedFrom === 'fail';
     if (preDone && earned) continue;
     // The evidence note stays: only the claim that a change was made and tested is undone.

@@ -7,6 +7,8 @@ import {
   ackPreChange,
   applies,
   closeRun,
+  fixedBlocking,
+  fixedBlockingText,
   matrixApplies,
   parseRun,
   postChangePending,
@@ -249,5 +251,29 @@ describe('the incident log of a closed run', () => {
     if (!result.ok) throw new Error(result.reason);
     expect(setIncident(run, result.log)).toEqual({ ok: false, reason: 'run_closed' });
     expect(ok(setIncident(reopenRun(run), result.log)).incident['site-isolated']?.at).toBe(at(2).toISOString());
+  });
+});
+
+describe('a Fixed mark the list cannot show', () => {
+  const allPre = (): Record<string, string> => Object.fromEntries(catalogue.preChange.map((r) => [r.id, at(1).toISOString()]));
+  const ghost = { state: 'fixed' as const, evidence: 'from an older catalogue', at: at(5).toISOString(), fixedFrom: 'fail' as const };
+
+  it('is undone on load when the catalogue does not know the check, so the pre-change list can be unticked again', () => {
+    const run: Run = { ...runWith(catalogue, 'wordpress', [], true), preChange: allPre(), marks: { 'EXT-999': ghost } };
+    const { run: next, dropped } = repairRun(catalogue, run);
+    expect(next.marks['EXT-999']).toEqual({ state: null, evidence: 'from an older catalogue', at: at(5).toISOString() });
+    expect(dropped).toEqual(['EXT-999 was Fixed but is not in this catalogue; it is unmarked now.']);
+    expect(ackPreChange(catalogue, next, 'window', false, at(6)).ok).toBe(true);
+  });
+
+  it('is named when it blocks the pre-change list, with a note when it is outside the profile', () => {
+    let run = ok(setState(catalogue, runWith(catalogue, 'wordpress', [], true), 'SEG-06', 'fail', at(1)));
+    run = ackAllPre(run);
+    run = ok(setState(catalogue, run, 'SEG-06', 'fixed', at(30)));
+    expect(fixedBlocking(catalogue, run)).toEqual([{ id: 'SEG-06', inProfile: true }]);
+    run = ok(setProfile(run, { ...run.profile, authorized: false }));
+    expect(ackPreChange(catalogue, run, 'window', false, at(31))).toEqual({ ok: false, reason: 'fixed_items_exist' });
+    expect(fixedBlocking(catalogue, run)).toEqual([{ id: 'SEG-06', inProfile: false }]);
+    expect(fixedBlockingText(catalogue, run)).toBe('Marked Fixed: SEG-06 (outside the current site profile; change the profile back to see it).');
   });
 });

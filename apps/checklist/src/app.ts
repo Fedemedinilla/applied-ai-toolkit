@@ -12,6 +12,7 @@ import {
   ackPreChange,
   applies,
   closeRun,
+  fixedBlockingText,
   matrixApplies,
   newRun,
   parseRun,
@@ -414,7 +415,8 @@ export async function startApp(options: AppOptions): Promise<App> {
     const result = t.dataset.kind === 'pre' ? ackPreChange(catalogue, run, t.dataset.row, t.checked, now()) : ackPostChange(catalogue, run, t.dataset.row, t.checked, now());
     if (!result.ok) {
       t.checked = !t.checked;
-      $(t.dataset.kind === 'pre' ? 'pre-status' : 'post-status').textContent = REFUSALS[result.reason];
+      const blocking = result.reason === 'fixed_items_exist' ? ` ${fixedBlockingText(catalogue, run)}` : '';
+      $(t.dataset.kind === 'pre' ? 'pre-status' : 'post-status').textContent = `${REFUSALS[result.reason]}${blocking}`;
       return;
     }
     apply(result, { focus: t.id });
