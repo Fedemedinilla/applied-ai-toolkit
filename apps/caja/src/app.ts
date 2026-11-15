@@ -362,7 +362,7 @@ export function mountApp(root: Document, deps: AppDeps): void {
     if (!model) return;
     const card = preview.querySelector('form[data-action="model-form"]');
     if (card) model.state.answers = collectAnswers(card, model.state.answers);
-    const result = modelSave(model.state);
+    const result = modelSave(model.state, localDay(deps.now()));
     if (!result.ok) {
       showError(result.message);
       return;

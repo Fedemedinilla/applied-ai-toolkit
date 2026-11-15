@@ -197,6 +197,31 @@ describe('reading with the model', () => {
     expect(stored[0]).toMatchObject({ amount: 45000, category: 'Servicios', day: '2026-11-03', via: 'model' });
   });
 
+  it('a reading of "hoy" saved after midnight keeps the day it was read on', async () => {
+    let clock = new Date(2026, 10, 14, 23, 59);
+    const e = endpoint(answering({ dateStated: true, date: '2026-11-14' }));
+    const store = mount({ api: e.api, now: () => clock });
+    await waitFor(() => !$('#model-toggle').hidden);
+    $<HTMLInputElement>('#model-mode').click();
+    type('hoy pagué la luz 45 lucas');
+    await waitFor(card);
+    expect(e.extracts[0]).toMatchObject({ today: '2026-11-14' });
+    clock = new Date(2026, 10, 15, 0, 1);
+    save();
+    const stored = JSON.parse(store.getItem(STORAGE_KEY) ?? '[]') as Array<Record<string, unknown>>;
+    expect(stored[0]).toMatchObject({ day: '2026-11-14', via: 'model' });
+    expect(document.querySelector('#days .day[aria-label="Ayer"] .row')).not.toBeNull();
+  });
+
+  it('a reading of "hoy" saved the same day stores no day', async () => {
+    const store = await mountWithModel(endpoint(answering({ dateStated: true, date: '2026-11-04' })));
+    type('hoy pagué la luz 45 lucas');
+    await waitFor(card);
+    save();
+    const stored = JSON.parse(store.getItem(STORAGE_KEY) ?? '[]') as Array<Record<string, unknown>>;
+    expect(stored[0]).not.toHaveProperty('day');
+  });
+
   it('a disagreement on the amount is a question with no button for the model figure', async () => {
     await mountWithModel(endpoint(answering({ kind: 'income', category: 'Ventas', amount: 12000 })));
     type('vendí 3 docenas a 12 mil la docena');

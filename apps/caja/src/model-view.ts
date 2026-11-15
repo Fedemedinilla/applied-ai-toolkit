@@ -254,12 +254,16 @@ export interface ModelSave {
   answer: Answer;
   kind: Kind;
   category: CategoryGuess;
-  /** Set only when the movement happened on another day than today. */
+  /** Set only when the movement happened on another day than the day it is saved on. */
   day: string | null;
 }
 
-/** Turns the card into what resolve() needs, or the first question still open. */
-export function modelSave(s: ModelState): { ok: true; save: ModelSave } | { ok: false; message: string } {
+/**
+ * Turns the card into what resolve() needs, or the first question still open. `savedOn` is the
+ * local day at save time. A row with no day is filed under its save time, so a sentence read as
+ * "hoy" at 23:59 and saved at 00:01 must carry its day; it defaults to the day the sentence was read.
+ */
+export function modelSave(s: ModelState, savedOn: string = s.today): { ok: true; save: ModelSave } | { ok: false; message: string } {
   const v = s.verdict;
   const q = questions(v);
   const a = s.answers;
@@ -287,5 +291,5 @@ export function modelSave(s: ModelState): { ok: true; save: ModelSave } | { ok: 
     }
     date = a.date;
   }
-  return { ok: true, save: { answer, kind, category: cat.guess, day: date === s.today ? null : date } };
+  return { ok: true, save: { answer, kind, category: cat.guess, day: date === savedOn ? null : date } };
 }
