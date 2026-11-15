@@ -98,7 +98,7 @@ const bytes = await buildReceiptPdf(
 | `test/text.test.ts` | The 0.1 em bound over every glyph; clipping with an ellipsis and none to spare; the number and length of measurements for a 10,000-character word and for 10,000 characters of prose; wrapping between words, breaking long words, clipping the last line; progress when nothing fits; `fitSize` exact at the zone width |
 | `test/money.test.ts` | Whole and cent amounts, the sign, the largest amount exact, another locale, Latin digits for `ar-EG` and `fa-IR`; BigInt line totals with half-up rounding; quantities; calendar dates with no zone shift |
 | `test/input.test.ts` | NaN, floats, strings, negatives and out-of-range values refused with the field path; quantity rules; impossible dates; bad options, a malformed locale tag included; `items` that is not an array; a running total that passes the maximum; a label override that is not a string; no field text in error messages; warnings per field; the unprintable placeholder; party lines beyond four |
-| `test/receipt.test.ts` | Every amount drawn, in order, with whole and cent values; credit balance below the totals; shipping 0 and absent extras; the adaptive size against the label edge and at the largest values; emoji, CJK, RTL, zero-width and combining text in every field; 10,000-character names in three lines; 500 lines in 20 pages; a fast-check property over every text field; PNG logo from `Uint8Array` and `ArrayBuffer`, bad bytes and a broken PNG; identical bytes a second apart; English labels, `en-US` and Letter size; every amount and date drawn with Latin digits under `ar-EG` and `fa-IR`; `buildReceipt` |
+| `test/receipt.test.ts` | Every amount drawn, in order, with whole and cent values; credit balance below the totals; shipping 0 and absent extras; the adaptive size against the label edge and at the largest values; emoji, CJK, RTL, zero-width and combining text in every field; 10,000-character names in three lines; 500 lines in 20 pages; a fast-check property over every text field; PNG logo from `Uint8Array` and `ArrayBuffer`, a JPEG logo, the smaller logo on each continuation page, bad bytes, a broken PNG and a JPEG header with no size; identical bytes a second apart; English labels, `en-US` and Letter size; every amount and date drawn with Latin digits under `ar-EG` and `fa-IR`; `buildReceipt` |
 | `test/pagination.test.ts` | The row count at which the totals move to page 2 alone, with no table head there; the row count at which a row moves under a repeated head; room reserved only for drawn extras; equal rows on full continuation pages; wrapped names as taller rows; notes over several pages in order; every text above the footer zone and inside the margins, the footer and page count on every page; the tallest allowed rows |
 | `test/browser.dom.test.ts` | A build under jsdom, wrapped in a `Blob` |
 
@@ -119,7 +119,7 @@ src/
   labels.ts     LABELS_ES and LABELS_EN
 examples/
   write-sample.ts
-test/           Vitest suites; helpers/ has the drawText recorder, a PNG encoder and fixtures
+test/           Vitest suites; helpers/ has the drawText recorder, a PNG encoder, JPEG bytes and fixtures
 ```
 
 ## Limits
