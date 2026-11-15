@@ -70,8 +70,8 @@ function hasMarker(root: string, rel: string, key: string): boolean {
 
 // File descriptor duplications ("2>&1", ">&2") write nothing; they are removed before looking for redirects.
 const FD_DUP = /\d*>&\d*-?/gu;
-// A redirect and the word it writes to: "> f", ">> f", "2> f", "&> f", ">| f".
-const REDIRECT = /(?:^|[^<>0-9&])(?:\d+|&)?>>?\|?\s*([^\s;|&()<>]+)/gu;
+// A redirect and the word it writes to: "> f", ">> f", "2> f", "&> f", ">| f", '> "f"', "> 'f'".
+const REDIRECT = /(?:^|[^<>0-9&])(?:\d+|&)?>>?\|?\s*("[^"]*"|'[^']*'|[^\s;|&()<>]+)/gu;
 // Commands whose arguments may be written, moved or deleted. Every word of such a command counts.
 const WRITE_COMMAND = /\btee\b|\bsed\s+(?:-[a-zA-Z]*\s+)*-i|\bperl\s+-[a-zA-Z]*i|\b(?:mv|cp|rm|rmdir|truncate|touch|install|ln|chmod|dd|unlink)\b|\bgit\s+(?:checkout|restore|rm|mv|apply|clean|reset)\b|writeFile|\bpython3?\s+-c|\bnode\s+-e/u;
 // Commands that remove or replace a whole folder: naming a folder that holds a protected path counts.
@@ -129,6 +129,12 @@ function shellWordPath(root: string, word: string): string | null {
   return projectPath(root, full);
 }
 
+/** A redirect target without its surrounding quotes, so `> "f"` and `> 'f'` name the file f. */
+function unquote(word: string): string {
+  const q = word.charAt(0);
+  return (q === '"' || q === "'") && word.length >= 2 && word.endsWith(q) ? word.slice(1, -1) : word;
+}
+
 /**
  * Protected paths a shell command writes, by heuristic. A redirect counts only for the word it writes
  * to, so `cat rules-v1.ts > /tmp/x` and `vitest run src 2>&1` pass. Every word of a writing command
@@ -139,7 +145,7 @@ function shellWordPath(root: string, word: string): string | null {
 export function bashTargets(command: string, root: string, config: GuardConfig): string[] {
   const text = command.replace(FD_DUP, ' ');
   const candidates: string[] = [];
-  for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(match[1]);
+  for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(unquote(match[1]));
   const writes = WRITE_COMMAND.test(text);
   if (writes) candidates.push(...text.split(SPLIT).filter(Boolean));
   const tree = TREE_COMMAND.test(text);

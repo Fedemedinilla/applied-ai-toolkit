@@ -85,6 +85,15 @@ describe('guard-protected-paths', () => {
     expect(bash(`cd /tmp && echo x > ${join(ROOT, '../elsewhere/rules-v1.ts')}`)).toEqual([]);
   });
 
+  it('unquotes the target of a redirect, in both quote styles', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('echo x > "src/tournament/rules-v1.ts"')).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash("echo x > 'test/golden/runs.json'")).toEqual(['test/golden/runs.json']);
+    expect(bash('cat >"test/golden/runs.json" <<EOF\n{}\nEOF')).toEqual(['test/golden/runs.json']);
+    expect(bash(`printf x >> "${join(ROOT, 'test/purity.test.ts')}"`)).toEqual(['test/purity.test.ts']);
+    expect(bash('echo x > "out file.txt"')).toEqual([]);
+  });
+
   it('does not treat the rest of src/ as protected, or fd duplication as a write', () => {
     const bash = (command: string) => bashTargets(command, ROOT, config);
     expect(bash('npx vitest run src 2>&1 | tail -20')).toEqual([]);
