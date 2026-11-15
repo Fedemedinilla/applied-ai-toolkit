@@ -7,8 +7,13 @@
  * proposes edits over exact quoted spans, and code applies, checks and reverts them.
  */
 import { z } from 'zod';
+import type { ModelClient } from '../../evals/src/index.ts';
+import type { Gateway } from '../../gateway/src/index.ts';
+import type { LintResult } from '../../slop-lint/src/types.ts';
+import { GENRES } from '../../style-refs/src/index.ts';
 
-export const GENRES = ['cover-letter', 'email', 'follow-up', 'whatsapp'] as const;
+/** The genres come from style-refs, so a principle and a rewrite cannot name different lists. */
+export { GENRES };
 export const Genre = z.enum(GENRES);
 export type Genre = z.infer<typeof Genre>;
 
@@ -125,8 +130,8 @@ export const Flag = z.strictObject({
 });
 export type Flag = z.infer<typeof Flag>;
 
-/** slop-lint's result for the text before and after. Typed against slop-lint once the fences allow it. */
-const Lint = z.unknown();
+/** slop-lint's result for the text before and after, produced by our own call to lint(), not parsed. */
+const Lint = z.custom<LintResult>((value) => typeof value === 'object' && value !== null && 'findings' in value);
 
 export const RewriteResult = z.strictObject({
   rewritten: z.string(),
@@ -140,3 +145,14 @@ export const RewriteResult = z.strictObject({
   usage: z.strictObject({ calls: z.number().int().nonnegative(), costUsd: z.number().nonnegative().nullable() }),
 });
 export type RewriteResult = z.infer<typeof RewriteResult>;
+
+/** What rewrite() is given besides the input (section 4.11): the caller injects the gateway; tests pass a fake. */
+export interface RewriteOptions {
+  readonly gateway: Gateway<string>;
+}
+
+/**
+ * The fact judge of section 4.6 runs evals' line-by-line judge through this interface, built over
+ * the gateway in F5, so the judge's calls also go through the caps.
+ */
+export type JudgeClient = ModelClient;
