@@ -7,8 +7,9 @@
 //                       {type: "draft", es, en, report, assistant}
 //                       {type: "text", text, assistant}
 //                     or an error code: bad_request (400), history_too_long (400),
-//                     category_not_for_role (400), cap_reached (503), model_unavailable (503),
-//                     model_unusable (502), server_error (500).
+//                     category_not_for_role (400), forbidden (403), unsupported_media_type (415),
+//                     cap_reached (503), model_unavailable (503), model_unusable (502),
+//                     server_error (500).
 //
 // The browser sends only ids for the role and the category; the tone, the length, the
 // sensitivity and everything else come from config/ on this side, so a request cannot lower a
@@ -132,13 +133,30 @@ async function readBody(request: Request): Promise<unknown> {
   }
 }
 
+/**
+ * Whether a browser says the request comes from another site. Sec-Fetch-Site is set by the
+ * browser and cannot be forged by a page; a script with no browser sends none and is let through.
+ */
+function crossSite(request: Request): boolean {
+  const site = request.headers.get('sec-fetch-site');
+  return site !== null && site !== 'same-origin' && site !== 'none';
+}
+
+/**
+ * A JSON content type makes a cross-origin browser request preflighted, and the server answers
+ * no preflight, so another site cannot post a text/plain body that spends the key.
+ */
+const isJson = (request: Request): boolean => /^application\/json\s*(?:;|$)/iu.test(request.headers.get('content-type') ?? '');
+
 export function createHandler(deps: HandlerDeps): Handler {
   const log = deps.log ?? (() => undefined);
   const { config } = deps;
 
   async function draft(request: Request, gateway: Gateway): Promise<Response> {
+    if (crossSite(request)) return error(403, 'forbidden');
     const parsed = Body.safeParse(await readBody(request));
     if (!parsed.success) return error(400, 'bad_request', [...new Set(parsed.error.issues.map((i) => String(i.path[0] ?? '(body)')))].join(','));
+    if (!isJson(request)) return error(415, 'unsupported_media_type');
     const { messages } = parsed.data;
     const role = config.catalog.roles.find((r) => r.id === parsed.data.role);
     const category = config.catalog.categories.find((c) => c.id === parsed.data.category);

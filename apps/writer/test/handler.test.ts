@@ -270,6 +270,26 @@ describe('requests refused before any call', () => {
     expect(api.requests).toHaveLength(0);
   });
 
+  it('a cross-site browser request cannot spend the key: no text/plain body, no cross-site fetch', async () => {
+    const { handler, api } = setup([streamed(TITLES), streamed(TITLES)]);
+    const send = (headers: Record<string, string>) =>
+      handler(new Request('http://127.0.0.1:8788/api/draft', { method: 'POST', headers, body: JSON.stringify(titlesTurn) }));
+    // A text/plain POST is a CORS simple request: a browser sends it with no preflight.
+    const plain = await send({ 'content-type': 'text/plain', origin: 'https://evil.example' });
+    expect(plain.status).toBe(415);
+    expect(await plain.json()).toEqual({ error: 'unsupported_media_type' });
+    expect((await send({})).status).toBe(415);
+    const crossSite = await send({ 'content-type': 'application/json', origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' });
+    expect(crossSite.status).toBe(403);
+    expect(await crossSite.json()).toEqual({ error: 'forbidden' });
+    expect((await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-site' })).status).toBe(403);
+    expect(api.requests).toHaveLength(0);
+    // The page's own request, and a script with no browser headers.
+    expect((await send({ 'content-type': 'application/json; charset=utf-8', 'sec-fetch-site': 'same-origin' })).status).toBe(200);
+    expect((await send({ 'content-type': 'application/json' })).status).toBe(200);
+    expect(api.requests).toHaveLength(2);
+  });
+
   it('the history rule in isolation', () => {
     const turns = (n: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? ('assistant' as const) : ('user' as const), content: 'x' }));
     expect(historyProblem(turns(MAX_MESSAGES))).toBeNull();
