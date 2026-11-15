@@ -64,12 +64,29 @@ final class AuditTest extends TestCase
 
     public function testRegistration(): void
     {
+        Functions\when('is_multisite')->justReturn(false);
         $this->options(['users_can_register' => '0']);
         self::assertSame(Verdict::Pass, $this->audit()->registration()->verdict);
         $this->options(['users_can_register' => '1', 'default_role' => 'subscriber']);
         self::assertSame(Verdict::Warn, $this->audit()->registration()->verdict);
         $this->options(['users_can_register' => '1', 'default_role' => 'administrator']);
         self::assertSame(Verdict::Fail, $this->audit()->registration()->verdict);
+    }
+
+    /** Multisite signup is governed by the network option `registration`, not users_can_register. */
+    public function testRegistrationOnMultisiteReadsTheNetworkOption(): void
+    {
+        Functions\when('is_multisite')->justReturn(true);
+        $this->options(['users_can_register' => '0', 'default_role' => 'subscriber']);
+        $network = 'all';
+        Functions\when('get_site_option')->alias(static function (string $name, mixed $default = false) use (&$network): mixed {
+            return $name === 'registration' ? $network : $default;
+        });
+        $finding = $this->audit()->registration();
+        self::assertSame(Verdict::Warn, $finding->verdict);
+        self::assertSame(['registration=all'], $finding->evidence);
+        $network = 'none';
+        self::assertSame(Verdict::Pass, $this->audit()->registration()->verdict);
     }
 
     public function testDebug(): void

@@ -119,6 +119,15 @@ final class Audit
     public function registration(): Finding
     {
         $title = 'Open registration';
+        if (is_multisite()) {
+            // wp-signup.php follows the network setting; each site's users_can_register is unused.
+            $network = get_site_option('registration', 'none');
+            $network = \is_string($network) && $network !== '' ? $network : 'none';
+            if ($network === 'none') {
+                return new Finding('INT-11', $title, Verdict::Pass, 'Signup is closed for the network.', ['registration=none']);
+            }
+            return new Finding('INT-11', $title, Verdict::Warn, "Anyone can sign up on this network ({$network}). Confirm the network needs it.", ["registration={$network}"]);
+        }
         if (!self::truthy(get_option('users_can_register'))) {
             return new Finding('INT-11', $title, Verdict::Pass, 'Registration is closed.');
         }
