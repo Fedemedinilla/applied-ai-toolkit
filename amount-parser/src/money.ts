@@ -261,9 +261,11 @@ function sentenceAmbiguity(s: Sentence): ParsedAmount | undefined {
   );
   if (fromTo) return undetermined(s, 'range', clean);
 
-  // "40 o 50 mil"
-  if (numeric.length >= 2 && (has(s, 'o') || has(s, 'u'))) {
-    const orIndex = words.findIndex((w) => w === 'o' || w === 'u');
+  // "40 o 50 mil", "7 u 8 mil". Spanish writes "u" for "o" only before an o sound ("u ocho", "u
+  // once", "u 8"); anywhere else "u" is the shop abbreviation of "unidades" ("10 u a 500 c/u").
+  const isOr = (w: string, i: number) => w === 'o' || (w === 'u' && /^(h?o|8|11$)/u.test(words[i + 1] ?? ''));
+  const orIndex = words.findIndex(isOr);
+  if (numeric.length >= 2 && orIndex >= 0) {
     const before = tokens.slice(0, orIndex).some(isNumber);
     const after = tokens.slice(orIndex).some(isNumber);
     if (before && after) return undetermined(s, 'range', clean);

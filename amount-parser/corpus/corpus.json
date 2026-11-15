@@ -2018,5 +2018,44 @@
   "corrected": false,
   "source": "red-team",
   "earlier_parser": "45000"
+ },
+ {
+  "phrase": "compre 10 u a 500 cada una",
+  "family": "quantity-unit-price",
+  "kind": "expense",
+  "quantity": 10,
+  "unit_price": 500,
+  "total": 5000,
+  "ambiguous": false,
+  "note": "\"u\" is the shop abbreviation of \"unidades\" and the price is per unit: 10 x 500 = 5.000. The conjunction \"u\" only appears before a word that starts with an o sound, and \"a\" is not one.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "ambiguous range"
+ },
+ {
+  "phrase": "compre 10 u de tornillos a 500 la unidad",
+  "family": "quantity-unit-price",
+  "kind": "expense",
+  "quantity": 10,
+  "unit_price": 500,
+  "total": 5000,
+  "ambiguous": false,
+  "note": "Same abbreviation with the goods named after it: 10 x 500 = 5.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "ambiguous range"
+ },
+ {
+  "phrase": "me sale 7 u 8 mil",
+  "family": "ranges",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": null,
+  "ambiguous": true,
+  "note": "CONTROL. Here \"u\" is the conjunction: \"siete u ocho mil\", the form \"o\" takes before a word that starts with an o sound. A range is a question.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "ambiguous range"
  }
 ]
