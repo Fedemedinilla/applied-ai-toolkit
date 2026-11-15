@@ -142,6 +142,16 @@ describe('the palette', () => {
     });
   }
 
+  it('has the lowest ratios and the button ratio the README quotes', () => {
+    const readme = readFileSync(join(appDir, 'README.md'), 'utf8');
+    for (const [theme, t] of Object.entries(PALETTE)) {
+      const pairs = Object.entries(t.colours).flatMap(([name, value]) => (['page', 'card'] as const).map((bg) => ({ name, bg, ratio: contrast(value, t[bg]) })));
+      const lowest = pairs.reduce((a, b) => (b.ratio < a.ratio ? b : a));
+      expect(readme, `${theme} lowest pair`).toContain(`${lowest.name} on ${lowest.bg === 'page' ? 'the page' : 'a card'}, ${lowest.ratio.toFixed(2)}:1`);
+      expect(readme, `${theme} button`).toContain(`The button label measures ${contrast(t.accentText, t.accent).toFixed(2)}:1`);
+    }
+  });
+
   it('is the palette styles.css uses, in both themes', () => {
     const css = readFileSync(join(appDir, 'src/styles.css'), 'utf8');
     const block = (name: string): Record<string, string> => {
