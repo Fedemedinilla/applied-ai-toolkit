@@ -180,6 +180,15 @@ final class LoginLimiterTest extends TestCase
         self::assertTrue($limiter->allowlisted((string) $limiter->clientIp()));
     }
 
+    public function testGuardAMappedAllowlistEntryIsNeverLocked(): void
+    {
+        $limiter = $this->limiter(['login_allowlist' => ['::ffff:203.0.113.9']]);
+        $_SERVER['REMOTE_ADDR'] = '::ffff:203.0.113.9';
+        self::assertTrue($limiter->allowlisted((string) $limiter->clientIp()));
+        $this->failTimes($limiter, 5);
+        self::assertNull($limiter->gate(null));
+    }
+
     public function testKeysDoNotHoldTheAddress(): void
     {
         $this->failTimes($this->limiter(), 1);

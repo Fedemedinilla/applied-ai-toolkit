@@ -88,12 +88,18 @@ final class IpAddress
         }
         $max = \strlen($packed) * 8;
         if (!isset($parts[1])) {
-            return [$packed, $max];
-        }
-        if (preg_match('/^\d{1,3}$/', $parts[1]) !== 1 || (int) $parts[1] > $max) {
+            $bits = $max;
+        } elseif (preg_match('/^\d{1,3}$/', $parts[1]) !== 1 || (int) $parts[1] > $max) {
             return null;
+        } else {
+            $bits = (int) $parts[1];
         }
-        return [$packed, (int) $parts[1]];
+        // A mapped entry (::ffff:203.0.113.0/120) becomes the IPv4 range it carries, because
+        // normalize() turns mapped client addresses into IPv4 before they are compared.
+        if ($max === 128 && $bits >= 96 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
+            return [substr($packed, 12), $bits - 96];
+        }
+        return [$packed, $bits];
     }
 
     private static function prefix(string $packed, int $bits): string
