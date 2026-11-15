@@ -237,5 +237,25 @@ describe('request shape and limits', () => {
     const handler = createAssistantHandler({ historySecret: SECRET, propose: async () => say('x'), limited: (ip) => ip === '192.0.2.1' });
     const res = await handler(post({ messages: [{ role: 'user', content: 'hola' }] }), { clientAddress: '192.0.2.1' });
     expect(res.status).toBe(429);
+    // A body that records every read: a throttled client's upload is never pulled.
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify({ messages: [{ role: 'user', content: 'hola' }] })));
+        controller.close();
+      },
+    }, { highWaterMark: 0 });
+    const streamed = new Request('https://salon.example/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as RequestInit);
+    expect((await handler(streamed, { clientAddress: '192.0.2.1' })).status).toBe(429);
+    expect(pulls).toBe(0);
+  });
+
+  it('a declared Content-Length above the limit is 413 before the body is read', async () => {
+    const s = setup([say('x')]);
+    const res = await s.handler(post({ messages: [{ role: 'user', content: 'hola' }] }, { 'content-length': '999999' }));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'too_large' });
+    expect(s.seen).toHaveLength(0);
   });
 });
