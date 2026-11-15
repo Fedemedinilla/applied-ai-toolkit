@@ -13,6 +13,8 @@ npm ci                 # exact versions from package-lock.json
 npm run check          # tsc --noEmit over every TypeScript folder (strict)
 npm test               # Vitest suites of every TypeScript folder
 node import-fences/cli.ts --config import-fences/repo.config.ts   # the import fences
+npm run build:packages # compiles the four npm packages to their dist/ folders, as npm pack does
+npm run pack:check     # packs each of the four as npm would, installs the tarball and checks it
 npm run build:apps     # production build of each app under apps/, into dist/apps/
 npm run guard:apps     # csp-build-guard over each app build, with its own config
 npm run test:python    # site-check's unittest suite
@@ -21,7 +23,7 @@ npm run lint:docs      # slop-lint in Markdown mode over every README and doc a 
 npm run build:docs     # the docs site, generated from the READMEs; a broken relative link fails it
 ```
 
-One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request, except `build:docs`, which the Pages workflow runs on `main`.
+One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request, with `build:packages` inside `pack:check`. The Pages workflow builds the docs again on `main` and publishes them.
 
 Two slower checks run weekly in `.github/workflows/quality.yml` and by hand when a change touches their targets:
 
