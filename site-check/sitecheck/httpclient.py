@@ -403,14 +403,25 @@ def body_sha256(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
 
 
+_NAT64_WELL_KNOWN = ipaddress.IPv6Network("64:ff9b::/96")
+
+
 def public_address(ip: str) -> bool:
     """True for a global unicast address: never loopback, private, CGNAT, link-local, ULA or reserved."""
     try:
         addr = ipaddress.ip_address(ip.split("%", 1)[0])
     except ValueError:
         return False
-    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
-        addr = addr.ipv4_mapped
+    if isinstance(addr, ipaddress.IPv6Address):
+        # An IPv6 address that carries an IPv4 one reaches that IPv4 address:
+        # ::ffff:a.b.c.d directly, 64:ff9b::/96 through a DNS64/NAT64 gateway
+        # (RFC 6052), and 2002::/16 through a 6to4 relay.
+        if addr.ipv4_mapped is not None:
+            addr = addr.ipv4_mapped
+        elif addr in _NAT64_WELL_KNOWN:
+            addr = ipaddress.IPv4Address(int(addr) & 0xFFFFFFFF)
+        elif addr.sixtofour is not None and not public_address(str(addr.sixtofour)):
+            return False
     return addr.is_global and not addr.is_multicast
 
 
@@ -533,7 +544,9 @@ def _declared_length(headers: list[tuple[str, str]]) -> int | None:
     if len(values) != 1:
         return None
     value = values.pop()
-    return int(value) if value.isdigit() else None
+    # isascii first: str.isdigit() is also True for the latin-1 superscripts
+    # that http.client decodes from a header byte, and int() rejects them.
+    return int(value) if value.isascii() and value.isdigit() else None
 
 
 def _safe_host(url: str) -> str:
@@ -945,7 +958,7 @@ class HttpClient:
         value = (resp.header("Retry-After") or "").strip()
         if not value:
             return None
-        if value.isdigit():
+        if value.isascii() and value.isdigit():
             return float(int(value))
         try:
             moment = email.utils.parsedate_to_datetime(value)
@@ -1113,7 +1126,8 @@ class HttpClient:
                 try:
                     ex = self._exchange(
                         method, current, headers, body, connect_timeout, read_timeout, max_bytes, wants_body,
-                        pin=kind in PINNED_KINDS, total_deadline=total_deadline,
+                        # rdap.org's redirect names a host the tool did not choose: pinned like the site.
+                        pin=kind in PINNED_KINDS or (purpose is Purpose.RDAP and hop > 0), total_deadline=total_deadline,
                     )
                 except ScopeError as exc:  # the transport's own test-isolation backstop
                     self._record(seq, ts, kind, purpose, method, current, hop=hop, outcome=Outcome.REFUSED_SCOPE, error=str(exc))

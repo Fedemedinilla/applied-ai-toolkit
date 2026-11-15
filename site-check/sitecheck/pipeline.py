@@ -876,6 +876,11 @@ def _run(
             state.canonical_entry = entry
         return entry is not None
 
+    # The og:image may sit on any host; an excluded one gets no request either.
+    # getattr: a services_factory passed to run() may bring a guard of its own.
+    set_exclusion = getattr(services.guard, "set_exclusion", None)
+    if set_exclusion is not None:
+        set_exclusion(lambda host: lst.match(host) is not None)
     con.warn(f"Measuring {config.url} (this takes a few minutes)...")
     try:
         from .collect import collect
@@ -1240,7 +1245,7 @@ def _local_moment(meta: dict[str, Any], key: str, fallback: dt.datetime) -> dt.d
 
 
 def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
-    from . import evaluate
+    from . import evaluate, kinds
     from .config import DEFAULT_KIND, DEFAULT_PARA
     from .model import Finding
     from .render_report import ReportContext, render_annex, render_report
@@ -1254,9 +1259,17 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         return _usage(con, f"--rerender: {exc}")
     meta = old.get("meta") if isinstance(old.get("meta"), dict) else {}
     checks = old.get("checks") or []
-    previous = (old.get("salida") or {}).get("codigo")
+    previous = (old.get("salida") or {}).get("codigo") if isinstance(old.get("salida"), dict) else None
     if not checks:
         return _usage(con, f"--rerender: that run has no checks (it ended with exit {previous}); measure again")
+    if not isinstance(checks, list) or not all(isinstance(c, dict) for c in checks):
+        return _usage(con, "--rerender: checks is not a list of objects; this file is not a valid run")
+    stored = []
+    for n, c in enumerate(checks, start=1):
+        try:
+            stored.append(Finding.from_datos(c))
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            return _usage(con, f"--rerender: check {n} ({c.get('id', '?')}) is not valid: {type(exc).__name__}: {exc}")
     domain = str(meta.get("dominio") or "")
     try:
         run_date = _local_date(meta)
@@ -1272,7 +1285,7 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         except (ValueError, OSError) as exc:
             return _usage(con, f"--overrides could not be used: {exc}")
 
-    findings = evaluate.recolour([Finding.from_datos(c) for c in checks], overrides)
+    findings = evaluate.recolour(stored, overrides)
     home_unreachable = bool(meta.get("portada_no_respondio"))
     hack_reasons = [] if home_unreachable else list(evaluate.hack_gate_of(findings).reasons)
 
@@ -1280,6 +1293,14 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
     institution = config.institution or meta.get("institucion") or domain
     para = config.para or meta.get("para") or DEFAULT_PARA
     kind = config.kind if config.kind_explicit else (meta.get("tipo") or DEFAULT_KIND)
+    stored_kind = str(meta.get("tipo") or DEFAULT_KIND)
+    if config.kind_explicit and kinds.of(str(kind)).educational != kinds.of(stored_kind).educational:
+        # VIS-17 (admissions) applies only to the educational kinds, and the
+        # stored run holds no data to evaluate it again for the other side.
+        return _usage(
+            con,
+            f"--rerender: --kind {kind} changes which checks apply (the run was measured as {stored_kind}); measure again with --kind",
+        )
     # The language the run was written in, unless --lang asks for another; a run stored before --lang is Spanish.
     lang = normalize_lang(config.lang or meta.get("idioma_informe"))
     velocity, mail_auth = _tables_from_datos(old.get("tablas"))

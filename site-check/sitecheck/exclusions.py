@@ -79,6 +79,8 @@ def _normalize_host(host: str) -> str | None:
     host = host.strip().rstrip(".").lower()
     if not host:
         return None
+    if domains.idna_deviation(host):
+        return None  # IDNA 2003 would store another domain (straße.de as strasse.de)
     try:
         ascii_host = host.encode("idna").decode("ascii")
     except UnicodeError:
