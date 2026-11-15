@@ -204,7 +204,10 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     rest: null,
   };
 
-  const findByEmail = (email: string): FakeUser | undefined => [...users.values()].find((u) => u.email === email);
+  // Auth trims and lowercases the email before it looks the user up, so case never makes a new user.
+  const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+  const findByEmail = (email: string): FakeUser | undefined =>
+    [...users.values()].find((u) => normalizeEmail(u.email) === normalizeEmail(email));
 
   function userJson(user: FakeUser) {
     return {
@@ -263,14 +266,16 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
   }
 
   async function otp(body: unknown): Promise<Response> {
-    const email = field(body, 'email');
-    if (typeof email !== 'string' || email === '') return authError(400, 'validation_failed', 'An email address is required');
-    if (findByEmail(email) === undefined) {
+    const raw = field(body, 'email');
+    const email = typeof raw === 'string' ? normalizeEmail(raw) : '';
+    if (email === '') return authError(400, 'validation_failed', 'An email address is required');
+    let user = findByEmail(email);
+    if (user === undefined) {
       if (field(body, 'create_user') === false) return authError(422, 'otp_disabled', 'Signups not allowed for otp');
-      const created = { id: crypto.randomUUID(), email };
-      users.set(created.id, created);
+      user = { id: crypto.randomUUID(), email };
+      users.set(user.id, user);
     }
-    pendingOtp.add(email);
+    pendingOtp.add(user.email);
     return Response.json({});
   }
 

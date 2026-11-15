@@ -81,6 +81,16 @@ describe('email code sign-in', () => {
     expect(fake.users.size).toBe(1);
   });
 
+  it('matches the email without regard to case or surrounding spaces, as Auth does', async () => {
+    const client = clientFor(fake);
+    const shouted = ` ${fake.user.email.toUpperCase()} `;
+    expect((await client.auth.signInWithOtp({ email: shouted })).error).toBeNull();
+    expect(fake.users.size).toBe(1);
+    const { data, error } = await client.auth.verifyOtp({ email: shouted, token: fake.otpCode, type: 'email' });
+    expect(error).toBeNull();
+    expect(data.user?.id).toBe(fake.user.id);
+  });
+
   it('an override answers before the fake: a 429 from the email rate limit', async () => {
     fake.knobs.override = (request) =>
       request.path === '/auth/v1/otp' ? authError(429, 'over_email_send_rate_limit', 'email rate limit exceeded') : undefined;
