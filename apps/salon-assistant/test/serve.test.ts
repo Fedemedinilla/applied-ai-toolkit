@@ -1,7 +1,7 @@
 // The local server from server/static.ts on a free port of 127.0.0.1, over a temporary folder and
 // a stub app. Nothing leaves the machine.
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type Server } from 'node:http';
 import { connect, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -73,6 +73,11 @@ describe('the local server', () => {
     expect(r.status).toBe(200);
     expect(r.text).toContain('page');
     expect(r.headers['content-security-policy']).toBe(CSP);
+  });
+
+  it('sends the policy csp-build-guard checks the build against', () => {
+    const config = JSON.parse(readFileSync(new URL('../csp-guard.config.json', import.meta.url), 'utf8')) as { csp: { value: string } };
+    expect(CSP).toBe(config.csp.value);
   });
 
   it('never serves a file outside the root', async () => {
