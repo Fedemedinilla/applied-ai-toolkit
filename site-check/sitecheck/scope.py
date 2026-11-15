@@ -669,6 +669,11 @@ class ScopeGuard:
                 raise self._refuse(to_url, purpose, "test isolation")
             if not self.test_loopback and t.scheme != "https":
                 return RedirectVerdict.LEAVE
+            if not self.test_loopback and (_is_ip_literal(t.host) or t.host == "localhost" or t.port != 443):
+                # The authoritative server is a public https NAME; the HTTP
+                # client also pins this hop to a public address.
+                self._note(to_url, purpose, "rdap hop to an IP address, localhost or a non-default port")
+                return RedirectVerdict.LEAVE
             self._admit(to_url, purpose, "rdap.org redirect")
             return RedirectVerdict.FOLLOW
         if purpose in API_PURPOSES or purpose is Purpose.CONTROL:

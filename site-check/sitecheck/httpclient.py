@@ -1126,7 +1126,8 @@ class HttpClient:
                 try:
                     ex = self._exchange(
                         method, current, headers, body, connect_timeout, read_timeout, max_bytes, wants_body,
-                        pin=kind in PINNED_KINDS, total_deadline=total_deadline,
+                        # rdap.org's redirect names a host the tool did not choose: pinned like the site.
+                        pin=kind in PINNED_KINDS or (purpose is Purpose.RDAP and hop > 0), total_deadline=total_deadline,
                     )
                 except ScopeError as exc:  # the transport's own test-isolation backstop
                     self._record(seq, ts, kind, purpose, method, current, hop=hop, outcome=Outcome.REFUSED_SCOPE, error=str(exc))

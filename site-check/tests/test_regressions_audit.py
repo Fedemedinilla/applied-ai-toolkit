@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +20,9 @@ from sitecheck import runformat
 from sitecheck.challenge import ChallengeDetector
 from sitecheck.credentials import Redactor
 from sitecheck.endpoints import Endpoints
-from sitecheck.httpclient import ClientConfig, HttpClient, LoopbackRoute, _declared_length, public_address
+from sitecheck.httpclient import ClientConfig, HttpClient, LoopbackRoute, _declared_length, _Exchange, public_address
 from sitecheck.requestlog import RequestLog
-from sitecheck.scope import Purpose, ScopeGuard
+from sitecheck.scope import Purpose, RedirectVerdict, ScopeGuard
 from fakeapis import FakeApis
 from fakesite import FakeSite, Route
 from fixhelp import run_e2e
@@ -227,6 +228,58 @@ class OgImageExclusionTest(unittest.TestCase):
             guard.redirect_verdict("https://cdn.test/a.png", "https://img.excluido.test/a.png", Purpose.OG_IMAGE, 1).value,
             "leave",
         )
+
+
+class RdapRedirectTest(unittest.TestCase):
+    """rdap.org's redirect goes to an https name on port 443, and the hop is address-pinned."""
+
+    START = "https://rdap.org/domain/example.org"
+
+    def _guard(self) -> ScopeGuard:
+        return ScopeGuard("example.org", "https://www.example.org/", Endpoints())
+
+    def test_ip_literals_localhost_and_other_ports_are_left(self) -> None:
+        g = self._guard()
+        for to in (
+            "https://10.0.0.5:8443/domain/example.org",
+            "https://169.254.169.254/latest/x/domain/example.org",
+            "https://[::1]/domain/example.org",
+            "https://localhost/domain/example.org",
+            "https://rdap.example.net:8443/domain/example.org",
+        ):
+            with self.subTest(to=to):
+                self.assertIs(g.redirect_verdict(self.START, to, Purpose.RDAP, 1), RedirectVerdict.LEAVE)
+
+    def test_path_query_and_scheme_are_checked(self) -> None:
+        g = self._guard()
+        for to in (
+            "https://rdap.example.net/domain/other.org",
+            "https://rdap.example.net/domain/example.org?x=1",
+            "http://rdap.example.net/domain/example.org",
+        ):
+            with self.subTest(to=to):
+                self.assertIs(g.redirect_verdict(self.START, to, Purpose.RDAP, 1), RedirectVerdict.LEAVE)
+
+    def test_an_https_name_on_443_is_followed(self) -> None:
+        g = self._guard()
+        for to in ("https://rdap.example.net/v1/domain/example.org", "https://rdap.example.net:443/domain/example.org"):
+            with self.subTest(to=to):
+                self.assertIs(g.redirect_verdict(self.START, to, Purpose.RDAP, 1), RedirectVerdict.FOLLOW)
+
+    def test_the_redirect_hop_is_pinned_to_a_public_address(self) -> None:
+        g = self._guard()
+        pins: list[tuple[str, bool]] = []
+
+        def fake_exchange(self, method, url, *args, pin, **kwargs):  # type: ignore[no-untyped-def]
+            pins.append((url, pin))
+            if url == RdapRedirectTest.START:
+                return _Exchange(status=302, reason="Found", headers=[("Location", "https://rdap.example.net/domain/example.org")], ms=1.0)
+            return _Exchange(status=200, reason="OK", headers=[("Content-Type", "application/rdap+json")], raw=b"{}", body_read=True, ms=1.0)
+
+        client = HttpClient(g, RequestLog(None, Redactor([])), ChallengeDetector(), Redactor([]), ClientConfig(pace_seconds=0, pace_jitter=0), sleeper=SleepRecorder())
+        with mock.patch.object(HttpClient, "_exchange", fake_exchange):
+            client.api_request("GET", self.START, purpose=Purpose.RDAP, headers={}, timeout=5, follow_redirects=True)
+        self.assertEqual(pins[-1], ("https://rdap.example.net/domain/example.org", True))
 
 
 if __name__ == "__main__":
