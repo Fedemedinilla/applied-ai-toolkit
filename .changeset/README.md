@@ -13,6 +13,8 @@ git add .changeset/*.md    # commit it with the change
 
 A change that needs no release (a test, a README typo) needs no changeset.
 
+No package has been published yet. The first release of each is 0.1.0, the version in its `package.json`, and it carries everything the folder does today, so no changeset describes a change against it. Changesets start with the first change after 0.1.0 is on npm.
+
 ## What happens on main
 
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs on every push to `main`, never on a pull request, one run at a time:
