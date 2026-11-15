@@ -120,7 +120,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
       'RET-01': 'off',
       'EST-09': { severity: 'low' },
       'EST-11': 'off',
-      // FMT-01 and FMT-02 are off as findings; WhatsApp's own formatting rules come with their sources.
+      // FMT-01 and FMT-02 are off as findings; WA-03 reports emoji used as bullets; WA-01 (`**` and `#`) is not implemented yet.
       'FMT-01': 'off',
       'FMT-02': 'off',
       'ORT-02': 'off',
@@ -132,6 +132,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
       'SIN-EN-06': { severity: 'low' },
       // REG-01 keeps its default severity, high: a voseo and tuteo mix is flagged without voiding the message.
     },
+    adds: [ruleById('WA-03')],
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: { ...COVER_LETTER.thresholds, openingMarksFollowText: true },
     experimental: true,

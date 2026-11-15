@@ -598,6 +598,7 @@ These rules are not in the catalog of 52, so a cover letter and a caller that pa
 | MAIL-02 | "Estimado/a" with a slash | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 3 (slop of generated Spanish) |
 | MAIL-03 | Generic subject line | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 8 (subject: role, name and a fact; not "Oportunidad emocionante") |
 | SEG-03 | Follow-up that copies the earlier message | follow-up | both | 2 | medium | 8 words in a row from the earlier message | structural | SÍNTESIS | Section 11, item 5, and ESP-03 in section 13.1 (no more than 8 words in a row from the job posting); applied to the earlier message |
+| WA-03 | Emoji used as bullets | whatsapp | both | 2 | medium | 0; a list is 2 lines in a row that open with an emoji | structural | REPORTADO | Section 4.4 (emoji as bullets among the format signs) |
 
 ## Known false positives
 

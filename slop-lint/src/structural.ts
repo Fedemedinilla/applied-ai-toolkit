@@ -90,6 +90,9 @@ const NOMINALIZATION: Record<Lang, RegExp> = {
 /** SEG-03: words in a row a follow-up may share with the earlier message (the report's limit for the job posting). */
 const COPIED_RUN = 8;
 
+/** WA-03: a line that opens with an emoji (or a keycap number) and goes on after a space. */
+const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
+
 /** MAIL-01: the thanks formula as a whole sentence. */
 const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration[.!]$/iu;
 
@@ -265,6 +268,22 @@ const checks: Record<string, Check> = {
       i = last + n;
     }
     return hits;
+  },
+
+  'WA-03': (ctx) => {
+    // The emoji that opens each non-blank line, or null; a blank line does not break a list.
+    const markers: Array<{ start: number; end: number } | null> = [];
+    let offset = 0;
+    for (const line of ctx.text.split('\n')) {
+      if (line.trim() !== '') {
+        const emoji = EMOJI_BULLET.exec(line)?.[1];
+        const start = emoji === undefined ? -1 : offset + line.indexOf(emoji);
+        markers.push(emoji === undefined ? null : { start, end: start + emoji.length });
+      }
+      offset += line.length + 1;
+    }
+    // A bullet is an item of a list, so it takes two such lines in a row.
+    return markers.flatMap((m, i) => (m !== null && (markers[i - 1] || markers[i + 1]) ? [{ ruleId: 'WA-03', ...m }] : []));
   },
 
   'MED-01': (ctx) => {
