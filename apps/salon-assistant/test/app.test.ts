@@ -69,7 +69,7 @@ const apiError = (status: number, type: string) => () =>
 const post = (messages: unknown[], lang?: 'en') =>
   new Request('http://127.0.0.1:8791/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, ...(lang ? { lang } : {}) }) });
 
-function app(queue: Array<(n: number) => Response>, over: { monthlyCapUsd?: number; apiKey?: string | null } = {}) {
+function app(queue: Array<(n: number) => Response>, over: { monthlyCapUsd?: number; apiKey?: string | null; perMinute?: number } = {}) {
   const api = fakeApi(queue);
   const handle = createApp({
     apiKey: over.apiKey === undefined ? 'sk-ant-test-only' : over.apiKey,
@@ -78,6 +78,7 @@ function app(queue: Array<(n: number) => Response>, over: { monthlyCapUsd?: numb
     now: () => NOW,
     log: () => {},
     ...(over.monthlyCapUsd !== undefined ? { monthlyCapUsd: over.monthlyCapUsd } : {}),
+    ...(over.perMinute !== undefined ? { perMinute: over.perMinute } : {}),
   });
   return { api, handle: (r: Request) => handle(r, '192.0.2.10') };
 }
@@ -150,8 +151,35 @@ describe('failures', () => {
   it('without a key: 503 on the API and on health, and no request', async () => {
     const { api, handle } = app([], { apiKey: null });
     expect((await handle(post([{ role: 'user', content: 'hola' }]))).status).toBe(503);
-    expect((await handle(new Request('http://127.0.0.1:8791/api/health'))).status).toBe(503);
+    const health = await handle(new Request('http://127.0.0.1:8791/api/health'));
+    // The page shows the missing-key notice only for this exact answer.
+    expect([health.status, await health.json()]).toEqual([503, { ok: false }]);
     expect(api.seen).toHaveLength(0);
+  });
+
+  it('with a key, health answers 200 {ok:true} and makes no request', async () => {
+    const { api, handle } = app([]);
+    const health = await handle(new Request('http://127.0.0.1:8791/api/health'));
+    expect([health.status, await health.json()]).toEqual([200, { ok: true }]);
+    expect(api.seen).toHaveLength(0);
+  });
+});
+
+describe('the per-IP limit on the app', () => {
+  it('refuses a turn past perMinute with 429 limited and no model call', async () => {
+    const { api, handle } = app([message({ booking: null, reply: 'Hola.' }), message({ booking: null, reply: 'Hola otra vez.' })], { perMinute: 1 });
+    expect((await handle(post([{ role: 'user', content: 'hola' }]))).status).toBe(200);
+    const res = await handle(post([{ role: 'user', content: 'hola de nuevo' }]));
+    expect([res.status, await res.json()]).toEqual([429, { error: 'limited' }]);
+    expect(api.seen).toHaveLength(1);
+  });
+
+  it('by default accepts twelve turns from one IP in a minute and refuses the thirteenth', async () => {
+    const { api, handle } = app(Array.from({ length: 13 }, () => message({ booking: null, reply: 'Hola.' })));
+    const statuses: number[] = [];
+    for (let i = 0; i < 13; i++) statuses.push((await handle(post([{ role: 'user', content: `hola ${i}` }]))).status);
+    expect(statuses).toEqual([...Array<number>(12).fill(200), 429]);
+    expect(api.seen).toHaveLength(12);
   });
 });
 
