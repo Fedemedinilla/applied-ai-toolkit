@@ -125,6 +125,12 @@ describe('the audit-diff workflow file', () => {
     expect(SOURCE).toContain('worktree add');
     expect(SOURCE).toContain('.claude/worktrees/');
   });
+
+  it('puts the fixer worktrees where the root .gitignore ignores them, so the integrator sees a clean status', () => {
+    // Read .gitignore itself: .git/info/exclude is a setting of one checkout, not of the repository.
+    const rules = readFileSync(new URL('../../.gitignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
+    expect(rules).toContain('/.claude/worktrees/');
+  });
 });
 
 describe('a dry run with fake agents', () => {
