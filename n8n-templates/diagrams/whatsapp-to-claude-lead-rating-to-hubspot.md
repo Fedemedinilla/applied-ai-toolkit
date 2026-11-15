@@ -6,8 +6,8 @@ Graph of `templates/whatsapp-to-claude-lead-rating-to-hubspot.json`, written by 
 flowchart LR
   n0(["Verify webhook (GET)"])
   n1{"Verify token matches?"}
-  n2(["Return challenge"])
-  n3(["Reject (403)"])
+  n2["Return challenge"]
+  n3["Reject (403)"]
   n4(["Receive WhatsApp (Webhook)"])
   n5["Extract message"]
   n6["Rate with Claude"]

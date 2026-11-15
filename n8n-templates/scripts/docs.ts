@@ -120,7 +120,7 @@ export function versionTable(templates: Template[]): string {
 const label = (text: string): string => `"${text.replace(/"/g, '#quot;')}"`;
 
 function shape(node: WorkflowNode, id: string): string {
-  if (/trigger|webhook$/i.test(node.type)) return `${id}([${label(node.name)}])`;
+  if (node.type === 'n8n-nodes-base.webhook' || /Trigger$/.test(node.type)) return `${id}([${label(node.name)}])`;
   if (node.type === 'n8n-nodes-base.if' || node.type === 'n8n-nodes-base.switch') return `${id}{${label(node.name)}}`;
   return `${id}[${label(node.name)}]`;
 }

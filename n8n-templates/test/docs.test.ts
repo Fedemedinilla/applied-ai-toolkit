@@ -92,6 +92,15 @@ describe('diagrams', () => {
     }
   });
 
+  it('draws only trigger nodes with the stadium shape, not Respond to Webhook', () => {
+    for (const t of templates) {
+      const working = t.workflow.nodes.filter((n) => n.type !== 'n8n-nodes-base.stickyNote');
+      const stadiums = [...diagram(t).matchAll(/^ {2}n(\d+)\(\[/gm)].map((m) => working[Number(m[1])]?.type);
+      expect(stadiums.length, t.file).toBeGreaterThan(0);
+      for (const type of stadiums) expect(type, t.file).toMatch(/^n8n-nodes-base\.webhook$|Trigger$/);
+    }
+  });
+
   it('labels the outputs of If nodes, so the discard branch is visible', () => {
     const invoicing = templates.find((t) => t.base === 'mercadopago-payment-to-afip-invoice');
     if (!invoicing) throw new Error('the invoicing workflow is missing');
