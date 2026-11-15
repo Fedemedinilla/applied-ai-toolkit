@@ -81,16 +81,17 @@ const ESCAPE = /\\(?=[!-/:-@[-`{-~])/gu;
 
 interface Line {
   start: number;
-  /** Offset of the line's last character plus one, before the newline. */
+  /** Offset of the line's last character plus one, before the newline and a CR before it. */
   end: number;
 }
 
+/** The lines of a document. A CRLF ending is left out of the line, so the block patterns read it as with LF. */
 function splitLines(text: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
   for (let i = 0; i <= text.length; i++) {
     if (i === text.length || text[i] === '\n') {
-      lines.push({ start, end: i });
+      lines.push({ start, end: i > start && text[i - 1] === '\r' && i < text.length ? i - 1 : i });
       start = i + 1;
     }
   }
@@ -153,7 +154,20 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
   const regions: Array<[number, number]> = [];
   const directives: Directive[] = [];
   const directiveIssues: DirectiveIssue[] = [];
-  for (const m of current().matchAll(HTML_COMMENT)) {
+  // A comment written inside inline code is code: it is neither a directive nor a comment. The
+  // spans are found here without masking; the inline pass below masks them.
+  // A comment that opens inside a span is skipped, and the search goes on after that span.
+  const codeSpans = maskInlineCode(current(), () => undefined);
+  const commentSource = current();
+  const comments: RegExpExecArray[] = [];
+  const commentRe = new RegExp(HTML_COMMENT.source, HTML_COMMENT.flags);
+  for (let m = commentRe.exec(commentSource); m !== null; m = commentRe.exec(commentSource)) {
+    const at = m.index;
+    const span = codeSpans.find(([a, b]) => a < at && at < b);
+    if (span) commentRe.lastIndex = span[1];
+    else comments.push(m);
+  }
+  for (const m of comments) {
     const end = m.index + m[0].length;
     const body = m[0].replace(/^<!--|-->$/gu, '').trim();
     regions.push([m.index, end]);
@@ -214,6 +228,8 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
   const kinds: Array<Block['kind'] | 'blank' | null> = [];
   let previous: Block['kind'] | 'blank' = 'blank';
   let previousIndent = 0;
+  // The last kind a line started (not null, not blank), kept as it goes instead of searched for.
+  let lastStart: Block['kind'] | undefined;
   for (const line of lines) {
     let t = lineText(line);
     if (t.trim() === '') {
@@ -250,11 +266,13 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
     } else if (kind === null && previous === 'blank') {
       // After a blank line, an indented line continues the list item above it.
       const indent = /^[ \t]*/u.exec(t)?.[0].length ?? 0;
-      const lastStart = [...kinds].reverse().find((k) => k !== null && k !== 'blank');
       kind = lastStart === 'list' && indent > previousIndent ? 'list' : 'paragraph';
     }
     kinds.push(kind);
-    if (kind !== null) previous = kind;
+    if (kind !== null) {
+      previous = kind;
+      lastStart = kind;
+    }
   }
 
   // Inline spans, in an order where an earlier one hides what a later one would match.

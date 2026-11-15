@@ -122,7 +122,7 @@ export function applyDirectives(
     for (const id of d.ids) {
       const rule = byId.get(id);
       if (!rule) {
-        problem('SUP-03', d, `${id} is not a rule that applies to this file: it does not exist, or the config turns it off`);
+        problem('SUP-03', d, `${id} is not a rule that applies to this file: it does not exist, the config turns it off, or it does not run on this language or format`);
       } else if (rule.severity === 'disqualify' && !options.allowDisqualify) {
         problem('SUP-02', d, `${id} has the severity disqualify, which a comment in the text cannot suppress; suppressions.allowDisqualify in the config allows it`);
       } else {
@@ -137,7 +137,14 @@ export function applyDirectives(
   const kept: Finding[] = [];
   const suppressed: SuppressedFinding[] = [];
   for (const f of findings) {
-    const range = ranges.find((r) => r.id === f.ruleId && f.start >= r.from && f.start < r.to);
+    // With nested disables of one rule, the innermost (narrowest) range takes the finding, so the
+    // directive written for that sentence, with its reason, is the one used. Two ranges of the same
+    // width, such as two disables left open to the end, credit the first, as written.
+    let range: Range | undefined;
+    for (const r of ranges) {
+      if (r.id !== f.ruleId || f.start < r.from || f.start >= r.to) continue;
+      if (range === undefined || r.to - r.from < range.to - range.from) range = r;
+    }
     if (!range) {
       kept.push(f);
       continue;

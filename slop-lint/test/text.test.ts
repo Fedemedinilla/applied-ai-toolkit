@@ -53,6 +53,20 @@ describe('countAnchors', () => {
     expect(countAnchors('uso airflow a diario.', 'es')).toBe(0);
     expect(countAnchors('uso airflow a diario.', 'es', ['airflow'])).toBe(1);
   });
+
+  it('trims the extra terms, so a blank one anchors nothing', () => {
+    expect(countAnchors('i am a proactive and passionate person.', 'en', [' '])).toBe(0);
+    expect(countAnchors('i am a proactive and passionate person.', 'en', ['x '])).toBe(0);
+    expect(countAnchors('uso airflow a diario.', 'es', [' airflow '])).toBe(1);
+  });
+
+  it('matches a multi-word term as whole words, not as a substring', () => {
+    expect(countAnchors('We report in power bi.', 'en', ['Power BI'])).toBe(1);
+    expect(countAnchors('We report in power\nbi.', 'en', ['Power BI'])).toBe(1);
+    expect(countAnchors('We read the power bill.', 'en', ['Power BI'])).toBe(0);
+    expect(countAnchors('We moved from nosql serverless.', 'en', ['SQL Server'])).toBe(0);
+    expect(countAnchors('uso contoso agro (c++) a diario.', 'es', ['agro (c++)'])).toBe(1);
+  });
 });
 
 describe('words and positions', () => {

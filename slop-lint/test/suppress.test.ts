@@ -115,6 +115,14 @@ describe('an unused suppression', () => {
     expect(problems(twice)).toEqual([['SUP-01', 2, 'no LEX-03 finding in its range']]);
   });
 
+  it('credits the innermost of two open disables of one rule, so its reason is kept', () => {
+    const nested = md(`<!-- slop-lint-disable LEX-03 -->\nIntro line.\n\n<!-- slop-lint-disable LEX-03: quoted -->\n${BANNED}\n<!-- slop-lint-enable LEX-03 -->\n`);
+    expect(nested.suppressed?.map((f) => [f.ruleId, f.suppressedBy])).toEqual([['LEX-03', { line: 4, column: 1, reason: 'quoted' }]]);
+    expect(problems(nested)).toEqual([['SUP-01', 1, 'no LEX-03 finding in its range']]);
+    const line = md(`<!-- slop-lint-disable LEX-03 -->\nIntro line.\n<!-- slop-lint-disable-next-line LEX-03: quoted -->\n${BANNED}\n`);
+    expect(line.suppressed?.map((f) => f.suppressedBy)).toEqual([{ line: 3, column: 1, reason: 'quoted' }]);
+  });
+
   it('costs no points and does not change the verdict or the counts', () => {
     const result = md('<!-- slop-lint-disable-next-line LEX-03 -->\nI built it in 2023.');
     expect(result).toMatchObject({ findings: [], passesTier1: true, score: { points: 15 } });
@@ -173,6 +181,13 @@ describe('an invalid directive', () => {
       expect(ids(result), directive).toEqual(['LEX-03']);
       expect(problems(result), directive).toEqual([['SUP-03', 1, expect.stringMatching(detail)]]);
     }
+  });
+
+  it('reports a rule that cannot run on this file: another language, or plain text only in Markdown', () => {
+    const other = md(`<!-- slop-lint-disable-next-line LEX-01 -->\nThe team shipped the report in May.`);
+    expect(problems(other)).toEqual([['SUP-03', 1, expect.stringMatching(/^LEX-01 is not a rule that applies to this file/u)]]);
+    const plain = md(`<!-- slop-lint-disable-next-line FMT-01 -->\nI use **Python** daily.`);
+    expect(problems(plain)).toEqual([['SUP-03', 1, expect.stringMatching(/^FMT-01 is not a rule that applies to this file/u)]]);
   });
 
   it('reports a rule the config turned off, and an enable with nothing to close', () => {

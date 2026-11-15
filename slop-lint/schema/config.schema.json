@@ -83,13 +83,14 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "\\S"
       }
     },
     "glob": {
       "type": "string",
-      "pattern": "^(?!/)(?!!)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]*/)?\\.\\.(?:/|$))[\\s\\S]+$",
-      "description": "A path pattern relative to the folder of the config file, with forward slashes. * stays inside one path segment, ? is one character, ** crosses folders. No braces, classes or negation."
+      "pattern": "^(?!/)(?!!)(?!\\./)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]*/)?\\.\\.(?:/|$))[\\s\\S]*[^/]$",
+      "description": "A path pattern relative to the folder of the config file, with forward slashes. * stays inside one path segment, ? is one character, ** crosses folders. No braces, classes or negation, no leading ./ and no trailing slash."
     },
     "ruleSettings": {
       "type": "object",

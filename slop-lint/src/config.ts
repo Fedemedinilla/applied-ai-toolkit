@@ -108,6 +108,13 @@ function text(value: unknown, path: string): string {
   return value;
 }
 
+/** An anchor term: a string with at least one character that is not whitespace, as --anchors keeps them. */
+function anchor(value: unknown, path: string): string {
+  const term = text(value, path);
+  if (term.trim() === '') throw new ConfigError(path, 'must hold a character other than whitespace; a blank anchor would count in every sentence');
+  return term;
+}
+
 function bool(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') throw new ConfigError(path, 'must be true or false');
   return value;
@@ -127,7 +134,9 @@ function glob(value: unknown, path: string): string {
 
 function ruleSettings(value: unknown, path: string): Record<string, RuleSetting> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(path, 'must be an object');
-  const out: Record<string, RuleSetting> = {};
+  // No prototype: JSON.parse leaves "__proto__" an own key, and on a plain object assigning it would
+  // set the prototype instead, so the key would vanish before the unknown-id check sees it.
+  const out = Object.create(null) as Record<string, RuleSetting>;
   for (const [id, raw] of Object.entries(value)) {
     const at = join(path, id);
     if (raw === 'off') {
@@ -179,7 +188,7 @@ function override(value: unknown, path: string): OverrideConfig {
   const out: OverrideConfig = { files };
   if ('lang' in record) out.lang = oneOf(record['lang'], join(path, 'lang'), LANGS);
   if ('format' in record) out.format = oneOf(record['format'], join(path, 'format'), FORMATS);
-  if ('anchors' in record) out.anchors = list(record['anchors'], join(path, 'anchors'), text);
+  if ('anchors' in record) out.anchors = list(record['anchors'], join(path, 'anchors'), anchor);
   if ('ruleSettings' in record) out.ruleSettings = ruleSettings(record['ruleSettings'], join(path, 'ruleSettings'));
   return out;
 }
@@ -214,7 +223,7 @@ export function validateShape(value: unknown): Config {
   }
   if ('lang' in record) config.lang = oneOf(record['lang'], 'lang', LANGS);
   if ('format' in record) config.format = oneOf(record['format'], 'format', FORMATS);
-  if ('anchors' in record) config.anchors = list(record['anchors'], 'anchors', text);
+  if ('anchors' in record) config.anchors = list(record['anchors'], 'anchors', anchor);
   if ('ignore' in record) config.ignore = list(record['ignore'], 'ignore', glob);
   if ('ruleSettings' in record) config.ruleSettings = ruleSettings(record['ruleSettings'], 'ruleSettings');
   if ('rules' in record) config.rules = list(record['rules'], 'rules', customRule);
@@ -246,7 +255,13 @@ export function validateMeaning(config: Config): void {
       throw new ConfigError(`${path}.pattern`, `does not compile: ${(error as Error).message}`);
     }
     // Such a pattern matches between every two characters of a text, and no match of it has any text to report.
-    if (re.test('')) throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere; make at least one character required');
+    // lint() drops every empty match, so a pattern that matches empty only at some positions, such as a
+    // lookahead or \b, would load and never report. A few probe texts, the pattern's own source among
+    // them for a lookahead that names its word, catch those; it is a heuristic, not a proof.
+    const probes = ['', ' ', 'a', 'a b.', 'Ab 1, c-d.\n', rule.pattern];
+    if (probes.some((probe) => [...probe.matchAll(re)].some((m) => m[0] === ''))) {
+      throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere or report nothing; make at least one character required');
+    }
   });
   const check = (settings: Record<string, RuleSetting> | undefined, path: string): void => {
     for (const id of Object.keys(settings ?? {})) {

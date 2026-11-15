@@ -81,6 +81,45 @@ describe('maskMarkdown', () => {
   });
 });
 
+describe('maskMarkdown on a long document', () => {
+  // Each line after a blank line used to copy and reverse every block kind seen so far, so a
+  // document of N paragraphs took O(N^2): about 8 s for 40,000 paragraphs, against 0.3 s now.
+  // The bound leaves a wide margin for a slow machine and still fails on the quadratic version.
+  it('stays linear in the number of paragraphs', () => {
+    const source = 'Short line here.\n\n'.repeat(40_000);
+    const started = performance.now();
+    const view = maskMarkdown(source);
+    expect(performance.now() - started).toBeLessThan(3000);
+    expect(view.blocks).toHaveLength(40_000);
+  });
+});
+
+describe('maskMarkdown with CRLF line endings', () => {
+  it('masks tables, link definitions, setext underlines, thematic breaks and closing hashes as with LF', () => {
+    const lf = [
+      'Title',
+      '=====',
+      '',
+      '## Notes ##',
+      '',
+      '| Tool | Note |',
+      '|------|------|',
+      '| dbt | leverage synergy |',
+      '',
+      '***',
+      '',
+      '[ref]: https://example.com/passionate-about',
+      '',
+      'I built the export in Python in 2023.',
+      '',
+    ].join('\n');
+    const crlf = lf.replace(/\n/gu, '\r\n');
+    expect(ids(lf)).toEqual([]);
+    expect(ids(crlf)).toEqual([]);
+    expect(maskMarkdown(crlf).text.replace(/\r/gu, '')).toBe(maskMarkdown(lf).text);
+  });
+});
+
 describe('lint in Markdown mode', () => {
   it('points every finding into the original file', () => {
     const source = '# A title\n\n```\nleverage\n```\n\n- Ultimately, I am passionate about **data**.\n';
@@ -179,6 +218,15 @@ describe('disable directives', () => {
 
   it('is not a directive inside a code block', () => {
     expect(ids('```\n<!-- slop-lint-disable -->\n```\nI am passionate about data.')).toEqual(['LEX-03']);
+  });
+
+  it('is not a directive inside inline code', () => {
+    expect(ids('Write `<!-- slop-lint-disable -->` to mask a span.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Write ``<!-- slop-lint-disable-next-line -->``\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Use `<!-- slop-lint-disable LEX-03 -->` here.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    // An unclosed comment opener in code would otherwise run to the end of the file; a real directive after it still works.
+    expect(ids('Type `<!--` to open a comment.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Type `<!--` first.\n<!-- slop-lint-disable-next-line -->\nI am passionate about data.')).toEqual([]);
   });
 
   it('is only read in Markdown mode', () => {

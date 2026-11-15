@@ -55,6 +55,12 @@ describe('globs', () => {
     expect(globToRegExp('a|b').test('a')).toBe(false);
   });
 
+  it('reads a hyphen as itself, outside any class', () => {
+    expect(m('cover-letters/*.md', 'cover-letters/a.md')).toBe(true);
+    expect(m('api-docs/**', 'api-docs/x/y.md')).toBe(true);
+    expect(m('a-b.md', 'a_b.md')).toBe(false);
+  });
+
   it('names what is wrong with a pattern it cannot use', () => {
     expect(globProblem('docs/**')).toBeUndefined();
     expect(globProblem('')).toMatch(/empty/u);
@@ -62,10 +68,33 @@ describe('globs', () => {
     expect(globProblem('docs\\es')).toMatch(/backslash/u);
     expect(globProblem('docs/../x')).toMatch(/\.\. segment/u);
     expect(globProblem('!docs/a.md')).toMatch(/negation/u);
+    expect(globProblem('./docs/**')).toMatch(/without \.\//u);
+    expect(globProblem('docs/')).toMatch(/add \*\*/u);
   });
 });
 
 describe('validateConfig', () => {
+  it('rejects a pattern that matches the empty string at some position, not only on an empty text', () => {
+    for (const pattern of ['(?=synergize)|\\b', '(?=synergize)', '\\b', '$', 'x?(?= )']) {
+      expect(problem({ rules: [{ ...HOUSE, pattern }] }), pattern).toMatch(/^rules\[0\]\.pattern: matches the empty string/u);
+    }
+    expect(problem({ rules: [HOUSE] })).toBe('accepted');
+    expect(problem({ rules: [{ ...HOUSE, pattern: 'synergi(?=ze)' }] })).toBe('accepted');
+  });
+
+  it('rejects an anchor that is only whitespace, at the top level and in an override', () => {
+    expect(problem({ anchors: ['dbt', ' '] })).toMatch(/^anchors\[1\]: must hold a character other than whitespace/u);
+    expect(problem({ overrides: [{ files: ['a.md'], anchors: ['\t\n'] }] })).toMatch(/^overrides\[0\]\.anchors\[0\]: must hold a character other than whitespace/u);
+    expect(problem({ anchors: ['Contoso Agro'] })).toBe('accepted');
+  });
+
+  it('rejects __proto__ under ruleSettings as an unknown id, as JSON.parse leaves it an own key', () => {
+    for (const value of ['"off"', '{"level":1}', '{"severity":"low"}']) {
+      expect(problem(JSON.parse(`{"ruleSettings":{"__proto__":${value}}}`))).toMatch(/^ruleSettings\.__proto__: is not the id of a built-in rule/u);
+      expect(problem(JSON.parse(`{"overrides":[{"files":["a.md"],"ruleSettings":{"__proto__":${value}}}]}`))).toMatch(/^overrides\[0\]\.ruleSettings\.__proto__: is not the id/u);
+    }
+  });
+
   it('accepts an empty object and returns what it was given', () => {
     expect(validateConfig({})).toEqual({});
     const config = { lang: 'es', anchors: ['dbt'], ruleSettings: { 'LEX-04': 'off' }, rules: [HOUSE] };
@@ -173,6 +202,15 @@ describe('settingsFor', () => {
     const placeholder = lint('I want to join [Company Name] in 2024.', { lang: 'en', rules: settings.rules });
     expect(placeholder).toMatchObject({ passesTier1: true, disqualified: false });
     expect(placeholder.findings.map((f) => [f.ruleId, f.level, f.severity])).toContainEqual(['FMT-04', 2, 'low']);
+  });
+
+  it('reports every hit of a Tier 2 pool rule raised to level 1, outside the shared budget', () => {
+    const settings = settingsFor({ ruleSettings: { 'LEX-04': { level: 1, severity: 'high' } } }, undefined);
+    const one = lint('This robust plan works.', { lang: 'en', rules: settings.rules });
+    expect(one.passesTier1).toBe(false);
+    expect(one.findings.map((f) => [f.ruleId, f.level, f.detail])).toEqual([['LEX-04', 1, undefined]]);
+    const three = lint('This robust plan is seamless and pivotal.', { lang: 'en', rules: settings.rules });
+    expect(three.findings.filter((f) => f.ruleId === 'LEX-04')).toHaveLength(3);
   });
 
   it('applies every matching override in order, and none to stdin or a file outside the folder', () => {

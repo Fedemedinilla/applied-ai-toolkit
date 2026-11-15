@@ -24,7 +24,9 @@ export function globToRegExp(glob: string): RegExp {
       }
     } else if (c === '*') re += '[^/]*';
     else if (c === '?') re += '[^/]';
-    else re += c.replace(/[\\^$.*+?()[\]{}|/-]/u, '\\$&');
+    // Only the syntax characters are escaped: under the u flag an escape such as \- outside a
+    // class is a SyntaxError, and a hyphen outside a class is already literal.
+    else re += c.replace(/[\\^$.*+?()[\]{}|/]/u, '\\$&');
   }
   return new RegExp(`^${re}$`, 'u');
 }
@@ -36,6 +38,15 @@ export function globProblem(glob: string): string | undefined {
   if (glob.startsWith('/')) return 'is absolute; a pattern is relative to the folder of the config file';
   if (glob.split('/').includes('..')) return 'has a .. segment; a pattern cannot leave the folder of the config file';
   if (glob.startsWith('!')) return 'starts with !; negation is not supported';
+  // Paths are matched without a leading ./ and without a trailing slash, so these forms never match.
+  if (glob.startsWith('./')) return 'starts with ./; write the path without ./, as docs/**';
+  if (glob.endsWith('/')) return 'ends with a slash; add ** to match a folder, as docs/**';
+  // A pattern that loads must also compile, so a bad one is a config error and not a crash later.
+  try {
+    globToRegExp(glob);
+  } catch (error) {
+    return `cannot be compiled: ${(error as Error).message}`;
+  }
   return undefined;
 }
 
