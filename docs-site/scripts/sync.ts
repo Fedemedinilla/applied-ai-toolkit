@@ -141,11 +141,16 @@ function segments(line: string): Array<{ text: string; code: boolean }> {
 }
 
 const FENCE = /^\s*(`{3,}|~{3,})/;
+/** A closing fence carries no info string: a line such as ```md inside a block is code. */
+const FENCE_CLOSE = /^\s*(`{3,}|~{3,})\s*$/;
 const SCHEME = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
-/** The target of an inline link or image, after its label: `](target)` or `](target "title")`. */
-const INLINE_TARGET = /\]\(([^()\s]+)(\s+"[^"]*")?\)/g;
-/** A reference definition: `[label]: target`. */
-const DEFINITION = /^(\s{0,3}\[[^\]]+\]:\s+)(\S+)/;
+/**
+ * The target of an inline link or image, after its label: `](target)`, `](<target>)` or either
+ * with a title in "...", '...' or (...). A bare target may hold one level of balanced parentheses.
+ */
+const INLINE_TARGET = /\]\((<[^<>\n]*>|(?:[^()\s<]|\([^()\s]*\))(?:[^()\s]|\([^()\s]*\))*)(\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\)/g;
+/** A reference definition: `[label]: target`. A footnote, `[^label]: text`, is not one. */
+const DEFINITION = /^(\s{0,3}\[(?!\^)[^\]]+\]:\s+)(\S+)/;
 
 /**
  * One link target as the docs site needs it, or null when it does not exist. Absolute URLs and
@@ -183,13 +188,15 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
     if (next === null) broken.push(target);
     return next ?? target;
   };
+  const fixInline = (target: string): string => (target.startsWith('<') ? `<${fix(target.slice(1, -1))}>` : fix(target));
   let fence: string | undefined;
   const lines = markdown.split('\n').map((line) => {
-    const marker = FENCE.exec(line)?.[1];
     if (fence !== undefined) {
-      if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) fence = undefined;
+      const close = FENCE_CLOSE.exec(line)?.[1];
+      if (close !== undefined && close[0] === fence[0] && close.length >= fence.length) fence = undefined;
       return line;
     }
+    const marker = FENCE.exec(line)?.[1];
     if (marker !== undefined) {
       fence = marker;
       return line;
@@ -199,14 +206,14 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
       return `${definition[1]}${fix(definition[2])}${line.slice(definition[0].length)}`;
     }
     return segments(line)
-      .map((s) => (s.code ? s.text : s.text.replace(INLINE_TARGET, (_all, target: string, title?: string) => `](${fix(target)}${title ?? ''})`)))
+      .map((s) => (s.code ? s.text : s.text.replace(INLINE_TARGET, (_all, target: string, title?: string) => `](${fixInline(target)}${title ?? ''})`)))
       .join('');
   });
   return { text: lines.join('\n'), broken };
 }
 
 /** Markdown inline syntax removed, for a title or a description. */
-const plainText = (markdown: string): string =>
+export const plainText = (markdown: string): string =>
   markdown
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<((?:https?:)[^>]+)>/g, '$1')
@@ -216,20 +223,27 @@ const plainText = (markdown: string): string =>
 
 const DESCRIPTION_LIMIT = 200;
 
-/** The first sentences of a paragraph that fit the limit; always at least one. */
+/**
+ * The first sentences of a paragraph that fit the limit; always at least one. A sentence ends
+ * only at punctuation followed by whitespace, so README.md, Node.js or 1.50 stay whole, and the
+ * result is always a prefix of the paragraph.
+ */
 function shorten(paragraph: string): string {
-  const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [paragraph];
   let out = '';
-  for (const sentence of sentences) {
-    if (out !== '' && (out + sentence).length > DESCRIPTION_LIMIT) break;
-    out += sentence;
+  for (const sentence of paragraph.split(/(?<=[.!?])\s+/)) {
+    const next = out === '' ? sentence : `${out} ${sentence}`;
+    if (out !== '' && next.length > DESCRIPTION_LIMIT) break;
+    out = next;
   }
   return out.trim();
 }
 
-/** The H1, the first paragraph after it, and the document without the H1. */
+/**
+ * The H1, the first paragraph after it, and the document without the H1. A leading byte order
+ * mark and CRLF line endings (a Windows checkout with core.autocrlf) are normalized first.
+ */
 export function splitDocument(markdown: string, source: string): { title: string; description: string; body: string } {
-  const lines = markdown.split('\n');
+  const lines = markdown.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
   const at = lines.findIndex((line) => line.trim() !== '');
   const title = /^# (.+)$/.exec(lines[at] ?? '')?.[1];
   if (title === undefined) throw new Error(`${source}: the first line is not an H1, so the page has no title`);

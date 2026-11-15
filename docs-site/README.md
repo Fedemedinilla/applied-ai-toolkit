@@ -51,5 +51,6 @@ After the build, [`scripts/check-links.ts`](scripts/check-links.ts) reads `dist/
 ## Limits
 
 - The link rewriter reads inline links, images and reference definitions. It does not read `href` or `src` in raw HTML, which no README uses today.
+- The sync checks that a link's file exists, not its anchor. Anchors on docs pages are checked by `check-links.ts` after `astro build`, which runs in `build:docs` on `main`, not in pull request CI. Anchors on links that become GitHub URLs are not checked at all.
 - The root README has no page. Links to it go to GitHub.
 - GitHub Pages cannot send response headers, so the site is served without a Content-Security-Policy, like the demos.

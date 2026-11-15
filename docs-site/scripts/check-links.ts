@@ -18,6 +18,7 @@ const SCHEME = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 /** An opening tag. Text content escapes its <, so a quoted href inside a code sample is not one. */
 const TAG = /<[a-zA-Z][^<>]*>/g;
 const ATTRIBUTE = /\s(?:href|src)="([^"]*)"/g;
+const ID = /\sid="([^"]*)"/;
 
 const decodeEntities = (value: string): string =>
   value.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -33,10 +34,22 @@ export function htmlFiles(dir: string, prefix = ''): string[] {
   return out.sort();
 }
 
-/** The file in dist that a URL path under the base is served from, or null when there is none. */
+const decode = (value: string): string | null => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The file in dist that a decoded and normalized URL path under the base is served from, or null
+ * when there is none.
+ */
 function served(dist: string, urlPath: string): string | null {
   if (urlPath !== BASE && !urlPath.startsWith(`${BASE}/`)) return null;
-  const relative = decodeURIComponent(urlPath.slice(BASE.length + 1));
+  const relative = urlPath.slice(BASE.length + 1);
+  if (relative === '..' || relative.startsWith('../')) return null;
   const candidates = relative === '' || relative.endsWith('/') ? [`${relative}index.html`] : [relative, `${relative}/index.html`];
   for (const candidate of candidates) {
     const file = join(dist, candidate);
@@ -49,9 +62,16 @@ function served(dist: string, urlPath: string): string | null {
 export function brokenLinks(dist: string): string[] {
   const problems: string[] = [];
   const html = new Map(htmlFiles(dist).map((file) => [file, readFileSync(join(dist, file), 'utf8')]));
+  // Ids come only from opening tags: code text and attributes such as data-x-id do not count.
+  const ids = new Map(
+    [...html].map(([file, page]) => [file, new Set([...page.matchAll(TAG)].flatMap((tag) => {
+      const id = ID.exec(tag[0])?.[1];
+      return id === undefined ? [] : [decodeEntities(id)];
+    }))]),
+  );
   const hasId = (file: string, id: string): boolean => {
-    const page = html.get(file);
-    return page === undefined || page.includes(`id="${id}"`);
+    const set = ids.get(file);
+    return set === undefined || set.has(id);
   };
   for (const [file, page] of html) {
     const pagePath = `${BASE}/${file.replace(/(^|\/)index\.html$/, '$1')}`;
@@ -59,8 +79,13 @@ export function brokenLinks(dist: string): string[] {
     for (const link of links) {
       if (link === '' || SCHEME.test(link)) continue;
       const hashAt = link.indexOf('#');
-      const path = (hashAt === -1 ? link : link.slice(0, hashAt)).replace(/\?.*$/, '');
-      const fragment = hashAt === -1 ? '' : decodeURIComponent(link.slice(hashAt + 1));
+      // Decode before normalizing, as a browser does, so %2e%2e is a dot segment here as well.
+      const path = decode((hashAt === -1 ? link : link.slice(0, hashAt)).replace(/\?.*$/, ''));
+      const fragment = hashAt === -1 ? '' : decode(link.slice(hashAt + 1));
+      if (path === null || fragment === null) {
+        problems.push(`${file}: ${link} (malformed percent-encoding)`);
+        continue;
+      }
       const target = path === '' ? pagePath : path.startsWith('/') ? posix.normalize(path) : posix.normalize(posix.join(posix.dirname(`${pagePath}x`), path));
       const targetFile = served(dist, target);
       if (targetFile === null) {

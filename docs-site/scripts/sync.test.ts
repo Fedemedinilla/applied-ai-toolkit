@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { brokenLinks, pageMismatch } from './check-links.ts';
 import { BASE, GROUPS, REPO_URL } from './site.ts';
-import { type LinkContext, type PathKind, plan, renderPage, REPO_ROOT, rewriteLinks, rewriteTarget, sidebar, splitDocument, sync } from './sync.ts';
+import { type LinkContext, type PathKind, plan, plainText, renderPage, REPO_ROOT, rewriteLinks, rewriteTarget, sidebar, splitDocument, sync } from './sync.ts';
 
 const TREE: Readonly<Record<string, PathKind>> = {
   '': 'dir',
@@ -113,6 +113,24 @@ describe('rewriteLinks', () => {
     expect(text).toBe(markdown.replace('(../evals/)', `(${BASE}/evals/)`));
   });
 
+  it('closes a fence only on a marker with no info string', () => {
+    const markdown = ['```', '```md', '[f](../evals/README.md)', '```', '[g](../evals/)'].join('\n');
+    const { text, broken } = rewrite(markdown);
+    expect(broken).toEqual([]);
+    expect(text).toBe(markdown.replace('(../evals/)', `(${BASE}/evals/)`));
+  });
+
+  it('leaves a footnote definition alone, and still rewrites a reference definition', () => {
+    const markdown = 'Text.[^1]\n\n[^1]: Measured on 2026-10-02.\n[e]: ../evals/';
+    expect(rewrite(markdown)).toEqual({ text: markdown.replace('../evals/', `${BASE}/evals/`), broken: [] });
+  });
+
+  it('reads angle-bracket targets, single-quoted and parenthesized titles, and parentheses in a path', () => {
+    const { text, broken } = rewrite("[a](<../evals/README.md>) [s](<a file.txt>) [b](../evals/README.md 'T') [p](src/caps.ts (T)) [c](missing(1).md)");
+    expect(text).toBe(`[a](<${BASE}/evals/>) [s](<${blob('gateway/a%20file.txt')}>) [b](${BASE}/evals/ 'T') [p](${blob('gateway/src/caps.ts')} (T)) [c](missing(1).md)`);
+    expect(broken).toEqual(['missing(1).md']);
+  });
+
   it('reports each link whose file does not exist, and keeps it as written', () => {
     const { text, broken } = rewrite('[a](src/missing.ts) and [b](../nowhere/README.md#x) and [c](src/caps.ts)');
     expect(broken).toEqual(['src/missing.ts', '../nowhere/README.md#x']);
@@ -130,6 +148,30 @@ describe('splitDocument and renderPage', () => {
     const long = `${'word '.repeat(50).trim()}.`;
     expect(splitDocument(`# T\n\nShort one. ${long}\n`, 'x').description).toBe('Short one.');
     expect(splitDocument(`# T\n\n${long} Short one.\n`, 'x').description).toBe(long);
+  });
+
+  it.each([
+    'Read the root README.md first. Then the rest.',
+    'Built on Node.js and Astro. It works.',
+    'Scripts for the demos on example.test. This is the record.',
+    'Costs US$ 1.50 per call. Cheap.',
+    'Use a short name, e.g. this one. Then more.',
+  ])('keeps a period inside a word as part of its sentence: %s', (paragraph) => {
+    const description = splitDocument(`# T\n\n${paragraph}\n`, 'x').description;
+    expect(description).toBe(paragraph);
+  });
+
+  it('cuts after a whole sentence even when the first one has an inner period', () => {
+    const long = `${'word '.repeat(50).trim()}.`;
+    expect(splitDocument(`# T\n\nSee README.md now. ${long}\n`, 'x').description).toBe('See README.md now.');
+  });
+
+  it('reads a document checked out with CRLF line endings or a byte order mark', () => {
+    const lf = splitDocument('# Title\n\nFirst para.\n\n## Use\n', 'x');
+    expect(splitDocument('# Title\r\n\r\nFirst para.\r\n\r\n## Use\r\n', 'x')).toEqual(lf);
+    expect(splitDocument('\uFEFF# Title\n\nFirst para.\n\n## Use\n', 'x')).toEqual(lf);
+    const page = { source: 'gateway/README.md', slug: 'gateway', label: 'gateway' };
+    expect(renderPage('\uFEFF# T\r\n\r\nSee [e](../evals/).\r\n', page, ctx).content).toBe(renderPage('# T\n\nSee [e](../evals/).\n', page, ctx).content);
   });
 
   it('refuses a document with no H1 or no first paragraph', () => {
@@ -213,6 +255,15 @@ describe('the real repository', () => {
     }
   });
 
+  it('gives every page a description that is the start of its first paragraph', () => {
+    for (const page of pages) {
+      const markdown = readFileSync(join(REPO_ROOT, page.source), 'utf8');
+      const { description, body } = splitDocument(markdown, page.source);
+      const first = plainText(body.split(/\n\s*\n/)[0] ?? '');
+      expect(first.startsWith(description), `${page.source}: ${description}`).toBe(true);
+    }
+  });
+
   it('groups the sidebar like the root README, with Project last and the license on GitHub', () => {
     const items = sidebar(pages);
     expect(items.map((i) => i.label)).toEqual(['Overview', 'Start here', ...GROUPS.map((g) => g.label), 'Project']);
@@ -261,6 +312,30 @@ describe('the dist checker', () => {
       `index.html: ${BASE}/gateway/#nope (no element with id "nope" in gateway/index.html)`,
       `index.html: /gateway/ (outside the base ${BASE}/)`,
       `index.html: /applied-ai-toolkit/caja/ (outside the base ${BASE}/)`,
+    ]);
+  });
+
+  it('takes ids only from opening tags, not from code text or other attributes', () => {
+    build({
+      'index.html': `<a href="${BASE}/gateway/#limits">a</a><a href="${BASE}/gateway/#nope">b</a><a href="${BASE}/gateway/#install">c</a>`,
+      'gateway/index.html': '<h2 data-x="1" id="install">Install</h2><pre><code>&lt;div id="limits"&gt;</code></pre><span data-nope-id="nope"></span>',
+    });
+    expect(brokenLinks(dist)).toEqual([
+      `index.html: ${BASE}/gateway/#limits (no element with id "limits" in gateway/index.html)`,
+      `index.html: ${BASE}/gateway/#nope (no element with id "nope" in gateway/index.html)`,
+    ]);
+  });
+
+  it('reports encoded dot segments that leave the base and malformed percent-encoding, without throwing', () => {
+    // The site sits one level down, so the encoded dot segment points at a file that exists.
+    build({
+      'site/index.html': `<a href="${BASE}/%2e%2e/secret.html">up</a><a href="${BASE}/%E0%A4%A/">bad path</a><a href="${BASE}/#%E0%A4%A">bad hash</a>`,
+      'secret.html': '',
+    });
+    expect(brokenLinks(join(dist, 'site'))).toEqual([
+      `index.html: ${BASE}/%2e%2e/secret.html (outside the base ${BASE}/)`,
+      `index.html: ${BASE}/%E0%A4%A/ (malformed percent-encoding)`,
+      `index.html: ${BASE}/#%E0%A4%A (malformed percent-encoding)`,
     ]);
   });
 
