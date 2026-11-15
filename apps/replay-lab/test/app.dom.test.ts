@@ -250,11 +250,20 @@ describe('batch', () => {
   });
 
   it('the same form gives the same report hash twice', () => {
-    mount();
+    const harness = mount();
     $<HTMLFormElement>('#batch-form').requestSubmit();
     const first = $('#batch-result code').getAttribute('title');
+    $('#batch-result').replaceChildren();
     $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(harness.batches).toBe(2);
     expect($('#batch-result code').getAttribute('title')).toBe(first);
+  });
+
+  it('a runner that answers before start() returns leaves the form ready for the next batch', () => {
+    const harness = mount();
+    for (let i = 0; i < 3; i++) $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(harness.batches).toBe(3);
+    expect($('#cancel-batch').hidden).toBe(true);
   });
 
   it('refuses an out-of-range run count without starting', () => {

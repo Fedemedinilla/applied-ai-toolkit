@@ -84,6 +84,8 @@ function formula(entry: LogEntry): string {
 export function mountApp(doc: Document, deps: Deps): App {
   let session: Session | null = null;
   let downloadUrl: string | null = null;
+  // The running batch: a token that its messages must still match, and its cancel function.
+  let activeBatch: object | null = null;
   let cancelBatch: (() => void) | null = null;
 
   const seedForm = byId<HTMLFormElement>(doc, 'seed-form');
@@ -307,6 +309,7 @@ export function mountApp(doc: Document, deps: Deps): App {
   runsInput.max = String(MAX_RUNS);
 
   function finishBatch(): void {
+    activeBatch = null;
     cancelBatch = null;
     runButton.disabled = false;
     cancelButton.hidden = true;
@@ -341,7 +344,7 @@ export function mountApp(doc: Document, deps: Deps): App {
 
   batchForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (cancelBatch) return;
+    if (activeBatch) return;
     const request = checkRequest({ runs: Number(runsInput.value), dice: Number(diceSelect.value), seedPrefix: prefixInput.value.trim() });
     if (typeof request === 'string') {
       batchStatus.textContent = `Not started: ${request}.`;
@@ -355,7 +358,12 @@ export function mountApp(doc: Document, deps: Deps): App {
     progress.value = 0;
     batchStatus.textContent = `Running ${request.runs.toLocaleString('en-US')} runs in a worker...`;
     let announcedQuarter = 0;
-    cancelBatch = deps.batch.start(request, (message) => {
+    // A runner may answer before start() returns, so the batch is identified by a token set first,
+    // and the cancel function is kept only while that batch is still the running one.
+    const token = {};
+    activeBatch = token;
+    const stop = deps.batch.start(request, (message) => {
+      if (activeBatch !== token) return;
       if (message.type === 'progress') {
         progress.value = message.done;
         // The status line changes once per quarter, so a screen reader is not read every update.
@@ -375,6 +383,7 @@ export function mountApp(doc: Document, deps: Deps): App {
       renderReport(message.report, message.hash, ms);
       batchStatus.textContent = `Done: ${message.report.runs.toLocaleString('en-US')} runs, mean score ${mean(message.report.score)}, median ${message.report.score.p50}.`;
     });
+    if (activeBatch === token) cancelBatch = stop;
   });
 
   cancelButton.addEventListener('click', () => {
