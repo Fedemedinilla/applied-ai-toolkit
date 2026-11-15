@@ -101,6 +101,16 @@ describe('time', () => {
     expect(decide(b({ date: '2026-11-05' }), TODAY, 'es', '19:50').ok).toBe(true);
   });
 
+  it('a time today that does not fit, once the last start has gone by, is too late today', () => {
+    // Saturday balayage: the last start is 12:00. At 13:00 a 14:00 request must not offer 12:00.
+    const sat = '2026-11-07';
+    expect(decide(b({ time: '14:00' }), sat, 'es', '13:00')).toMatchObject({ ok: false, reason: 'too_late_today', say: 'Hoy ya no llega a entrar Balayage antes del cierre. ¿Vemos otro día?' });
+    expect(reason(decide(b({ time: '14:00' }), sat, 'en', '12:00'))).toBe('too_late_today');
+    // Before the last start, the refusal still names it, and so it does on any other day.
+    expect(decide(b({ time: '14:00' }), sat, 'es', '11:00')).toMatchObject({ reason: 'late_start', say: expect.stringContaining('arranca 12:00') });
+    expect(reason(decide(b({ time: '14:00' }), TODAY, 'es', '13:00'))).toBe('late_start');
+  });
+
   it('today with no time lists only the people who can still start', () => {
     // Wednesday men's cut: Rubén until 15:00, Damián until 20:00. At 16:00 only Damián is left.
     const d = decide(b({ service: 'Corte de hombre (máquina y tijera)', date: TODAY }), TODAY, 'es', '16:00');
@@ -148,6 +158,33 @@ describe('services', () => {
   it("English \"men's cut\" is the men's cut, not also the women's", () => {
     expect(findService("men's cut", 'en')?.id).toBe('corte-hombre');
     expect(findService('Men’s cut', 'en')?.id).toBe('corte-hombre');
+  });
+
+  it('a request that names a row and something more is not a card for that row alone', () => {
+    // The combo row "Corte + barba" is 23000 and 50 minutes; the men's cut alone is 16000 and 30.
+    const cutAndBeard = decide(b({ service: 'Corte de hombre (máquina y tijera) + barba', date: '2026-11-17' }), TODAY);
+    expect(cutAndBeard).toMatchObject({
+      ok: false,
+      reason: 'ambiguous_service',
+      say: '"Corte de hombre (máquina y tijera) + barba" me da para varios: Corte de hombre (máquina y tijera), Perfilado de barba. ¿Cuál de esos?',
+    });
+    expect(reason(decide(b({ service: 'Balayage y corte de mujer' }), TODAY))).toBe('ambiguous_service');
+    expect(reason(decide(b({ service: "Men's cut (clippers and scissors) + beard" }), TODAY, 'en'))).toBe('ambiguous_service');
+    // Something more that is not a row: not loaded, rather than the row it came with.
+    expect(reason(decide(b({ service: 'Balayage y alisado japonés' }), TODAY))).toBe('service_not_loaded');
+    // Words that name nothing do not change the row.
+    expect(findService('un balayage, por favor')?.id).toBe('balayage');
+    expect(findService('a balayage, please', 'en')?.id).toBe('balayage');
+  });
+
+  it('a refusal quotes the model’s service on one line and cut to 60 characters', () => {
+    expect(decide(b({ service: '  Fade\n  con   diseño ' }), TODAY)).toMatchObject({ say: expect.stringContaining('No tengo cargado "Fade con diseño" como servicio') });
+    const long = `Fade ${'x'.repeat(54)} y más`;
+    expect(decide(b({ service: long }), TODAY)).toMatchObject({ say: expect.stringContaining(`No tengo cargado "Fade ${'x'.repeat(52)}..." como servicio`) });
+    const sixty = `Fade ${'x'.repeat(55)}`;
+    expect(decide(b({ service: sixty }), TODAY)).toMatchObject({ say: expect.stringContaining(`"${sixty}"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(50)}  y` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(50)} y"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(51)}   abcd` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(51)}..."`) });
   });
 
   it('the card carries the row’s price and minutes, never the model’s', () => {

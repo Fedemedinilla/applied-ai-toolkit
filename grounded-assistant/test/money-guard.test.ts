@@ -2,7 +2,7 @@
 // a passing case so nobody rediscovers it.
 
 import { describe, expect, it } from 'vitest';
-import { ALLOWED_MONEY, cardInWords, misstatedRows, moneyIsOurs, moneyToEn, moneyVerdict, plainText, quantityMentioned, reachable, SALON_SERVICES, withoutControls } from '../src/index.ts';
+import { ALLOWED_MONEY, cardInWords, MAX_QUANTITY, misstatedRows, moneyIsOurs, moneyToEn, moneyVerdict, plainText, quantityMentioned, reachable, SALON_SERVICES, withoutControls } from '../src/index.ts';
 
 const LIST = SALON_SERVICES.map((s) => `${s.name}: $${s.price.toLocaleString('es-AR')}`).join('\n');
 
@@ -47,7 +47,7 @@ describe('what is stopped', () => {
     ['a negative figure', 'El corte sale $16.000 y te descuento $-5.000.'],
     ['real cents are not the row', 'El corte de hombre sale $16.000,50.'],
     ['$32.000 with no quantity written', 'El corte de hombre sale $32.000.'],
-    ['twenty-five is past the cap', 'Veinticinco cortes de hombre: $400.000.'],
+    ['a number word the quantity table does not hold is no quantity', 'Veinticinco cortes de hombre: $400.000.'],
     ['the whole list does not save a figure no sum reaches', `${LIST}\nTe hago todo por $40.500.`],
   ];
   it.each(stop)('%s', (_label, reply) => expect(moneyIsOurs(reply)).toBe(false));
@@ -83,8 +83,13 @@ describe('quantityMentioned', () => {
     ['Come once a month.', 1, 'en'],
     ['Por los 11, sumando, da $121.000.', 11, 'es'],
     ['$16.000 x2', 2, 'es'],
+    // The bound is MAX_QUANTITY, twenty: the word table, the digit patterns and "x" all stop there.
+    ['Por los 20 cortes de hombre.', 20, 'es'],
+    ['Por los 21 cortes de hombre.', 1, 'es'],
+    ['$16.000 x25', 1, 'es'],
   ];
   it.each(cases)('%s is %i', (text, n, lang) => expect(quantityMentioned(text, lang)).toBe(n));
+  it('the largest quantity read is MAX_QUANTITY', () => expect(MAX_QUANTITY).toBe(20));
 });
 
 describe('misstated rows and the verdict', () => {
@@ -105,6 +110,33 @@ describe('misstated rows and the verdict', () => {
 
   it('a wrong price on another service withdraws the card', () => {
     expect(moneyVerdict('Balayage: $78.000. El matizado sale $15.000.', { service: 'Balayage' })).toBe('apology');
+  });
+});
+
+describe('decomposed accents (NFD)', () => {
+  const nfd = (t: string) => t.normalize('NFD');
+  it('a service name with a decomposed accent is still named', () => {
+    expect(misstatedRows(nfd('El color de raíz sale $52.000.')).map((r) => r.id)).toEqual(['color-raiz']);
+  });
+  it('the verdict is the same as on composed text', () => {
+    const reply = 'Listo, el color de raíz sale $52.000. Te lo paso al local.';
+    expect(moneyVerdict(nfd(reply), { service: 'Color de raíz, un solo tono' })).toBe(moneyVerdict(reply, { service: 'Color de raíz, un solo tono' }));
+    expect(moneyVerdict(nfd(reply), { service: 'Color de raíz, un solo tono' })).toBe('card');
+  });
+});
+
+describe('price phrases over long gaps', () => {
+  // Three whitespace quantifiers side by side once backtracked cubically: 4,000 spaces took 9 s.
+  const gaps = [' '.repeat(5000), '\n'.repeat(5000), '\u00A0'.repeat(5000), ' ,'.repeat(2500), ' :'.repeat(2500)];
+  it.each(gaps.map((g, i) => [i, g] as const))('gap %i between a name and a figure is judged quickly', (_i, gap) => {
+    const started = performance.now();
+    moneyVerdict(`Balayage${gap}x $78.000`, null);
+    moneyVerdict(`$78.000 x${gap}el balayage`, null);
+    moneyVerdict(`Balayage${gap}y${gap}x $78.000`, null);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+  it('a padded price phrase is still a price phrase', () => {
+    expect(misstatedRows(`Balayage${' '.repeat(5000)}sale $65.000.`).map((r) => r.id)).toEqual(['balayage']);
   });
 });
 
@@ -137,6 +169,20 @@ describe('reading a figure, Spanish path', () => {
   it('"k" is not read in Spanish: $25k is $25', () => expect(moneyIsOurs('Papá e hijo sale $25k.')).toBe(false));
   it('a minus after the sign and a space is still a negative figure', () => expect(moneyIsOurs('El corte sale $16.000 y te descuento $- 5.000.')).toBe(false));
   it('a sign with punctuation and no digits is not a figure', () => expect(moneyIsOurs('Se paga en $, no en dólares.')).toBe(true));
+});
+
+describe('invisible characters and Unicode minus signs after the sign', () => {
+  // A reader sees "$99.999"; a guard that reads nothing between "$" and the digits sees no figure.
+  const cases: Array<[string, string]> = [
+    ['a zero-width space', 'El corte de hombre sale $\u200B99.999.'],
+    ['a word joiner', 'El corte de hombre sale $\u206099.999.'],
+    ['a soft hyphen', 'El corte de hombre sale $\u00AD99.999.'],
+  ];
+  it.each(cases)('%s does not hide an invented figure', (_label, reply) => expect(moneyIsOurs(reply)).toBe(false));
+  it.each(cases)('%s does not hide an invented figure in English', (_label, reply) => expect(moneyIsOurs(reply.replace('99.999', '99,999'), 'en')).toBe(false));
+  it('a real price behind a zero-width space is still the row', () => expect(moneyIsOurs('El corte de hombre sale $\u200B16.000.')).toBe(true));
+  it('U+2212 after the sign is a negative figure', () => expect(moneyIsOurs('El corte sale $16.000 y te descuento $\u22125.000.')).toBe(false));
+  it('an en dash after the sign is a negative figure', () => expect(moneyIsOurs("A men's cut is $16,000, and I take off $\u2013 5,000.", 'en')).toBe(false));
 });
 
 describe('reading a figure, English path', () => {

@@ -147,6 +147,15 @@ function realDate(iso: string): boolean {
  * time zone. Without `now`, a booking for today at an hour already gone was approved (in the
  * source, at 17:00 the assistant offered "hoy a las 12").
  */
+/** How much of the model's `service` a refusal quotes; every name on the list is shorter. */
+const QUOTED_SERVICE_MAX = 60;
+
+/** The model's `service` as a refusal quotes it: one line, at most QUOTED_SERVICE_MAX characters. */
+function quoted(service: string): string {
+  const one = service.replace(/\s+/g, ' ').trim();
+  return one.length > QUOTED_SERVICE_MAX ? `${one.slice(0, QUOTED_SERVICE_MAX - 3).trimEnd()}...` : one;
+}
+
 export function decide(b: ProposedBooking, today: string, lang: Lang = 'es', now?: string): Decision {
   const say = SAY[lang];
   const no = (reason: Refusal, text: string): Decision => ({ ok: false, reason, say: text });
@@ -155,8 +164,8 @@ export function decide(b: ProposedBooking, today: string, lang: Lang = 'es', now
     // Three different noes, because saying the wrong one is also a lie: "corte" is five rows.
     if (!b.service.trim()) return no('no_service', say.no_service());
     const options = findServices(b.service, lang);
-    if (options.length > 1) return no('ambiguous_service', say.ambiguous_service(b.service, options.map((o) => serviceName(o, lang))));
-    return no('service_not_loaded', say.service_not_loaded(b.service));
+    if (options.length > 1) return no('ambiguous_service', say.ambiguous_service(quoted(b.service), options.map((o) => serviceName(o, lang))));
+    return no('service_not_loaded', say.service_not_loaded(quoted(b.service)));
   }
   const name = serviceName(service, lang);
 
@@ -196,6 +205,8 @@ export function decide(b: ProposedBooking, today: string, lang: Lang = 'es', now
     possible = doable.filter((s) => fits(s, service, weekday, time));
     if (!possible.length) {
       const lastStart = Math.max(...doable.map((s) => window(s).closes - service.minutes));
+      // A last start that has gone by today is not an alternative to offer.
+      if (now && b.date === today && lastStart <= toMin(now)) return no('too_late_today', say.too_late_today(name));
       return no('late_start', say.late_start(name, service.minutes, toHHMM(lastStart)));
     }
   } else if (now && b.date === today) {

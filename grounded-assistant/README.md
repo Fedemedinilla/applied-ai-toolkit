@@ -17,7 +17,7 @@ I extracted it from the assistant demo on [federicomedinilla.com](https://federi
 From the repository root, offline:
 
 ```sh
-npx vitest run grounded-assistant   # 191 tests, under a second, no key
+npx vitest run grounded-assistant   # 224 tests, under a second, no key
 npm run check                       # tsc --noEmit, strict
 ```
 
@@ -41,7 +41,7 @@ The salon's data, the context the model reads and both prompts (Spanish and Engl
 3. Each turn is cut to 600 characters and trimmed; the last one must be a user turn.
 4. `propose` gets the rules and the context (one stable block), today's date and time in the salon's zone (a second block), the schema and the messages. A reply with a control character in it gets one more try.
 5. Links and `www.` come out of the prose, and control characters are mended.
-6. A proposed booking goes through `decide()`. A refusal replaces the prose with a sentence that names the failed check, and `bookingRejected` carries its code.
+6. A proposed booking goes through `decide()`. A refusal replaces the prose with a sentence that names the failed check, and `bookingRejected` carries its code. A refusal that quotes the model's `service` quotes at most 60 characters of it and goes through the same cleaning as step 5.
 7. The money guard judges the prose. An invented figure replaces the reply with an apology and withdraws the card (`bookingWithdrawn`). A wrong price on the card's own service keeps the card and rewrites the reply as the card in words. On the English path, figures are rewritten as `$16,000`.
 8. A reply that contains an email address is replaced.
 9. The reply is signed together with the conversation it closes, and sent.
@@ -50,7 +50,7 @@ The salon's data, the context the model reads and both prompts (Spanish and Engl
 
 **The model proposes, code decides.** The card is the one thing the demo promises is true, so nothing on it comes from the model. The price and duration come from the row and the stylist from the grid. A refused booking also replaces the prose, because the model wrote it to accompany a booking that is not happening. In the source, prose and card once disagreed: the sentence promised a slot that no card showed.
 
-**An empty, ambiguous or unknown service gets its own answer.** `findService` used to answer anything. `findService('')`, `('a')` and `('de')` all returned the men's cut at $16.000, the first row whose name contained that letter, and an empty service is what a stalled model emits. Nothing under four characters (three in English) matches by inclusion now. A fragment that fits several rows ("corte" is five) asks which one. Only a name that matches no row is "not loaded", and that answer points to the salon's site.
+**An empty, ambiguous or unknown service gets its own answer.** `findService` used to answer anything. `findService('')`, `('a')` and `('de')` all returned the men's cut at $16.000, the first row whose name contained that letter, and an empty service is what a stalled model emits. Nothing under four characters (three in English) matches by inclusion now. A fragment that fits several rows ("corte" is five) asks which one. So does a row named with another service. "Corte de hombre (máquina y tijera) + barba" once came back as the men's cut alone, at $16.000 and 30 minutes. Only a name that matches no row is "not loaded", and that answer points to the salon's site.
 
 **The whole service has to fit.** An early draft accepted 150 minutes of highlights starting when the colourist had less than that left: the model reasoned about the start and forgot the duration. `fits()` checks the start and end against the salon's hours and the person's shift. With a time, every person who could take it is checked. The source once checked only the first person in the list. It answered "the last start is 14:30" (that person's closing) while another barber worked until 18:00. It also put someone who starts at 13:00 on a 09:30 card. Without a time, a request for today keeps only the people who can still start after now and finish before closing. An earlier version approved a 180-minute balayage for today at 19:50, after the colourist's shift had ended.
 
@@ -58,7 +58,7 @@ The salon's data, the context the model reads and both prompts (Spanish and Engl
 
 **Reachable sums, computed and pruned.** The prompt requires a total from three services on. A guard that only knew single rows punished that. In the source, five of six two-service totals were replaced by the apology. The next version enumerated subsets and gave up past 8 rows, which killed "send me the full price list and tell me what a cut with blow-dry costs". `reachable()` builds the set of sums, one row at a time, of the rows the reply shows, pruned at the largest figure in the reply. Every price is a multiple of 1,000 over a table that adds up to 530,000, so the set has at most 531 sums. A bare total with nothing shown still dies, because the sum is trusted only when its parts are on screen.
 
-**Rows count as often as the reply shows them.** A price counts as many times as the reply writes it, names distinct rows that cost it, or writes a quantity ("dos cortes", "three blow-dries", "x2"), whichever is more. Quantity detection skips hours ("a las once"), dates ("sábado 10", "el doce de octubre") and durations ("dos horas"), and caps at twenty. A quantity multiplies only rows the reply shows, not the whole table, so "dos" somewhere in a reply does not make 2 x $13.000 ours when no shave was mentioned.
+**Rows count as often as the reply shows them.** A price counts as many times as the reply writes it, names distinct rows that cost it, or writes a quantity ("dos cortes", "three blow-dries", "x2"), whichever is more. Quantity detection skips hours ("a las once"), dates ("sábado 10", "el doce de octubre") and durations ("dos horas"), and reads up to twenty. The word table and the digit patterns stop there, so "veinticinco" and "21" are no quantity. A quantity multiplies only rows the reply shows, not the whole table, so "dos" somewhere in a reply does not make 2 x $13.000 ours when no shave was mentioned.
 
 **Reading the number, not its typography.** "$16.000,00" is sixteen thousand; the source's first reader dropped separators and read 1,600,000, which killed a true reply. `\s*` after the sign, because with one optional space "$  99.999" matched nothing and an invented price went through. A minus is read only between the sign and the digits, since "- $16.000" is a bullet. The `$0` seed of the sum set is excluded, so "te lo dejo en $0" is not ours.
 
@@ -74,10 +74,10 @@ The salon's data, the context the model reads and both prompts (Spanish and Engl
 
 | File | Covers |
 |---|---|
-| `test/decide.test.ts` | Closed days, past and impossible dates, UTC calendar days, nobody for the service that day, unknown and wrong stylists, blank names, the last start across everyone who could take it, candidates at a time, past times today including the current minute, today with no time after the last possible start, the 90-day horizon, English times, empty and ambiguous services, unloaded services |
-| `test/money-guard.test.ts` | The source's cases: true prices and sums that pass, invented figures that die, each pinned known gap (a whole table makes most totals reachable; figures without `$`; a discount that lands on another real row); quantity detection with hours, dates and durations; misstated rows and the three verdicts; the sum set's bound; English rewriting; control characters |
+| `test/decide.test.ts` | Closed days, past and impossible dates, UTC calendar days, nobody for the service that day, unknown and wrong stylists, blank names, the last start across everyone who could take it, candidates at a time, past times today including the current minute, a time today that does not fit once the last start has gone by, today with no time after the last possible start, the 90-day horizon, English times, empty and ambiguous services, a row named with something more, unloaded services |
+| `test/money-guard.test.ts` | The source's cases: true prices and sums that pass, invented figures that die, each pinned known gap (a whole table makes most totals reachable; figures without `$`; a discount that lands on another real row); quantity detection with hours, dates and durations; misstated rows and the three verdicts; the sum set's bound and the quantity bound; English rewriting; control characters; invisible characters and Unicode minus signs after the sign; decomposed accents; long whitespace gaps in price phrases |
 | `test/corpus.test.ts` | 55 replies written to break the guard (30 Spanish, 25 English), each labelled from the salon's facts. 36 get the right verdict. 19 are known misses in three kinds, and each is asserted to still be wrong, so a fix shows up as a failing test until it leaves the list |
-| `test/handler.test.ts` | The whole turn with a scripted `propose`: the system blocks and the clock line, cards, refusals that replace prose, the apology that withdraws a card, the card in words, links and addresses removed, the garbled-reply retry and the first reply kept when the retry is garbled too; v2 signatures across turns, forged, moved and replayed replies, edited history, short secrets; request shape, turn limit, cut and trim, model failures |
+| `test/handler.test.ts` | The whole turn with a scripted `propose`: the system blocks and the clock line, cards, refusals that replace prose and are cleaned like it, the apology that withdraws a card, the card in words, links and addresses removed, the garbled-reply retry and the first reply kept when the retry is garbled too; v2 signatures across turns, forged, moved and replayed replies, edited history, short secrets; the rules quoting the salon tables; request shape, the 405 body, the limiter that never reads the body, a declared Content-Length, the eighth and ninth turns, cut and trim, a padded history sent back as received, model failures |
 
 The model over the real gateway and a fake Anthropic HTTP API is tested in [`apps/salon-assistant`](../apps/salon-assistant/).
 
@@ -89,13 +89,13 @@ npm run mutation:grounded-assistant   # StrykerJS over src/decide.ts and src/mon
 
 Stryker changes the code one small edit at a time and runs this folder's tests against each mutant; a mutant that survives is a line a bug could change with no test failing. The report goes to `reports/mutation/grounded-assistant/`.
 
-Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+Measured on 2026-11-15 with StrykerJS 10.1.1, on 4 cores of a shared cloud container, after the fixes of the 2026-11-15 audit:
 
 | File | Mutants | Killed | Timeout | Survived | Not covered | Score |
 | --- | --- | --- | --- | --- | --- | --- |
-| `src/decide.ts` | 252 | 239 | 0 | 9 | 4 | 94.84% |
-| `src/money-guard.ts` | 659 | 474 | 1 | 165 | 19 | 72.08% |
-| Both | 911 | 713 | 1 | 174 | 23 | 78.38% |
+| `src/decide.ts` | 276 | 263 | 0 | 9 | 4 | 95.29% |
+| `src/money-guard.ts` | 676 | 488 | 2 | 167 | 19 | 72.49% |
+| Both | 952 | 751 | 2 | 176 | 23 | 79.10% |
 
 The first run scored 70.69% (`decide.ts` 86.51%, `money-guard.ts` 64.64%). The gaps it showed, each now a test:
 
@@ -108,16 +108,16 @@ The first run scored 70.69% (`decide.ts` 86.51%, `money-guard.ts` 64.64%). The g
 
 What survives in `decide.ts` (13 mutants) is equivalent on the shipped salon tables. The `too_long` refusal and the window arithmetic before it cannot be reached, because no service is longer than the shortest shift of someone who does it. `upper()` is applied to English service names that already start with a capital. The Spanish staff list is never shorter than two names. They would stop being equivalent if the tables changed, and the tests should grow with them.
 
-What survives in `money-guard.ts` (184 mutants) is not equivalent, and is listed here as untested:
+What survives in `money-guard.ts` (186 mutants) is not equivalent, and is listed here as untested:
 
 | Area | Lines | Left | What is not pinned |
 | --- | --- | --- | --- |
-| Amount readers | 20 to 46 | 10 | The cents arithmetic, which no price can make visible, and a trailing run of punctuation in the raw match |
-| `quantityMentioned` | 48 to 101 | 86 | Most words of the quantity table, the weekday and month lists, and each exclusion taken alone |
-| Figures and sums | 103 to 139 | 5 | The Spanish reading of a figure only the English reader accepts |
-| Price phrase patterns | 141 to 158 | 32 | Each alternative of `STRONG_AFTER`, `WEAK_AFTER`, `STRONG_BEFORE` and `JOINER` needs a phrase of its own |
-| `misstatedRows` | 160 to 200 | 46 | Group totals, the figure before a name, and the boundaries of the quantity multiple |
-| Verdict and output | 201 on | 5 | Staff names with no accent in `withoutControls` |
+| Amount readers | 20 to 52 | 12 | The cents arithmetic, which no price can make visible, a trailing run of punctuation in the raw match, and single members of the format-character and dash classes after the sign |
+| `quantityMentioned` | 53 to 104 | 86 | Most words of the quantity table, the weekday and month lists, and each exclusion taken alone |
+| Figures and sums | 105 to 159 | 7 | The Spanish reading of a figure only the English reader accepts, and the NFC step of `moneyIsOurs` taken alone |
+| Price phrase patterns | 160 to 172 | 30 | Each alternative of `STRONG_AFTER`, `WEAK_AFTER`, `STRONG_BEFORE` and `JOINER` needs a phrase of its own |
+| `misstatedRows` | 173 to 220 | 46 | Group totals, the figure before a name, and the boundaries of the quantity multiple |
+| Verdict and output | 221 on | 5 | Staff names with no accent in `withoutControls` |
 
 The guard's verdict on whole replies is covered by the 55-reply corpus; these mutants are single alternatives inside its heuristics. A wrong one makes the guard stricter or looser on one phrasing, and the next test to write for this file is a phrase per alternative of the four patterns.
 

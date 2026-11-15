@@ -41,11 +41,18 @@ function toAmountEn(raw: string): number {
  * `\s*` and not `\s?`: with one optional space, "$  99.999" matched nothing, no match meant no
  * figures, and an invented price with two spaces after the sign went straight through. The minus
  * is read only between the sign and the digits; "- $16.000" is a bullet, not a negative.
+ * Format characters (\p{Cf}: zero-width space, word joiner, soft hyphen) and Unicode dashes count
+ * there too: a reader sees "$\u200B99.999" as "$99.999", and a pattern that read only spaces and
+ * "-" saw no figure at all, so the invented price went out.
  */
-const MONEY = /\$\s*(?:-\s*)?[\d.,]+/g;
-const MONEY_EN = /\$\s*(?:-\s*)?[\d.,]+(?:\s*k\b)?/gi;
+const MONEY = /\$[\s\p{Cf}]*(?:[-\u2010-\u2015\u2212\uFE63\uFF0D][\s\p{Cf}]*)?[\d.,]+/gu;
+const MONEY_EN = /\$[\s\p{Cf}]*(?:[-\u2010-\u2015\u2212\uFE63\uFF0D][\s\p{Cf}]*)?[\d.,]+(?:\s*k\b)?/giu;
+/** Any dash or minus a reply can put between the sign and the digits. */
+const MINUS = /[-\u2010-\u2015\u2212\uFE63\uFF0D]/;
 
-/* Quantities the reply writes: "dos cortes", "three blow-dries", "2 x". Capped at twenty. What is
+/* Quantities the reply writes: "dos cortes", "three blow-dries", "2 x". Up to twenty, MAX_QUANTITY:
+   the word table, the digit pattern and the "x" pattern all stop there, so the Math.min at the end
+   only keeps the bound if one of them grows. "veinticinco" and "21" are no quantity. What is
    not a quantity: an hour ("a las once"), a date ("sábado 10", "el doce de octubre"), a duration
    ("dos horas"). "once" is eleven only on the Spanish path. */
 const QUANTITIES: Readonly<Record<string, number>> = {
@@ -68,7 +75,7 @@ const HOUR_AFTER_ARTICLE = /^(a|de|desde|hasta|entre|y)$/;
 
 /** The largest quantity the reply writes, from 1 (none) to MAX_QUANTITY. */
 export function quantityMentioned(reply: string, lang: Lang = 'es'): number {
-  const folded = foldKeepingLength(reply);
+  const folded = foldKeepingLength(reply.normalize('NFC'));
   const words = folded.match(/\p{L}+(?:'s)?|\d+/gu) ?? [];
   let max = 1;
   for (const [i, w] of words.entries()) {
@@ -139,11 +146,12 @@ export function reachable(uses: readonly number[], cap: number): Set<number> {
   return sums;
 }
 
-export function moneyIsOurs(reply: string, lang: Lang = 'es'): boolean {
+export function moneyIsOurs(text: string, lang: Lang = 'es'): boolean {
+  const reply = text.normalize('NFC');
   const figures = figuresIn(reply, lang);
   if (!figures.length) return true;
   // No published price is negative, and this salon publishes no discounts.
-  if (figures.some((f) => f.raw.includes('-'))) return false;
+  if (figures.some((f) => MINUS.test(f.raw))) return false;
   const found = figures.map((f) => f.n);
   const sums = reachable(shownRows(reply, found, lang), Math.max(...found));
   // n > 0: the set is seeded at 0, and "te lo dejo en $0" must not be ours.
@@ -156,6 +164,11 @@ const STRONG_AFTER = /^\s*(?:\([^)]*\))?[\s,(]*(?::|sale|cuesta|vale|es|esta|es 
 const WEAK_AFTER = /^\s*(?:\([^)]*\))?[\s,(]*(?:son|salen|cuestan|valen|queda en|quedan en|queda|da|dan|suma|suman|en total|total|todo junto|are|come to|comes to|add up to|adds up to|in total|would come to)[\s:]*$/;
 const STRONG_BEFORE = /^\s*(?:el|la|los|las|del|de la|por el|por la|cada|for|for the|for a|for his|for her|for your|for my|per)?\s*$/;
 const JOINER = /^\s*(?:,|y|e|con|mas|\+|and|with|plus|&)\s*(?:el|la|los|las|un|una|the|a|an)?\s*$/;
+/* The patterns above put several whitespace quantifiers side by side, and a long run of spaces
+   before a character that does not fit made V8 try every split: 4,000 spaces took 9 s, cubically,
+   on every request of the process. A gap is tested with each run collapsed to one space, so no
+   quantifier has a run to split; the patterns treat every whitespace alike, so the verdict holds. */
+const phrase = (gap: string) => gap.replace(/\s+/g, ' ');
 
 /**
  * The rows whose price the reply states wrong: "<row> is $N" or "$N for <row>" where $N is not that
@@ -164,14 +177,17 @@ const JOINER = /^\s*(?:,|y|e|con|mas|\+|and|with|plus|&)\s*(?:el|la|los|las|un|u
  * $12,000 card; $16,000 is a real row, so moneyIsOurs passed it. Only these two shapes are judged:
  * judging any figure after a name read corrections and alternatives as contradictions.
  */
-export function misstatedRows(reply: string, lang: Lang = 'es'): Service[] {
+export function misstatedRows(text: string, lang: Lang = 'es'): Service[] {
+  // Composed first: foldKeepingLength folds one unit at a time, so in decomposed text the accent
+  // stays behind as its own character and "rai\u0301z" no longer names the root colour.
+  const reply = text.normalize('NFC');
   const figures = figuresIn(reply, lang);
   if (!figures.length) return [];
   const folded = foldKeepingLength(reply);
   const mentions = servicesNamedIn(reply);
   const found = figures.map((f) => f.n);
   const qty = quantityMentioned(reply, lang);
-  const joined = (a: Mention, b: Mention) => JOINER.test(folded.slice(a.end, b.start));
+  const joined = (a: Mention, b: Mention) => JOINER.test(phrase(folded.slice(a.end, b.start)));
   const out: Service[] = [];
   for (const [i, m] of mentions.entries()) {
     const p = m.service.price;
@@ -189,13 +205,13 @@ export function misstatedRows(reply: string, lang: Lang = 'es'): Service[] {
     const prev = [...figures].reverse().find((f) => f.at + f.raw.length <= m.start);
     let wrong = false;
     if (next && !mentions.some((o) => o.start >= m.end && o.start < next.at)) {
-      const between = folded.slice(m.end, next.at);
+      const between = phrase(folded.slice(m.end, next.at));
       if (STRONG_AFTER.test(between)) wrong = inGroup ? !total(next.n) : !multiple(next.n);
       else if (WEAK_AFTER.test(between)) wrong = !total(next.n);
     }
     if (!wrong && prev && !mentions.some((o) => o.start >= prev.at && o.end <= m.start)) {
       const between = folded.slice(prev.at + prev.raw.length, m.start);
-      if (!between.includes('\n') && STRONG_BEFORE.test(between)) wrong = inGroup ? !total(prev.n) : !multiple(prev.n);
+      if (!between.includes('\n') && STRONG_BEFORE.test(phrase(between))) wrong = inGroup ? !total(prev.n) : !multiple(prev.n);
     }
     if (wrong && !out.includes(m.service)) out.push(m.service);
   }
