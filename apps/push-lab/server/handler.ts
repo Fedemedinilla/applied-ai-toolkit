@@ -288,7 +288,9 @@ export function createHandler(deps: HandlerDeps): (request: Request) => Promise<
 
   return async (request) => {
     const match = /\/api\/([a-z-]+)$/u.exec(new URL(request.url).pathname);
-    const route = match?.[1] === undefined ? undefined : routes[match[1]];
+    // Own keys only: the route pattern also matches `constructor`, which a plain object inherits.
+    const name = match?.[1];
+    const route = name !== undefined && Object.hasOwn(routes, name) ? routes[name] : undefined;
     if (!route) return fail('not_found', 404);
     if (request.method !== route.method) return fail('method_not_allowed', 405, {}, { allow: route.method });
     return route.run(request);

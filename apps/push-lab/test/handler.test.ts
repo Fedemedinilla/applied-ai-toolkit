@@ -391,6 +391,16 @@ describe('routing', () => {
     expect(wrong.headers.get('allow')).toBe('POST');
   });
 
+  it('answers 404 for api/constructor, a name the route table must not inherit from Object.prototype', async () => {
+    const { call } = setup();
+    for (const init of [{}, { method: 'POST' }]) {
+      const response = await call('api/constructor', undefined, init);
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: 'not_found' });
+      expect(response.headers.get('allow')).toBeNull();
+    }
+  });
+
   it('redirect-check is a bare 302: no body, no content-type', async () => {
     const response = await setup().call('api/redirect-check');
     expect(response.status).toBe(302);
