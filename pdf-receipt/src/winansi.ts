@@ -7,8 +7,9 @@
 //   1. Printable ASCII, Latin-1 and the 27 extra CP1252 characters are kept.
 //   2. Typographic stand-ins with an exact ASCII equivalent are mapped (minus sign, odd spaces,
 //      non-breaking hyphen, primes).
-//   3. Otherwise NFKC is tried ("Ａ" to "A", "ﬁ" to "fi"), then NFD with the combining marks
-//      removed ("ő" to "o", "ș" to "s"). The first result that encodes is used.
+//   3. Otherwise NFKC is tried ("Ａ" to "A", "ﬁ" to "fi", "⅓" to "1/3" through the stand-ins), then
+//      NFD with the combining marks removed ("ő" to "o", "ș" to "s"). The first result that encodes
+//      is used.
 //   4. Anything else is dropped. Format characters and combining marks (zero-width joiners,
 //      bidi overrides, variation selectors) are dropped silently; a dropped visible character is
 //      counted so the caller can say that something was removed.
@@ -59,6 +60,12 @@ export interface Sanitized {
   readonly dropped: number;
 }
 
+function withStandIns(s: string): string {
+  let out = '';
+  for (const ch of s) out += STAND_INS.get(ch) ?? ch;
+  return out;
+}
+
 function sanitizeRun(run: string): Sanitized {
   let out = '';
   let dropped = 0;
@@ -72,12 +79,15 @@ function sanitizeRun(run: string): Sanitized {
       out += standIn;
       continue;
     }
-    const compat = ch.normalize('NFKC');
+    // The NFKC form can hold characters that only a stand-in makes drawable: "⅓" is "1", U+2044, "3".
+    const nfkc = ch.normalize('NFKC');
+    const compat = withStandIns(nfkc);
     if (compat !== ch && compat.length > 0 && isWinAnsi(compat)) {
-      out += compat;
+      // "1⅓" would read as eleven thirds without the space.
+      out += nfkc.includes('\u2044') && /\d$/.test(out) ? ` ${compat}` : compat;
       continue;
     }
-    const bare = ch.normalize('NFD').replace(MARKS, '');
+    const bare = withStandIns(ch.normalize('NFD').replace(MARKS, ''));
     if (bare !== ch && bare.length > 0 && isWinAnsi(bare)) {
       out += bare;
       continue;
