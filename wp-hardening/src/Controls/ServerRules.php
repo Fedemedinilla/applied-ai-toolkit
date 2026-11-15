@@ -122,16 +122,18 @@ final class ServerRules implements Control
     public function nginxBlock(): string
     {
         $uploads = $this->paths()->uploadsUri;
+        // Exact locations, so they follow siteurl: with core in /wp/ the files are at /wp/readme.html.
+        $site = $this->paths()->siteUri;
         $lines = [
             '# WP Hardening: add inside server { }, then run nginx -t before reloading.',
             '# The uploads location uses ^~, so it wins over regex locations such as `location ~ \.php$`',
             '# wherever it sits. Regex locations elsewhere (cache headers for images, for example) no longer',
             '# apply under ' . $uploads . '/: copy those directives inside it if the site relies on them.',
             'autoindex off;',
-            'location = /readme.html { deny all; }',
+            'location = ' . $site . '/readme.html { deny all; }',
         ];
         if ($this->integrations->xmlrpcUsers() === []) {
-            $lines[] = 'location = /xmlrpc.php { deny all; }';
+            $lines[] = 'location = ' . $site . '/xmlrpc.php { deny all; }';
         }
         $lines[] = 'location ^~ ' . $uploads . '/ {';
         $lines[] = '    location ~* \.(?:php\d?|phtml|pht|phps|phar)$ { deny all; }';

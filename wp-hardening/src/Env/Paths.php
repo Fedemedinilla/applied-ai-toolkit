@@ -17,6 +17,12 @@ final class Paths
     /** URL path of the uploads directory, for the nginx rule ("/wp-content/uploads"). */
     public readonly string $uploadsUri;
 
+    /**
+     * URL path where core is served, from siteurl, for the nginx readme.html and xmlrpc.php rules:
+     * "" at the URL root, "/wp" with core in its own directory.
+     */
+    public readonly string $siteUri;
+
     public function __construct(
         public readonly string $root,
         public readonly string $content,
@@ -24,9 +30,12 @@ final class Paths
         public readonly string $muPlugins,
         ?string $home = null,
         string $uploadsUri = '/wp-content/uploads',
+        string $siteUri = '',
     ) {
         $this->home = $home ?? $root;
         $this->uploadsUri = self::safeUri($uploadsUri);
+        $site = '/' . trim($siteUri, '/');
+        $this->siteUri = $site !== '/' && self::isSafeUri($site) ? $site : '';
     }
 
     public static function fromWordPress(): self
@@ -38,6 +47,7 @@ final class Paths
         $baseurl = \is_array($uploads) && \is_string($uploads['baseurl'] ?? null) ? $uploads['baseurl'] : '';
         $uri = parse_url($baseurl, PHP_URL_PATH);
         $root = rtrim(ABSPATH, '/');
+        $site = parse_url((string) get_option('siteurl'), PHP_URL_PATH);
         return new self(
             $root,
             rtrim(WP_CONTENT_DIR, '/'),
@@ -45,6 +55,7 @@ final class Paths
             rtrim(\defined('WPMU_PLUGIN_DIR') ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins', '/'),
             self::homeRoot($root, (string) get_option('home'), (string) get_option('siteurl')),
             \is_string($uri) ? $uri : '/wp-content/uploads',
+            \is_string($site) ? $site : '',
         );
     }
 
@@ -70,7 +81,12 @@ final class Paths
     private static function safeUri(string $uri): string
     {
         $uri = '/' . trim($uri, '/');
-        return preg_match('#^(?:/[A-Za-z0-9._~-]+)+$#', $uri) === 1 ? $uri : '/wp-content/uploads';
+        return self::isSafeUri($uri) ? $uri : '/wp-content/uploads';
+    }
+
+    private static function isSafeUri(string $uri): bool
+    {
+        return preg_match('#^(?:/[A-Za-z0-9._~-]+)+$#', $uri) === 1;
     }
 
     /** wp-config.php sits in the root or one level above it; WordPress looks in both places. */

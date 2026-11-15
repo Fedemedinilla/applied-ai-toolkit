@@ -98,6 +98,19 @@ final class ServerRulesTest extends TestCase
         self::assertSame('/wp-content/uploads', $odd->uploadsUri, 'a path nginx would need quoted falls back to the default');
     }
 
+    /** With core in /wp/, readme.html and xmlrpc.php are served at /wp/..., where an exact location at / never reaches. */
+    public function testNginxDeniesFollowTheCoreDirectory(): void
+    {
+        $paths = new Paths($this->root . '/wp', $this->root . '/wp/wp-content', $this->root . '/wp/wp-content/uploads', $this->root . '/wp/wp-content/mu-plugins', $this->root, '/wp/wp-content/uploads', '/wp');
+        $block = (new ServerRules($paths, new Integrations(new FakeConstants(), Settings::fromArray([])), []))->nginxBlock();
+        self::assertStringContainsString('location = /wp/readme.html { deny all; }', $block);
+        self::assertStringContainsString('location = /wp/xmlrpc.php { deny all; }', $block);
+        self::assertStringContainsString('location ^~ /wp/wp-content/uploads/ {', $block);
+        $odd = new Paths($this->root, $this->root, $this->root, $this->root, null, '/wp-content/uploads', '/w p;}');
+        self::assertSame('', $odd->siteUri, 'a path nginx would need quoted falls back to the URL root');
+        self::assertSame('', (new Paths($this->root, $this->root, $this->root, $this->root, null, '/wp-content/uploads', '/'))->siteUri);
+    }
+
     public function testGuardAnInstalledXmlrpcDenyIsCriticalWhenJetpackUsesIt(): void
     {
         // The root block was pasted before Jetpack was installed, so it still denies xmlrpc.php.
