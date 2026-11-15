@@ -182,6 +182,8 @@ export function dedupeKey(node: WorkflowNode, scope: Scope): string {
  *   the items by key and lets the whole group through.
  * - The node fails once the stored keys plus the incoming items exceed the
  *   history size (10,000 by default). It does not evict old keys to make room.
+ * - A key that names an Object.prototype member, such as "constructor" or
+ *   "__proto__", fails the whole execution, real items included.
  */
 export class DedupeHistory {
   readonly #seen = new Set<string>();
@@ -197,6 +199,12 @@ export class DedupeHistory {
 
   /** One execution: which of these items, given by key, leave the node. */
   execute(keys: string[]): boolean[] {
+    // n8n groups the items in a plain {}: itemMapping[key] is then an inherited member
+    // without push, so the node throws a TypeError before it records anything.
+    const inherited = keys.find((key) => key in Object.prototype);
+    if (inherited !== undefined) {
+      throw new NodeFailure(`itemMapping[checkValue].push is not a function (key '${inherited}')`);
+    }
     if (this.#seen.size + keys.length > this.#maxEntries) {
       throw new NodeFailure('The number of items to be processed exceeds the maximum history size');
     }

@@ -458,6 +458,15 @@ describe('dedupeKey and DedupeHistory', () => {
     expect(history.execute(['a', 'a'])).toEqual([false, false]);
   });
 
+  it('fails the whole execution on a key that names an Object.prototype member, as n8n does', () => {
+    const history = new DedupeHistory();
+    for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(() => history.execute(['wamid.1', key]), key).toThrow(NodeFailure);
+    }
+    expect(history.size).toBe(0);
+    expect(history.execute(['wamid.1', 'proto'])).toEqual([true, true]);
+  });
+
   it('fails instead of evicting once the history is full', () => {
     const history = new DedupeHistory(3);
     expect(history.execute(['a', 'b'])).toEqual([true, true]);
