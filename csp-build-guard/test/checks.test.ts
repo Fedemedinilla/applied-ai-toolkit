@@ -119,6 +119,10 @@ describe('lookbehind targets', () => {
   it('rejects a fractional number, which would read 16.10 as 16.1', () => {
     expect(() => parseConfig({ lookbehind: { targets: { safari: 16.4 } } }, '.')).toThrow(ConfigError);
   });
+
+  it('rejects an empty targets object, which would leave nothing to compare against', () => {
+    expect(() => parseConfig({ lookbehind: { targets: {} } }, '.')).toThrow(/lookbehind\.targets: list at least one browser/);
+  });
 });
 
 describe('inline hashes', () => {

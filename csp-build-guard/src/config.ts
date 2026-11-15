@@ -91,8 +91,14 @@ export const configSchema = z.strictObject({
       z.strictObject({
         /** Browser files to scan, as globs relative to the static root. Inline scripts are always scanned. */
         files: z.array(z.string()).default(['**/*.js', '**/*.mjs']),
-        /** Oldest supported version per browser. Omitted: any lookbehind fails. */
-        targets: z.partialRecord(z.enum(Object.keys(LOOKBEHIND_SUPPORT) as [Browser, ...Browser[]]), version).optional(),
+        /**
+         * Oldest supported version per browser. Omitted: any lookbehind fails. An empty object is
+         * rejected, since it would leave the check nothing to compare against.
+         */
+        targets: z
+          .partialRecord(z.enum(Object.keys(LOOKBEHIND_SUPPORT) as [Browser, ...Browser[]]), version)
+          .refine((targets) => Object.keys(targets).length > 0, 'list at least one browser, or leave targets out')
+          .optional(),
       }),
     ])
     .default({ files: ['**/*.js', '**/*.mjs'] }),
