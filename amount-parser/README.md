@@ -34,7 +34,7 @@ const r = parseAmount('vendí 5 tortas a 8000');
 if (r?.ambiguous) askTheUser(r.reason, r.spans);
 ```
 
-`parseAmount(text, slang?)` returns `null` (no amount), or a `ParsedAmount` with `value`, `ambiguous`, `reason`, `approximate`, `quantity`, `unitPrice`, `literal`, `source` and `spans`. `slang` adds scale words and overrides built-in ones, for example `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key: `{ gamba: 200 }` leaves the built-in "gambas" at 100. The other exports are `parseNumber`, `normalize` and `BASE_SCALES`.
+`parseAmount(text, slang?)` returns `null` (no amount), or a `ParsedAmount` with `value`, `ambiguous`, `reason`, `approximate`, `quantity`, `unitPrice`, `literal`, `source` and `spans`. `slang` adds scale words and overrides built-in ones, for example `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key: `{ gamba: 200 }` leaves the built-in "gambas" at 100. Keys are normalized like the sentence, so `{ Quinás: 500 }` matches "quinas". A value that is not a finite number above zero throws a `RangeError` instead of coming back as an amount. The other exports are `parseNumber`, `normalize` and `BASE_SCALES`.
 
 ## Why this is not a model call
 

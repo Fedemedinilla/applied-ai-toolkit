@@ -714,6 +714,18 @@ function singleAmount({ s, best }: Reading): ParsedAmount {
   };
 }
 
+/** Keys the way `normalize` leaves the words they must match; values that can scale an amount. */
+function normalizeSlang(slang: Readonly<Record<string, number>>): Record<string, number> {
+  const out = wordTable() as Record<string, number>;
+  for (const [key, value] of Object.entries(slang)) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      throw new RangeError(`slang "${key}" must be a finite number above zero, got ${String(value)}`);
+    }
+    out[normalize(key)] = value;
+  }
+  return out;
+}
+
 const READING_STEPS = [openRemainder, quantityTimesUnitPrice, instalments, countWithoutMarker, discounts, half, sums];
 
 /**
@@ -721,10 +733,12 @@ const READING_STEPS = [openRemainder, quantityTimesUnitPrice, instalments, count
  * with `ambiguous: true` and a `reason` when the app should ask, and otherwise the value.
  *
  * `slang` adds scale words on top of the built-in ones and overrides them, for example
- * `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key.
+ * `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key. Keys are normalized
+ * like the sentence ("Quinás" matches "quinas"), and a value that is not a finite number above zero
+ * throws a RangeError.
  */
 export function parseAmount(text: string, slang: Readonly<Record<string, number>> = {}): ParsedAmount | null {
-  const scales = wordTable(BASE_SCALES, slang);
+  const scales = wordTable(BASE_SCALES, normalizeSlang(slang));
   const clean = normalize(text);
   if (!clean) return null;
 

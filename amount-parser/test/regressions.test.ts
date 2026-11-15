@@ -158,3 +158,19 @@ describe('words that name a key of Object.prototype', () => {
     expect(withoutSpans(r)).toStrictEqual(withoutSpans(parseAmount(phrase.replace('constructor', 'carpintero'))));
   });
 });
+
+describe('caller slang', () => {
+  it('adds a scale word and overrides a built-in one', () => {
+    expect(parseAmount('gaste 20 quinas', { quinas: 500 })?.value).toBe(10_000);
+    expect(parseAmount('gaste 3 gambas', { gambas: 200 })?.value).toBe(600);
+  });
+
+  it('matches a key written with capitals or accents, as the sentence is normalized', () => {
+    expect(parseAmount('gaste 20 Quinas', { Quinas: 500 })?.value).toBe(10_000);
+    expect(parseAmount('gaste 20 lucas', { lucás: 2000 })?.value).toBe(40_000);
+  });
+
+  it.each([-500, 0, Number.NaN, Number.POSITIVE_INFINITY])('rejects a scale of %s instead of returning it as an amount', (bad) => {
+    expect(() => parseAmount('gaste 20 quinas', { quinas: bad })).toThrow(RangeError);
+  });
+});
