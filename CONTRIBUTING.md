@@ -6,7 +6,7 @@ To report a vulnerability, do not open an issue; follow [SECURITY.md](SECURITY.m
 
 ## Run everything
 
-Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. From the repository root:
+Node 24.15.0 or newer within Node 24, since jsdom and the Changesets CLI need 24.15.0; CI uses the version in `.node-version`. Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. From the repository root:
 
 ```sh
 npm ci                 # exact versions from package-lock.json
