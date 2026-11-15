@@ -130,8 +130,9 @@ export const MONEY_VERBS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Fixed expressions that talk about money without naming an amount. Matched as substrings of the
- * normalized sentence, so "doscientos dos pesos" also matches "dos pesos" (see the README's limits).
+ * Fixed expressions that talk about money without naming an amount. Matched as whole words of the
+ * sentence, so "doscientos dos pesos" also matches "dos pesos" (see the README's limits). They veto
+ * the sentence only when no figure outside them names an amount.
  */
 export const NON_AMOUNT_IDIOMS: readonly string[] = [
   'una fortuna', 'un platal', 'un dineral', 'una banda', 'un huevo',

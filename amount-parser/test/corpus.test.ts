@@ -30,8 +30,8 @@ function meets(r: ParsedAmount | null, e: Expected): boolean {
 const families = [...new Set(corpus.map((c) => c.family))].sort();
 
 describe('corpus file', () => {
-  it('has 191 unique phrases in 15 families, each with a note', () => {
-    expect(corpus).toHaveLength(191);
+  it('has 194 unique phrases in 15 families, each with a note', () => {
+    expect(corpus).toHaveLength(194);
     expect(new Set(corpus.map((c) => c.phrase)).size).toBe(corpus.length);
     expect(families).toHaveLength(15);
     for (const c of corpus) expect(c.note.length).toBeGreaterThan(10);
@@ -45,7 +45,7 @@ describe('corpus file', () => {
 
   it('records what the parser returned before the fix for every audit case', () => {
     const audit = corpus.filter((c) => c.source === 'audit');
-    expect(audit).toHaveLength(26);
+    expect(audit).toHaveLength(29);
     for (const c of audit) expect(c.earlier_parser).toBeTypeOf('string');
   });
 

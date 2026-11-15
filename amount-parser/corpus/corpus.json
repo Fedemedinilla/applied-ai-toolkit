@@ -2356,5 +2356,44 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "1000"
+ },
+ {
+  "phrase": "pague 80 mil a una banda para el cumple",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 80000,
+  "ambiguous": false,
+  "note": "\"una banda\" is the idiom for a lot only when it stands for the amount. Here it is the band that was hired, and the sentence names its price: 80.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "compre un huevo de pascua por 15 mil",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 15000,
+  "ambiguous": false,
+  "note": "A literal Easter egg with an explicit price: 15.000. The idiom \"un huevo\" used to veto the sentence.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "compre dos mangos en la verduleria por 3 mil",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 3000,
+  "ambiguous": false,
+  "note": "Mangoes from the greengrocer, priced at 3.000. \"dos mangos\" is next to nothing only when no other figure names the amount.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
  }
 ]

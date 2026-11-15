@@ -223,9 +223,19 @@ function readSentence(text: string, clean: string, scales: Readonly<Record<strin
  * excluded, keep reading. A result: the sentence must be asked about (foreign currency).
  */
 function excludedPhrases(s: Sentence): ParsedAmount | null | undefined {
-  // "dos mangos" is "next to nothing", not two pesos, and no native speaker reads it literally.
+  // "dos mangos" is "next to nothing", not two pesos, and no native speaker reads it literally when
+  // it stands for the amount. The same words are also a band, an egg or mangoes: when a figure
+  // outside the idiom names the amount ("pague 80 mil a una banda"), the idiom does not veto it.
+  // Matched on whole words, so "doscientos dos pesos" still matches (see the README's limits).
+  const rawWords = s.raw.map((w) => w.text);
   for (const idiom of NON_AMOUNT_IDIOMS) {
-    if (s.clean.includes(idiom)) return null;
+    const parts = idiom.split(' ');
+    for (let at = 0; at + parts.length <= rawWords.length; at++) {
+      if (!parts.every((p, k) => rawWords[at + k] === p)) continue;
+      const end = at + parts.length;
+      const figureOutside = s.numeric.some((t) => t.to <= at || t.from >= end);
+      if (!figureOutside) return null;
+    }
   }
   // Checked on the text and not on the tokens, because the tokenizer splits "u$s" into three pieces.
   if (FOREIGN_CURRENCY.test(s.clean)) return undetermined(s, 'foreign_currency', s.clean);

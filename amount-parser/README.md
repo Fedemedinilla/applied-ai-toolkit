@@ -158,7 +158,7 @@ Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container 
 ## Limits
 
 - **`CORRECTION_MARKERS` includes "no" and "para".** They are there for spoken self-corrections ("gasté veinte, no, pará, treinta mil"), and both are also ordinary words. When one of them sits between two figures, everything before it is dropped. "gaste 5 mil para la fiesta y 3 mil de envio" returns 3000 instead of 8000, and "pague 20 mil de luz y no 30 mil" returns 30000. Removing them would break the dictated corrections in the corpus, so the fix needs corpus cases for both readings first. `test/limits.test.ts` pins the current behaviour. Two more ordinary words in the set, "mejor" and "digo", count only right before the new figure ("mejor dicho treinta", "digo treinta"). So "le pagué 10 mil al mejor gasista y 5 mil de repuestos" keeps its 15000.
-- Idioms are matched as substrings. "dos pesos" means next to nothing, so "pague doscientos dos pesos" returns no amount.
+- Idioms are matched as whole words, and they also match inside a longer number. "dos pesos" means next to nothing, so "pague doscientos dos pesos" returns no amount. An idiom vetoes the sentence only when no other figure names the amount: "pagué 80 mil a una banda" is 80000.
 - A zero passes as a value ("gaste 0 pesos" returns 0), and a minus sign is dropped. Callers that store amounts should reject values that are not positive.
 - Fullwidth digits are not read as digits. "gaste ２０ mil" skips the "２０" and returns 1000 for the bare "mil". Folding them with NFKC in `normalize` would fix it, as a deliberate change with corpus cases.
 - "x" is not read as multiplication: "pague 2 mil x 3" returns 2000.
