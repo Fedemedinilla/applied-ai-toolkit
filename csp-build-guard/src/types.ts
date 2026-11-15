@@ -33,9 +33,9 @@ export interface Page {
   readonly parts: PageParts;
   /**
    * The Content-Security-Policy the page is served with: each delivery that applies (a header
-   * rule, a meta element, the literal), in order.
+   * rule or the literal, then each meta element in <head>), in order. `meta` marks the meta ones.
    */
-  readonly csp: ReadonlyArray<{ readonly origin: string; readonly value: string }>;
+  readonly csp: ReadonlyArray<{ readonly origin: string; readonly value: string; readonly meta?: boolean }>;
   /**
    * The policies the browser enforces, read from `csp`: header values as a comma-separated list,
    * each `<meta>` content as one policy, since a comma separates nothing there.

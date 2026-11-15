@@ -247,6 +247,19 @@ describe('meta policies', () => {
     expect(check(report, 'inline-hashes')?.status).toBe('fail');
   });
 
+  it('checks a <meta> policy next to a header policy, since the browser enforces both', () => {
+    const header = `script-src ${sha256('alert(1)')}`;
+    const vercel = JSON.stringify({ headers: [{ source: '/(.*)', headers: [{ key: 'Content-Security-Policy', value: header }] }] });
+    const page = `<head><meta http-equiv="Content-Security-Policy" content="script-src https://evil.example"><script>alert(1)</script></head>`;
+    const report = guard({ 'index.html': page, 'vercel.json': vercel }, { csp: { from: 'vercel-json' }, policy: { 'script-src': { sources: [], hashes: true } } });
+    expect(messages(report, 'inline-hashes')).toEqual([expect.stringMatching(/^script-src does not list 'sha256-.*on index\.html\. The browser blocks it/)]);
+    expect(messages(report, 'policy')).toEqual([
+      'index.html: the page also carries a <meta> policy, which the browser enforces next to the header; one policy is expected',
+    ]);
+    const literal = guard({ 'index.html': page }, { csp: { from: 'literal', value: header }, policy: { 'script-src': { sources: [], hashes: true } } });
+    expect(messages(literal, 'policy')).toEqual(messages(report, 'policy'));
+  });
+
   it('agrees the verb and the nouns with their counts in a passing summary', () => {
     const meta = `<meta http-equiv="Content-Security-Policy" content="script-src 'self'">`;
     expect(check(guard({ 'index.html': meta }, config), 'policy')?.summary).toBe('1 page sends exactly the expected policy (1 directive)');

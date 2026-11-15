@@ -48,15 +48,14 @@ export function runGuard({ dir, config, env = process.env }: RunOptions): GuardR
     const parts = parsePage(readFileSync(join(site.staticRoot, path), 'utf8'));
     const urlPaths = urlPathsForPage(site, path);
     const csp = config.csp;
-    let delivered: Page['csp'] = [];
-    if (csp?.from === 'literal') delivered = [{ origin: 'literal', value: csp.value }];
-    else if (csp?.from === 'meta') delivered = parts.metaPolicies.map((value, i) => ({ origin: `<meta> ${i + 1}`, value }));
-    else if (headerRules !== null) delivered = headerValues(headerRules, urlPaths, 'content-security-policy');
-    const policies =
-      csp?.from === 'meta'
-        ? delivered.flatMap((d) => parseSerializedCsp(d.value) ?? [])
-        : parseCsp(delivered.map((d) => d.value).join(', '));
-    return { path, display: `${prefix}${path}`, urlPaths, parts, csp: delivered, policies };
+    let headers: Page['csp'] = [];
+    if (csp?.from === 'literal') headers = [{ origin: 'literal', value: csp.value }];
+    else if (headerRules !== null) headers = headerValues(headerRules, urlPaths, 'content-security-policy');
+    // The browser enforces every <meta> policy in <head> next to the header ones, whatever the
+    // configured source, so they are delivered too.
+    const metas = csp === undefined ? [] : parts.metaPolicies.map((value, i) => ({ origin: `<meta> ${i + 1}`, value, meta: true }));
+    const policies = [...parseCsp(headers.map((d) => d.value).join(', ')), ...metas.flatMap((d) => parseSerializedCsp(d.value) ?? [])];
+    return { path, display: `${prefix}${path}`, urlPaths, parts, csp: [...headers, ...metas], policies };
   });
   const ctx: Context = { site, config, pages, headerRules, env };
   const checks = [checkInlineHashes, checkPolicy, checkHeaders, checkSecrets, checkLookbehind, checkJsBudget].map((check) => check(ctx));
