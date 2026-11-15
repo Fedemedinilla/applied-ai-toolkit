@@ -57,8 +57,8 @@ export function fileNameFor(number: string): string {
     .replace(/\p{M}/gu, '')
     .replace(/[^A-Za-z0-9-]+/gu, '-')
     .replace(/-{2,}/gu, '-')
-    .replace(/^-|-$/gu, '')
-    .slice(0, 60);
+    .slice(0, 60)
+    .replace(/^-|-$/gu, '');
   return slug ? `remito-${slug}.pdf` : 'remito.pdf';
 }
 

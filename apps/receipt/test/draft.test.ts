@@ -83,4 +83,8 @@ describe('fileNameFor', () => {
     expect(fileNameFor('R 0099 ★ Ñandú/../x')).toBe('remito-R-0099-Nandu-x.pdf');
     expect(fileNameFor('😀')).toBe('remito.pdf');
   });
+
+  it('never ends the name in a dash when it cuts a long number at 60 characters', () => {
+    expect(fileNameFor(`${'A'.repeat(59)} B`)).toBe(`remito-${'A'.repeat(59)}.pdf`);
+  });
 });
