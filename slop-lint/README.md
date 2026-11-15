@@ -42,6 +42,7 @@ node slop-lint/cli.ts README.md slop-lint/README.md --lang en --sarif > slop-lin
 npm run lint:docs                          # every README and the case study; fails on a tier 1 finding
 node slop-lint/scripts/rules-table.ts      # prints the rule table below from the catalog
 node slop-lint/cli.ts --list-rules         # every rule that applies, after slop-lint.config.json if there is one
+node slop-lint/cli.ts draft.txt --lang es --genre email --variety rioplatense   # an email, not a letter (see Genres)
 ```
 
 The CLI exits 1 when a level 1 rule fires in any of its files, 0 otherwise, and 2 on bad usage, a config file it cannot use or an unreadable file. That lets it gate a pipeline. `--lang` is required unless a config file sets the language (see Config file). The first two findings of the first command, and its last line:
@@ -68,6 +69,9 @@ result.passesTier1;   // false if any level 1 rule fired
 result.findings;      // [{ ruleId, level, severity, start, end, line, column, match, message, suggestion, detail? }]
 result.score;         // { points, max: 15 }
 result.stats;         // words, sentences, sentenceLengthCV, anchors, tier2Used, emDashes, ...
+
+const chat = lint(message, { lang: 'es', genre: 'whatsapp', variety: 'rioplatense' });
+chat.genre;           // 'whatsapp'; the key is absent for a cover letter, the default
 ```
 
 `start` and `end` are UTF-16 offsets, so `text.slice(start, end) === match`. Node 24 runs the `.ts` files directly (type stripping), so there is no build step and no dependency beyond the repository's dev tooling.
@@ -155,8 +159,9 @@ Inputs:
 | `files` | yes | Paths or globs, separated by spaces or newlines. `**` matches across folders, skips hidden ones and does not skip `node_modules`. Only regular files count, and a pattern that matches none fails the step. A path cannot contain a space. |
 | `lang` | no | `en` or `es`. Empty, the default, leaves the language to the config file, which can set it per folder. With neither, the step fails. |
 | `format` | no | `text` or `markdown`. Empty, the default, reads a `.md` file as Markdown and anything else as text. |
+| `genre` | no | `cover-letter`, `email`, `follow-up`, `whatsapp` or `auto`, passed to `--genre`. Empty, the default, leaves it to the config file, and `cover-letter` without one. The three new genres are experimental (see Genres). |
 | `anchors` | no | Comma-separated anchor terms, passed to `--anchors`. |
-| `config` | no | Path of a config file, passed to `--config`. Empty, the default, looks for `slop-lint.config.json` from the workspace root (see Config file). `lang`, `format` and `anchors`, when set, win over it. |
+| `config` | no | Path of a config file, passed to `--config`. Empty, the default, looks for `slop-lint.config.json` from the workspace root (see Config file). `lang`, `format`, `genre` and `anchors`, when set, win over it. |
 | `sarif-file` | no | A path to write the SARIF log to, as well as the text output. Its folder is created. |
 | `fail` | no | `true` (the default) fails the step on a level 1 finding. `false` never fails on findings. |
 
@@ -202,7 +207,21 @@ Words such as <!-- slop-lint-disable -->"robust" and "seamless"<!-- slop-lint-en
 
 These directives carry no rule id, and they are a mask. Everything between `slop-lint-disable` and `slop-lint-enable` is masked like code, inside a line or across paragraphs; a `disable` without an `enable` runs to the end of the file. `slop-lint-disable-next-line` masks the line after the comment. Directives are HTML comments, so they do not show on a rendered page, and they only work in Markdown mode. Inside a code block they are code, which is why the example above is not applied. A directive that names a rule id works differently. It hides nothing and records what it suppressed. See Inline suppression.
 
-The Tier 2 budget, the colon budget and the em dash budget stay at their cover-letter sizes. A README of 2,000 words spends them early, so it gets level 2 findings that a letter of the same density would not. They are reported, and they do not fail the run.
+The Tier 2 budget, the colon budget and the em dash budget stay at their cover-letter sizes, which are the `cover-letter` genre's and the default. A README of 2,000 words spends them early, so it gets level 2 findings that a letter of the same density would not. They are reported, and they do not fail the run. No genre fits a README yet; `npm run lint:docs` passes none.
+
+## Genres
+
+A cover letter, an email, a follow-up and a WhatsApp message are judged differently. An early question is the request in a mail, emoji are ordinary in a chat, and a follow-up quotes the earlier message on purpose. `--genre` (or `genre` in `lint()` and in the config) picks a profile: `cover-letter`, the default, `email`, `follow-up` or `whatsapp`. Without it the output is byte for byte what it was before genres existed, which the goldens and `test/cover-letters.test.ts` pin.
+
+- **One table holds every choice.** `GENRE_PROFILES` in `src/genres.ts` says, per genre, which rules are off, which change level, severity or budget, the Tier 2 budget, and the structural thresholds. The 52 rules of the catalog are not edited per genre. The `cover-letter` profile repeats today's constants, and `test/genres.test.ts` fails if the two drift apart.
+- **The new profiles are experimental.** Where the research gives no number for a genre, the profile keeps the cover-letter value until a labelled set of fictional texts measures its false positives. The CLI says so on stderr each time it uses one.
+- **The config wins over the genre.** The profile applies to the catalog first, and a rule the config names keeps the config's setting. A caller that passes its own `rules` to `lint()` gets that list as given; the genre then brings its thresholds, its Tier 2 budget and its messages.
+- **Messages follow the genre.** Seven catalog messages speak of a letter or a candidate. `src/messages.ts` holds their wording for the other genres, and a cover letter keeps the catalog's text.
+- **The genre is never guessed in silence.** `lint()` takes it as given. `--genre auto` calls `guessGenre()`, which reads the subject line, a reference to an earlier message, greeting and sign-off, length, emoji and lines with no closing period. When it is unsure it says so on stderr and lints the file as a cover letter, since a wrong guess turns rules off without a word.
+- **`--variety rioplatense` or `--variety neutral`** makes REG-01 flag every verb form of the other register, even in a text that uses only that one. Without it REG-01 flags the minority register, as before.
+- **`--previous <file>`** passes the earlier message of a follow-up. No rule reads it yet.
+- **The score keeps its scale.** The 15 points are the cover-letter rubric's. In the other genres they are an inherited scale, not a rubric anyone has validated for that genre.
+- **SARIF names the genre.** A run with a genre other than `cover-letter` carries `run.properties.genres`, the genre per file uri, and each rule is described with the level and severity the profile gave it.
 
 ## Config file
 
@@ -244,17 +263,19 @@ A team adapts slop-lint to its own writing with a `slop-lint.config.json`, witho
 | `$schema` | Path or address of [`schema/config.schema.json`](schema/config.schema.json), for completion and checks in an editor. The CLI ignores it. |
 | `lang` | `en` or `es`, used when `--lang` is not given. With a `lang` here or in an override, `--lang` is optional. |
 | `format` | `text` or `markdown` for every file, used when `--format` is not given. Left out, a `.md` file is Markdown and anything else is text. |
+| `genre` | `cover-letter`, `email`, `follow-up` or `whatsapp`, used when `--genre` is not given. Left out, `cover-letter`. See Genres. |
+| `variety` | `rioplatense` or `neutral`, used when `--variety` is not given. Only REG-01 reads it. |
 | `anchors` | Extra anchor terms, each trimmed and none blank. `--anchors` replaces them. |
 | `ignore` | Globs of files to skip, even when they are named on the command line. Standard input is never skipped. |
 | `ruleSettings` | Per rule id: `"off"`, or an object with a new `level` (1, 2 or 3), a new `severity` (`disqualify`, `high`, `medium`, `low`) or both. The id is a built-in rule's or a custom rule's. |
 | `rules` | Custom pattern rules (below). |
-| `overrides` | A list of `{ "files": [globs], ... }` with any of `lang`, `format`, `anchors` and `ruleSettings` for the files that match. |
+| `overrides` | A list of `{ "files": [globs], ... }` with any of `lang`, `format`, `genre`, `variety`, `anchors` and `ruleSettings` for the files that match. |
 | `suppressions` | Three switches for the inline directives, all optional (see Inline suppression). |
 
 How the values combine:
 
-- **Flags win over the config.** `--lang`, `--format` and `--anchors` replace what the config says for every file, overrides included. A flag is typed for one run, and the config is the standing rule.
-- **Every matching override applies, in the order written.** A later `lang` or `format` replaces an earlier one. `anchors` are added to the top-level list. A rule's setting replaces the earlier setting of that rule as a whole, so an override can turn a rule back on.
+- **Flags win over the config.** `--lang`, `--format`, `--genre`, `--variety` and `--anchors` replace what the config says for every file, overrides included. A flag is typed for one run, and the config is the standing rule.
+- **Every matching override applies, in the order written.** A later `lang`, `format`, `genre` or `variety` replaces an earlier one. `anchors` are added to the top-level list. A rule's setting replaces the earlier setting of that rule as a whole, so an override can turn a rule back on.
 - **Globs are relative to the folder of the config file**, with forward slashes, and match the whole path. `*` stays inside one path segment, `?` is one character, and `**` crosses folders; `docs/**/a.md` also matches `docs/a.md`. There are no braces, character classes or negation. A glob that starts with `./` or ends with a slash is a config error, since no path has either form. Write `docs/**` for a folder. `README.md` is the one at the top, and `**/README.md` is every one. A file outside that folder matches no glob and gets the top-level settings.
 - **A bad config is a usage error.** An unknown key, a wrong type, an id that names no rule or a regex that does not compile exits 2 with the file and the key path, such as `slop-lint.config.json: rules[0].flags: has the flag y; only g, i, m, s, u are supported`, and prints nothing on stdout. A typo that was skipped in silence would turn a setting off without anyone noticing.
 - **The schema and the validator are both written by hand.** The package has no runtime dependency, so the CLI does not load a schema library. `test/config-schema.test.ts` runs the JSON Schema and the validator over the same 67 fixtures and fails when one accepts what the other rejects. Eight fixtures are rejected only by the validator, each for a reason a JSON Schema cannot state, such as a regex that does not compile.
@@ -373,7 +394,7 @@ The directives without a rule id, described under Markdown mode, are a different
 - **It does not find files.** `ignore` removes files from the ones named on the command line, and the shell or the action expands the globs. There is no `include` key.
 - **It does not read directives in plain text**, and a directive cannot change a rule's level, set anchors or switch the language. Those belong in the config.
 - **It does not fix anything.** There is no `--fix`. The suggestion is for a person or for the next model call.
-- **It does not change budgets or thresholds from the config.** The Tier 2 budget, the per-rule budgets and the sentence-length limits are the report's numbers. A rule can be turned off or moved to another level, and that is all.
+- **It does not change budgets or thresholds from the config.** The Tier 2 budget, the per-rule budgets and the sentence-length limits come from the genre's profile in `src/genres.ts`, and for a cover letter they are the report's numbers. The config can pick a genre and turn a rule off or move it to another level, and that is all.
 - **It does not keep a baseline** of known findings to ignore. A finding is fixed, suppressed by name or covered by a setting.
 - **It does not detect who wrote a text**, as Limits and what is not included explains.
 
@@ -383,7 +404,9 @@ The directives without a rule id, described under Markdown mode, are a different
 |---|---|
 | `src/rules.ts` | the catalog: every rule as data, with its regex per language, level, budget, message, suggestion, source, deviations from the report, known false positives, and a positive and near-miss example |
 | `src/lint.ts` | `lint()`: matching, anchor and quote exemptions, overlap resolution, budgets, score |
-| `src/structural.ts` | checks that count instead of match: anchor density, rhythm, long sentences, em dash and raya use, register mixing, nominalizations |
+| `src/structural.ts` | checks that count instead of match: anchor density, rhythm, long sentences, em dash and raya use, register mixing, nominalizations; each reads its numbers from the genre's thresholds |
+| `src/genres.ts` | `GENRE_PROFILES`, `resolveRules()` and `guessGenre()`: what each genre changes from the catalog |
+| `src/messages.ts` | the wording of the letter-bound messages for the other genres |
 | `src/text.ts` | sentence splitting, words, anchors, offsets |
 | `src/markdown.ts` | Markdown mode: masks code, tables, comments, link URLs and markers with spaces, reads the disable directives, splits the document into blocks |
 | `src/regex.ts` | Unicode-aware word boundaries |
@@ -396,6 +419,7 @@ The directives without a rule id, described under Markdown mode, are a different
 | `cli.ts` | command-line entry point |
 | `action.yml` | the composite GitHub Action (Use it in CI) |
 | `fixtures/cover-letters/` | the six letters of the report's section 15, all fictional |
+| `test/fixtures/genres/` | one fictional email, follow-up and WhatsApp message, linted by `genres.test.ts` and pinned by `cli-genre.test.ts` |
 | `research/PROMPT.md` | what the research report covers and where its rules live |
 | `test/` | offline tests; `test/golden/` holds the CLI output that `output-regression.test.ts` pins |
 
@@ -581,7 +605,7 @@ Each rule lists its own in `falsePositives`. The ones that matter in practice:
 - FMT-04 flags a capitalized aside in brackets ("[Translated from Portuguese]") and, in plain text, a Markdown link label. With severity "disqualify", that costs the whole score, which is why the pattern is narrow.
 - A quotation that opens with a straight quote and closes with one later in the same sentence is exempt even when the first mark was a typo.
 - The proper-noun anchor test counts any capitalized word that is not the first in its sentence, so "English" or a capitalized job title counts as an anchor. That errs toward letting context words through.
-- The Tier 2 budget and the em dash budget are set for a cover letter of 150 to 300 words. They do not scale with length; lint a longer text section by section.
+- The Tier 2 budget and the em dash budget are set for a cover letter of 150 to 300 words. They do not scale with length; lint a longer text section by section. The email, follow-up and WhatsApp profiles keep those sizes until a labelled set measures what fits each genre.
 
 ## What needs a model judge
 

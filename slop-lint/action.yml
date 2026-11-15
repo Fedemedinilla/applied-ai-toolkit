@@ -20,12 +20,16 @@ inputs:
     description: text or markdown. Empty reads a .md file as Markdown and anything else as text.
     required: false
     default: ''
+  genre:
+    description: cover-letter, email, follow-up, whatsapp or auto. Empty leaves it to the config file, and cover-letter without one. The three new genres are experimental; auto guesses per file and falls back to cover-letter when unsure.
+    required: false
+    default: ''
   anchors:
     description: Comma-separated extra anchor terms, such as tool names written in lowercase.
     required: false
     default: ''
   config:
-    description: Path of a slop-lint config file. Empty looks for slop-lint.config.json from the workspace root. The values of lang, format and anchors, when set here, win over it.
+    description: Path of a slop-lint config file. Empty looks for slop-lint.config.json from the workspace root. The values of lang, format, genre and anchors, when set here, win over it.
     required: false
     default: ''
   sarif-file:
@@ -61,6 +65,7 @@ runs:
         SLOP_FILES: ${{ inputs.files }}
         SLOP_LANG: ${{ inputs.lang }}
         SLOP_FORMAT: ${{ inputs.format }}
+        SLOP_GENRE: ${{ inputs.genre }}
         SLOP_ANCHORS: ${{ inputs.anchors }}
         SLOP_CONFIG: ${{ inputs.config }}
         SLOP_SARIF_FILE: ${{ inputs.sarif-file }}
@@ -100,6 +105,7 @@ runs:
         args=()
         if [[ -n "$SLOP_LANG" ]]; then args+=(--lang "$SLOP_LANG"); fi
         if [[ -n "$SLOP_FORMAT" ]]; then args+=(--format "$SLOP_FORMAT"); fi
+        if [[ -n "$SLOP_GENRE" ]]; then args+=(--genre "$SLOP_GENRE"); fi
         if [[ -n "$SLOP_ANCHORS" ]]; then args+=(--anchors "$SLOP_ANCHORS"); fi
         # --config=value keeps a value that starts with - from reading as another option.
         if [[ -n "$SLOP_CONFIG" ]]; then args+=("--config=$SLOP_CONFIG"); fi
