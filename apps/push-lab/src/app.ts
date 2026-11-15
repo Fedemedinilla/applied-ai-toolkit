@@ -1,7 +1,7 @@
 // The page: install instructions, enabling push, a test send, the badge counter and the server
 // diagnosis. Every browser API comes in through AppDeps, so the tests run it in jsdom with fakes.
 
-import { explainError, PROBLEMS, readTestAnswer, testMessage } from './messages.ts';
+import { explainError, PROBLEMS, readTestAnswer, reRegisterMessage, testMessage, type RegisterResult } from './messages.ts';
 import type { Platform } from './platform.ts';
 import { API, base64UrlToBytes, subscriptionBody, type WorkerMessage } from './wire.ts';
 
@@ -207,7 +207,7 @@ export function mountApp(doc: Document, deps: AppDeps): { refresh(): Promise<voi
   };
 
   /** Registers the browser's subscription with the server. Idempotent there, so it runs on every load. */
-  const register = async (sub: SubscriptionLike): Promise<'ok' | 'store_failed' | 'unknown_service' | 'rejected' | 'network'> => {
+  const register = async (sub: SubscriptionLike): Promise<RegisterResult> => {
     const body = subscriptionBody(sub.toJSON());
     if (!body) return 'rejected';
     try {
@@ -364,9 +364,11 @@ export function mountApp(doc: Document, deps: AppDeps): { refresh(): Promise<voi
         delaySeconds: el.testDelay.checked ? 5 : 0,
       });
       const answer = readTestAnswer(response.status, await readJson(response));
-      el.testStatus.textContent = testMessage(answer);
+      el.testStatus.textContent =
+        answer.kind === 'not_subscribed' ? 'El servidor no tenía este dispositivo. Registrándolo de nuevo…' : testMessage(answer);
       if (answer.kind === 'delivered') log(`Servidor: ${KIND_LABEL[kind] ?? kind} aceptada por el servicio de push.`);
-      if (answer.kind === 'not_subscribed') await register(sub);
+      // The text says "registered again" only once the server has stored it.
+      if (answer.kind === 'not_subscribed') el.testStatus.textContent = reRegisterMessage(await register(sub));
       if (answer.kind === 'gone') {
         await sub.unsubscribe().catch(() => false);
         await refresh().catch(() => undefined);

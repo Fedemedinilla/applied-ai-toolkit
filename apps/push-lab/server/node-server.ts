@@ -4,7 +4,7 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, relative, sep } from 'node:path';
 import { Readable } from 'node:stream';
 
 export const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -41,10 +41,12 @@ export function resolveStatic(dir: string, pathname: string): string | null {
   return full.startsWith(root) ? full : null;
 }
 
-function cacheControl(path: string): string {
+function cacheControl(dir: string, path: string): string {
   // Hashed names never change; everything else (index.html, sw.js, the manifest) must be checked
-  // on every load, or a phone keeps an old worker for a day.
-  return path.includes(`${sep}assets${sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
+  // on every load, or a phone keeps an old worker for a day. Decided from the path inside the
+  // build, so a build that lives under some other folder named assets keeps these rules.
+  const parts = relative(dir, path).split(sep);
+  return parts.length > 1 && parts[0] === 'assets' ? 'public, max-age=31536000, immutable' : 'no-cache';
 }
 
 async function serveFile(dir: string, req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void> {
@@ -59,7 +61,7 @@ async function serveFile(dir: string, req: IncomingMessage, res: ServerResponse,
   res.writeHead(200, {
     'content-type': CONTENT_TYPES[extname(path)] ?? 'application/octet-stream',
     'content-length': body.length,
-    'cache-control': cacheControl(path),
+    'cache-control': cacheControl(dir, path),
     'content-security-policy': CSP,
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',
@@ -90,6 +92,21 @@ async function sendResponse(res: ServerResponse, response: Response): Promise<vo
   res.end(response.body ? Buffer.from(await response.arrayBuffer()) : undefined);
 }
 
+export const DEFAULT_PORT = 4330;
+
+/**
+ * The port for a PORT value: the default when it is absent or blank, a whole number from 1 to
+ * 65535 otherwise. Anything else throws. `Number('')` is 0, and port 0 makes Node pick a random
+ * one, so an empty PORT used to start the lab where nobody could find it.
+ */
+export function portFrom(value: string | undefined): number {
+  const text = (value ?? '').trim();
+  if (text === '') return DEFAULT_PORT;
+  const port = /^\d+$/u.test(text) ? Number(text) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`PORT must be a whole number from 1 to 65535, got "${value}"`);
+  return port;
+}
+
 export interface NodeServerOptions {
   readonly handler: (request: Request) => Promise<Response>;
   /** The build output (dist/apps/push-lab). */
@@ -98,7 +115,16 @@ export interface NodeServerOptions {
 
 export function createNodeServer({ handler, dir }: NodeServerOptions): Server {
   return createServer((req, res) => {
-    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    // node:http accepts request targets that WHATWG URL refuses (`//[`). Thrown here, outside the
+    // guarded chain below, that would be an uncaught exception and the end of the process.
+    let pathname: string;
+    try {
+      pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Bad request');
+      return;
+    }
     // A fixed origin: the handler reads only the path, and a Host header is whatever the client sent.
     const work = pathname.startsWith('/api/')
       ? Promise.resolve()

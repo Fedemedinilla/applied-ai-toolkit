@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { explainError, readTestAnswer, testMessage } from '../src/messages.ts';
+import { explainError, readTestAnswer, reRegisterMessage, testMessage } from '../src/messages.ts';
 import { detectPlatform } from '../src/platform.ts';
 import { base64UrlToBytes, subscriptionBody } from '../src/wire.ts';
 import { serviceOf } from '../server/push.ts';
@@ -128,6 +128,24 @@ describe('messages', () => {
     expect(readTestAnswer(429, { error: 'too_soon', retryAfterSeconds: 2 })).toEqual({ kind: 'too_soon', seconds: 2 });
     expect(readTestAnswer(502, { error: 'push_failed', statusCode: 403 })).toEqual({ kind: 'push_failed', statusCode: 403 });
     expect(readTestAnswer(500, 'oops')).toEqual({ kind: 'other', status: 500 });
+  });
+
+  it('does not call an unreachable push service slow: retrying does not fix the server network', () => {
+    const timeout = testMessage(readTestAnswer(502, { error: 'push_failed', statusCode: null, reason: 'timeout' }));
+    expect(timeout).toContain('no respondió a tiempo');
+    const unreachable = testMessage(readTestAnswer(502, { error: 'push_failed', statusCode: null, reason: 'unreachable' }));
+    expect(unreachable).not.toContain('a tiempo');
+    expect(unreachable).toContain('red del servidor');
+    // An answer with no reason, from an older server, still reads.
+    expect(testMessage(readTestAnswer(502, { error: 'push_failed', statusCode: null }))).toContain('El servicio de push no respondió');
+  });
+
+  it('says a lost device was registered again only when it was', () => {
+    expect(reRegisterMessage('ok')).toContain('Ya se volvió a registrar');
+    for (const result of ['store_failed', 'unknown_service', 'rejected', 'network'] as const) {
+      expect(reRegisterMessage(result)).not.toContain('Ya se volvió a registrar');
+    }
+    expect(reRegisterMessage('store_failed')).toContain('No desactives');
   });
 
   it('explains browser errors by name, and keeps the raw reason otherwise', () => {

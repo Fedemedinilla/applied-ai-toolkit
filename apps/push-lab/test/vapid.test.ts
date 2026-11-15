@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { createECDH } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import webpush from 'web-push';
 import { checkVapid, derivePublicKey, generateVapidPair, readVapidConfig } from '../server/vapid.ts';
 
@@ -82,4 +84,31 @@ describe('readVapidConfig', () => {
       readVapidConfig({ PUSH_LAB_VAPID_PUBLIC_KEY: ' abc \n', PUSH_LAB_VAPID_SUBJECT: 'mailto:a@example.test' }),
     ).toEqual({ publicKey: 'abc', privateKey: '', subject: 'mailto:a@example.test' });
   });
+});
+
+describe('scripts/vapid.ts, the key generator', () => {
+  const script = fileURLToPath(new URL('../scripts/vapid.ts', import.meta.url));
+  const run = (...args: string[]) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+  const subjectLine = (out: string) => out.split('\n').find((line) => line.startsWith('PUSH_LAB_VAPID_SUBJECT='));
+
+  it('takes the subject as --subject value and as --subject=value', () => {
+    for (const args of [['--subject', 'mailto:ops@example.test'], ['--subject=mailto:ops@example.test']]) {
+      const result = run(...args);
+      expect(result.status).toBe(0);
+      expect(subjectLine(result.stdout)).toBe('PUSH_LAB_VAPID_SUBJECT=mailto:ops@example.test');
+    }
+  });
+
+  it('uses the placeholder only when no subject is given', () => {
+    expect(subjectLine(run().stdout)).toBe('PUSH_LAB_VAPID_SUBJECT=mailto:you@example.test');
+  });
+
+  it.each(['--subjct=mailto:ops@example.test', '--subject mailto:ops@example.test extra', '--subject', '--subject='])(
+    'refuses "%s" with exit 1 and prints no keys',
+    (line) => {
+      const result = run(...line.split(' '));
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+    },
+  );
 });

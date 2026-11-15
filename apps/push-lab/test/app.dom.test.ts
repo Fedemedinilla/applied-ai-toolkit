@@ -282,6 +282,18 @@ describe('sending a test', () => {
     await vi.waitFor(async () => expect(await app.store.list()).toHaveLength(1));
   });
 
+  it('a lost device that cannot be registered again says so, not that it was registered', async () => {
+    const store = memoryStore();
+    const app = await ready({ store });
+    await store.remove(app.current()?.endpoint ?? '');
+    store.put = () => Promise.reject(new Error('db down'));
+    app.$('test-button').click();
+    await vi.waitFor(() => expect(app.text('test-status')).toContain('no pudo volver a guardarlo'));
+    expect(app.text('test-status')).not.toContain('Ya se volvió a registrar');
+    expect(app.text('test-status')).toContain('No desactives');
+    expect(app.current()?.active).toBe(true);
+  });
+
   it('a 410 from the push service drops the browser subscription and offers Activar again', async () => {
     const send: Sender = () => Promise.reject(Object.assign(new Error('gone'), { statusCode: 410 }));
     const app = await ready({ send });
