@@ -48,7 +48,7 @@ const server = createServer((req, res) => {
   if (url.pathname === '/api/contact') {
     const method = req.method ?? 'GET';
     if (!METHODS.has(method)) {
-      res.writeHead(405, { allow: 'GET, POST' }).end();
+      res.writeHead(405, { allow: 'POST' }).end();
       return;
     }
     const chunks: Buffer[] = [];
