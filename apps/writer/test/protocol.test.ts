@@ -2,7 +2,7 @@
 // canonical text that goes back into the history.
 
 import { describe, expect, it } from 'vitest';
-import { parseReply, parseTitles, placeholders, serializeReply } from '../src/protocol.ts';
+import { isServedAssistantTurn, parseReply, parseTitles, placeholders, serializeReply } from '../src/protocol.ts';
 
 describe('titles', () => {
   it('reads the A:/B:/C: form the prompt asks for', () => {
@@ -14,6 +14,26 @@ describe('titles', () => {
 
   it('accepts numbered, dashed, quoted and bold lines, and drops blanks and repeats', () => {
     expect(parseTitles('\n1. "Uno"\n- **Dos**\n  c) «Tres»  \n\nuno\n')).toEqual(['Uno', 'Dos', 'Tres']);
+  });
+
+  it('drops bold and quotes in any order, and a bold wrapper around the label', () => {
+    expect(parseTitles('A: "**Reunión**"\nB: **«Huerta»**\n**C: Otra**\n- "**Cuarta**"')).toEqual(['Reunión', 'Huerta', 'Otra', 'Cuarta']);
+    expect(parseTitles('**Uno** y **dos**\nB: tres')).toEqual(['**Uno** y **dos**', 'tres']);
+  });
+
+  it('serves a titles turn that the next request accepts, whatever the line style', () => {
+    for (const lines of [
+      ['A: "**Reunión**"', 'B: "**Huerta**"'],
+      ['**A: Reunión**', '**B: Huerta**'],
+      ['1. «**Uno**»', '2. **"Dos"**'],
+      ['- **Uno** y **dos**', '* tres'],
+      ['A: "Uno"', 'B: Dos'],
+    ]) {
+      const once = serializeReply(parseReply(`[[TITULOS]]\n${lines.join('\n')}\n[[/TITULOS]]`));
+      expect(serializeReply(parseReply(once))).toBe(once);
+      expect(isServedAssistantTurn(once, 1)).toBe(true);
+      expect(once).not.toMatch(/: \*[^*]/u);
+    }
   });
 
   it('drops titles over 120 characters and keeps at most five', () => {

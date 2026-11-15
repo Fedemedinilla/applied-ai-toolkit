@@ -16,7 +16,11 @@ export interface Specific {
   readonly text: string;
 }
 
-const TIME = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/gu;
+/**
+ * A time ends at its last digit, so a suffix touching it ("15:00hs", "8:30h") does not split it
+ * into two numbers. A 12-hour suffix ("3:00pm", "3:00 p.m.") is kept with it, for asTime.
+ */
+const TIME = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)(?:\s?[ap]\.?\s?m\b\.?)?/giu;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu;
 const URL_LIKE = /\bhttps?:\/\/\S+|\bwww\.\S+/gu;
 const NUMBER = /\d+(?:[.,]\d+)*/gu;
@@ -42,9 +46,14 @@ export function specifics(text: string): Specific[] {
 
 const digits = (s: string): string => s.replace(/\D/gu, '');
 const asInt = (s: string): string => String(Number(digits(s)));
+/** "08:00" and "8.00" as "8:00"; "3:00pm" and "3:00 p.m." as "15:00"; "12:30am" as "0:30". */
 const asTime = (s: string): string => {
-  const [hour = '', minutes = ''] = s.split(/[:.]/u);
-  return `${Number(hour)}:${minutes}`;
+  const m = /^(\d{1,2})[:.](\d{2})\s?(?:([ap])\.?\s?m\.?)?$/iu.exec(s);
+  if (!m) return s;
+  const hour = Number(m[1]);
+  const half = m[3]?.toLowerCase();
+  const h24 = half === undefined ? hour : (hour % 12) + (half === 'p' ? 12 : 0);
+  return `${h24}:${m[2] ?? ''}`;
 };
 
 /**

@@ -83,10 +83,11 @@ export function signatureFor(catalog: Pick<Catalog, 'roles' | 'committeeSignatur
 
 /**
  * Pictographs, minus the four that are text symbols in running prose (©, ®, ‼, ™) and that
- * Extended_Pictographic includes anyway. A lookahead, not a lookbehind: the page is built
- * without lookbehind (csp-build-guard).
+ * Extended_Pictographic includes anyway, plus the two kinds of emoji it leaves out: flags
+ * (regional indicator pairs) and keycaps (U+20E3). A lookahead, not a lookbehind: the page is
+ * built without lookbehind (csp-build-guard).
  */
-export const EMOJI = /(?![\u00A9\u00AE\u203C\u2122])\p{Extended_Pictographic}/u;
+export const EMOJI = /(?![\u00A9\u00AE\u203C\u2122])(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3)/u;
 
 /** Lower case with accents removed, so "Excursión" matches "excursion". */
 export const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('es');
