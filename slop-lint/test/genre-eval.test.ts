@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { evaluate, formatRatio, guessGrid, LABELED_GENRES, LANGS, loadSets, locate, toMarkdown, validateSet, type LabeledSet } from '../scripts/genre-eval.ts';
+import { evaluate, formatRatio, guessGrid, LABELED_GENRES, LANGS, loadSets, locate, report, toMarkdown, validateSet, type LabeledSet } from '../scripts/genre-eval.ts';
 import { GUESS_CUTS } from '../src/genres.ts';
 
 // Fictional: the names, the branch and the file are invented for this test.
@@ -173,5 +174,10 @@ describe('the labelled set', () => {
     const chats = of('whatsapp');
     expect(chats.some((i) => words(i.text) >= GUESS_CUTS.shortWords)).toBe(true);
     expect(chats.some((i) => words(i.text) < GUESS_CUTS.shortWords)).toBe(true);
+  });
+
+  it('matches the saved report, so slop-lint/research/genre-eval-report.md is never stale', () => {
+    const saved = readFileSync(new URL('../research/genre-eval-report.md', import.meta.url), 'utf8');
+    expect(saved).toBe(report(dir));
   });
 });
