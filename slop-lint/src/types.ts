@@ -35,6 +35,8 @@ export interface Example {
   fire: string;
   /** A near-miss the rule must leave alone. */
   pass: string;
+  /** The earlier message, for a rule that compares the text with it (SEG-03). */
+  previous?: string;
 }
 
 interface RuleBase {
@@ -182,7 +184,7 @@ export interface LintOptions {
    * rioplatense text, voseo in a neutral one). Left out, REG-01 flags the minority register.
    */
   variety?: Variety;
-  /** The text of the earlier message, for a follow-up. No rule reads it yet; it is accepted so callers can pass it now. */
+  /** The text of the earlier message, for a follow-up. Only the rules that compare with it read it. */
   previous?: string;
 }
 

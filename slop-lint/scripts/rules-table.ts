@@ -1,6 +1,7 @@
-// Prints the rule catalog as a Markdown table, for the README.
+// Prints the rule catalog as a Markdown table for the README, then the rules only some genres run.
 // Usage: node slop-lint/scripts/rules-table.ts
-import { RULES } from '../src/rules.ts';
+import { GENRES, resolveRules } from '../src/genres.ts';
+import { GENRE_RULES, RULES } from '../src/rules.ts';
 
 const cell = (s: string) => s.replace(/\|/gu, '\\|');
 const budget = (r: (typeof RULES)[number]): string => {
@@ -10,10 +11,22 @@ const budget = (r: (typeof RULES)[number]): string => {
   if (r.kind === 'pattern' && r.budget) return String(r.budget);
   return r.kind === 'structural' ? r.threshold : '0';
 };
+const genresOf = (id: string): string => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id)).join(', ');
 
 const rows = RULES.map((r) =>
   `| ${r.id} | ${cell(r.name)} | ${r.lang} | ${r.level} | ${r.severity} | ${budget(r)} | ${r.kind} | ${r.source.evidence.join(', ')} | ${cell(r.source.ref)} |`,
 );
+const genreRows = GENRE_RULES.map((r) =>
+  `| ${r.id} | ${cell(r.name)} | ${genresOf(r.id)} | ${r.lang} | ${r.level} | ${r.severity} | ${budget(r)} | ${r.kind} | ${r.source.evidence.join(', ')} | ${cell(r.source.ref)} |`,
+);
 process.stdout.write(
-  ['| id | rule | lang | level | severity | budget | kind | evidence | source |', '|---|---|---|---|---|---|---|---|---|', ...rows].join('\n') + '\n',
+  [
+    '| id | rule | lang | level | severity | budget | kind | evidence | source |',
+    '|---|---|---|---|---|---|---|---|---|',
+    ...rows,
+    '',
+    '| id | rule | genres | lang | level | severity | budget | kind | evidence | source |',
+    '|---|---|---|---|---|---|---|---|---|---|',
+    ...genreRows,
+  ].join('\n') + '\n',
 );

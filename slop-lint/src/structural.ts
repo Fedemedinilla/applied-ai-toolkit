@@ -25,6 +25,8 @@ export interface StructuralContext {
   thresholds: StructuralThresholds;
   /** The Spanish variety, when the caller gave one. REG-01 reads it. */
   variety?: Variety;
+  /** The earlier message, when the caller gave one. */
+  previous?: string;
 }
 
 /** Every number a structural check applies, so a genre profile can set them. */
@@ -84,6 +86,9 @@ const NOMINALIZATION: Record<Lang, RegExp> = {
   es: /^\p{L}{2,}(?:ción|ciones|sión|siones|miento|mientos|dad|dades)$/iu,
   en: /^\p{L}{3,}(?:tion|tions|ment|ments|ity|ities|ness|nesses)$/iu,
 };
+
+/** MAIL-01: the thanks formula as a whole sentence. */
+const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration[.!]$/iu;
 
 function prose(ctx: StructuralContext): Span[] {
   return ctx.sentences.filter(isProse);
@@ -224,6 +229,14 @@ const checks: Record<string, Check> = {
     const count = ws.filter((w) => NOMINALIZATION[ctx.lang].test(w.text)).length;
     if (count * ctx.thresholds.wordsPerNominalization <= ws.length) return [];
     return [{ ruleId: 'OFI-01', start: ws[0]?.start ?? 0, end: ws[ws.length - 1]?.end ?? 0, detail: `${count} in ${ws.length} words` }];
+  },
+
+  'MAIL-01': (ctx) => {
+    if (ctx.lang !== 'en') return [];
+    // The last prose sentence: a sign-off and a name are not prose, so they do not hide it.
+    const last = prose(ctx).at(-1);
+    if (last === undefined || !SOLE_THANKS.test(last.text)) return [];
+    return [{ ruleId: 'MAIL-01', start: last.start, end: last.end }];
   },
 
   'MED-01': (ctx) => {

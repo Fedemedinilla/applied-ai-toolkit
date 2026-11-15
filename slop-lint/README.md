@@ -215,6 +215,7 @@ A cover letter, an email, a follow-up and a WhatsApp message are judged differen
 
 - **One table holds every choice.** `GENRE_PROFILES` in `src/genres.ts` says, per genre, which rules are off, which change level, severity or budget, the Tier 2 budget, and the structural thresholds. The 52 rules of the catalog are not edited per genre. The `cover-letter` profile repeats today's constants, and `test/genres.test.ts` fails if the two drift apart.
 - **A mail may hold a short list.** In `email` and `follow-up`, FMT-01 keeps bold and headings at level 1, and its list items become FMT-01-LIST at level 2, medium. The two patterns joined are the catalog's. A config setting for FMT-01 applies to both parts. FMT-01-LIST can also be set by its own id under `ruleSettings`, and that setting wins for the list part, so `"FMT-01-LIST": "off"` allows lists in a mail and keeps bold and headings at level 1. The two ids are separate settings, so an override that sets FMT-01 leaves a FMT-01-LIST setting in place. In `cover-letter` and `whatsapp`, which do not split FMT-01, a FMT-01-LIST setting changes nothing.
+- **Some rules run only in a genre.** A mail's closing formula or a chat's emoji bullets are not cover-letter rules, so they live outside the catalog of 52, in `GENRE_RULES`, and a profile adds them. A cover letter never runs them. Each has a source, like the catalog's (see Rules only some genres run).
 - **The new profiles are experimental.** Where the research gives no number for a genre, the profile keeps the cover-letter value until a labelled set of fictional texts measures its false positives. The CLI says so on stderr each time it uses one.
 - **The config wins over the genre.** The profile applies to the catalog first, and a rule the config names keeps the config's setting. A caller that passes its own `rules` to `lint()` gets that list as given; the genre then brings its thresholds, its Tier 2 budget and its messages.
 - **Messages follow the genre.** Seven catalog messages speak of a letter or a candidate. `src/messages.ts` holds their wording for the other genres, and a cover letter keeps the catalog's text.
@@ -268,7 +269,7 @@ A team adapts slop-lint to its own writing with a `slop-lint.config.json`, witho
 | `variety` | `rioplatense` or `neutral`, used when `--variety` is not given. Only REG-01 reads it. |
 | `anchors` | Extra anchor terms, each trimmed and none blank. `--anchors` replaces them. |
 | `ignore` | Globs of files to skip, even when they are named on the command line. Standard input is never skipped. |
-| `ruleSettings` | Per rule id: `"off"`, or an object with a new `level` (1, 2 or 3), a new `severity` (`disqualify`, `high`, `medium`, `low`) or both. The id is a built-in rule's, a custom rule's or FMT-01-LIST, the list part of FMT-01 in `email` and `follow-up`. |
+| `ruleSettings` | Per rule id: `"off"`, or an object with a new `level` (1, 2 or 3), a new `severity` (`disqualify`, `high`, `medium`, `low`) or both. The id is a built-in rule's, a custom rule's, FMT-01-LIST, the list part of FMT-01 in `email` and `follow-up`, or a rule only some genres run, such as MAIL-01. |
 | `rules` | Custom pattern rules (below). |
 | `overrides` | A list of `{ "files": [globs], ... }` with any of `lang`, `format`, `genre`, `variety`, `anchors` and `ruleSettings` for the files that match. |
 | `suppressions` | Three switches for the inline directives, all optional (see Inline suppression). |
@@ -586,6 +587,14 @@ Generated with `node slop-lint/scripts/rules-table.ts`. A test checks that every
 | MED-01 | Adverbs in -mente | es | 2 | low | 2 per text | structural | SÍNTESIS | Section 8.2 |
 
 The full Tier 1 and Tier 2 lists, with each regex, are in `src/rules.ts`.
+
+### Rules only some genres run
+
+These rules are not in the catalog of 52, so a cover letter and a caller that passes `RULES` never run them. A genre's profile adds them (`adds` in `src/genres.ts`), and a config can name them under `ruleSettings` like any built-in rule. The same script prints this table.
+
+| id | rule | genres | lang | level | severity | budget | kind | evidence | source |
+|---|---|---|---|---|---|---|---|---|---|
+| MAIL-01 | Thanks formula as the only closing | email, follow-up | en | 1 | high | 0 as the last sentence | structural | SÍNTESIS | Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line) |
 
 ## Known false positives
 

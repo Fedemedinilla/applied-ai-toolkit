@@ -218,6 +218,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
     longSentenceScope: mode.longSentenceScope,
     thresholds: profile.thresholds,
     ...(options.variety === undefined ? {} : { variety: options.variety }),
+    ...(options.previous === undefined ? {} : { previous: options.previous }),
   };
   structuralRules.forEach((rule, i) => {
     if (!appliesTo(rule, lang) || !active(rule)) return;

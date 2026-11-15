@@ -1258,10 +1258,45 @@ export const STRUCTURAL_RULES: readonly StructuralRule[] = structural;
 
 export const RULES: readonly Rule[] = [...PATTERN_RULES, ...STRUCTURAL_RULES];
 
+/**
+ * Rules that only some genres run. They are not in RULES, so a cover letter, the default, and a
+ * caller that passes RULES get the catalog as it was; a genre's profile in genres.ts adds them.
+ * Each keeps the conventions of the catalog (source, section, examples, a README row).
+ */
+const mail: Rule[] = [
+  {
+    kind: 'structural',
+    id: 'MAIL-01',
+    threshold: '0 as the last sentence',
+    name: 'Thanks formula as the only closing',
+    lang: 'en',
+    level: 1,
+    severity: 'high',
+    message: 'The mail closes on a stock thanks and nothing else.',
+    suggestion: 'Close with the next step: what you will send, or when you can talk.',
+    source: { evidence: ['SÍNTESIS'], ref: 'Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line)', section: '12' },
+    deviation:
+      'The report bans the formula only as the sole closing line and gives no test for that. Here it fires when the formula, as a whole ' +
+      'sentence, is the last prose sentence of the text; a sign-off and a name after it are not prose and do not count. The report lists it ' +
+      'for cover letters; it runs in email and follow-up, where the rest of the closing line usually is.',
+    falsePositives: 'A mail whose request comes before the thanks, in the sentence above it.',
+    examples: [
+      {
+        lang: 'en',
+        fire: 'Hi Dana,\n\nI rebuilt the sales dashboard in Power BI in 2024.\n\nThank you for your time and consideration.\n\nBest,\nSam',
+        pass: 'Hi Dana,\n\nThank you for your time and consideration. I can send the code sample on Monday.\n\nBest,\nSam',
+      },
+    ],
+  },
+];
+
+export const GENRE_RULES: readonly Rule[] = [...mail];
+
 export const TIER2_BUDGET = 2;
 
+/** A rule of the catalog or of GENRE_RULES, by id. */
 export function ruleById(id: string): Rule {
-  const rule = RULES.find((r) => r.id === id);
+  const rule = RULES.find((r) => r.id === id) ?? GENRE_RULES.find((r) => r.id === id);
   if (!rule) throw new Error(`Unknown rule ${id}`);
   return rule;
 }

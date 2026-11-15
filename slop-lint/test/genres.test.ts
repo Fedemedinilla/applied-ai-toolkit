@@ -4,7 +4,7 @@ import { applySetting, DEFAULT_GENRE, GENRE_PROFILES, GENRES, guessGenre, resolv
 import { settingsFor, validateConfig } from '../src/config.ts';
 import { appliesTo, lint } from '../src/lint.ts';
 import { MESSAGE_VARIANTS, messageFor } from '../src/messages.ts';
-import { RULES, ruleById, TIER2_BUDGET } from '../src/rules.ts';
+import { GENRE_RULES, RULES, ruleById, TIER2_BUDGET } from '../src/rules.ts';
 import { DEFAULT_THRESHOLDS, runStructural, type StructuralContext } from '../src/structural.ts';
 import { splitSentences } from '../src/text.ts';
 import type { Genre, Lang, LintOptions } from '../src/types.ts';
@@ -369,5 +369,49 @@ describe('guessGenre', () => {
 
   it('is not called by lint(): without a genre a mail is read as a cover letter', () => {
     expect('genre' in lint(genreFixture('email-es.txt'), { lang: 'es' })).toBe(false);
+  });
+});
+
+describe('rules only a genre runs', () => {
+  const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
+
+  it('run in the genres the design gives them and never in a cover letter', () => {
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'] };
+    for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
+    expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
+  });
+
+  it('can be named by a config, which wins over the genre', () => {
+    for (const rule of GENRE_RULES) {
+      const genre = where(rule.id)[0] ?? 'email';
+      expect(() => validateConfig({ ruleSettings: { [rule.id]: 'off' } }), rule.id).not.toThrow();
+      expect(settingsFor({}, undefined, 'config file', { genre }).rules.some((r) => r.id === rule.id), rule.id).toBe(true);
+      const off = settingsFor(validateConfig({ ruleSettings: { [rule.id]: 'off' } }), undefined, 'config file', { genre });
+      expect(off.rules.some((r) => r.id === rule.id), rule.id).toBe(false);
+      expect(off.off, rule.id).toContain(rule.id);
+      expect(settingsFor({}, undefined, 'config file', { genre: 'cover-letter' }).rules.some((r) => r.id === rule.id), rule.id).toBe(false);
+    }
+  });
+});
+
+describe('MAIL-01, thanks as the only closing sentence', () => {
+  const mail = 'Hi Dana,\n\nI rebuilt the sales dashboard in Power BI in 2024.\n\nThank you for your time and consideration.\n\nBest,\nSam';
+
+  it('fires in email and follow-up as a level 1 finding, and not in a cover letter', () => {
+    for (const genre of ['email', 'follow-up'] as const) {
+      const result = lint(mail, { lang: 'en', genre });
+      const f = result.findings.find((x) => x.ruleId === 'MAIL-01');
+      expect(f, genre).toMatchObject({ level: 1, severity: 'high', match: 'Thank you for your time and consideration.' });
+      expect(result.passesTier1, genre).toBe(false);
+    }
+    expect(ids(mail, { lang: 'en' })).not.toContain('MAIL-01');
+    expect(ids(mail, { lang: 'en', genre: 'whatsapp' })).not.toContain('MAIL-01');
+  });
+
+  it('leaves the formula alone when another sentence closes the text or the sentence goes on', () => {
+    const then = 'Hi Dana,\n\nThank you for your time and consideration. I can send the code sample on Monday.\n\nBest,\nSam';
+    const longer = 'Hi Dana,\n\nThank you for your time and consideration, and for the notes on the brief.\n\nBest,\nSam';
+    expect(ids(then, { lang: 'en', genre: 'email' })).not.toContain('MAIL-01');
+    expect(ids(longer, { lang: 'en', genre: 'email' })).not.toContain('MAIL-01');
   });
 });

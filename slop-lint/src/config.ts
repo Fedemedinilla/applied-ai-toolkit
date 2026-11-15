@@ -7,10 +7,10 @@
  * schema/config.schema.json describes the same shape for editors, and test/config-schema.test.ts
  * runs both over one fixture set so they cannot drift apart.
  */
-import { applySetting, GENRE_PROFILES, GENRES, SPLIT_PART_IDS, splitRule } from './genres.ts';
+import { addedRules, applySetting, GENRE_PROFILES, GENRES, SPLIT_PART_IDS, splitRule } from './genres.ts';
 import { globProblem, matchesAny } from './glob.ts';
 import { messageFor } from './messages.ts';
-import { RULES } from './rules.ts';
+import { GENRE_RULES, RULES } from './rules.ts';
 import type { Format, Genre, Lang, Level, PatternRule, Rule, RuleLang, Severity, Variety } from './types.ts';
 
 export const CONFIG_FILE = 'slop-lint.config.json';
@@ -333,6 +333,8 @@ export function validateMeaning(config: Config): void {
   });
   // A split part such as FMT-01-LIST can be set on its own; custom ids start with X-, so they cannot collide.
   for (const id of SPLIT_PART_IDS) ids.add(id);
+  // So can a rule only some genres run, such as MAIL-01; in a genre that does not run it, the setting changes nothing.
+  for (const rule of GENRE_RULES) ids.add(rule.id);
   const check = (settings: Record<string, RuleSetting> | undefined, path: string): void => {
     for (const id of Object.keys(settings ?? {})) {
       if (!ids.has(id)) throw new ConfigError(join(path, id), 'is not the id of a built-in rule or of a rule under rules; --list-rules prints every id');
@@ -424,7 +426,7 @@ export function settingsFor(config: Config, path: string | undefined, origin: st
   const resolvedGenre = flags.genre ?? genre ?? 'cover-letter';
   const resolvedVariety = flags.variety ?? variety;
   const profile = GENRE_PROFILES[resolvedGenre].rules;
-  const all: Rule[] = [...RULES, ...(config.rules ?? []).map((r) => toRule(r, origin))];
+  const all: Rule[] = [...RULES, ...addedRules(resolvedGenre), ...(config.rules ?? []).map((r) => toRule(r, origin))];
   const rules: Rule[] = [];
   const off: string[] = [];
   for (const rule of all) {

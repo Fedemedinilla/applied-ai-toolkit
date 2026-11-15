@@ -116,7 +116,7 @@
     },
     "ruleSettings": {
       "type": "object",
-      "description": "Per rule id: \"off\", or a new level, severity or both. The id is a built-in rule's, a custom rule's or FMT-01-LIST, the list part of FMT-01 in email and follow-up.",
+      "description": "Per rule id: \"off\", or a new level, severity or both. The id is a built-in rule's, a custom rule's, FMT-01-LIST, the list part of FMT-01 in email and follow-up, or a rule only some genres run, such as MAIL-01.",
       "additionalProperties": {
         "oneOf": [
           {
