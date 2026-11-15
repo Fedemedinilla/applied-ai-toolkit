@@ -17,3 +17,5 @@ Refuse zero prices in `model_prices` (`> 0` checks, renamed `model_prices_*_posi
 Leave unmeasured token attributes out of a cut call's span instead of reporting them as zero, and mark the span `incomplete: true`.
 
 Race the reservation write against the deadline and the caller's signal, so a store that hangs no longer holds a call past its `timeoutMs`. The cut throws `ApiError` with the reservation's id, and a reservation that lands later is closed with a zero-usage row.
+
+Keep zod's pattern in the description next to an accepted format (`date-time`, `uuid`, `email` and others) instead of dropping it, since zod's pattern is narrower and is checked on return.
