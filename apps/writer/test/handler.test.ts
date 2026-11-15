@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { apiKeyFromEnv } from '../server/env.ts';
-import { createHandler, historyProblem, MAX_BODY_BYTES, MAX_MESSAGES, wrapUserTurn, type Handler } from '../server/handler.ts';
+import { createHandler, historyProblem, MAX_ASSISTANT_CHARS, MAX_BODY_BYTES, MAX_MESSAGE_CHARS, MAX_MESSAGES, wrapUserTurn, type Handler } from '../server/handler.ts';
 import { createWriterModel, EFFORT, MAX_TOKENS, MODEL } from '../server/model.ts';
 import { buildSystem, PROMPT_VERSION } from '../server/prompt.ts';
 import { apiError, fakeAnthropic, streamed, type FakeAnthropic, type Reply } from './fake-anthropic.ts';
@@ -251,6 +251,47 @@ describe('requests refused before any call', () => {
     expect(historyProblem(turns(MAX_MESSAGES))).toBeNull();
     expect(historyProblem(turns(MAX_MESSAGES + 2))).toBe('too_long');
     expect(historyProblem(turns(2))).toBe('shape');
+  });
+});
+
+describe('every served assistant turn is accepted on the next request', () => {
+  const next = (messages: ReadonlyArray<{ role: string; content: string }>, assistant: string, user: string) => ({
+    ...titlesTurn,
+    messages: [...messages, { role: 'assistant', content: assistant }, { role: 'user', content: user }],
+  });
+
+  it('a titles reply after the titles step is model_unusable, not a picker the next turn refuses', async () => {
+    const { handler, api, logged } = setup([streamed('[[TITULOS]]\nA: Cuatro\nB: Cinco\n[[/TITULOS]]'), streamed(DRAFT)]);
+    const res = await handler(post(draftTurn));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'model_unusable' });
+    expect(logged.at(-1)).toEqual({ event: 'draft_failed', data: { code: 'unreturnable_reply', step: 'draft' } });
+    expect(api.requests).toHaveLength(1);
+    // The history the page kept still works.
+    expect((await handler(post(draftTurn))).status).toBe(200);
+  });
+
+  it('a long bilingual draft round-trips, so "Ajustar la extensión" can be sent', async () => {
+    const es = `Estimadas familias:\n\n${'Los invitamos a la muestra anual de arte. '.repeat(50)}\n\nEquipo Directivo`;
+    const en = `Dear families,\n\n${'We invite you to the annual art show here. '.repeat(50)}\n\nLeadership Team`;
+    const long = `[[COMUNICADO]]\n${es}\n[[EN]]\n${en}\n[[/COMUNICADO]]`;
+    expect(long.length).toBeGreaterThan(4000);
+    const { handler } = setup([streamed(long), streamed(DRAFT)]);
+    const brief = { role: 'coordinacion', category: 'evento', messages: [{ role: 'user', content: 'Muestra anual de arte el 20 de noviembre.' }] };
+    const first = await handler(post(brief));
+    const json = (await first.json()) as { type: string; assistant: string; report: { lengths: Array<{ status: string }> } };
+    expect([first.status, json.type, json.report.lengths.map((l) => l.status)]).toEqual([200, 'draft', ['long', 'long']]);
+    const fix = await handler(post({ ...brief, messages: [...brief.messages, { role: 'assistant', content: json.assistant }, { role: 'user', content: 'Más breve.' }] }));
+    expect(fix.status).toBe(200);
+  });
+
+  it('a draft too long to send back is model_unusable, and a user turn keeps its own limit', async () => {
+    const huge = `[[COMUNICADO]]\n${'x'.repeat(MAX_ASSISTANT_CHARS)}\n[[/COMUNICADO]]`;
+    const { handler, logged } = setup([streamed(huge)]);
+    expect((await handler(post(titlesTurn))).status).toBe(502);
+    expect(logged.at(-1)?.data).toEqual({ code: 'unreturnable_reply', step: 'titles' });
+    const res = await handler(post(next(draftTurn.messages, DRAFT, 'x'.repeat(MAX_MESSAGE_CHARS + 1))));
+    expect(res.status).toBe(400);
   });
 });
 

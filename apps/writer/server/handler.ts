@@ -28,7 +28,14 @@ import { buildSystem, PROMPT_VERSION, stepFor } from './prompt.ts';
 
 export { MAX_MESSAGES };
 
+/** A user turn: the brief, a title choice or a change request. */
 export const MAX_MESSAGE_CHARS = 4000;
+/**
+ * An assistant turn the page sends back. A draft is longer than a request: the longest bilingual
+ * range is 1,100 characters per language, and "Ajustar la extensión" exists for a model that
+ * overshoots it, so the limit leaves room for about three times that range in each language.
+ */
+export const MAX_ASSISTANT_CHARS = 8000;
 export const MAX_HISTORY_CHARS = 20_000;
 /**
  * Refused before reading when Content-Length says it is too big. Otherwise the body is read as a
@@ -36,10 +43,10 @@ export const MAX_HISTORY_CHARS = 20_000;
  */
 export const MAX_BODY_BYTES = 64 * 1024;
 
-const Message = z.strictObject({
-  role: z.enum(['user', 'assistant']),
-  content: z.string().trim().min(1).max(MAX_MESSAGE_CHARS),
-});
+const Message = z.discriminatedUnion('role', [
+  z.strictObject({ role: z.literal('user'), content: z.string().trim().min(1).max(MAX_MESSAGE_CHARS) }),
+  z.strictObject({ role: z.literal('assistant'), content: z.string().trim().min(1).max(MAX_ASSISTANT_CHARS) }),
+]);
 
 const Body = z.strictObject({
   role: z.string().min(1).max(40),
@@ -163,6 +170,13 @@ export function createHandler(deps: HandlerDeps): Handler {
       });
       const parsedReply = parseReply(result.text);
       const assistant = serializeReply(parsedReply);
+      // Never serve a turn the next request would refuse: titles after the titles step, or a
+      // draft too long to send back. The page keeps its history, so trying again still works.
+      const empty = parsedReply.kind === 'text' && parsedReply.text === '';
+      if (!empty && (assistant.length > MAX_ASSISTANT_CHARS || !isServedAssistantTurn(assistant, messages.length))) {
+        log('draft_failed', { code: 'unreturnable_reply', step });
+        return error(502, 'model_unusable');
+      }
       switch (parsedReply.kind) {
         case 'titles':
           return reply(200, { type: 'titles', step, titles: parsedReply.titles, assistant });
