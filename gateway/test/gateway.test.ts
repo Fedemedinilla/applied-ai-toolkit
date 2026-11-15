@@ -613,6 +613,8 @@ describe('invalid config or request: no API call', () => {
       { ...REQUEST, system: ['a', 'b', 'c', 'd', 'e'] },
       { ...REQUEST, system: [''] },
       { ...REQUEST, timeoutMs: -1 },
+      // Above the setTimeout limit, Node would fire the deadline after 1 ms.
+      { ...REQUEST, timeoutMs: 2_147_483_648 },
       // 2 in the system and 3 in the messages: the API allows 4 per request.
       { ...REQUEST, messages: [{ role: 'user', content: [WITH_BREAKPOINT, WITH_BREAKPOINT, WITH_BREAKPOINT] }] },
       { ...REQUEST, config: { model: 'claude-sonnet-5-5', effort: 'medium' }, hardCase: true },
@@ -1086,5 +1088,13 @@ describe('setup', () => {
     const { deps } = fakeDeps(client);
     expect(() => createGateway({ ...deps, timeZone: 'Mars/Olympus_Mons' })).toThrow(SetupError);
     expect(() => createGateway({ ...deps, timeoutMs: 0 })).toThrow(SetupError);
+  });
+
+  it('a timeout above what setTimeout holds (2^31 - 1 ms) fails at startup, since Node would fire it after 1 ms', () => {
+    const { client } = fakeApi([]);
+    const { deps } = fakeDeps(client);
+    expect(() => createGateway({ ...deps, timeoutMs: 2_147_483_647 })).not.toThrow();
+    expect(() => createGateway({ ...deps, timeoutMs: 2_147_483_648 })).toThrow(SetupError);
+    expect(() => createGateway({ ...deps, timeoutMs: 2_592_000_000 })).toThrow(/at most 2147483647/);
   });
 });

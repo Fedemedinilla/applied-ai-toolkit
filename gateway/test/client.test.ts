@@ -102,5 +102,6 @@ describe('createClaudeClient', () => {
     expect(() => createClaudeClient({ apiKey: ' ', timeoutMs: 1000 })).toThrow(SetupError);
     expect(() => createClaudeClient({ apiKey: 'sk', timeoutMs: 0 })).toThrow(SetupError);
     expect(() => createClaudeClient({ apiKey: 'sk', timeoutMs: 1.5 })).toThrow(SetupError);
+    expect(() => createClaudeClient({ apiKey: 'sk', timeoutMs: 2_147_483_648 })).toThrow(SetupError);
   });
 });

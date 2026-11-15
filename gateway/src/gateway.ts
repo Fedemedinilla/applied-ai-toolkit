@@ -60,7 +60,7 @@ import { BUILT_IN_REGISTRY, FALLBACK_DEFAULT_BETA, type Effort, type ModelRegist
 import type { CallObserver, CallOperation, CallSpan } from './observe.ts';
 import type { Clock, ConfigStore, EventLog, PriceStore, UsageRow, UsageStore } from './ports.ts';
 import { structuredFormat, type StructuredFormat } from './schema.ts';
-import { requirePositiveInt, requireTimeZone } from './setup.ts';
+import { MAX_TIMEOUT_MS, requireTimeoutMs, requireTimeZone } from './setup.ts';
 
 type BetaMessage = Anthropic.Beta.BetaMessage;
 export type ContentBlock = Anthropic.Beta.BetaContentBlock;
@@ -119,7 +119,7 @@ export interface GatewayDeps<M extends string = SupportedModel> {
   /**
    * Deadline for a whole call when the request does not bring its own: store reads, waiting for
    * headers, the body and the stream. The SDK timeout only covers the headers. The reservation is
-   * inside the deadline; the closing row is outside it.
+   * inside the deadline; the closing row is outside it. At most 2147483647 (the setTimeout limit).
    */
   readonly timeoutMs: number;
 }
@@ -166,7 +166,7 @@ export interface GatewayRequest<M extends string = SupportedModel> {
   /** Use the task's hardCaseEffort if it has one. Not combinable with `config`. */
   readonly hardCase?: boolean;
   readonly signal?: AbortSignal;
-  /** Deadline for this call instead of the default. */
+  /** Deadline for this call instead of the default. At most 2147483647, the setTimeout limit. */
   readonly timeoutMs?: number;
 }
 
@@ -346,7 +346,9 @@ function validateRequest(request: GatewayRequest<string>, streaming: boolean, sc
   if (!streaming && request.maxTokens > MAX_TOKENS_WITHOUT_STREAMING) {
     fail(`maxTokens ${request.maxTokens} without streaming (up to ${MAX_TOKENS_WITHOUT_STREAMING}): use structuredStream`);
   }
-  if (request.timeoutMs !== undefined && (!Number.isInteger(request.timeoutMs) || request.timeoutMs <= 0)) fail(`timeoutMs ${request.timeoutMs}`);
+  if (request.timeoutMs !== undefined && (!Number.isInteger(request.timeoutMs) || request.timeoutMs <= 0 || request.timeoutMs > MAX_TIMEOUT_MS)) {
+    fail(`timeoutMs ${request.timeoutMs} (a whole number of ms from 1 to ${MAX_TIMEOUT_MS})`);
+  }
   if (request.system.some((block) => block.trim() === '')) fail('an empty system block');
   // Attachment tokens do not follow from request size. They go through streaming, where
   // message_start measures them, with a bound for a cut before message_start.
@@ -393,7 +395,7 @@ function errorName(error: unknown): string {
 
 export function createGateway<M extends string = SupportedModel>(deps: GatewayDeps<M>): Gateway<M> {
   requireTimeZone(deps.timeZone);
-  requirePositiveInt(deps.timeoutMs, 'timeoutMs of the gateway');
+  requireTimeoutMs(deps.timeoutMs, 'timeoutMs of the gateway');
   // Without deps.models, M is its default, SupportedModel, which is what the built-in registry holds.
   const models = (deps.models ?? BUILT_IN_REGISTRY) as ModelRegistry<M>;
   const schemas = configSchemasFor(models.ids);
