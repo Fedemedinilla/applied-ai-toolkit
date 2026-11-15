@@ -11,3 +11,5 @@ dist/
 # StrykerJS sandboxes, and the mutation and benchmark reports (npm run mutation, npm run bench).
 .stryker-tmp/
 reports/
+# The diff-scoped audit's scope, written by npm run -s audit:scope -- --json > scope.json.
+/scope.json
