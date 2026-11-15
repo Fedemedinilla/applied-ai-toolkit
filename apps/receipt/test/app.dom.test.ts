@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFStream } from 'pdf-lib';
 import { mountApp, type App } from '../src/app.ts';
 
 // Paths, not URL objects: under jsdom the global URL is jsdom's, which node:fs does not accept.
@@ -20,6 +20,7 @@ interface Harness {
   app: App;
   blobs: Map<string, Blob>;
   revoked: string[];
+  created: () => number;
 }
 
 // Every mounted app is destroyed after its test, so no timer from one test fires into the next
@@ -53,7 +54,39 @@ function mount(overrides: Overrides = {}): Harness {
     debounceMs: 5,
   });
   mounted.push(app);
-  return { app, blobs, revoked };
+  return { app, blobs, revoked, created: () => n };
+}
+
+/** A promise with its resolve and reject, to finish an async dependency when a test says so. */
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 20));
+
+function choose(value: 'sample' | 'none' | 'file'): void {
+  const radio = $<HTMLInputElement>(`input[name="logo"][value="${value}"]`);
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function pick(file: File): void {
+  const input = $<HTMLInputElement>('#logo-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+async function hasImage(h: Harness): Promise<boolean> {
+  const pdf = await pdfOf(h);
+  return pdf.context
+    .enumerateIndirectObjects()
+    .some(([, obj]) => obj instanceof PDFStream && obj.dict instanceof PDFDict && obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'));
 }
 
 const $ = <T extends HTMLElement>(selector: string): T => {
@@ -218,6 +251,15 @@ describe('the receipt page', () => {
     expect(pending()).toEqual([true, true]);
   });
 
+  it('removes the link and says it is updating as soon as a sample button is clicked', async () => {
+    $<HTMLButtonElement>('[data-sample="long"]').click();
+    expect($('#download').hasAttribute('href')).toBe(false);
+    expect($('#open').hasAttribute('href')).toBe(false);
+    expect($('#status').textContent).toBe('Actualizando el PDF…');
+    await h.app.settled();
+    expect($('#download').getAttribute('download')).toBe('remito-R-0120.pdf');
+  });
+
   it('cancels a scheduled rebuild when destroyed', async () => {
     type('#customer-name', 'Otro Jardín');
     h.app.destroy();
@@ -281,4 +323,13 @@ describe('when the sample logo cannot be fetched', () => {
     expect($('#download').hasAttribute('href')).toBe(true);
     expect($('#status').textContent).toMatch(/^Listo:/u);
   });
+
+});
+
+describe('uploaded logo files', () => {
+
+});
+
+describe('builds that finish late', () => {
+
 });

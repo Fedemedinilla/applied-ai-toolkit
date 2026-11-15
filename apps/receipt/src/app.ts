@@ -361,6 +361,9 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     if (destroyed) return Promise.resolve();
     if (timer) clearTimeout(timer);
     timer = null;
+    // A sample button fills the form and builds at once: the old order's link goes first.
+    clearLinks();
+    status.textContent = 'Actualizando el PDF…';
     const seq = ++sequence;
     running = build(seq, focusOnError);
     return running;
