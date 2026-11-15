@@ -1,7 +1,8 @@
 /**
  * A small PostgREST stand-in for reads: GET /rest/v1/<table> with `select` (plain column lists),
- * `eq` filters and `limit`, plus the single-object Accept header that `.single()` sends. Anything
- * else answers 501 with code `not_in_fake`, so a test that needs more fails loudly and writes its
+ * `eq` filters and `limit`, plus the single-object Accept header that `.single()` sends, on the
+ * public schema. Anything else (another Accept such as `.csv()`, another schema through
+ * `.schema()`) answers 501 with code `not_in_fake`, so a test that needs more fails loudly and writes its
  * own handler instead of getting a plausible wrong answer.
  */
 import type { RecordedRequest, RestHandler } from './fake-auth.ts';
@@ -9,6 +10,17 @@ import type { RecordedRequest, RestHandler } from './fake-auth.ts';
 export type Row = Readonly<Record<string, unknown>>;
 
 const SINGLE_OBJECT = 'application/vnd.pgrst.object+json';
+/** The Accept values restTables answers: none, plain JSON, any, or the single object of `.single()`. */
+const ACCEPTED = new Set([null, 'application/json', '*/*', SINGLE_OBJECT]);
+/** A plain column name. A star inside a list, a JSON path (`->`, `->>`) or a quoted name is not one. */
+const COLUMN = /^[A-Za-z_][A-Za-z0-9_$]*$/;
+
+function unknownColumn(table: string, column: string): Response {
+  return Response.json(
+    { code: '42703', details: null, hint: null, message: `column ${table}.${column} does not exist` },
+    { status: 400 },
+  );
+}
 
 export function notInFake(what: string): Response {
   return Response.json({ code: 'not_in_fake', message: `The fake does not emulate ${what}` }, { status: 501 });
@@ -28,6 +40,12 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
     if (request.method !== 'GET') return notInFake(`${request.method} on PostgREST`);
     const prefer = request.headers.get('prefer') ?? '';
     if (/\bcount=/.test(prefer)) return notInFake(`counts (Prefer: ${prefer})`);
+    const accept = request.headers.get('accept');
+    if (!ACCEPTED.has(accept)) return notInFake(`the response format ${accept}`);
+    for (const name of ['accept-profile', 'content-profile']) {
+      const profile = request.headers.get(name);
+      if (profile !== null && profile !== 'public') return notInFake(`the schema ${profile} (${name})`);
+    }
     const table = request.path.slice('/rest/v1/'.length);
     const rows = tables[table];
     if (rows === undefined) {
@@ -44,6 +62,8 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
       if (key === 'select') {
         if (/[():!]/.test(value)) return notInFake('embedded resources, casts or renamed columns in select');
         columns = value === '*' ? null : value.split(',').map((c) => c.trim());
+        const odd = columns?.find((c) => !COLUMN.test(c));
+        if (odd !== undefined) return notInFake(`the select item ${odd}`);
       } else if (key === 'limit') {
         const n = Number(value);
         if (!/^\d+$/.test(value) || !Number.isSafeInteger(n)) return notInFake(`the limit ${value}`);
@@ -51,17 +71,26 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
       } else if (key === 'order' || key === 'offset' || key === 'or' || key === 'and') {
         return notInFake(`the ${key} parameter`);
       } else if (value.startsWith('eq.')) {
+        if (!COLUMN.test(key)) return notInFake(`the filter ${key}`);
         filters.push([key, value.slice(3)]);
       } else {
         return notInFake(`the filter ${key}=${value}`);
       }
     }
 
-    let result = rows.filter((row) => filters.every(([column, expected]) => row[column] !== undefined && String(row[column]) === expected));
+    // PostgREST answers 42703 for a column the table does not have. The fake knows the columns only
+    // from the rows, so an empty table cannot tell and answers as before.
+    if (rows.length > 0) {
+      const known = new Set(rows.flatMap((row) => Object.keys(row)));
+      const missing = [...(columns ?? []), ...filters.map(([column]) => column)].find((c) => !known.has(c));
+      if (missing !== undefined) return unknownColumn(table, missing);
+    }
+
+    let result = rows.filter((row) => filters.every(([column, expected]) => row[column] !== undefined && row[column] !== null && String(row[column]) === expected));
     if (limit !== null) result = result.slice(0, limit);
     const projected = result.map((row) => project(row, columns));
 
-    if (request.headers.get('accept') === SINGLE_OBJECT) {
+    if (accept === SINGLE_OBJECT) {
       if (projected.length !== 1) {
         return Response.json(
           {

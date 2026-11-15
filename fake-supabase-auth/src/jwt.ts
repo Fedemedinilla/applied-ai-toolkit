@@ -89,6 +89,9 @@ function isClaims(value: unknown): value is AccessTokenClaims {
 export async function verifyAccessToken(keys: SigningKeys, token: string, nowSeconds: number): Promise<VerifyResult> {
   const parts = token.split('.');
   if (parts.length !== 3) return { ok: false, reason: 'malformed' };
+  // Buffer drops characters that are not base64url, so 'abc!' would decode like 'abc'. A strict
+  // JWT parser rejects them, and so does the fake.
+  if (!parts.every((part) => /^[A-Za-z0-9_-]*$/.test(part))) return { ok: false, reason: 'malformed' };
   const [head = '', body = '', signature = ''] = parts;
   let parsedHeader: unknown;
   let claims: unknown;

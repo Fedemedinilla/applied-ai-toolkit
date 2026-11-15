@@ -81,6 +81,29 @@ describe('email code sign-in', () => {
     expect(fake.users.size).toBe(1);
   });
 
+  it('matches the email without regard to case or surrounding spaces, as Auth does', async () => {
+    const client = clientFor(fake);
+    const shouted = ` ${fake.user.email.toUpperCase()} `;
+    expect((await client.auth.signInWithOtp({ email: shouted })).error).toBeNull();
+    expect(fake.users.size).toBe(1);
+    const { data, error } = await client.auth.verifyOtp({ email: shouted, token: fake.otpCode, type: 'email' });
+    expect(error).toBeNull();
+    expect(data.user?.id).toBe(fake.user.id);
+  });
+
+  it('phone codes, token_hash links, password and id_token sign-in get not_in_fake, not an ordinary Auth error', async () => {
+    const client = clientFor(fake);
+    const notInFake = { name: 'AuthApiError', status: 404, code: 'not_in_fake' };
+
+    expect((await client.auth.signInWithOtp({ phone: '+10000000000' })).error).toMatchObject(notInFake);
+    expect((await client.auth.verifyOtp({ token_hash: 'abc', type: 'email' })).error).toMatchObject(notInFake);
+    expect((await client.auth.verifyOtp({ phone: '+10000000000', token: fake.otpCode, type: 'sms' })).error).toMatchObject(notInFake);
+    const password = (await client.auth.signInWithPassword({ email: fake.user.email, password: 'x' })).error;
+    expect(password).toMatchObject(notInFake);
+    expect(password?.message).toMatch(/password/);
+    expect((await client.auth.signInWithIdToken({ provider: 'google', token: 'x' })).error).toMatchObject(notInFake);
+  });
+
   it('an override answers before the fake: a 429 from the email rate limit', async () => {
     fake.knobs.override = (request) =>
       request.path === '/auth/v1/otp' ? authError(429, 'over_email_send_rate_limit', 'email rate limit exceeded') : undefined;
@@ -124,6 +147,25 @@ describe('OAuth with PKCE', () => {
     url.searchParams.set('code_challenge', 'not-the-challenge');
     const { error } = await client.auth.exchangeCodeForSession(fake.authorize(url.href));
     expect(error).toMatchObject({ status: 403, code: 'bad_code_verifier' });
+  });
+
+  it('authorize(url, userId) signs in another seeded user; a userId that does not exist gets 404 user_not_found', async () => {
+    const second = { id: '44444444-4444-4444-8444-444444444444', email: 'second@example.test' };
+    fake = await createFakeSupabase({ users: [DEFAULT_USER, second] });
+    const startFlow = async (client: SupabaseClient): Promise<string> => {
+      const started = await client.auth.signInWithOAuth({ provider: 'google', options: { skipBrowserRedirect: true } });
+      if (started.data.url === null) throw new Error('no authorize URL');
+      return started.data.url;
+    };
+
+    const client = clientFor(fake);
+    const { data, error } = await client.auth.exchangeCodeForSession(fake.authorize(await startFlow(client), second.id));
+    expect(error).toBeNull();
+    expect(data.user?.id).toBe(second.id);
+
+    const other = clientFor(fake);
+    const missing = await other.auth.exchangeCodeForSession(fake.authorize(await startFlow(other), fake.otherUserId));
+    expect(missing.error).toMatchObject({ status: 404, code: 'user_not_found' });
   });
 });
 
@@ -179,6 +221,22 @@ describe('getClaims', () => {
     expect(fake.calls).toEqual(['GET /auth/v1/user']);
   });
 
+  it('with HS256, /user rejects a token with characters outside base64url added to the signature', async () => {
+    fake.knobs.symmetric = true;
+    const session = await signIn(fake, clientFor(fake));
+    const token = session.access_token;
+    const cut = token.length - 4;
+    const userWith = (bearerToken: string) =>
+      fake.fetch(`${fake.url}/auth/v1/user`, { headers: { apikey: fake.publishableKey, authorization: `Bearer ${bearerToken}` } });
+
+    expect((await userWith(token)).status).toBe(200);
+    for (const bad of [`${token}!`, `${token}~`, `${token.slice(0, cut)}!!${token.slice(cut)}`]) {
+      const response = await userWith(bad);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error_code: 'bad_jwt' });
+    }
+  });
+
   it('with Auth answering 503 to the JWKS, returns a retryable error and keeps the session', async () => {
     const storage = memoryStorage();
     const client = clientFor(fake, { storage });
@@ -211,6 +269,21 @@ describe('refresh', () => {
 
     const reused = await clientFor(fake).auth.refreshSession({ refresh_token: expired.refresh_token });
     expect(reused.error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
+  });
+
+  it('reusing a spent refresh token revokes the rest of that session, and only that session', async () => {
+    const stolen = await signIn(fake, clientFor(fake));
+    const otherDevice = await signIn(fake, clientFor(fake));
+    const refreshWith = (refreshToken: string) => clientFor(fake).auth.refreshSession({ refresh_token: refreshToken });
+
+    const rotated = await refreshWith(stolen.refresh_token);
+    expect(rotated.error).toBeNull();
+    const child = rotated.data.session?.refresh_token;
+    if (child === undefined) throw new Error('no rotated refresh token');
+
+    expect((await refreshWith(stolen.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
+    expect((await refreshWith(child)).error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
+    expect((await refreshWith(otherDevice.refresh_token)).error).toBeNull();
   });
 
   it('a 5xx on refresh is retried with backoff for about 30 seconds, then returned, and the session stays', async () => {
@@ -250,6 +323,26 @@ describe('refresh', () => {
     expect(error).toMatchObject({ name: 'AuthApiError', status: 400, code: 'refresh_token_not_found' });
     expect(fake.calls).toEqual(['POST /auth/v1/token']);
     expect(storage.items.has(STORAGE_KEY)).toBe(false);
+  });
+});
+
+describe('/user and /logout with an expired token', () => {
+  it('getUser with an expired jwt passed explicitly gets 403 bad_jwt, and so does /logout', async () => {
+    fake.knobs.expiresIn = -60;
+    const session = await signIn(fake, clientFor(fake));
+
+    const { data, error } = await clientFor(fake).auth.getUser(session.access_token);
+    expect(data.user).toBeNull();
+    expect(error).toMatchObject({ status: 403, code: 'bad_jwt' });
+    expect(error?.message).toMatch(/token is expired/);
+    expect(fake.calls).toEqual(['GET /auth/v1/user']);
+
+    const logout = await fake.fetch(`${fake.url}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { apikey: fake.publishableKey, authorization: `Bearer ${session.access_token}` },
+    });
+    expect(logout.status).toBe(403);
+    expect(await logout.json()).toMatchObject({ error_code: 'bad_jwt' });
   });
 });
 
@@ -330,6 +423,18 @@ describe('logout', () => {
     expect((await refreshWith(laptopSession.refresh_token)).error).toBeNull();
   });
 
+  it('the default scope is global and revokes the refresh token of every session of the user', async () => {
+    const phone = clientFor(fake);
+    const laptop = clientFor(fake);
+    const phoneSession = await signIn(fake, phone);
+    const laptopSession = await signIn(fake, laptop);
+
+    expect((await phone.auth.signOut()).error).toBeNull();
+    expect(fake.requests.at(-1)?.query.get('scope')).toBe('global');
+    expect((await refreshWith(phoneSession.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_not_found' });
+    expect((await refreshWith(laptopSession.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_not_found' });
+  });
+
   it('scope others keeps this session and revokes every other one', async () => {
     const phone = clientFor(fake);
     const laptop = clientFor(fake);
@@ -376,6 +481,20 @@ describe('Auth that hangs', () => {
   it('a hung request with no signal fails at once instead of stalling the test', async () => {
     fake.knobs.hang = true;
     await expect(fake.fetch(`${fake.url}/auth/v1/user`)).rejects.toThrow(/no AbortSignal/);
+  });
+
+  it('a delay still fails when the signal aborts while the request body is read', async () => {
+    fake.knobs.delays['/auth/v1/otp'] = 300;
+    const controller = new AbortController();
+    const body = new ReadableStream<Uint8Array>({
+      pull(stream) {
+        controller.abort();
+        stream.enqueue(new TextEncoder().encode(JSON.stringify({ email: fake.user.email })));
+        stream.close();
+      },
+    });
+    const init = { method: 'POST', body, duplex: 'half', signal: controller.signal, headers: { apikey: fake.publishableKey } };
+    await expect(fake.fetch(`${fake.url}/auth/v1/otp`, init as RequestInit)).rejects.toMatchObject({ name: 'AbortError' });
   });
 
   it('a signal aborted before the call sends nothing', async () => {
@@ -433,6 +552,41 @@ describe('PostgREST', () => {
     expect(bad.status).toBe(501);
   });
 
+  it('an Accept other than JSON or a single object, and a schema other than public, get not_in_fake', async () => {
+    fake.knobs.rest = restTables({ notes: NOTES });
+    const client = clientFor(fake);
+
+    expect((await client.from('notes').select('id').eq('id', 1).maybeSingle()).data).toEqual({ id: 1 });
+    expect(await client.from('notes').select('id').csv()).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').geojson()).toMatchObject({ status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').explain()).toMatchObject({ status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.schema('private').from('notes').select('id')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(fake.requests.at(-1)?.headers.get('accept-profile')).toBe('private');
+  });
+
+  it('eq.null matches the string null only, never a SQL NULL, as in PostgREST', async () => {
+    fake.knobs.rest = restTables({ notes: [{ id: 1, owner: null }, { id: 2, owner: 'null' }] });
+    expect((await clientFor(fake).from('notes').select('id').eq('owner', 'null')).data).toEqual([{ id: 2 }]);
+  });
+
+  it('a star inside a list, a JSON path in select or in a filter get not_in_fake, not rows of nulls', async () => {
+    fake.knobs.rest = restTables({ notes: [{ id: 1, data: { k: 'v' } }] });
+    const client = clientFor(fake);
+
+    expect(await client.from('notes').select('*, id')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('data->k')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').eq('data->>k', 'v')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+  });
+
+  it('a column that no row has gets 400 42703, as PostgREST answers; an empty table still answers []', async () => {
+    fake.knobs.rest = restTables({ notes: NOTES, empty: [] });
+    const client = clientFor(fake);
+
+    expect(await client.from('notes').select('id,titel')).toMatchObject({ data: null, status: 400, error: { code: '42703' } });
+    expect(await client.from('notes').select('*').eq('ownr_id', 'x')).toMatchObject({ data: null, status: 400, error: { code: '42703' } });
+    expect(await client.from('empty').select('id').eq('owner_id', 'x')).toMatchObject({ error: null, data: [], status: 200 });
+  });
+
   it('a GET that gets 503 is retried three times by postgrest-js, honoring Retry-After; Auth failWith does not touch it', async () => {
     fake.knobs.failWith = 503;
     fake.knobs.rest = () => new Response('schema cache loading', { status: 503, headers: { 'retry-after': '0' } });
@@ -457,6 +611,11 @@ describe('PostgREST', () => {
 });
 
 describe('the fake itself', () => {
+  it('refuses a url with a path at creation, since it routes /auth/v1 and /rest/v1 from the root', async () => {
+    await expect(createFakeSupabase({ url: 'http://supabase.test/proj' })).rejects.toThrow(/must be an origin/);
+    expect((await createFakeSupabase({ url: 'http://supabase.test/' })).url).toBe('http://supabase.test');
+  });
+
   it('refuses any other origin, so a test cannot reach the network through it by mistake', async () => {
     await expect(fake.fetch('https://api.example.test/v1')).rejects.toThrow(/only answers http:\/\/supabase.test/);
     expect(fake.calls).toEqual([]);
