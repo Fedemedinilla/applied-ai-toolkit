@@ -92,7 +92,7 @@ An outage turns every client into a loop of resends, and the retries can keep th
 - `Retry-After` is honored. When the server asks for a longer pause than `maxDelayMs`, the client stops retrying and goes to the re-read instead of waiting or ignoring it.
 - Definite refusals are never retried, and a request that fails the client's own validation (the same rules as `validate_lines`) is never sent.
 - After `unknown` the next attempt is the user's tap, with the same key. However many times they tap within the window, the database holds one order.
-- With the defaults a call can take up to about 33 s, made of three 8 s attempts, up to 900 ms of backoff and an 8 s re-read. Set `timeoutMs` and `maxAttempts` so that fits inside the server's request limit. If the platform kills the handler first, the browser gets the `unknown` case.
+- With the defaults a call can take up to about 40 s. That is three 8 s attempts, an 8 s re-read and up to two waits of `maxDelayMs` (4 s each) when the server sends a `Retry-After` of 4 s or less. Without `Retry-After` the backoff adds at most 900 ms. Set `timeoutMs` and `maxAttempts` so that fits inside the server's request limit. If the platform kills the handler first, the browser gets the `unknown` case.
 
 ## Why the key is generated on the client
 
