@@ -103,6 +103,18 @@ describe('text never throws; warnings say what changed', () => {
     expect(warnings).toEqual([{ code: 'characters_dropped', field: 'customer.name', count: 3 }]);
   });
 
+  it('names the input line that was clipped, after an empty line before it', async () => {
+    const warnings: ReceiptWarning[] = [];
+    const long = 'x'.repeat(400);
+    await buildReceiptPdf(order({ shop: { name: 'V', lines: ['', long] }, customer: { name: 'C', lines: ['', '🌵', long] } }), {
+      onWarning: (w) => warnings.push(w),
+    });
+    expect(warnings.filter((w) => w.code === 'text_clipped')).toEqual([
+      { code: 'text_clipped', field: 'shop.lines[1]' },
+      { code: 'text_clipped', field: 'customer.lines[2]' },
+    ]);
+  });
+
   it('reports party lines beyond the fourth', async () => {
     const warnings: ReceiptWarning[] = [];
     await buildReceiptPdf(order({ customer: { name: 'C', lines: ['1', '2', '3', '4', '5', '6'] } }), { onWarning: (w) => warnings.push(w) });

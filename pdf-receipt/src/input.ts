@@ -115,13 +115,19 @@ function calendarDate(value: unknown, field: string): string {
   return value as string;
 }
 
+/** A party's lines keep the input path, so a warning from the layout names the line the caller wrote. */
+export interface PreparedParty {
+  readonly name: string;
+  readonly lines: ReadonlyArray<{ readonly text: string; readonly field: string }>;
+}
+
 /** Everything the layout draws, already validated, computed and made safe for the font. */
 export interface PreparedReceipt {
   readonly number: string;
   readonly issuedOn: string;
   readonly issuedText: string;
-  readonly shop: { readonly name: string; readonly lines: readonly string[] };
-  readonly customer: { readonly name: string; readonly lines: readonly string[] };
+  readonly shop: PreparedParty;
+  readonly customer: PreparedParty;
   readonly deliveryText: string | null;
   readonly items: ReadonlyArray<{
     readonly name: string;
@@ -170,15 +176,15 @@ export function prepare(data: ReceiptData, { labels: rawLabels, format, warn }: 
   };
   const money = (c: number): string => printable(formatCents(c, format));
 
-  const party = (p: ReceiptParty, field: string) => {
+  const party = (p: ReceiptParty, field: string): PreparedParty => {
     const all = p.lines ?? [];
     if (all.length > MAX_PARTY_LINES) warn({ code: 'lines_omitted', field: `${field}.lines`, count: all.length - MAX_PARTY_LINES });
     return {
       name: line(p.name, `${field}.name`),
       lines: all
         .slice(0, MAX_PARTY_LINES)
-        .map((l, i) => line(l, `${field}.lines[${i}]`))
-        .filter((l) => l.length > 0),
+        .map((l, i) => ({ text: line(l, `${field}.lines[${i}]`), field: `${field}.lines[${i}]` }))
+        .filter((l) => l.text.length > 0),
     };
   };
 

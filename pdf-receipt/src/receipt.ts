@@ -277,9 +277,9 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
     left = top - 20;
     text(fitted(r.shop.name, bold, 20, half, 'shop.name'), M, left, bold, 20, accent);
   }
-  r.shop.lines.forEach((l, i) => {
+  r.shop.lines.forEach((l) => {
     left -= 13;
-    text(fitted(l, regular, 9, half, `shop.lines[${i}]`), M, left, regular, 9, MUTED);
+    text(fitted(l.text, regular, 9, half, l.field), M, left, regular, 9, MUTED);
   });
   let rightY = top - 18;
   right(L.title, W - M, rightY, bold, fitSize(bold, L.title, 18, half));
@@ -295,9 +295,9 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
   text(clip(bold, L.customer, 9, contentWidth).text, M, y, bold, 9, MUTED);
   y -= 17;
   text(fitted(r.customer.name, bold, 14, contentWidth, 'customer.name'), M, y, bold, 14);
-  r.customer.lines.forEach((l, i) => {
+  r.customer.lines.forEach((l) => {
     y -= 15;
-    text(fitted(l, regular, 10, contentWidth, `customer.lines[${i}]`), M, y, regular, 10, MUTED);
+    text(fitted(l.text, regular, 10, contentWidth, l.field), M, y, regular, 10, MUTED);
   });
   if (r.deliveryText !== null) {
     y -= 15;
