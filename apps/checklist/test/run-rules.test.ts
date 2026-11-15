@@ -138,7 +138,7 @@ describe('the "before" snapshot', () => {
     let run = ok(setState(catalogue, runWith(catalogue, 'wordpress'), 'EXT-02', 'fail', at(1)));
     run = ok(setEvidence(catalogue, run, 'EXT-03', 'only a note', at(2)));
     run = ok(recordBaseline(run, at(3)));
-    expect(run.baseline).toEqual({ at: at(3).toISOString(), states: { 'EXT-02': 'fail' }, evidence: { 'EXT-02': '' } });
+    expect(run.baseline).toEqual({ at: at(3).toISOString(), states: { 'EXT-02': 'fail' }, evidence: { 'EXT-02': '' }, profile: run.profile, catalogueId: catalogue.id });
     expect(recordBaseline(run, at(4))).toEqual({ ok: false, reason: 'baseline_exists' });
   });
 

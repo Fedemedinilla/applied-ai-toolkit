@@ -61,6 +61,9 @@ export interface Baseline {
   readonly at: string;
   readonly states: Readonly<Record<string, State>>;
   readonly evidence: Readonly<Record<string, string>>;
+  /** The site profile and catalogue when "before" was recorded. Runs from before they were kept lack them. */
+  readonly profile?: Profile;
+  readonly catalogueId?: string;
 }
 
 export interface Run {
@@ -236,7 +239,7 @@ export function recordBaseline(run: Run, now: Date): Result {
     states[id] = mark.state;
     evidence[id] = mark.evidence;
   }
-  return { ok: true, run: { ...run, baseline: { at: now.toISOString(), states, evidence } } };
+  return { ok: true, run: { ...run, baseline: { at: now.toISOString(), states, evidence, profile: run.profile, catalogueId: run.catalogueId } } };
 }
 
 export function closeRun(catalogue: Catalogue, run: Run, now: Date): Result {
@@ -279,19 +282,37 @@ const isIso = (v: unknown): v is string => {
 const isState = (v: unknown): v is State => (STATES as readonly unknown[]).includes(v);
 const allValues = (v: unknown, test: (x: unknown) => boolean): boolean => isRecord(v) && Object.values(v).every(test);
 
+const isProfile = (p: unknown): p is Profile =>
+  isRecord(p) &&
+  PLATFORM_IDS.includes(String(p.platform)) &&
+  typeof p.authorized === 'boolean' &&
+  Array.isArray(p.features) &&
+  p.features.every((f) => FEATURE_IDS.includes(String(f)));
+
 export function isRun(v: unknown): v is Run {
   if (!isRecord(v) || v.format !== 'site-checklist-run' || v.version !== 1) return false;
   if (typeof v.catalogueId !== 'string' || !isIso(v.createdAt)) return false;
   const { site, profile, baseline, closedAt, imports } = v;
   if (!isRecord(site) || typeof site.name !== 'string' || typeof site.url !== 'string') return false;
-  if (!isRecord(profile) || !PLATFORM_IDS.includes(String(profile.platform)) || typeof profile.authorized !== 'boolean') return false;
-  if (!Array.isArray(profile.features) || !profile.features.every((f) => FEATURE_IDS.includes(String(f)))) return false;
+  if (!isProfile(profile)) return false;
   if (
     !allValues(v.marks, (m) => isRecord(m) && (m.state === null || isState(m.state)) && typeof m.evidence === 'string' && isIso(m.at) && (m.fixedFrom === undefined || m.fixedFrom === 'fail'))
   ) {
     return false;
   }
-  if (baseline !== null && !(isRecord(baseline) && isIso(baseline.at) && allValues(baseline.states, isState) && allValues(baseline.evidence, (e) => typeof e === 'string'))) return false;
+  if (
+    baseline !== null &&
+    !(
+      isRecord(baseline) &&
+      isIso(baseline.at) &&
+      allValues(baseline.states, isState) &&
+      allValues(baseline.evidence, (e) => typeof e === 'string') &&
+      (baseline.profile === undefined || isProfile(baseline.profile)) &&
+      (baseline.catalogueId === undefined || typeof baseline.catalogueId === 'string')
+    )
+  ) {
+    return false;
+  }
   if (!allValues(v.preChange, isIso) || !allValues(v.postChange, isIso)) return false;
   if (closedAt !== null && !isIso(closedAt)) return false;
   if (

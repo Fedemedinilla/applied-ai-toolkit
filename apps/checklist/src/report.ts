@@ -2,10 +2,10 @@
 // Every string a person typed goes through md() before it is written, so an evidence note cannot add
 // a heading, a link, a table cell or raw HTML to the report.
 
-import type { Catalogue, Item } from './catalogue.ts';
+import { PLATFORMS, type Catalogue, type Item } from './catalogue.ts';
 import { COLOUR_INFO, COLOURS, deriveColour, summarise, countLine, type Colour, type Summary } from './colours.ts';
 import { formatElapsed, formatUtc, timeline } from './incident.ts';
-import { applies, matrixApplies, STATE_LABELS, type Run, type State } from './run.ts';
+import { applies, matrixApplies, postChangePending, preChangeDone, STATE_LABELS, type Baseline, type Profile, type Run, type State } from './run.ts';
 
 /** One line of inline Markdown from free text: whitespace collapsed, syntax characters escaped. */
 export function md(text: string): string {
@@ -23,10 +23,40 @@ function siteTitle(run: Run): string {
   return md(run.site.name || run.site.url || 'Unnamed site');
 }
 
-function scopeText(run: Run, kind: ReportKind): string {
-  if (kind === 'before-after' && run.baseline) {
-    return `Measured before (${day(run.baseline.at)}) and after (the date above) with the same checklist and the same site profile. Each change was made after the pre-change list and checked with the post-change matrix (listed at the end).`;
-  }
+/** What differs between two profiles, in words, or an empty list when they match. */
+function profileChanges(was: Profile, now: Profile): string[] {
+  const out: string[] = [];
+  const label = (id: string): string => PLATFORMS.find((p) => p.id === id)?.label ?? id;
+  if (was.platform !== now.platform) out.push(`the platform was ${label(was.platform)} then and is ${label(now.platform)} now`);
+  if (was.authorized !== now.authorized) out.push(`written authorization was ${was.authorized ? 'signed then and is not now' : 'not signed then and is now'}`);
+  const added = now.features.filter((f) => !was.features.includes(f));
+  const removed = was.features.filter((f) => !now.features.includes(f));
+  if (added.length) out.push(`features added since: ${added.join(', ')}`);
+  if (removed.length) out.push(`features removed since: ${removed.join(', ')}`);
+  return out;
+}
+
+function beforeAfterScope(catalogue: Catalogue, run: Run, baseline: Baseline): string {
+  // Each claim is written only when the run backs it.
+  const sameChecklist = (baseline.catalogueId ?? run.catalogueId) === catalogue.id;
+  const checklist = sameChecklist ? 'the same checklist' : `checklist ${md(baseline.catalogueId ?? run.catalogueId)} for "before" and ${catalogue.id} for "after"`;
+  const changes = baseline.profile ? profileChanges(baseline.profile, run.profile) : null;
+  const opening = `Measured before (${day(baseline.at)}) and after (the date above) with ${checklist}`;
+  const profile =
+    changes === null
+      ? `${opening}. The site profile of "before" was not recorded in this run, so both columns use the current one.`
+      : changes.length === 0
+        ? `${opening} and the same site profile.`
+        : `${opening}. The site profile changed after "before" was recorded: ${changes.join('; ')}. Each column counts the checks of its own profile.`;
+  const control =
+    preChangeDone(catalogue, run) && postChangePending(catalogue, run).length === 0
+      ? 'Each change was made after the pre-change list and checked with the post-change matrix (listed at the end).'
+      : 'The pre-change list or the post-change matrix is not fully acknowledged; see the change control record at the end.';
+  return `${profile} ${control}`;
+}
+
+function scopeText(catalogue: Catalogue, run: Run, kind: ReportKind): string {
+  if (kind === 'before-after' && run.baseline) return beforeAfterScope(catalogue, run, run.baseline);
   if (!run.profile.authorized) {
     return 'Only what any visitor can see from outside was checked: how the site answers, how it loads on a phone, how the domain and its mail are set up, and whether it is on lists of dangerous sites. The dashboard and the hosting were not opened, so users, backups and installed components are not in this report.';
   }
@@ -83,7 +113,7 @@ export function reportMarkdown(catalogue: Catalogue, run: Run, kind: ReportKind,
 
   out.push(`# Site status: ${siteTitle(run)}`, '');
   out.push(`Site: ${md(run.site.url || 'no address given')}. Date: ${day(now.toISOString())}. Catalogue ${catalogue.id}.`, '');
-  out.push('## What was checked and what was not', '', scopeText(run, kind), '');
+  out.push('## What was checked and what was not', '', scopeText(catalogue, run, kind), '');
 
   out.push('## Summary', '', ...summaryLines(after), '');
 
