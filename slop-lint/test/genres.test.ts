@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { applySetting, DEFAULT_GENRE, GENRE_PROFILES, GENRES, guessGenre, resolveRules } from '../src/genres.ts';
+import { settingsFor } from '../src/config.ts';
 import { appliesTo, lint } from '../src/lint.ts';
 import { MESSAGE_VARIANTS, messageFor } from '../src/messages.ts';
 import { RULES, ruleById, TIER2_BUDGET } from '../src/rules.ts';
@@ -166,6 +167,49 @@ describe('email', () => {
     const result = lint(text, { lang: 'es', genre: 'email' });
     expect(result.findings.map((f) => [f.ruleId, f.severity])).toEqual([['EST-09', 'low']]);
     expect(result.score.points).toBe(14.5);
+  });
+});
+
+describe('Markdown in a mail', () => {
+  const text = 'Hola Laura,\n\nTe paso lo que hablamos:\n\n- el tablero de ventas\n- la carga de datos\n\nEl **jueves** lo vemos.\n\nSaludos,\nAna\n';
+  const fmt = (genre?: Genre) => lint(text, { lang: 'es', ...(genre === undefined ? {} : { genre }) }).findings.filter((f) => f.ruleId.startsWith('FMT-01')).map((f) => [f.ruleId, f.level, f.severity, f.match]);
+
+  it('lowers a short list to level 2 medium and keeps bold and headings at level 1, in email and follow-up', () => {
+    for (const genre of ['email', 'follow-up'] as const) {
+      expect(fmt(genre), genre).toEqual([
+        ['FMT-01-LIST', 2, 'medium', '- '],
+        ['FMT-01-LIST', 2, 'medium', '- '],
+        ['FMT-01', 1, 'high', '**jueves**'],
+      ]);
+      const bold = lint(text, { lang: 'es', genre }).findings.find((f) => f.ruleId === 'FMT-01');
+      expect(bold?.message, genre).not.toMatch(/portal/u);
+    }
+  });
+
+  it('keeps the whole rule at level 1 in a cover letter', () => {
+    expect(fmt()).toEqual([
+      ['FMT-01', 1, 'high', '- '],
+      ['FMT-01', 1, 'high', '- '],
+      ['FMT-01', 1, 'high', '**jueves**'],
+    ]);
+  });
+
+  it('splits the catalog pattern without losing or adding a match', () => {
+    const catalog = ruleById('FMT-01');
+    const parts = resolveRules(RULES, 'email').filter((r) => r.id.startsWith('FMT-01'));
+    expect(parts.map((r) => r.id)).toEqual(['FMT-01', 'FMT-01-LIST']);
+    if (catalog.kind !== 'pattern') throw new Error('FMT-01 is a pattern rule');
+    for (const lang of ['en', 'es'] as const) {
+      expect(parts.map((r) => (r.kind === 'pattern' ? r.patterns[lang] : '')).join('|'), lang).toBe(catalog.patterns[lang]);
+    }
+  });
+
+  it('lets a config setting for FMT-01 apply to both parts', () => {
+    const settings = settingsFor({ ruleSettings: { 'FMT-01': 'off' } }, undefined, 'config file', { genre: 'email' });
+    expect(settings.rules.some((r) => r.id.startsWith('FMT-01'))).toBe(false);
+    expect(settings.off.filter((id) => id === 'FMT-01')).toEqual(['FMT-01']);
+    const raised = settingsFor({ ruleSettings: { 'FMT-01': { level: 1, severity: 'high' } } }, undefined, 'config file', { genre: 'email' });
+    expect(raised.rules.filter((r) => r.id.startsWith('FMT-01')).map((r) => [r.id, r.level])).toEqual([['FMT-01', 1], ['FMT-01-LIST', 1]]);
   });
 });
 

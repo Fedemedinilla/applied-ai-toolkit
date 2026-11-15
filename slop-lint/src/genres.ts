@@ -8,12 +8,18 @@
  * number they leave at the cover-letter value is still to be measured, not a calibrated choice.
  */
 import { messageFor } from './messages.ts';
+import { ruleById } from './rules.ts';
 import type { StructuralThresholds } from './structural.ts';
 import type { Genre, GenreSetting, PatternRule, Rule } from './types.ts';
 
 export interface GenreProfile {
   /** Per rule id. A rule left out keeps its catalog setting. */
   rules: Readonly<Partial<Record<string, GenreSetting>>>;
+  /**
+   * Catalog rules this genre runs as several rules, by the catalog id. The first part keeps the
+   * id; a config setting for that id applies to every part.
+   */
+  splits?: Readonly<Partial<Record<string, readonly Rule[]>>>;
   /** The shared Tier 2 budget per text. */
   tier2Budget: number;
   thresholds: StructuralThresholds;
@@ -50,10 +56,38 @@ const NOT_A_LETTER: Readonly<Record<string, GenreSetting>> = {
   'CAR-03': 'off',
 };
 
+const FMT_01 = ruleById('FMT-01');
+const MARKUP = String.raw`\*\*[^*\n]+\*\*|__[^_\n]+__|^#{1,6}[ \t]`;
+const LIST_ITEM = String.raw`^[ \t]*(?:[-*•]|\d+[.)])[ \t]+`;
+
+/**
+ * A mail can hold a short list, so in email and follow-up FMT-01 keeps bold and headings at
+ * level 1 and its list items become FMT-01-LIST at level 2. The two patterns joined are the
+ * catalog's, which test/genres.test.ts checks.
+ */
+const FMT_01_IN_A_MAIL: readonly Rule[] =
+  FMT_01.kind === 'pattern'
+    ? [
+        { ...FMT_01, patterns: { en: MARKUP, es: MARKUP }, examples: [{ lang: 'en', fire: 'I use **Python** daily.', pass: 'I use Python daily.' }] },
+        {
+          ...FMT_01,
+          id: 'FMT-01-LIST',
+          name: 'List in a plain-text mail',
+          level: 2,
+          severity: 'medium',
+          patterns: { en: LIST_ITEM, es: LIST_ITEM },
+          message: 'List in a plain-text mail. A short one reads fine; a long one reads as a report.',
+          suggestion: 'Keep it to a few items, or write them as a sentence.',
+          examples: [{ lang: 'es', fire: '- Power BI\n- SQL', pass: 'Power BI y SQL.' }],
+        },
+      ]
+    : [FMT_01];
+
 export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
   'cover-letter': COVER_LETTER,
   email: {
     rules: { ...NOT_A_LETTER, 'EST-09': { severity: 'low' } },
+    splits: { 'FMT-01': FMT_01_IN_A_MAIL },
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: COVER_LETTER.thresholds,
     experimental: true,
@@ -61,6 +95,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
   'follow-up': {
     // Quoting the earlier message is what a follow-up is for, so process narration is off.
     rules: { ...NOT_A_LETTER, 'EST-09': 'off', 'EST-11': 'off' },
+    splits: { 'FMT-01': FMT_01_IN_A_MAIL },
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: COVER_LETTER.thresholds,
     experimental: true,
@@ -109,6 +144,11 @@ export function applySetting(rule: Rule, setting: GenreSetting | undefined): Rul
   return changed;
 }
 
+/** The rules a catalog rule runs as in this genre: itself, or its parts when the profile splits it. */
+export function splitRule(rule: Rule, genre: Genre = DEFAULT_GENRE): readonly Rule[] {
+  return GENRE_PROFILES[genre].splits?.[rule.id] ?? [rule];
+}
+
 /**
  * The rules with a genre's profile applied: the ones set to "off" dropped, the others cloned with
  * the profile's level, severity, budget and message. Structural budgets are not set here; they
@@ -117,12 +157,14 @@ export function applySetting(rule: Rule, setting: GenreSetting | undefined): Rul
  */
 export function resolveRules(rules: readonly Rule[], genre: Genre = DEFAULT_GENRE): Rule[] {
   const profile = GENRE_PROFILES[genre];
-  return rules.flatMap((rule) => {
-    const applied = applySetting(rule, profile.rules[rule.id]);
-    if (applied === undefined) return [];
-    const message = messageFor(applied, genre);
-    return [message === applied.message ? applied : { ...applied, message }];
-  });
+  return rules.flatMap((rule) =>
+    splitRule(rule, genre).flatMap((part) => {
+      const applied = applySetting(part, profile.rules[rule.id]);
+      if (applied === undefined) return [];
+      const message = messageFor(applied, genre);
+      return [message === applied.message ? applied : { ...applied, message }];
+    }),
+  );
 }
 
 export interface GenreGuess {

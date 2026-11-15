@@ -1,0 +1,14 @@
+Subject: Stock dashboard for the Rosario branch
+
+Hi Dana,
+
+The new version of the dashboard is in the shared folder. It changes three things:
+
+- the refresh runs every 12 minutes
+- the stock column shows units per branch
+- the export keeps the filters
+
+Could we look at it on Thursday at 10?
+
+Best regards,
+Sam Rivera
