@@ -15,3 +15,5 @@ End a span's `durationMs` before the observer's own price read, so tracing no lo
 Refuse zero prices in `model_prices` (`> 0` checks, renamed `model_prices_*_positive`) and in `PriceRow`, and suggest only `SELECT` on `model_prices` for the application role. A zero row in force priced every call at nothing and switched the caps off. Existing databases need the new checks applied by a migration.
 
 Leave unmeasured token attributes out of a cut call's span instead of reporting them as zero, and mark the span `incomplete: true`.
+
+Race the reservation write against the deadline and the caller's signal, so a store that hangs no longer holds a call past its `timeoutMs`. The cut throws `ApiError` with the reservation's id, and a reservation that lands later is closed with a zero-usage row.

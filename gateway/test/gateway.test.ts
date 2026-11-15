@@ -851,6 +851,52 @@ describe('the ledger', () => {
     expect(harness.openReservations).toEqual([reservation]);
   });
 
+  describe('a reservation write that does not answer', () => {
+    /** Holds every reservation insert until released; closing rows go through. */
+    function holdReservations(harness: ReturnType<typeof setup>['harness'], deps: ReturnType<typeof setup>['deps']) {
+      const held: Array<{ readonly id: string; readonly release: () => void }> = [];
+      const record = deps.usage.record.bind(deps.usage);
+      const gateway = createGateway({
+        ...deps,
+        usage: {
+          ...deps.usage,
+          record: async (row) => {
+            if (row.reservation) await new Promise<void>((release) => held.push({ id: row.id, release }));
+            return record(row);
+          },
+        },
+      });
+      return { gateway, held, harness };
+    }
+
+    it('the deadline cuts the call with timeout and names the reservation, which may land later', async () => {
+      const { deps, harness, requests } = setup([], { timeoutMs: 30 });
+      const { gateway, held } = holdReservations(harness, deps);
+      const error = await failure(gateway.structured(Triage, REQUEST));
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ code: 'timeout', usageId: held[0]?.id });
+      expect(requests).toHaveLength(0);
+      // The insert lands after the cut: it is closed with a zero-usage row, not left at its worst case.
+      for (const { release } of held) release();
+      await vi.waitFor(() => expect(harness.ledger).toHaveLength(2));
+      expect(harness.openReservations).toEqual([]);
+      expect(harness.ledger[1]).toMatchObject({ replaces: held[0]?.id, costUsd: 0, errorCode: 'timeout' });
+    });
+
+    it("the caller's signal cuts the call with cancelled", async () => {
+      const { deps, harness, requests } = setup([]);
+      const { gateway, held } = holdReservations(harness, deps);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 20);
+      const error = await failure(gateway.structured(Triage, { ...REQUEST, signal: controller.signal }));
+      expect(error).toMatchObject({ code: 'cancelled', usageId: held[0]?.id });
+      expect(requests).toHaveLength(0);
+      for (const { release } of held) release();
+      await vi.waitFor(() => expect(harness.ledger).toHaveLength(2));
+      expect(harness.openReservations).toEqual([]);
+    });
+  });
+
   it('when closing rows always fail, each call leaves its worst-case reservation and the caps end up cutting', async () => {
     // Like a deploy that writes a column the database does not have yet, only on closing rows.
     const { gateway, harness, requests } = setup(Array.from({ length: 20 }, () => () => jsonResponse(triageResponse())));

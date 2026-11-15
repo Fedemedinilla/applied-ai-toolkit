@@ -596,7 +596,8 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
    * Shared by the three entry points: deadline, preparation, reservation, call and record. A cut
    * before the request leaves (an already aborted signal, or the deadline or signal during the
    * reads) throws ApiError with no row and no notice: nothing was spent. A cut while the
-   * reservation was being written closes it with a zero-usage row.
+   * reservation was being written does not wait for the store: it throws ApiError with the
+   * reservation's id at once, and closes the reservation with a zero-usage row if it lands later.
    */
   async function call(request: GatewayRequest<string>, format: StructuredFormat<unknown> | null, mode: Mode, trace: Trace | null): Promise<Call<M>> {
     const fixed = validateRequest(request, mode.kind === 'stream', schemas);
@@ -627,7 +628,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         trace.model = prepared.model;
         trace.effort = prepared.effort;
       }
-      reservation = await reserve(prepared, trace);
+      reservation = await reserveWithinDeadline(prepared, trace, deadline, cutCode);
       if (trace) {
         trace.reservationId = reservation.id;
         trace.estimatedInput = reservation.estimatedInput;
@@ -653,9 +654,38 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
     return { response: executed.response, meta: await recordResponse(prepared, reservation, executed) };
   }
 
-  /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
-  async function reserve(prepared: Prepared<M>, trace: Trace | null): Promise<Reservation> {
+  /**
+   * The reservation, raced against the deadline and the caller's signal: a store that does not
+   * answer cannot hold the call past either. On a cut the write may still land, so the error names
+   * its id, and a reservation that lands afterwards is closed with a zero-usage row (a failure to
+   * close it is logged as record_failed and it stays open at its worst case).
+   */
+  async function reserveWithinDeadline(prepared: Prepared<M>, trace: Trace | null, deadline: Deadline, cutCode: () => 'timeout' | 'cancelled'): Promise<Reservation> {
     const id = crypto.randomUUID();
+    const writing = reserve(prepared, trace, id);
+    const signal = deadline.signal;
+    let onAbort = () => {};
+    const cut = new Promise<never>((_, reject) => {
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      return await Promise.race([writing, cut]);
+    } catch (error) {
+      if (!signal.aborted || error instanceof ReservationError) throw error;
+      const code = cutCode();
+      writing.then(
+        (late) => recordUnbilled(prepared, late, { code, requestId: null, durationMs: 0 }).catch(() => {}),
+        () => {},
+      );
+      throw cutBeforeSending(code, error, id);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
+  async function reserve(prepared: Prepared<M>, trace: Trace | null, id: string): Promise<Reservation> {
     const estimatedInput = estimateInputTokens(prepared.params) + prepared.attachmentBound;
     const row: UsageRow = {
       ...prepared.row,
