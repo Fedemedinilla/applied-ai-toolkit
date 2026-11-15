@@ -27,8 +27,11 @@
 // (.isEmail(), .toDateTime() and so on), $if, $ifEmpty, $max, $min, $today,
 // Luxon beyond the formats above, $env, $vars, $workflow, $execution,
 // $prevNode, $itemIndex, $runIndex, $parameter, $input, $node, $items, $jmespath,
-// paired-item resolution across branches and n8n's sandbox restrictions. A test
-// checks that the templates use nothing outside the emulated list.
+// paired-item resolution across branches and n8n's sandbox restrictions. Tests
+// check that the templates use no `$` global outside the emulated list, none of
+// n8n's bare globals (N8N_BARE_GLOBALS) and no extension method
+// (EXTENSION_METHODS). Here an extension call yields undefined; in n8n it runs,
+// and on a null or undefined value it fails the node instead of yielding "".
 
 import vm from 'node:vm';
 import { codeOnly } from './js-scan.ts';
@@ -106,6 +109,53 @@ export function expressionGlobals(parameter: string): string[] {
     .join('\n');
   const names = [...code.matchAll(/\$[A-Za-z_]+|\$(?=\()/g), ...code.matchAll(BARE_GLOBAL)].map((m) => m[0]);
   return [...new Set(names)].sort();
+}
+
+/**
+ * n8n's extension methods, from the string, number, date, array, object and
+ * boolean extensions of n8n-workflow 2.15.0 plus isEmpty and isNotEmpty.
+ * n8n rewrites `x.name(...)` into a call of its own when the name is one of
+ * these, and that call fails the node when x is null or undefined.
+ */
+export const EXTENSION_METHODS: readonly string[] = [
+  ...new Set(
+    [
+      'hash removeMarkdown removeTags toDate toDateTime toBoolean toDecimalNumber toNumber toFloat toInt toWholeNumber',
+      'toSentenceCase toSnakeCase toTitleCase urlDecode urlEncode quote replaceSpecialChars length isDomain isEmail',
+      'isNumeric isUrl isEmpty isNotEmpty toJsonString extractEmail extractDomain extractUrl extractUrlPath parseJson',
+      'base64Encode base64Decode',
+      'ceil floor format round abs isInteger isEven isOdd',
+      'beginningOf endOfMonth extract isBetween isDst isInLast isWeekend minus plus diffTo diffToNow',
+      'removeDuplicates unique first last pluck randomItem sum min max average compact smartJoin chunk renameKeys',
+      'merge union difference intersection append',
+      'hasField removeField removeFieldsContaining keepFieldsContaining keys values',
+    ]
+      .join(' ')
+      .split(' '),
+  ),
+];
+
+const BUILT_IN_NAMESPACE = /^(?:Math|Object|JSON|Number|String|Array|Date)$/;
+
+/**
+ * Extension methods called inside the code blocks of a parameter. Calls on a
+ * built-in namespace (`Math.max`, `Object.keys`) and `$('Node').first()` or
+ * `.last()` are left out: n8n runs those as they are.
+ */
+export function extensionCalls(parameter: string): string[] {
+  if (!parameter.startsWith('=')) return [];
+  const found = new Set<string>();
+  for (const chunk of splitExpression(parameter.slice(1))) {
+    if (chunk.type !== 'code') continue;
+    const code = codeOnly(chunk.text).replace(/\$\(\s*''\s*\)\s*\.\s*(?:first|last)\s*\(/g, ' ');
+    for (const m of code.matchAll(/([A-Za-z_$][\w$]*)?\s*\??\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.\s*)?\(/g)) {
+      const receiver = m[1] ?? '';
+      const name = m[2] ?? '';
+      if (BUILT_IN_NAMESPACE.test(receiver)) continue;
+      if (EXTENSION_METHODS.includes(name)) found.add(name);
+    }
+  }
+  return [...found].sort();
 }
 
 function clone(value: unknown): unknown {

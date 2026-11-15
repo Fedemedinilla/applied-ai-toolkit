@@ -9,6 +9,7 @@ import {
   ExpressionHarnessError,
   evaluate,
   expressionGlobals,
+  extensionCalls,
   splitExpression,
 } from './expressions.ts';
 import { DedupeHistory, NodeFailure, NotEmulated, applySet, dedupeKey, ifPasses, jsonBody, switchOutput } from './nodes.ts';
@@ -238,6 +239,35 @@ describe('expressionGlobals', () => {
       }
     }
     expect(blocks).toBeGreaterThan(100);
+  });
+});
+
+describe('extensionCalls', () => {
+  it("lists calls to n8n's extension methods, which the harness does not emulate", () => {
+    expect(evaluate('={{ $json.email.isEmail() }}', { json: { email: 'ana@example.com' } })).toBeUndefined();
+    expect(extensionCalls('={{ $json.email.isEmail() }}')).toEqual(['isEmail']);
+    expect(extensionCalls('=Items: {{ $json.items?.first() }} {{ $json.d.toDateTime().format("x") }}')).toEqual([
+      'first',
+      'format',
+      'toDateTime',
+    ]);
+  });
+
+  it("leaves out native calls, built-in namespaces and $('Node').first()", () => {
+    const text = "={{ Math.max(1, Math.round($json.n)) + Object.keys($json).length + $('Node').first().json.a + $json.s.trim().slice(0, 9) + '.isEmail()' }}";
+    expect(extensionCalls(text)).toEqual([]);
+    expect(extensionCalls('$json.email.isEmail() outside an expression')).toEqual([]);
+  });
+
+  it('every expression in the templates calls no extension method', () => {
+    for (const { file, workflow } of loadTemplates()) {
+      for (const node of workingNodes(workflow)) {
+        for (const { path, value } of strings(node.parameters)) {
+          if (path.at(-1) === 'jsCode') continue;
+          expect(extensionCalls(value), `${file} / ${node.name} / ${path.join('.')}`).toEqual([]);
+        }
+      }
+    }
   });
 });
 
