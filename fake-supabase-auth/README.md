@@ -76,7 +76,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 
 **A gateway check on the key.** A request whose `apikey` header is not the publishable key gets the gateway's 401 before Auth or PostgREST sees it. A client built with the wrong key fails in the test instead of only in production.
 
-**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404, and a PostgREST feature that `restTables` does not implement (a count, `order`, a filter other than `eq`, a `limit` that is not a whole number, a response format such as `.csv()`, a schema other than `public`) answers 501. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
+**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404, and a PostgREST feature that `restTables` does not implement (a count, `order`, a filter other than `eq`, a `limit` that is not a whole number, a response format such as `.csv()`, a schema other than `public`, a JSON path or a `*` inside a column list) answers 501. A column that no row of the table has gets PostgREST's 400 `42703`, so a typo in a column name fails as it would in production; an empty table cannot tell and answers `[]`. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
 
 ## What the installed client does
 

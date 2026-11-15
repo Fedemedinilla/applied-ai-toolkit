@@ -450,6 +450,24 @@ describe('PostgREST', () => {
     expect((await clientFor(fake).from('notes').select('id').eq('owner', 'null')).data).toEqual([{ id: 2 }]);
   });
 
+  it('a star inside a list, a JSON path in select or in a filter get not_in_fake, not rows of nulls', async () => {
+    fake.knobs.rest = restTables({ notes: [{ id: 1, data: { k: 'v' } }] });
+    const client = clientFor(fake);
+
+    expect(await client.from('notes').select('*, id')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('data->k')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').eq('data->>k', 'v')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+  });
+
+  it('a column that no row has gets 400 42703, as PostgREST answers; an empty table still answers []', async () => {
+    fake.knobs.rest = restTables({ notes: NOTES, empty: [] });
+    const client = clientFor(fake);
+
+    expect(await client.from('notes').select('id,titel')).toMatchObject({ data: null, status: 400, error: { code: '42703' } });
+    expect(await client.from('notes').select('*').eq('ownr_id', 'x')).toMatchObject({ data: null, status: 400, error: { code: '42703' } });
+    expect(await client.from('empty').select('id').eq('owner_id', 'x')).toMatchObject({ error: null, data: [], status: 200 });
+  });
+
   it('a GET that gets 503 is retried three times by postgrest-js, honoring Retry-After; Auth failWith does not touch it', async () => {
     fake.knobs.failWith = 503;
     fake.knobs.rest = () => new Response('schema cache loading', { status: 503, headers: { 'retry-after': '0' } });

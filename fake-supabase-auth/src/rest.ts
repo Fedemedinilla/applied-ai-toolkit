@@ -12,6 +12,15 @@ export type Row = Readonly<Record<string, unknown>>;
 const SINGLE_OBJECT = 'application/vnd.pgrst.object+json';
 /** The Accept values restTables answers: none, plain JSON, any, or the single object of `.single()`. */
 const ACCEPTED = new Set([null, 'application/json', '*/*', SINGLE_OBJECT]);
+/** A plain column name. A star inside a list, a JSON path (`->`, `->>`) or a quoted name is not one. */
+const COLUMN = /^[A-Za-z_][A-Za-z0-9_$]*$/;
+
+function unknownColumn(table: string, column: string): Response {
+  return Response.json(
+    { code: '42703', details: null, hint: null, message: `column ${table}.${column} does not exist` },
+    { status: 400 },
+  );
+}
 
 export function notInFake(what: string): Response {
   return Response.json({ code: 'not_in_fake', message: `The fake does not emulate ${what}` }, { status: 501 });
@@ -53,6 +62,8 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
       if (key === 'select') {
         if (/[():!]/.test(value)) return notInFake('embedded resources, casts or renamed columns in select');
         columns = value === '*' ? null : value.split(',').map((c) => c.trim());
+        const odd = columns?.find((c) => !COLUMN.test(c));
+        if (odd !== undefined) return notInFake(`the select item ${odd}`);
       } else if (key === 'limit') {
         const n = Number(value);
         if (!/^\d+$/.test(value) || !Number.isSafeInteger(n)) return notInFake(`the limit ${value}`);
@@ -60,10 +71,19 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
       } else if (key === 'order' || key === 'offset' || key === 'or' || key === 'and') {
         return notInFake(`the ${key} parameter`);
       } else if (value.startsWith('eq.')) {
+        if (!COLUMN.test(key)) return notInFake(`the filter ${key}`);
         filters.push([key, value.slice(3)]);
       } else {
         return notInFake(`the filter ${key}=${value}`);
       }
+    }
+
+    // PostgREST answers 42703 for a column the table does not have. The fake knows the columns only
+    // from the rows, so an empty table cannot tell and answers as before.
+    if (rows.length > 0) {
+      const known = new Set(rows.flatMap((row) => Object.keys(row)));
+      const missing = [...(columns ?? []), ...filters.map(([column]) => column)].find((c) => !known.has(c));
+      if (missing !== undefined) return unknownColumn(table, missing);
     }
 
     let result = rows.filter((row) => filters.every(([column, expected]) => row[column] !== undefined && row[column] !== null && String(row[column]) === expected));
