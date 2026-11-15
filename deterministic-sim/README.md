@@ -100,7 +100,7 @@ More dice raise the median and widen the spread. In this ruleset nothing makes a
 | `test/replay.test.ts` | Replay and prefixes, the inputs hash under key reordering, the state hash over the log, record parsing, seal and verify with an edited input, a wrong state hash, no hashes, a malformed hash, an illegal input |
 | `test/properties.test.ts` | fast-check, 200 runs each of up to 20 inputs, full games included (a check fails if the generator stops short): replay byte-identical, prefixes, no mutation of deep-frozen arguments, bounds after every step, score equal to the logged points, house independent of the dice |
 | `test/batch.test.ts` | Integer summaries and percentiles, negative bins, a batch equal to itself by hash, counts, `summarize` equal to `runBatch`, spread by policy, run-count and dice bounds, the CLI exiting 2 with one line on a bad `--runs`, `--dice` or `--seed-prefix` |
-| `test/golden.test.ts` | Six sealed runs, two of them full 20-round games, still replay to their hashes |
+| `test/golden.test.ts` | Six sealed runs, four of them full 20-round games, still replay to their hashes |
 | `test/purity.test.ts` | Every file in `src/` against the rules above; 48 violations the scanner must catch and 8 clean snippets it must pass |
 | `test/hooks.test.ts` | Glob matching, protected and unprotected paths, the handwritten marker in edits and in shell writes, the override, the Bash heuristic with absolute paths, `2>&1`, redirects elsewhere and folder removal, case folding, input that is not a tool call, the guard as a process, the related-tests command |
 
