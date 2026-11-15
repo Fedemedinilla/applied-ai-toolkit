@@ -47,7 +47,11 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
     return id === null ? [] : [[id, e] as const];
   }));
   const wanted = options.ids === 'all' ? [...byId.keys()].sort() : [...new Set(options.ids)];
-  if (wanted.length === 0) throw new ForgeError('bad_request', `No ${entity} candidates to promote`);
+  if (wanted.length === 0) {
+    // A pending file that could not be read as a candidate is reported, not taken for an empty folder.
+    if (pending.problems.length > 0) throw new ForgeError('refused', 'Nothing was promoted', problems);
+    throw new ForgeError('bad_request', `No ${entity} candidates to promote`);
+  }
 
   const selected: { id: string; value: unknown }[] = [];
   const replaced: string[] = [];
@@ -55,7 +59,8 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
     const entry = byId.get(id);
     const where = `${ENTITIES[entity].folder}/${id}.json`;
     if (!entry) {
-      problems.push({ where: `_candidates/${where}`, path: '', message: 'no such candidate' });
+      // A file there that the loader already reported is not "no such candidate".
+      if (!pending.problems.some((p) => p.where === `_candidates/${where}`)) problems.push({ where: `_candidates/${where}`, path: '', message: 'no such candidate' });
       continue;
     }
     if (typeof entry.value === 'object' && entry.value !== null && 'handwritten' in entry.value && entry.value.handwritten === true) {
@@ -77,7 +82,12 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
   merged[entity].push(...selected.map((s) => ({ source: `_candidates/${relativeSource(entity, `${s.id}.json`)}`, value: s.value })));
   const checked = checkCatalog(merged);
   if (!checked.ok) problems.push(...checked.problems);
-  problems.push(...rangeRules(entity, selected, checkCatalog(catalog.raw), replaced));
+  // The rule context is the catalogue without the entries being replaced. When the merged check
+  // passes, that is its index without the candidates; this also holds when the file being replaced
+  // is the one entry that does not validate today.
+  const current = checked.ok ? checked : checkCatalog(catalog.raw);
+  const ruleIndex = withoutIds(current.ok ? current.index : EMPTY_INDEX, entity, checked.ok ? selected.map((s) => s.id) : replaced);
+  problems.push(...rangeRules(entity, selected, ruleIndex));
   if (problems.length > 0) throw new ForgeError('refused', 'Nothing was promoted', problems);
 
   // Written as parsed, so the catalogue file has every default spelled out.
@@ -91,7 +101,15 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
       if ((await occupant(path)) !== 'generated') throw new ForgeError('refused', `${relativeSource(entity, `${id}.json`)} changed during promote; ${moved.length} moved before it`);
       await writeJsonAtomic(path, value);
     } else {
-      await writeJsonNew(path, value);
+      try {
+        await writeJsonNew(path, value);
+      } catch (error) {
+        // The link refuses a file that appeared since the check (another promote, a person).
+        if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+          throw new ForgeError('refused', `${relativeSource(entity, `${id}.json`)} appeared during promote; ${moved.length} moved before it`);
+        }
+        throw error;
+      }
     }
     await remove(candidatePath(dir, entity, id));
     moved.push(id);
@@ -101,11 +119,11 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
 
 /**
  * The range rules for generated content, applied to each candidate that parses, against the
- * catalogue as it is now without the entries being replaced. A catalogue that does not validate is
- * already reported by the full check, so the rules then run against an empty index.
+ * catalogue as it is now without the entries being replaced. When neither the merged catalogue nor
+ * the current one validates, promote refuses on those problems anyway, so the rules then run
+ * against an empty index.
  */
-function rangeRules(entity: EntityName, selected: readonly { id: string; value: unknown }[], current: ReturnType<typeof checkCatalog>, replaced: readonly string[]): Problem[] {
-  const index = withoutReplaced(current.ok ? current.index : EMPTY_INDEX, entity, replaced);
+function rangeRules(entity: EntityName, selected: readonly { id: string; value: unknown }[], index: CatalogIndex): Problem[] {
   const problems: Problem[] = [];
   for (const { id, value } of selected) {
     const parsed = SCHEMAS[entity].safeParse(value);
@@ -120,10 +138,10 @@ function rangeRules(entity: EntityName, selected: readonly { id: string; value: 
 
 const EMPTY_INDEX: CatalogIndex = { keyword: new Map(), faction: new Map(), set: new Map(), card: new Map(), deck: new Map() };
 
-function withoutReplaced(index: CatalogIndex, entity: EntityName, replaced: readonly string[]): CatalogIndex {
-  if (replaced.length === 0) return index;
+function withoutIds(index: CatalogIndex, entity: EntityName, ids: readonly string[]): CatalogIndex {
+  if (ids.length === 0) return index;
   const drop = <T>(map: ReadonlyMap<string, T>, name: EntityName): ReadonlyMap<string, T> =>
-    name === entity ? new Map([...map].filter(([id]) => !replaced.includes(id))) : map;
+    name === entity ? new Map([...map].filter(([id]) => !ids.includes(id))) : map;
   return {
     keyword: drop(index.keyword, 'keyword'),
     faction: drop(index.faction, 'faction'),

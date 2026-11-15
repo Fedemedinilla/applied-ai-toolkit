@@ -97,6 +97,41 @@ describe('the command line', () => {
     expect(await readdir(join(dir, '_candidates', 'cards'))).toEqual(['flare.json']);
   });
 
+  it('exits 1 when a run accepts nothing', async () => {
+    const r = io([messageText('{"candidates": [{"id": "half', undefined, 'max_tokens')]);
+    expect(await runCli(['generate', '--entity', 'card', '--count', '2', '--dir', dir], r.io)).toBe(1);
+    expect(r.out).toContain('  the response could not be used: truncated');
+  });
+
+  it('exits 1 when an accepted candidate could not be written', async () => {
+    const r = io([messageText(await response('card-batch'))]);
+    // A file appears at brine-scout's path while the call is out.
+    const fetch = r.io.fetch;
+    if (!fetch) throw new Error('the fake API is missing');
+    const value: CliIo = {
+      ...r.io,
+      fetch: async (...args: Parameters<typeof fetch>) => {
+        await writeJson(join(dir, '_candidates', 'cards', 'brine-scout.json'), { id: 'brine-scout', by: 'someone else' });
+        return fetch(...args);
+      },
+    };
+    expect(await runCli(['generate', '--entity', 'card', '--count', '8', '--dir', dir], value)).toBe(1);
+    expect(r.out).toContain('  accepted brine-scout, but its file could not be written to _candidates/: EEXIST');
+  });
+
+  it('exits 1 for a --dir that does not exist, and generate makes no call and creates nothing', async () => {
+    const missing = join(dir, 'no-such-catalogue');
+    const a = io();
+    expect(await runCli(['validate', '--dir', missing], a.io)).toBe(1);
+    expect(a.err).toEqual(['--dir: no catalogue folder there', '1 problem(s)']);
+
+    const b = io([messageText(await response('card-batch'))]);
+    expect(await runCli(['generate', '--entity', 'keyword', '--count', '1', '--dir', missing], b.io)).toBe(1);
+    expect(b.err[0]).toContain('--dir: no catalogue folder there');
+    expect(b.api.requests).toHaveLength(0);
+    await expect(readdir(missing)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('prints one line for an unexpected error, with its code and no path or stack trace', async () => {
     const r = io();
     expect(await runCli(['validate', '--dir', README], r.io)).toBe(1);
