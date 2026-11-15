@@ -19,6 +19,12 @@ describe('planJobs', () => {
     expect(firstSample.every((j) => j.sample === 1)).toBe(true);
   });
 
+  it('rejects a variant, language or case listed twice', () => {
+    expect(() => planJobs(PROBES, ['V0', 'V4', 'V0'], ['en'], 1)).toThrow(/variant V0 is listed twice/);
+    expect(() => planJobs(PROBES, ['V0'], ['en', 'en'], 1)).toThrow(/language en is listed twice/);
+    expect(() => planJobs([PROBES[0]!, PROBES[0]!], ['V0'], ['en'], 1)).toThrow(`case ${PROBES[0]!.id} is listed twice`);
+  });
+
   it('rejects a sample count that is not a positive integer', () => {
     expect(() => planJobs(PROBES, ids, ['en'], 0)).toThrow();
     expect(() => planJobs(PROBES, ids, ['en'], 1.5)).toThrow();

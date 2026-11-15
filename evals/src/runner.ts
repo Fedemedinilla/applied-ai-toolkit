@@ -71,6 +71,18 @@ export function planJobs<C extends { id: string }, L extends string>(
   samples: number,
 ): Job<C, L>[] {
   if (!Number.isInteger(samples) || samples < 1) throw new Error(`samples must be a positive integer, got ${samples}`);
+  // A repeat would pay for the same piece twice and give one variant a
+  // larger denominator than the others, so it stops here, before any call.
+  const once = (what: string, ids: readonly string[]) => {
+    const seen = new Set<string>();
+    for (const id of ids) {
+      if (seen.has(id)) throw new Error(`${what} ${id} is listed twice`);
+      seen.add(id);
+    }
+  };
+  once('variant', variants);
+  once('language', langs);
+  once('case', cases.map((c) => c.id));
   const jobs: Job<C, L>[] = [];
   for (let sample = 1; sample <= samples; sample++)
     for (const c of cases)

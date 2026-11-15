@@ -40,7 +40,12 @@ const cases = CASE_SETS[casesName] ?? usageError(`unknown --cases ${casesName}; 
 const samples = intFlag('samples', 3);
 
 const target = createWriterTarget();
-const jobs = planJobs(cases, variantIds, langs, samples);
+let jobs;
+try {
+  jobs = planJobs(cases, variantIds, langs, samples);
+} catch (e) {
+  usageError(String((e as Error).message));
+}
 
 if (hasFlag('dump')) {
   let dump;
