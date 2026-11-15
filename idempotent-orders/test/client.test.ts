@@ -200,6 +200,14 @@ describe('placeOrder', () => {
     expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'already_placed', via: 'reread', order: { status: 'confirmed' } });
   });
 
+  it('treats a confirmed order with another cart found by the re-read as key_expired, not_pending', async () => {
+    const k = key();
+    const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetB, quantity: 1 }])).id;
+    await db.query('select confirm_order($1, 1, $2)', [id, key()]);
+    fake.failAlways('place_order', 'drop-before');
+    expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'rejected', reason: 'key_expired', why: 'not_pending', requests: 4 });
+  });
+
   it('does not report a confirmed order with another cart as placed after a lost attempt', async () => {
     const k = key();
     const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetB, quantity: 1 }])).id;
@@ -373,6 +381,15 @@ describe('confirmOrder', () => {
     expect(await client().confirmOrder({ orderId: id, expectedVersion: 1, key: key() })).toMatchObject({
       kind: 'rejected',
       reason: 'not_pending',
+      requests: 4,
+    });
+  });
+
+  it('reports a missing order found by the confirm re-read as not_found', async () => {
+    fake.failAlways('confirm_order', 'drop-before');
+    expect(await client().confirmOrder({ orderId: 999_999, expectedVersion: 1, key: key() })).toEqual({
+      kind: 'rejected',
+      reason: 'not_found',
       requests: 4,
     });
   });
