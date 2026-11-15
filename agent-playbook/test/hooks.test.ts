@@ -234,6 +234,11 @@ describe('related-tests', () => {
     expect(relatedTestArgs('../other/src/a.ts')).toBeNull();
   });
 
+  it('passes a file named like an option as a path, never as an option', () => {
+    expect(relatedTestArgs('--config=evil.ts')).toEqual(['vitest', 'related', './--config=evil.ts', '--run', '--passWithNoTests', '--reporter=dot']);
+    expect(relatedTestArgs('-t.ts')?.[2]).toBe('./-t.ts');
+  });
+
   it('hands the agent the tail of the output, where the failure summary is', () => {
     expect(tail('a\nb\nc\nd\n', 2)).toBe('c\nd');
   });
@@ -276,6 +281,12 @@ describe('related-tests, run as Claude Code runs it', () => {
     expect(result.stderr).toContain('line 11\n');
     expect(result.stderr).not.toContain('line 10\n');
     expect(readFileSync(join(root, 'npx.log'), 'utf8')).toBe('vitest related src/race.ts --run --passWithNoTests --reporter=dot\n');
+  });
+
+  it('hands vitest a dash-prefixed file name as a path', () => {
+    fakeNpx(0);
+    expect(hook('--config=alt.ts')).toEqual({ code: 0, stderr: '' });
+    expect(readFileSync(join(root, 'npx.log'), 'utf8')).toBe('vitest related ./--config=alt.ts --run --passWithNoTests --reporter=dot\n');
   });
 
   it('exits 0 and prints nothing when they pass, and runs nothing for a file without tests', () => {
