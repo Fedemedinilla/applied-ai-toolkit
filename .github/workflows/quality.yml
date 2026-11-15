@@ -1,11 +1,16 @@
-# The slow checks: mutation testing (StrykerJS) of the critical modules and the benchmarks. Weekly
-# and on demand, never on a push: one mutation target takes minutes, where CI takes seconds.
+# The slow checks: mutation testing (StrykerJS) of the critical modules, the benchmarks and the
+# npm audit. Weekly and on demand, never on a push: one mutation target takes minutes, where CI
+# takes seconds.
 #
 # - mutation: one job per target (gateway caps and cost, grounded-assistant decide and money guard,
 #   amount-parser core). A job fails when the mutation score falls below thresholds.break in that
 #   folder's stryker.config.json. Each README has a "Mutation testing" section with the numbers.
 # - bench: `npm run bench`, then the comparison with test/bench/baseline.json, which fails on a
 #   regression beyond the tolerance. test/bench/README.md explains the method and its limits.
+# - audit: one job per lockfile (root and docs-site). `npm audit --omit=dev --audit-level=low` is
+#   the gate: any advisory against a runtime dependency fails the job. The full `npm audit`, dev
+#   dependencies included, is a report that never fails the job, uploaded as JSON and text. npm
+#   audit reads the lockfile, so no install runs. MAINTENANCE.md, Dependencies, says what to do.
 #
 # The reports are uploaded as artifacts whether the job passed or not. No job has secrets or write
 # permissions; agent-playbook/test/workflow-secrets.test.ts checks this file with the default
@@ -90,5 +95,52 @@ jobs:
         with:
           name: bench
           path: reports/bench/
+          if-no-files-found: warn
+          retention-days: 30
+
+  audit:
+    name: npm audit (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: root
+            dir: .
+          - name: docs-site
+            dir: docs-site
+    env:
+      AUDIT_DIR: ${{ matrix.dir }}
+      REPORT_DIR: ${{ github.workspace }}/reports/audit/${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+
+      # The report first, so it exists even when the gate fails. npm audit exits 1 when it finds
+      # anything; here that is the report's content, not a failure.
+      - name: Full audit report, dev dependencies included (never fails)
+        run: |
+          mkdir -p "$REPORT_DIR"
+          cd "$AUDIT_DIR"
+          npm audit --json > "$REPORT_DIR/npm-audit-full.json" || true
+          npm audit > "$REPORT_DIR/npm-audit-full.txt" || true
+          grep -E "vulnerabilit" "$REPORT_DIR/npm-audit-full.txt" || true
+
+      - name: Gate, runtime dependencies at any severity
+        working-directory: ${{ matrix.dir }}
+        run: npm audit --omit=dev --audit-level=low
+
+      - name: Upload the audit report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-audit-${{ matrix.name }}
+          path: reports/audit/${{ matrix.name }}/
           if-no-files-found: warn
           retention-days: 30
