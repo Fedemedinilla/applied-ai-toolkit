@@ -49,6 +49,15 @@ describe('cli', () => {
     expect(run(['-', '-', '--lang', 'en'], 'Text.').status).toBe(2);
   });
 
+  it('exits 2 when --format or --lang is the last argument, with no value', () => {
+    const format = run([fixture('en-after.txt'), '--lang', 'en', '--format']);
+    expect(format.status).toBe(2);
+    expect(format.stderr).toMatch(/^--format needs a value\n/u);
+    const lang = run([fixture('en-after.txt'), '--lang']);
+    expect(lang.status).toBe(2);
+    expect(lang.stderr).toMatch(/^--lang needs a value\n/u);
+  });
+
   describe('--format', () => {
     const dir = mkdtempSync(join(tmpdir(), 'slop-lint-cli-'));
     const doc = '# Notes\n\n- First item.\n- Second item.\n\n```\nI am passionate about data.\n```\n';
