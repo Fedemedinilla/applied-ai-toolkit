@@ -270,6 +270,15 @@ describe('run file', () => {
     expect(text('#import-result')).toBe('c.json was not loaded: a run changed while it was read.');
   });
 
+  it('an imported seed with spaces at its ends loads as is, with a note that Start would trim it', async () => {
+    const { app } = mount();
+    chooseFile('x.json', JSON.stringify({ format: 'dsim-run/1', rulesetVersion: 'dice-1', seed: ' lab-1 ', inputs: [{ kind: 'roll', dice: 3 }] }));
+    await vi.waitFor(() => expect(text('#import-result')).toContain('Final state hash'));
+    expect(app.session()?.state).toEqual(replay(' lab-1 ', [{ kind: 'roll', dice: 3 }]));
+    expect($<HTMLInputElement>('#seed').value).toBe(' lab-1 ');
+    expect(text('#import-result .note')).toBe('This seed has spaces at its start or end. Start trims the seed field, so Start would not replay this run.');
+  });
+
   it('refuses a file over 64 KB without reading it', () => {
     mount();
     const input = $<HTMLInputElement>('#import-file');

@@ -304,6 +304,11 @@ export function mountApp(doc: Document, deps: Deps): App {
           h(doc, 'p', {}, `${file.name}: seed "${v.record.seed}", ${v.record.inputs.length} ${v.record.inputs.length === 1 ? 'input' : 'inputs'}, ruleset ${v.record.rulesetVersion}. Replayed to round ${v.state.round}, score ${v.state.score}.`),
           h(doc, 'ul', { class: 'checks' }, line('Inputs hash', v.inputsHashMatches, v.inputsHash), line('Final state hash', v.finalStateHashMatches, v.finalStateHash)),
         );
+        // The core accepts any seed, but startRun trims the field: say so rather than let Start
+        // quietly play another game from the seed shown.
+        if (v.record.seed !== v.record.seed.trim()) {
+          importResult.append(h(doc, 'p', { class: 'note' }, 'This seed has spaces at its start or end. Start trims the seed field, so Start would not replay this run.'));
+        }
         seedInput.value = v.record.seed;
         render(fromReplay(v.record, v.state));
       },
