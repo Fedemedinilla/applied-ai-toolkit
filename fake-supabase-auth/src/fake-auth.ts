@@ -176,6 +176,14 @@ export function authError(status: number, errorCode: string, msg: string): Respo
   return Response.json({ code: status, error_code: errorCode, msg }, { status });
 }
 
+/**
+ * A real Auth feature the fake does not have. 404 like an unknown route (a 5xx would make auth-js
+ * retry), in Auth's shape so auth-js reports error.code 'not_in_fake'.
+ */
+function notInFakeAuth(what: string): Response {
+  return authError(404, 'not_in_fake', `The fake does not emulate ${what}`);
+}
+
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 function bearer(headers: Headers): string | null {
@@ -281,6 +289,7 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
 
   async function otp(body: unknown): Promise<Response> {
     const raw = field(body, 'email');
+    if (raw === undefined && field(body, 'phone') !== undefined) return notInFakeAuth('phone sign-in on /otp');
     const email = typeof raw === 'string' ? normalizeEmail(raw) : '';
     if (email === '') return authError(400, 'validation_failed', 'An email address is required');
     let user = findByEmail(email);
@@ -294,6 +303,8 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
   }
 
   async function verify(body: unknown): Promise<Response> {
+    if (field(body, 'token_hash') !== undefined) return notInFakeAuth('token_hash verification on /verify (magic and confirmation links)');
+    if (field(body, 'email') === undefined && field(body, 'phone') !== undefined) return notInFakeAuth('phone verification on /verify');
     const email = field(body, 'email');
     const user = typeof email === 'string' ? findByEmail(email) : undefined;
     // Auth gives the same answer for a wrong code, a used one and an email that never asked.
@@ -352,7 +363,7 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
       case 'POST /token':
         if (grant === 'pkce') return exchangePkce(request.body);
         if (grant === 'refresh_token') return refresh(request.body);
-        return authError(400, 'unsupported_grant_type', 'unsupported_grant_type');
+        return notInFakeAuth(`the grant_type ${grant ?? '(none)'} on /token`);
       case 'GET /user': {
         const who = await authenticate(request.headers);
         return who instanceof Response ? who : Response.json(userJson(who.user));

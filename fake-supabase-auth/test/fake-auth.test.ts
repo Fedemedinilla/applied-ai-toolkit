@@ -91,6 +91,19 @@ describe('email code sign-in', () => {
     expect(data.user?.id).toBe(fake.user.id);
   });
 
+  it('phone codes, token_hash links, password and id_token sign-in get not_in_fake, not an ordinary Auth error', async () => {
+    const client = clientFor(fake);
+    const notInFake = { name: 'AuthApiError', status: 404, code: 'not_in_fake' };
+
+    expect((await client.auth.signInWithOtp({ phone: '+10000000000' })).error).toMatchObject(notInFake);
+    expect((await client.auth.verifyOtp({ token_hash: 'abc', type: 'email' })).error).toMatchObject(notInFake);
+    expect((await client.auth.verifyOtp({ phone: '+10000000000', token: fake.otpCode, type: 'sms' })).error).toMatchObject(notInFake);
+    const password = (await client.auth.signInWithPassword({ email: fake.user.email, password: 'x' })).error;
+    expect(password).toMatchObject(notInFake);
+    expect(password?.message).toMatch(/password/);
+    expect((await client.auth.signInWithIdToken({ provider: 'google', token: 'x' })).error).toMatchObject(notInFake);
+  });
+
   it('an override answers before the fake: a 429 from the email rate limit', async () => {
     fake.knobs.override = (request) =>
       request.path === '/auth/v1/otp' ? authError(429, 'over_email_send_rate_limit', 'email rate limit exceeded') : undefined;
