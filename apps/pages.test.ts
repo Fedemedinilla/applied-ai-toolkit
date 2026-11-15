@@ -76,6 +76,21 @@ describe('the demo links', () => {
   });
 });
 
+describe('the npm scripts', () => {
+  const scripts = (JSON.parse(read('../package.json')) as { scripts: Record<string, string> }).scripts;
+
+  it('build:pages builds exactly PAGES_APPS, in order, then assembles', () => {
+    const steps = (scripts['build:pages'] ?? '').split(' && ');
+    expect(steps.at(-1)).toBe('node apps/pages.ts');
+    expect(steps.slice(0, -1)).toEqual(PAGES_APPS.map((app) => `npm run build:${app}`));
+  });
+
+  it('guard:pages runs csp-build-guard over exactly PAGES_APPS, each with its own config', () => {
+    const steps = (scripts['guard:pages'] ?? '').split(' && ');
+    expect(steps).toEqual(PAGES_APPS.map((app) => `node csp-build-guard/cli.ts --dir dist/apps/${app} --config apps/${app}/csp-guard.config.json`));
+  });
+});
+
 describe('assemblePages', () => {
   let root = '';
   afterEach(() => {
