@@ -89,6 +89,11 @@ describe('the npm scripts', () => {
     const steps = (scripts['guard:pages'] ?? '').split(' && ');
     expect(steps).toEqual(PAGES_APPS.map((app) => `node csp-build-guard/cli.ts --dir dist/apps/${app} --config apps/${app}/csp-guard.config.json`));
   });
+
+  it.each(PAGES_APPS)('apps/%s/csp-guard.config.json searches the build for the key placeholder pages.yml sets', (app) => {
+    const config: unknown = JSON.parse(read(`./${app}/csp-guard.config.json`));
+    expect(config).toMatchObject({ secrets: { env: expect.arrayContaining(['ANTHROPIC_API_KEY']) } });
+  });
 });
 
 describe('assemblePages', () => {
