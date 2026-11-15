@@ -243,6 +243,16 @@ describe('the action script', () => {
     expect(r.outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
   });
 
+  it('takes a pattern that names an existing file as that file, even with [ ] in it', () => {
+    const ws = workspace({ 'README.md': CLEAN, 'docs/[slug]/page.md': CLEAN, 'docs/s/page.md': CLEAN });
+    const r = runAction(ws, { SLOP_FILES: 'README.md docs/[slug]/page.md' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^docs\/\[slug\]\/page\.md: 0 findings/mu);
+    expect(r.stdout).not.toMatch(/^docs\/s\/page\.md/mu);
+    // A pattern that names no file is still a glob.
+    expect(runAction(ws, { SLOP_FILES: 'README.md docs/?/page.md' }).stdout).toMatch(/^docs\/s\/page\.md: 0 findings/mu);
+  });
+
   it('refuses a sarif-file with a line break, which could forge another output', () => {
     const ws = workspace({ 'letter.txt': BANNED });
     const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'a.sarif\nexit-code=0', SLOP_FAIL: 'false' });

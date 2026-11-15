@@ -10,7 +10,7 @@ author: Federico Medinilla
 
 inputs:
   files:
-    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that matches no file fails the step.
+    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that names an existing file is read as that path, brackets included. A pattern that matches no file fails the step.
     required: true
   lang:
     description: Language of the text, en or es. Empty leaves it to the config file, which may set it per folder; with neither, the step fails.
@@ -76,6 +76,12 @@ runs:
         (( ${#patterns[@]} > 0 )) || fail "files is empty"
         files=()
         for pattern in "${patterns[@]}"; do
+          # A pattern that names an existing file is that file, so docs/[slug]/page.md works.
+          if [[ -f "$pattern" ]]; then
+            [[ "$pattern" == -* ]] && pattern="./$pattern"
+            files+=("$pattern")
+            continue
+          fi
           matched=0
           for path in $pattern; do
             [[ -f "$path" ]] || continue
