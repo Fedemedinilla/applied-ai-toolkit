@@ -3,7 +3,7 @@
  * .json config the way it loads a module, and the examples in the README are valid configs.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { CONFIG_SCHEMA_URL, configJsonSchema, loadConfig, parseConfig } from '../src/config.ts';
@@ -89,6 +89,13 @@ describe('a JSON config', () => {
     expect(cli(root, ['--config', 'config/fences.json'])).toMatchObject({ code: 0, stdout: 'import-fences: 0 violations in 3 files, 3 rules\n' });
   });
 
+  it('loads a file saved with a UTF-8 byte order mark, as Windows editors write it', async () => {
+    const root = tree({ ...CLEAN_FILES, 'import-fences.config.json': `\uFEFF${JSON.stringify(JSON_CONFIG)}` });
+    const { $schema: _schema, ...plain } = JSON_CONFIG;
+    expect((await loadConfig(join(root, 'import-fences.config.json'))).config).toEqual(parseConfig(plain));
+    expect(cli(root)).toMatchObject({ code: 0, stdout: 'import-fences: 0 violations in 3 files, 3 rules\n' });
+  });
+
   it('exits 2 with nothing on stdout when it is not JSON, not an object, or not a valid config', () => {
     const root = tree({
       ...CLEAN_FILES,
@@ -101,6 +108,17 @@ describe('a JSON config', () => {
     for (const name of ['list.json', 'typo.json', 'extra.json']) {
       expect(cli(root, ['--config', name]), name).toMatchObject({ code: 2, stdout: '', stderr: expect.stringMatching(/^invalid config:/) as unknown });
     }
+  });
+});
+
+describe('a module config', () => {
+  it('is read again when the file changes in the same process', async () => {
+    const write = (include: string) => `export default { groups: { a: { include: ['${include}'] } }, rules: [{ rule: 'dynamic-import', group: 'a' }] };\n`;
+    const root = tree({ 'fences.config.ts': write('a/**') });
+    const path = join(root, 'fences.config.ts');
+    expect((await loadConfig(path)).config.groups['a']?.include).toEqual(['a/**']);
+    writeFileSync(path, write('b/**'));
+    expect((await loadConfig(path)).config.groups['a']?.include).toEqual(['b/**']);
   });
 });
 
