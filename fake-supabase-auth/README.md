@@ -93,15 +93,15 @@ The tests pin these behaviors of `@supabase/supabase-js` 2.118.0. Some differ fr
 
 ## What the tests cover
 
-`test/fake-auth.test.ts` runs 31 tests, all through the real `createClient`. `test/readme-example.test.ts` runs the example above as written.
+`test/fake-auth.test.ts` runs 44 tests, all through the real `createClient`. `test/readme-example.test.ts` runs the example above as written.
 
-- Email code sign-in with a wrong code, the right code, a reused code, `shouldCreateUser: false`, a 429 through `override` and a wrong API key.
-- The OAuth PKCE exchange, a reused code and a verifier that does not match.
-- `getClaims` with ES256 (JWKS only, then cached), with HS256 (`/user` each call), a tampered token on both, Auth answering 503 to the JWKS.
-- An expired token is refreshed and rotated, a spent refresh token is rejected, a 5xx is retried for 30 seconds under fake timers, and a 400 removes the session. The 60 second cooldown after a failed refresh, then recovery.
-- A deleted user on the ES256 and HS256 paths and on sign-out. Logout with scope `local` and `others`, checking both the revoked and the surviving refresh token.
-- Auth hanging past an `AbortSignal.timeout`, a per-route delay on either side of the deadline, a signal aborted before the call, a signal carried on a `Request`, and `hang` with no signal.
-- PostgREST headers and bearer token on a select, filtering and projection, `limit`, `.single()`, an unknown table, an unsupported filter, a count and a bad `limit` rejected, the 503 retry and a 500.
+- Email code sign-in with a wrong code, the right code, a reused code, an email in another case, `shouldCreateUser: false`, a 429 through `override` and a wrong API key. Phone codes, `token_hash` links, password and id_token sign-in get `not_in_fake`.
+- The OAuth PKCE exchange, a reused code, a verifier that does not match, and `authorize` for a second user or an unknown one.
+- `getClaims` with ES256 (JWKS only, then cached), with HS256 (`/user` each call), a tampered token on both, a signature with characters outside base64url, Auth answering 503 to the JWKS. An expired token passed to `/user` and `/logout`.
+- An expired token is refreshed and rotated. A spent refresh token is rejected and revokes the rest of its session. A 5xx is retried for 30 seconds under fake timers, and a 400 removes the session. The 60 second cooldown after a failed refresh, then recovery.
+- A deleted user on the ES256 and HS256 paths and on sign-out. Logout with the default scope `global`, with `local` and with `others`, checking both the revoked and the surviving refresh token.
+- Auth hanging past an `AbortSignal.timeout`, a per-route delay on either side of the deadline, a signal aborted before the call, a signal carried on a `Request`, a signal that aborts during the body read, and `hang` with no signal.
+- PostgREST headers and bearer token on a select, filtering and projection, `limit`, `.single()`, an unknown table, an unsupported filter, a count and a bad `limit` rejected, the 503 retry and a 500. Also `eq.null` against NULL, another `Accept` or schema, a JSON path, a `*` in a list and an unknown column.
 
 ## Layout
 
