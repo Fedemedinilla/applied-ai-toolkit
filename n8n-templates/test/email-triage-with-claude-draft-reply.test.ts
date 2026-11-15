@@ -112,6 +112,11 @@ describe('Create draft reply', () => {
     expect(evaluate(options.sendTo, afterModel(output, email({ From: 'ana@example.com' })))).toBe('ana@example.com');
   });
 
+  it('takes the last bracketed address, so a quoted display name with angle brackets does not win', () => {
+    const from = '"Ana <Sales>" <ana@example.com>';
+    expect(evaluate(options.sendTo, afterModel(output, email({ From: from })))).toBe('ana@example.com');
+  });
+
   it('does not stack "Re:" on a subject that already has it, and handles a missing subject', () => {
     expect(evaluate(draft.parameters.subject, afterModel(output, email({ Subject: 'RE: Quote' })))).toBe('RE: Quote');
     expect(evaluate(draft.parameters.subject, afterModel(output, email({ Subject: undefined })))).toBe('Re: ');
