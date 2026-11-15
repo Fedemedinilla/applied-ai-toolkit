@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { readJsonl } from '../src/files.ts';
+import { freshOutput, readJsonl } from '../src/files.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'evals-files-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -21,5 +21,16 @@ describe('readJsonl', () => {
 
   it('reads a file that starts with a byte order mark', () => {
     expect(readJsonl(file('bom.jsonl', '﻿{"a":1}\n'))).toEqual([{ a: 1 }]);
+  });
+});
+
+describe('freshOutput', () => {
+  it('creates an empty file and refuses one that exists, leaving it as it was', () => {
+    const path = join(dir, 'new.jsonl');
+    expect(freshOutput(path)).toBe(path);
+    expect(readFileSync(path, 'utf8')).toBe('');
+    const old = file('old.jsonl', '{"a":1}\n');
+    expect(() => freshOutput(old)).toThrow(`${old} already exists; pick a new file so two runs never mix`);
+    expect(readFileSync(old, 'utf8')).toBe('{"a":1}\n');
   });
 });

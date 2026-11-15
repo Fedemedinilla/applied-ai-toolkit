@@ -1,5 +1,5 @@
 /** JSONL and output-file helpers shared by the scripts. */
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * One JSON value per non-blank line. A leading byte order mark (Windows
@@ -30,7 +30,13 @@ export const appendJsonl = (path: string, row: unknown) => appendFileSync(path, 
  * would silently mix two runs of a prompt that has changed since.
  */
 export function freshOutput(path: string): string {
-  if (existsSync(path)) throw new Error(`${path} already exists; pick a new file so two runs never mix`);
-  writeFileSync(path, '');
+  // One exclusive create, not a check then a write: two runs started together
+  // on one path cannot both pass.
+  try {
+    writeFileSync(path, '', { flag: 'wx' });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`${path} already exists; pick a new file so two runs never mix`);
+    throw e;
+  }
   return path;
 }
