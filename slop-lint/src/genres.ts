@@ -133,7 +133,8 @@ export interface GenreGuess {
 }
 
 const SUBJECT = /^(?:asunto|subject)\s*:/imu;
-const PREVIOUS = /\b(?:te escribí el|le escribí el|te escribí la semana|I wrote to you on|following up on|follow(?:ing)? up|as I mentioned in my (?:last|previous)|retomo (?:el|mi) (?:mail|mensaje))|^(?:asunto|subject)\s*:\s*(?:re|rv)\s*:/imu;
+// Only phrases that point back to a message: a bare "follow up" is something a cover letter promises too.
+const PREVIOUS = /\b(?:te escribí el|le escribí el|te escribí la semana|I wrote to you on|following up on (?:my|our)|as I mentioned in my (?:last|previous)|retomo (?:el|mi) (?:mail|mensaje))|^(?:asunto|subject)\s*:\s*(?:re|rv)\s*:/imu;
 const GREETING = /^(?:hola|estimad[oa]s?|buen(?:os|as) (?:días|tardes|noches)|dear|hi|hello)\b[^\n]{0,40}[,:]?\s*$/imu;
 const SIGN_OFF = /^(?:saludos(?: cordiales)?|un saludo|atentamente|gracias|best(?: regards)?|regards|kind regards|thanks|cheers),?\s*$/imu;
 const EMOJI = /(?![©®™])\p{Extended_Pictographic}/u;
@@ -164,7 +165,8 @@ export function guessGenre(text: string): GenreGuess {
   const short = wordCount < 60;
   if (short) signals.push(`${wordCount} words`);
 
-  if (previous) return { genre: 'follow-up', confidence: subject || greeting || signOff ? 'high' : 'low', signals };
+  // A letter can mention an earlier application too, so a long text needs a subject line to be sure.
+  if (previous) return { genre: 'follow-up', confidence: subject || ((greeting || signOff) && wordCount < 150) ? 'high' : 'low', signals };
   if (subject) return { genre: 'email', confidence: 'high', signals };
   if (short && (emoji || chatLines) && !signOff) return { genre: 'whatsapp', confidence: emoji && chatLines ? 'high' : 'low', signals };
   // A cover letter has a greeting and a sign-off too; it is longer than most mails.
