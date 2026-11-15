@@ -1,6 +1,7 @@
 -- Reference schema for the chat widget, PostgreSQL 15 or newer. Tenancy is by row: every table
--- carries tenant_id, and every query in server/sql-store.ts filters on it. A new business is an
--- insert, not a deploy.
+-- carries tenant_id, and every query in server/sql-store.ts filters on it or on a key the server
+-- chose (the turn id) or that is unique (the owner's email). A new business is an insert, not a
+-- deploy.
 --
 -- The checks repeat the zod schemas in server/tenant.ts and the limits in server/limits.ts, so a
 -- row written by hand or by another tool cannot hold what the handlers would refuse to read.
@@ -10,6 +11,23 @@
 --
 -- test/store-contract.test.ts applies this file to an in-process Postgres (PGlite) and runs the
 -- same suite as the in-memory store.
+
+-- Element checks for the two array columns. A check cannot hold a subquery, so each one is an
+-- immutable function over the array. A null element fails, as zod would refuse it.
+create function widget_domains_ok(domains text[]) returns boolean
+  language sql immutable
+  return coalesce((
+    select bool_and(d is not null and char_length(d) between 1 and 253
+      and d ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$')
+    from unnest(domains) as d
+  ), true);
+
+create function widget_questions_ok(questions text[]) returns boolean
+  language sql immutable
+  return coalesce((
+    select bool_and(q is not null and char_length(q) between 1 and 80)
+    from unnest(questions) as q
+  ), true);
 
 create table widget_tenants (
   tenant_id text primary key
@@ -22,7 +40,7 @@ create table widget_tenants (
   monthly_turns integer constraint widget_tenants_monthly_turns check (monthly_turns > 0),
   -- An empty list answers on no site at all.
   allowed_domains text[] not null default '{}'
-    constraint widget_tenants_allowed_domains check (cardinality(allowed_domains) <= 20),
+    constraint widget_tenants_allowed_domains check (cardinality(allowed_domains) <= 20 and widget_domains_ok(allowed_domains)),
   bot_name text not null default 'Asistente' constraint widget_tenants_bot_name check (char_length(bot_name) between 1 and 60),
   header text not null default 'Asistente' constraint widget_tenants_header check (char_length(header) between 1 and 60),
   welcome text not null default 'Hola. ¿En qué te puedo ayudar?' constraint widget_tenants_welcome check (char_length(welcome) between 1 and 300),
@@ -31,7 +49,7 @@ create table widget_tenants (
   primary_color text not null default '#1f6f5c' constraint widget_tenants_primary_color check (primary_color ~* '^#[0-9a-f]{6}$'),
   font text not null default 'system-ui' constraint widget_tenants_font check (font ~ '^[A-Za-z0-9 ,''-]{1,60}$'),
   suggested_questions text[] not null default '{}'
-    constraint widget_tenants_suggested_questions check (cardinality(suggested_questions) <= 4),
+    constraint widget_tenants_suggested_questions check (cardinality(suggested_questions) <= 4 and widget_questions_ok(suggested_questions)),
   tone_preset text not null default 'friendly' constraint widget_tenants_tone_preset check (tone_preset in ('friendly', 'formal', 'direct')),
   tone text not null default '' constraint widget_tenants_tone check (char_length(tone) <= 1000),
   context text not null default '' constraint widget_tenants_context check (char_length(context) <= 20000),
@@ -41,7 +59,11 @@ create table widget_tenants (
 
 create table widget_owners (
   tenant_id text primary key references widget_tenants (tenant_id) on delete cascade,
-  email text not null constraint widget_owners_email check (email = lower(email) and position('@' in email) > 1),
+  email text not null constraint widget_owners_email check (
+    email = lower(email)
+    -- The pattern of z.email(), which Owner parses this column with.
+    and email ~ '^([a-z0-9_''+-]+\.)*[a-z0-9_''+-]*[a-z0-9_+-]@([a-z0-9][a-z0-9-]*\.)+[a-z]{2,}$'
+  ),
   -- Null until the owner accepts an invite. The format carries its scrypt parameters.
   password_hash text constraint widget_owners_password_hash check (password_hash like 'scrypt$%'),
   -- The nonce of the only invite link that still works. Accepting it clears it.

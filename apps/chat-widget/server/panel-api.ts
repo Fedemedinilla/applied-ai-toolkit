@@ -7,10 +7,11 @@
 //   PUT  /panel/api/content         a ContentPatch
 //   POST /panel/api/invite/check    {token} -> {email}
 //   POST /panel/api/invite/accept   {token, password}
-//   POST /panel/api/admin/invite    Basic auth; {tenantId, email, allowedDomains} -> {inviteUrl}
+//   POST /panel/api/admin/invite    Basic auth; {tenantId, email, allowedDomains} -> {inviteUrl, created}
 //
 // Every write needs an Origin equal to the panel's own and a JSON content type, so a form or a
-// fetch from another site cannot reach it even before the SameSite cookie is considered.
+// fetch from another site cannot reach it even before the SameSite cookie is considered. The one
+// exception is admin/invite with no Origin at all, the way curl calls it; Basic auth guards it.
 
 import { z } from 'zod';
 import {
@@ -220,13 +221,17 @@ export function createPanelApi(deps: PanelDeps): PanelApi {
     const nonce = newId();
     await timed(store.setInviteNonce(tenantId, nonce));
     log('invite_issued', { tenant: tenantId, created: created === 'created' });
-    return reply(200, { inviteUrl: inviteUrl(deps.publicBaseUrl, auth.sign('invite', tenantId, nonce, INVITE_MAX_AGE_S)) });
+    // allowedDomains applies only when the tenant is created; `created` tells the operator which case this was.
+    return reply(200, { inviteUrl: inviteUrl(deps.publicBaseUrl, auth.sign('invite', tenantId, nonce, INVITE_MAX_AGE_S)), created: created === 'created' });
   }
 
   async function route(request: Request, path: string): Promise<Response> {
     const method = request.method;
     const writes = method !== 'GET' && method !== 'HEAD';
-    if (writes && !sameOrigin(request)) return fail(403, 'cross_origin');
+    // The operator route has no page: it is called with curl or a script, which sends no Origin, and
+    // its credential is the Basic header, not a cookie. Another site's Origin is still refused.
+    const operatorCli = path === 'admin/invite' && request.headers.get('origin') === null;
+    if (writes && !operatorCli && !sameOrigin(request)) return fail(403, 'cross_origin');
 
     if (path === 'login') return method === 'POST' ? login(request) : fail(405, 'method_not_allowed');
     if (path === 'logout') return method === 'POST' ? reply(200, { ok: true }, { 'set-cookie': clearSessionCookie() }) : fail(405, 'method_not_allowed');

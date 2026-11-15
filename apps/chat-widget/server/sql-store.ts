@@ -1,7 +1,7 @@
 // TenantStore and AccountStore over Postgres (sql/schema.sql). It takes a `query` function rather
 // than a driver, so it carries no dependency: node-postgres's Pool.query and PGlite's query both fit.
-// Every statement filters on the tenant id or the turn id, and each write is a single statement,
-// so it is atomic without a transaction.
+// Every statement filters on the tenant id, the turn id or (for login) the owner's unique email,
+// and each write is a single statement, so it is atomic without a transaction.
 
 import type { AccountStore, NewTenant, TenantStore, TurnOutcome, TurnReservation } from './store.ts';
 import type { ContentPatch } from './tenant.ts';

@@ -62,7 +62,7 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 
 ### Tenancy
 
-**Multi-tenant by row.** `widget_tenants`, `widget_owners` and `widget_turns` all carry `tenant_id`, and every statement in [`server/sql-store.ts`](server/sql-store.ts) filters on it. One deployment per client would mean copying every fix into every copy. Here a new business is `createTenant`, and a fix reaches every tenant at once. One suite runs against the in-memory store and against `SqlStore` on [`sql/schema.sql`](sql/schema.sql) in an in-process Postgres (PGlite), and checks that one tenant's writes and counts never touch another's.
+**Multi-tenant by row.** `widget_tenants`, `widget_owners` and `widget_turns` all carry `tenant_id`. Every statement in [`server/sql-store.ts`](server/sql-store.ts) filters on it, with three exceptions. Closing and dropping a turn go by the turn id the server generated. Login finds the owner by the unique email. One deployment per client would mean copying every fix into every copy. Here a new business is `createTenant`, and a fix reaches every tenant at once. One suite runs against the in-memory store and against `SqlStore` on [`sql/schema.sql`](sql/schema.sql) in an in-process Postgres (PGlite), and checks that one tenant's writes and counts never touch another's.
 
 **The panel's tenant comes from the signed session only.** No panel route takes a tenant id from the request. The content schema is strict, so a body that names `tenantId` is refused.
 
@@ -120,7 +120,15 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 
 **Invites are single-use, and their token never reaches a log.** The operator creates a tenant and an invite with HTTP Basic, compared in constant time and limited per IP on failures. The operator password must be at least 16 characters, because it can reissue any owner's invite. The owner's row stores the nonce of the one invite that still works. Accepting it clears the nonce in the same statement that sets the password, so two tabs cannot both use one link, and issuing a new invite voids the old one. A link that stayed valid until a password existed would be usable for its whole lifetime if it leaked. The token travels in the URL fragment (`/panel/#invite=...`), which browsers send neither to the server nor in `Referer`, and the page removes it from the address bar on load.
 
-**Writes need the panel's own Origin and a JSON body.** A missing Origin is refused, since every browser sends one on a `fetch` POST or PUT. A form from another site cannot send `application/json`, and a cross-origin `fetch` that does gets no CORS answer from the panel routes, even in a browser that ignores `SameSite`.
+The operator route has no page. It is called from a terminal, and a call with no `Origin` header is accepted there. It answers `{ inviteUrl, created }`. The allowed domains apply only when the call creates the tenant; for an existing one (`created: false`) the route issues a new invite and leaves the row as it was.
+
+```sh
+curl -u ops:"$CHAT_WIDGET_ADMIN_PASSWORD" -H 'content-type: application/json' \
+  -d '{"tenantId":"taller-uno","email":"owner@taller-uno.example","allowedDomains":["taller-uno.example"]}' \
+  http://localhost:4331/panel/api/admin/invite
+```
+
+**Writes need the panel's own Origin and a JSON body.** A missing Origin is refused, since every browser sends one on a `fetch` POST or PUT. The one exception is the operator route, whose credential is the Basic header and not a cookie; an Origin other than the panel's is refused there too. A form from another site cannot send `application/json`, and a cross-origin `fetch` that does gets no CORS answer from the panel routes, even in a browser that ignores `SameSite`.
 
 ## What the tests cover
 
@@ -132,9 +140,11 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 | `test/loader.dom.test.ts` | jsdom: mounting, no mount on failure, one mount under concurrent tags, text never markup, request shape, history, errors, accessibility |
 | `test/store-contract.test.ts` | One suite on `MemoryStore` and on `SqlStore` in PGlite, plus the schema's checks |
 | `test/guards.test.ts` | IP keys, the limiter, the byte-limited reader, Origin and Referer matching, deadlines, static paths |
+| `test/node-http.test.ts` | The Node server over a socket on 127.0.0.1: a request-target the URL parser rejects answers 400 and the server keeps serving |
+| `test/env.test.ts` | The default public URL uses the validated port |
 | `test/build.test.ts` | The production build: the loader adds no globals, has no HTML-parsing call, and uses relative URLs |
 
-127 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
+140 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
 
 ## Layout
 
@@ -174,7 +184,7 @@ test/                Vitest suites and the fake API
 - **The history is the client's word.** The widget sends the conversation, so a script can write the assistant's earlier turns. The schema forces alternation and a visitor turn last, the caps still apply, and the rules block is always first, but the model reads a history the server did not write.
 - **No conversation log.** Turns store tokens and cost, not text. Showing owners their visitors' conversations needs a retention policy and consent text this folder does not have.
 - **No streaming to the visitor.** The gateway streams from the API, and the reply goes to the widget whole.
-- **The panel is minimal.** It edits the name, the welcome message, the tone, the context, the FAQ and the suggested questions. The color, the font and the allowed domains are set by the operator in the store. There are no file uploads, no usage view and no password change except through a new invite.
+- **The panel is minimal.** It edits the name, the welcome message, the tone, the context, the FAQ and the suggested questions. The operator sets the widget's header, the input placeholder, the color, the font and the allowed domains in the store. A new tenant's header reads "Asistente" until the operator changes it, and the name the owner sets reaches only the prompt. There are no file uploads, no usage view and no password change except through a new invite.
 - **The demo needs the server.** On a static host the config request fails and the widget does not mount, by design.
 - **Model replies were tested against a fake API only.** There is no accuracy figure for the prompt, and `live-check.ts` prints three replies and records nothing.
 - **The prices are the gateway example's.** Check the current pricing page before relying on a computed cost.
