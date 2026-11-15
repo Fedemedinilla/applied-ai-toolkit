@@ -91,6 +91,12 @@ export function maskNonCode(code: string): string {
       while (j < n && /[\w$]/.test(code[j] ?? '')) j++;
       last = code.slice(i, j);
       i = j;
+    } else if ((c === '+' || c === '-') && next === c) {
+      // `++` or `--`: after an operand it is postfix and the result is a value, so a "/" that
+      // follows divides (`i++/2`); otherwise it is prefix and an operand still has to come.
+      const afterOperand = last !== '' && !REGEX_AFTER_PUNCTUATOR.has(last) && last !== '}' && !REGEX_AFTER_KEYWORD.has(last);
+      last = afterOperand ? 'a' : c;
+      i += 2;
     } else {
       if (templates.length && (c === '{' || c === '}')) templates[templates.length - 1] = (templates[templates.length - 1] ?? 0) + (c === '{' ? 1 : -1);
       if (!/\s/.test(c)) last = c;

@@ -117,6 +117,13 @@ describe('staticImports', () => {
     expect(check(report, 'js-budget')?.status).toBe('pass');
   });
 
+  it('reads a / after a postfix ++ or -- as division, not as the start of a regex', () => {
+    expect(staticImports('import"./a.js";let i=0;i++/2;import"./b.js";')).toEqual(['./a.js', './b.js']);
+    expect(staticImports('import"./a.js";x=a++/2;export*from"./c.js";')).toEqual(['./a.js', './c.js']);
+    expect(staticImports('import"./a.js";x=a--/2;import"./d.js";')).toEqual(['./a.js', './d.js']);
+    expect(staticImports('import"./a.js";x=a+ +/r"/.source;import"./e.js";')).toEqual(['./a.js', './e.js']);
+  });
+
   it('counts a query-string import against the file and fails on an extensionless one', () => {
     const report = guard(
       {
