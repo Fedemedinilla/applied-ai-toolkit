@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { RULES } from './rules.ts';
+import { DOCUMENT_SCOPE_IDS } from './structural.ts';
 import { lineColumn, lineStarts } from './text.ts';
 import { DIRECTIVE_RULES, type DirectiveRule } from './suppress.ts';
 import type { Finding, Level, LintResult, Rule, Severity } from './types.ts';
@@ -215,7 +216,10 @@ export function toSarif(all: readonly SarifInput[]): SarifLog {
     // fingerprint is the same whether a finding is suppressed or not.
     const prose = [...result.findings, ...suppressed.keys()].sort((a, b) => a.start - b.start);
     for (const f of [...prose, ...(result.directiveProblems ?? [])]) {
-      const key = `${f.ruleId}\0${f.match}`;
+      // A whole-document finding (ESP-02, EST-11, OFI-01) quotes the whole prose, so its match changes
+      // on any edit; it is fingerprinted by rule and file alone, and keeps its alert as the text moves.
+      const match = DOCUMENT_SCOPE_IDS.has(f.ruleId) ? '' : f.match;
+      const key = `${f.ruleId}\0${match}`;
       const occurrence = seen.get(key) ?? 0;
       seen.set(key, occurrence + 1);
       const ruleIndex = index.get(f.ruleId);
@@ -227,7 +231,7 @@ export function toSarif(all: readonly SarifInput[]): SarifLog {
         level: sarifLevel(f),
         message: { text: messageText(f) },
         locations: [{ physicalLocation: { artifactLocation: { uri }, region: region(text, f, starts) } }],
-        partialFingerprints: { [FINGERPRINT_KEY]: fingerprint(f.ruleId, uri, f.match, occurrence) },
+        partialFingerprints: { [FINGERPRINT_KEY]: fingerprint(f.ruleId, uri, match, occurrence) },
         ...(by === undefined ? {} : { suppressions: [{ kind: 'inSource' as const, ...(by.reason === undefined ? {} : { justification: by.reason }) }] }),
       });
     }

@@ -169,6 +169,9 @@ const checks: Record<string, Check> = {
 
 export const STRUCTURAL_CHECK_IDS: readonly string[] = Object.keys(checks);
 
+/** The checks whose one finding spans the whole prose of the document, so its match is the document. */
+export const DOCUMENT_SCOPE_IDS: ReadonlySet<string> = new Set(['ESP-02', 'EST-11', 'OFI-01']);
+
 export function runStructural(ruleId: string, ctx: StructuralContext): StructuralHit[] {
   const check = checks[ruleId];
   if (!check) throw new Error(`No structural check for ${ruleId}`);
