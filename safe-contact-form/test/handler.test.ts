@@ -166,6 +166,15 @@ describe('what the acknowledgment may quote', () => {
     expect(s.resend.sent[1]!.text.startsWith('Hi,\n\n')).toBe(true);
   });
 
+  it('a name or message cut through an emoji reaches no email with a lone surrogate', async () => {
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    const s = setup();
+    const name = `${'a'.repeat(31)}😀${'b'.repeat(66)}😀`;
+    await s.handler(asJson(good(s.now, { full_name: name, body: `${'m'.repeat(299)}😀 and more` })), ctx());
+    expect(s.resend.sent).toHaveLength(2);
+    for (const mail of s.resend.sent) for (const part of [mail.subject, mail.html, mail.text]) expect(lone.test(part)).toBe(false);
+  });
+
   it('the quote is cut at quoteMax', async () => {
     const s = setup({ quoteMax: 20 });
     await s.handler(asJson(good(s.now, { body: 'b'.repeat(100) })), ctx());

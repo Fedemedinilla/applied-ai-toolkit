@@ -8,6 +8,16 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 }
 
+/**
+ * The first `max` UTF-16 units of `s`, without a high surrogate left alone at the end: a cut
+ * through an emoji would otherwise send a broken character that providers show as U+FFFD or refuse.
+ */
+export function cut(s: string, max: number): string {
+  const head = s.slice(0, max);
+  const last = head.charCodeAt(head.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? head.slice(0, -1) : head;
+}
+
 /** A subject or a name is one line: a newline inside would split a header or leave text hanging. */
 export const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
@@ -58,8 +68,8 @@ export function stripLinks(s: string, placeholder: string): string {
  */
 export function quote(message: string, max: number, placeholder: string): string {
   const clean = stripLinks(message, placeholder).trim();
-  const cut = clean.length > max ? `${clean.slice(0, max).trimEnd()}…` : clean;
-  return stripLinks(cut, placeholder);
+  const short = clean.length > max ? `${cut(clean, max).trimEnd()}…` : clean;
+  return stripLinks(short, placeholder);
 }
 
 /**
@@ -68,6 +78,6 @@ export function quote(message: string, max: number, placeholder: string): string
  * link comes back as `fallback`.
  */
 export function greeting(name: string, max: number, fallback: string): string {
-  const n = oneLine(stripLinks(oneLine(stripLinks(name, '')).slice(0, max), ''));
+  const n = oneLine(stripLinks(cut(oneLine(stripLinks(name, '')), max), ''));
   return n || fallback;
 }

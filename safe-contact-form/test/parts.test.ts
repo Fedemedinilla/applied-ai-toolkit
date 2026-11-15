@@ -36,6 +36,13 @@ describe('quote and greeting', () => {
     expect(quote(s, 18, '[x]')).toBe(`${'a'.repeat(10)} [x]`);
   });
 
+  const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  it('a cut through an emoji leaves no lone surrogate', () => {
+    expect(quote('😀'.repeat(5), 3, '[l]')).toBe('😀…');
+    expect(greeting('😀😀😀', 3, '')).toBe('😀');
+    expect(lone.test(quote(`${'a'.repeat(299)}😀 more`, 300, '[l]'))).toBe(false);
+  });
+
   it('greeting is one line and falls back when only links were there', () => {
     expect(greeting('Ana\nMaría', 32, 'there')).toBe('Ana María');
     expect(greeting('www.evil.example', 32, 'there')).toBe('there');

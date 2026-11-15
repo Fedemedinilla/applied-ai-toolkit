@@ -8,7 +8,7 @@
  * address under the site's name.
  */
 import { createLimiter, type RateLimit } from './rate-limit.ts';
-import { escapeHtml, greeting, htmlDocument, oneLine, paragraphs, quote } from './sanitize.ts';
+import { cut, escapeHtml, greeting, htmlDocument, oneLine, paragraphs, quote } from './sanitize.ts';
 import { fill, TEXTS, type Lang, type PageText, type Texts } from './texts.ts';
 import type { MailTransport } from './transport.ts';
 
@@ -242,7 +242,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
       log({ kind: 'rejected', reason: 'too_large' });
       return fail('too_large', 413);
     }
-    const g = (key: keyof FieldNames, max = 5000) => (data.get(fields[key]) ?? '').trim().slice(0, max);
+    const g = (key: keyof FieldNames, max = 5000) => cut((data.get(fields[key]) ?? '').trim(), max);
     const requested = g('lang', 5);
     if (requested === 'en' || requested === 'es') lang = requested;
 
@@ -271,12 +271,12 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
       return success(true);
     }
 
-    const name = oneLine(g('name')).slice(0, 100);
+    const name = cut(oneLine(g('name')), 100);
     const email = g('email', 200);
-    const phone = oneLine(g('phone')).slice(0, 40);
+    const phone = cut(oneLine(g('phone')), 40);
     const message = g('message');
-    const source = oneLine(g('source')).slice(0, 60);
-    const subject = oneLine(g('subject')).slice(0, 90);
+    const source = cut(oneLine(g('source')), 60);
+    const subject = cut(oneLine(g('subject')), 90);
     if (!name || email.length > 160 || !EMAIL.test(email) || message.length < 2) {
       log({ kind: 'rejected', reason: 'invalid' });
       return fail('invalid', 400);
