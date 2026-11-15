@@ -70,6 +70,26 @@ describe('static files', () => {
     expect(manifest.headers.get('content-type')).toBe('application/manifest+json');
   });
 
+  it('decides immutable from the path inside the build, not from where the build lives', async () => {
+    const parent = mkdtempSync(join(tmpdir(), 'push-lab-serve-'));
+    const nested = join(parent, 'assets', 'push-lab');
+    mkdirSync(join(nested, 'assets'), { recursive: true });
+    writeFileSync(join(nested, 'index.html'), '<!doctype html><title>t</title>');
+    writeFileSync(join(nested, 'sw.js'), 'self;');
+    writeFileSync(join(nested, 'assets', 'index-abc.js'), 'x;');
+    const other = createNodeServer({ handler: async () => new Response(null, { status: 404 }), dir: nested });
+    await new Promise<void>((resolve) => other.listen(0, '127.0.0.1', resolve));
+    const at = `http://127.0.0.1:${(other.address() as AddressInfo).port}`;
+    try {
+      expect((await fetch(`${at}/`)).headers.get('cache-control')).toBe('no-cache');
+      expect((await fetch(`${at}/sw.js`)).headers.get('cache-control')).toBe('no-cache');
+      expect((await fetch(`${at}/assets/index-abc.js`)).headers.get('cache-control')).toContain('immutable');
+    } finally {
+      await new Promise((resolve) => other.close(resolve));
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
   it('refuses paths that leave the build folder', () => {
     expect(resolveStatic(dir, '/../etc/passwd')).toBeNull();
     expect(resolveStatic(dir, '/%2e%2e/%2e%2e/etc/passwd')).toBeNull();

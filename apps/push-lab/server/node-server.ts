@@ -4,7 +4,7 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, relative, sep } from 'node:path';
 import { Readable } from 'node:stream';
 
 export const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -41,10 +41,12 @@ export function resolveStatic(dir: string, pathname: string): string | null {
   return full.startsWith(root) ? full : null;
 }
 
-function cacheControl(path: string): string {
+function cacheControl(dir: string, path: string): string {
   // Hashed names never change; everything else (index.html, sw.js, the manifest) must be checked
-  // on every load, or a phone keeps an old worker for a day.
-  return path.includes(`${sep}assets${sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
+  // on every load, or a phone keeps an old worker for a day. Decided from the path inside the
+  // build, so a build that lives under some other folder named assets keeps these rules.
+  const parts = relative(dir, path).split(sep);
+  return parts.length > 1 && parts[0] === 'assets' ? 'public, max-age=31536000, immutable' : 'no-cache';
 }
 
 async function serveFile(dir: string, req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void> {
@@ -59,7 +61,7 @@ async function serveFile(dir: string, req: IncomingMessage, res: ServerResponse,
   res.writeHead(200, {
     'content-type': CONTENT_TYPES[extname(path)] ?? 'application/octet-stream',
     'content-length': body.length,
-    'cache-control': cacheControl(path),
+    'cache-control': cacheControl(dir, path),
     'content-security-policy': CSP,
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',
