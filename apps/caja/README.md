@@ -40,9 +40,9 @@ ANTHROPIC_API_KEY=sk-ant-... node apps/caja/server/live-check.ts
 
 The output uses relative URLs only (`base: './'`), so `dist/apps/caja` works at a domain root or under a subpath such as GitHub Pages. The service worker needs `localhost` or HTTPS; anywhere else the app runs but does not open offline.
 
-The build (Vite 8.3.4) writes 51.79 kB of JavaScript, 18.74 kB gzipped, and 8.02 kB of CSS. The service worker is 2.32 kB. Model mode's browser side accounts for 12.59 kB of that JavaScript, 3.79 kB gzipped (the build before it wrote 39.20 kB and 14.95 kB). The server is not part of the build. The 63.20 kB corpus is fetched only when the phrases tab opens.
+The build (Vite 8.3.4) writes 52.64 kB of JavaScript, 19.06 kB gzipped, and 9.90 kB of CSS. The CSS imports the shared brand stylesheet, which adds three IBM Plex woff2 files (14.70, 20.30 and 45.71 kB, 80.71 kB in all); the service worker precaches them with the rest. The service worker is 2.44 kB. When model mode was added, its browser side measured 12.59 kB of JavaScript, 3.79 kB gzipped (the build before it wrote 39.20 kB and 14.95 kB). The server is not part of the build. The 63.20 kB corpus is fetched only when the phrases tab opens.
 
-After the build, CI runs [`csp-build-guard`](../../csp-build-guard/) over `dist/apps/caja` with [`csp-guard.config.json`](csp-guard.config.json). It is published on GitHub Pages, which cannot send response headers, so the config holds the strict policy a host should send (`'self'` only, `data:` images, no plugins) as a `literal`. The run checks that the build works under it with no inline script, has no regex lookbehind, and keeps the JavaScript of `index.html` under 20 kB gzipped. Its own measure of the current build is 18.6 kB gzipped and 16.9 kB brotli.
+After the build, CI runs [`csp-build-guard`](../../csp-build-guard/) over `dist/apps/caja` with [`csp-guard.config.json`](csp-guard.config.json). It is published on GitHub Pages, which cannot send response headers, so the config holds the strict policy a host should send (`'self'` only, `data:` images, no plugins) as a `literal`. The run checks that the build works under it with no inline script, has no regex lookbehind, and keeps the JavaScript of `index.html` under 20 kB gzipped. Its own measure of the current build is 18.9 kB gzipped and 17.2 kB brotli.
 
 ## Model mode
 
