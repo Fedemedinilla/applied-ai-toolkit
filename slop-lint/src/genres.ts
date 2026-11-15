@@ -62,7 +62,7 @@ const NOT_A_LETTER: Readonly<Record<string, GenreSetting>> = {
 const FMT_01 = ruleById('FMT-01');
 
 /** The rules of GENRE_RULES that email and follow-up run. */
-const MAIL_RULES: readonly Rule[] = ['MAIL-01', 'MAIL-02'].map(ruleById);
+const MAIL_RULES: readonly Rule[] = ['MAIL-01', 'MAIL-02', 'MAIL-03'].map(ruleById);
 const MARKUP = String.raw`\*\*[^*\n]+\*\*|__[^_\n]+__|^#{1,6}[ \t]`;
 const LIST_ITEM = String.raw`^[ \t]*(?:[-*•]|\d+[.)])[ \t]+`;
 

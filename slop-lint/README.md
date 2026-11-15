@@ -596,6 +596,7 @@ These rules are not in the catalog of 52, so a cover letter and a caller that pa
 |---|---|---|---|---|---|---|---|---|---|
 | MAIL-01 | Thanks formula as the only closing | email, follow-up | en | 1 | high | 0 as the last sentence | structural | SÍNTESIS | Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line) |
 | MAIL-02 | "Estimado/a" with a slash | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 3 (slop of generated Spanish) |
+| MAIL-03 | Generic subject line | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 8 (subject: role, name and a fact; not "Oportunidad emocionante") |
 
 ## Known false positives
 

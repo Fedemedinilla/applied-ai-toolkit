@@ -376,7 +376,7 @@ describe('rules only a genre runs', () => {
   const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
 
   it('run in the genres the design gives them and never in a cover letter', () => {
-    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'] };
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'] };
     for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
     expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
   });
@@ -429,5 +429,27 @@ describe('MAIL-02, "Estimado/a" with a slash', () => {
 
   it('leaves a greeting that names the reader alone', () => {
     expect(ids('Estimada Laura:\n\nTe paso el tablero.', { lang: 'es', genre: 'email' })).not.toContain('MAIL-02');
+  });
+});
+
+describe('MAIL-03, a generic subject', () => {
+  const body = '\n\nHola, Laura:\n\nTe paso el tablero de ventas de 2024.\n\nSaludos,\nAna';
+
+  it('fires on the phrase the report names, on a first line that starts with Asunto: or Subject:', () => {
+    for (const genre of ['email', 'follow-up'] as const) {
+      for (const subject of ['Asunto: Oportunidad emocionante', 'Subject: Una oportunidad emocionante en Datos Ficticios']) {
+        const f = lint(subject + body, { lang: 'es', genre }).findings.find((x) => x.ruleId === 'MAIL-03');
+        expect(f, `${genre}: ${subject}`).toMatchObject({ level: 2, severity: 'medium', line: 1 });
+        expect(f?.match.toLowerCase()).toBe('oportunidad emocionante');
+      }
+    }
+    expect(ids(`Asunto: Oportunidad emocionante${body}`, { lang: 'es' })).not.toContain('MAIL-03');
+  });
+
+  it('reads only the subject line: the phrase in the body, or a subject after the first line, is left alone', () => {
+    const inBody = 'Asunto: Analista de datos · Ana Ruiz · Power BI\n\nHola, Laura:\n\nVi una oportunidad emocionante en el aviso.';
+    const notFirst = `Hola, Laura:\nAsunto: Oportunidad emocionante${body}`;
+    expect(ids(inBody, { lang: 'es', genre: 'email' })).not.toContain('MAIL-03');
+    expect(ids(notFirst, { lang: 'es', genre: 'email' })).not.toContain('MAIL-03');
   });
 });
