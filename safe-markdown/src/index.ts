@@ -100,6 +100,8 @@ function resolve(options: MarkdownOptions): Resolved {
   };
 }
 
+const MAILTO = /^mailto:[^\s@?%]+@[^\s@?%]+$/i;
+
 function hostIn(hostname: string, list: readonly string[]): boolean {
   const h = hostname.toLowerCase().replace(/^www\./, '');
   return list.includes(h);
@@ -119,7 +121,9 @@ function anchor(url: string, label: string, r: Resolved): string | null {
   if (url.includes(Z)) return null;
   const raw = unescapeHtml(url);
   if (/^mailto:/i.test(raw)) {
-    if (!r.mailto || !/^mailto:[^\s@]+@[^\s@]+$/i.test(raw)) return null;
+    // One address and nothing else: "?" would open cc=, bcc= and body= headers, and "%40" would
+    // hide a second "@".
+    if (!r.mailto || !MAILTO.test(raw)) return null;
     return `<a href="${escapeHtml(raw)}">${label}</a>`;
   }
   if (raw.startsWith('#') || (raw.startsWith('/') && !/^\/[/\\]/.test(raw))) {

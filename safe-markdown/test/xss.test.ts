@@ -112,6 +112,18 @@ describe('quotes and attributes', () => {
     inert('[x](mailto:a"onclick="alert(1)@shop.example)');
   });
 
+  it('a mailto with headers or percent-encoding is not a link, so it cannot add a hidden recipient', () => {
+    for (const url of [
+      'mailto:a@b.example?cc=evil%40x.example&body=hi',
+      'mailto:a@b.example?bcc=c%40d.example',
+      'mailto:a@b.example?subject=x',
+      'mailto:a%40evil.example@b.example',
+    ]) {
+      expect(md(`[x](${url})`)).not.toContain('<a ');
+    }
+    expect(md('[x](mailto:desk@shop.example)')).toContain('<a href="mailto:desk@shop.example">x</a>');
+  });
+
   it('angle brackets in the URL are percent-encoded in the href', () => {
     expect(md('[x](https://shop.example/<b>)')).toContain('href="https://shop.example/%3Cb%3E"');
   });
