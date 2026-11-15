@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFStream } from 'pdf-lib';
 import { mountApp, type App } from '../src/app.ts';
 
 // Paths, not URL objects: under jsdom the global URL is jsdom's, which node:fs does not accept.
@@ -20,6 +20,7 @@ interface Harness {
   app: App;
   blobs: Map<string, Blob>;
   revoked: string[];
+  created: () => number;
 }
 
 // Every mounted app is destroyed after its test, so no timer from one test fires into the next
@@ -53,7 +54,39 @@ function mount(overrides: Overrides = {}): Harness {
     debounceMs: 5,
   });
   mounted.push(app);
-  return { app, blobs, revoked };
+  return { app, blobs, revoked, created: () => n };
+}
+
+/** A promise with its resolve and reject, to finish an async dependency when a test says so. */
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 20));
+
+function choose(value: 'sample' | 'none' | 'file'): void {
+  const radio = $<HTMLInputElement>(`input[name="logo"][value="${value}"]`);
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function pick(file: File): void {
+  const input = $<HTMLInputElement>('#logo-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+async function hasImage(h: Harness): Promise<boolean> {
+  const pdf = await pdfOf(h);
+  return pdf.context
+    .enumerateIndirectObjects()
+    .some(([, obj]) => obj instanceof PDFStream && obj.dict instanceof PDFDict && obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'));
 }
 
 const $ = <T extends HTMLElement>(selector: string): T => {
@@ -218,6 +251,26 @@ describe('the receipt page', () => {
     expect(pending()).toEqual([true, true]);
   });
 
+  it('removes the link and says it is updating as soon as a sample button is clicked', async () => {
+    $<HTMLButtonElement>('[data-sample="long"]').click();
+    expect($('#download').hasAttribute('href')).toBe(false);
+    expect($('#open').hasAttribute('href')).toBe(false);
+    expect($('#status').textContent).toBe('Actualizando el PDF…');
+    await h.app.settled();
+    expect($('#download').getAttribute('download')).toBe('remito-R-0120.pdf');
+  });
+
+  it('blanks the preview frame while an edit is pending and while the form has an error', async () => {
+    type('#customer-name', 'Otro Jardín');
+    expect($('#preview').hasAttribute('src')).toBe(false);
+    await h.app.settled();
+    expect($('#preview').getAttribute('src')).toBe('blob:test/2');
+    type('#item-1-price', '6800.50');
+    await h.app.settled();
+    expect($('#preview').hasAttribute('src')).toBe(false);
+    expect(h.revoked).toEqual(['blob:test/1', 'blob:test/2']);
+  });
+
   it('cancels a scheduled rebuild when destroyed', async () => {
     type('#customer-name', 'Otro Jardín');
     h.app.destroy();
@@ -280,5 +333,95 @@ describe('when the sample logo cannot be fetched', () => {
     await h.app.settled();
     expect($('#download').hasAttribute('href')).toBe(true);
     expect($('#status').textContent).toMatch(/^Listo:/u);
+  });
+
+  it('says so, and fetches it again on a later build', async () => {
+    let calls = 0;
+    const h = mount({ loadSampleLogo: async () => (++calls === 1 ? Promise.reject(new Error('offline')) : logo) });
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(false);
+    expect($('#notice-list').textContent).toBe('No se pudo cargar el logo de ejemplo; el PDF salió sin logo.');
+    choose('none');
+    await h.app.settled();
+    choose('sample');
+    await h.app.settled();
+    expect(calls).toBe(2);
+    expect(await hasImage(h)).toBe(true);
+    expect($('#notices').hidden).toBe(true);
+  });
+});
+
+describe('uploaded logo files', () => {
+  it('keeps the file picked last when an earlier read finishes after it', async () => {
+    const reads = new Map<string, ReturnType<typeof deferred<Uint8Array>>>();
+    const h = mount({
+      readFile: (file) => {
+        const d = deferred<Uint8Array>();
+        reads.set(file.name, d);
+        return d.promise;
+      },
+    });
+    await h.app.settled();
+    choose('file');
+    await h.app.settled();
+    pick(new File(['not an image'], 'old.txt'));
+    pick(new File([logo], 'new.png', { type: 'image/png' }));
+    reads.get('new.png')?.resolve(logo);
+    await tick();
+    await h.app.settled();
+    reads.get('old.txt')?.resolve(new TextEncoder().encode('not an image'));
+    await tick();
+    await h.app.settled();
+    expect($('#notices').hidden).toBe(true);
+    expect(await hasImage(h)).toBe(true);
+  });
+
+  it('drops the previous file when the next one cannot be read', async () => {
+    let calls = 0;
+    const h = mount({ readFile: async (file) => (++calls === 1 ? new Uint8Array(await file.arrayBuffer()) : Promise.reject(new Error('unreadable'))) });
+    await h.app.settled();
+    choose('file');
+    await h.app.settled();
+    pick(new File([logo], 'a.png', { type: 'image/png' }));
+    await tick();
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(true);
+    pick(new File(['x'], 'b.png', { type: 'image/png' }));
+    await tick();
+    expect($('#status').textContent).toBe('No se pudo leer el archivo del logo.');
+    type('#notes', 'Otra aclaración');
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(false);
+  });
+});
+
+describe('builds that finish late', () => {
+  it('drops an older build that lands after a newer one', async () => {
+    const sample = deferred<Uint8Array | null>();
+    const h = mount({ loadSampleLogo: () => sample.promise });
+    // The first build waits on the sample logo; the second has no logo and lands first.
+    choose('none');
+    await new Promise((r) => setTimeout(r, 10));
+    await h.app.settled();
+    expect($('#download').getAttribute('href')).toBe('blob:test/1');
+    sample.resolve(logo);
+    await tick();
+    await h.app.settled();
+    expect(h.created()).toBe(1);
+    expect($('#download').getAttribute('href')).toBe('blob:test/1');
+    expect($('#status').textContent).toMatch(/^Listo:/u);
+    expect(await hasImage(h)).toBe(false);
+  });
+
+  it('drops a build in flight when destroyed, and builds nothing after', async () => {
+    const sample = deferred<Uint8Array | null>();
+    const h = mount({ loadSampleLogo: () => sample.promise });
+    h.app.destroy();
+    sample.resolve(logo);
+    await tick();
+    $<HTMLButtonElement>('[data-sample="simple"]').click();
+    await tick();
+    expect(h.created()).toBe(0);
+    expect($('#download').hasAttribute('href')).toBe(false);
   });
 });

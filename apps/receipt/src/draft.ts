@@ -1,7 +1,7 @@
 // The form as plain strings (a Draft), and the step that turns it into the library's
 // ReceiptData. Kept free of the DOM so it can be tested as a pure function.
 
-import type { ReceiptData, ReceiptItem } from '../../../pdf-receipt/src/index.ts';
+import { lineTotalCents, MAX_CENTS, type ReceiptData, type ReceiptItem } from '../../../pdf-receipt/src/index.ts';
 import { parseMoney, parseQuantity } from './fields.ts';
 
 export interface DraftItem {
@@ -86,6 +86,12 @@ export function toReceipt(draft: Draft, rowIds: readonly number[]): DraftResult 
     if (!price.ok) errors.push({ field: FIELD.itemUnitPrice(row), message: price.message });
     else if (price.value === null) errors.push({ field: FIELD.itemUnitPrice(row), message: 'Falta el precio.' });
     if (quantity.ok && price.ok && price.value !== null) {
+      // Each value can be within its own limit while their product is not; the library would
+      // report that on the row as a whole, so it is caught here and put on the price.
+      if (lineTotalCents(quantity.value, price.value) > MAX_CENTS) {
+        errors.push({ field: FIELD.itemUnitPrice(row), message: 'El subtotal (cantidad por precio) es demasiado grande.' });
+        return;
+      }
       items.push({ name: item.name, detail: item.detail, quantity: quantity.value, unitPriceCents: price.value });
       rows.push({ id: row, position: i + 1 });
     }

@@ -18,7 +18,7 @@ import {
 } from '../../../pdf-receipt/src/index.ts';
 import { FIELD, toReceipt, type Draft, type DraftItem, type FieldError } from './draft.ts';
 import { parseMoney, parseQuantity } from './fields.ts';
-import { inputErrorText, warningText, type Located } from './messages.ts';
+import { inputErrorText, SAMPLE_LOGO_MISSING, warningText, type Located } from './messages.ts';
 import { EMPTY_ITEM, hostileOrder, longOrder, simpleOrder } from './samples.ts';
 
 export interface AppDeps {
@@ -57,8 +57,8 @@ export function fileNameFor(number: string): string {
     .replace(/\p{M}/gu, '')
     .replace(/[^A-Za-z0-9-]+/gu, '-')
     .replace(/-{2,}/gu, '-')
-    .replace(/^-|-$/gu, '')
-    .slice(0, 60);
+    .slice(0, 60)
+    .replace(/^-|-$/gu, '');
   return slug ? `remito-${slug}.pdf` : 'remito.pdf';
 }
 
@@ -83,6 +83,8 @@ export function mountApp(doc: Document, deps: AppDeps): App {
   let running: Promise<void> = Promise.resolve();
   let sampleLogo: Promise<Uint8Array | null> | null = null;
   let uploadedLogo: Uint8Array | null = null;
+  /** Bumped on each pick of a logo file, so a slower read of an earlier file is dropped. */
+  let logoRead = 0;
   let destroyed = false;
   /** What the live region last said, as a state key: 'ready:<pages>' or the error text. */
   let announced: string | null = null;
@@ -257,6 +259,10 @@ export function mountApp(doc: Document, deps: AppDeps): App {
       a.setAttribute('aria-disabled', 'true');
     }
     for (const p of pending) p.hidden = false;
+    // The frame's PDF viewer has its own save button, so it must not keep the old order either.
+    preview.removeAttribute('src');
+    if (currentUrl) deps.revokeUrl(currentUrl);
+    currentUrl = null;
   };
 
   /** A notice's target, or the logo choice in use when the file input is hidden. */
@@ -289,9 +295,21 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     notices.hidden = items.length === 0;
   };
 
+  const logoChoice = (): string | undefined => form.querySelector<HTMLInputElement>('input[name="logo"]:checked')?.value;
+
   const logoBytes = async (): Promise<Uint8Array | null> => {
-    const choice = form.querySelector<HTMLInputElement>('input[name="logo"]:checked')?.value;
-    if (choice === 'sample') return (sampleLogo ??= deps.loadSampleLogo().catch(() => null));
+    const choice = logoChoice();
+    if (choice === 'sample') {
+      // Only a fetch that worked is kept: after a failure the next build asks again.
+      sampleLogo ??= deps
+        .loadSampleLogo()
+        .catch(() => null)
+        .then((bytes) => {
+          if (bytes === null) sampleLogo = null;
+          return bytes;
+        });
+      return sampleLogo;
+    }
     if (choice === 'file') return uploadedLogo;
     return null;
   };
@@ -321,8 +339,10 @@ export function mountApp(doc: Document, deps: AppDeps): App {
       if (focusOnError) doc.getElementById(result.errors[0]?.field ?? '')?.focus();
       return;
     }
+    const usesSample = logoChoice() === 'sample';
     const logo = await logoBytes();
     if (seq !== sequence) return;
+    const sampleMissing = usesSample && logo === null;
     let built;
     try {
       built = await buildReceipt(result.data, { logo });
@@ -350,7 +370,8 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     preview.src = url;
     if (currentUrl) deps.revokeUrl(currentUrl);
     currentUrl = url;
-    showNotices(built.warnings.map((w) => warningText(w, result.rows)));
+    const located = built.warnings.map((w) => warningText(w, result.rows));
+    showNotices(sampleMissing ? [SAMPLE_LOGO_MISSING, ...located] : located);
     const pages = built.pageCount === 1 ? '1 página' : `${built.pageCount} páginas`;
     const ready = `Listo: ${name}, ${pages}, ${AR_DECIMAL.format(built.bytes.length / 1000)} kB.`;
     status.textContent = ready;
@@ -361,6 +382,9 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     if (destroyed) return Promise.resolve();
     if (timer) clearTimeout(timer);
     timer = null;
+    // A sample button fills the form and builds at once: the old order's link goes first.
+    clearLinks();
+    status.textContent = 'Actualizando el PDF…';
     const seq = ++sequence;
     running = build(seq, focusOnError);
     return running;
@@ -392,12 +416,19 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     const file = logoFile.files?.[0];
     if (!file) return;
     clearLinks();
+    const read = ++logoRead;
     deps.readFile(file).then(
       (bytes) => {
+        if (destroyed || read !== logoRead) return;
         uploadedLogo = bytes;
         schedule();
       },
-      () => fail('No se pudo leer el archivo del logo.'),
+      () => {
+        if (destroyed || read !== logoRead) return;
+        // The input now shows the file that failed, so the previous file's bytes must not print.
+        uploadedLogo = null;
+        fail('No se pudo leer el archivo del logo.');
+      },
     );
   });
   form.addEventListener('submit', (e) => {
