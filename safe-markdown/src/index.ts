@@ -84,13 +84,16 @@ function resolve(options: MarkdownOptions): Resolved {
   }
   const norm = (h: string) => h.trim().toLowerCase().replace(/^www\./, '');
   const external = options.externalHosts ?? '*';
-  const internal = options.internalHosts.map(norm);
+  // An empty entry (a trailing comma in a comma-split list) would make the bare-host pattern
+  // match any "/" after a space, so blank entries are dropped.
+  const hostList = (list: readonly string[]) => list.map(norm).filter((h) => h !== '');
+  const internal = hostList(options.internalHosts);
   return {
     internal,
     bareHost: internal.length
       ? new RegExp(`(^|[^\\w./@-])((?:www\\.)?(?:${internal.map(escapeRegex).join('|')})/(?:(?!&(?:quot|#39|lt|gt);)[^\\s()\\u0000])*)`, 'gi')
       : null,
-    external: external === '*' ? '*' : external.map(norm),
+    external: external === '*' ? '*' : hostList(external),
     mailto: options.mailto ?? true,
     prefix,
     max,

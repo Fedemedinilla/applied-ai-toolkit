@@ -72,6 +72,13 @@ describe('inline', () => {
     );
   });
 
+  it('an empty or blank internal host entry is ignored, so a path in prose stays text', () => {
+    for (const internalHosts of [[''], ['  '], ['shop.example', '']]) {
+      expect(renderInline('see /etc/passwd and 1 /2', { internalHosts })).toBe('see /etc/passwd and 1 /2');
+    }
+    expect(renderInline('shop.example/a', { internalHosts: ['shop.example', ''] })).toBe('<a href="https://shop.example/a">shop.example/a</a>');
+  });
+
   it('quotes around a bare URL stay outside it', () => {
     expect(renderInline('"https://shop.example/a"', opts)).toBe('&quot;<a href="https://shop.example/a">https://shop.example/a</a>&quot;');
   });
