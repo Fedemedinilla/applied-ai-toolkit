@@ -33,6 +33,8 @@ describe('the audit areas', () => {
     expect(unitsOf('slop-lint/action.yml')).toEqual(['slop-lint', 'ci-workflows-actions']);
     expect(unitsOf('package.json')).toEqual(['packaging-release', 'dependencies']);
     expect(unitsOf('test/packaging/pack-check.ts')).toEqual(['packaging-release']);
+    expect(unitsOf('.github/dependabot.yml')).toEqual(['ci-workflows-actions', 'dependencies']);
+    expect(unitsOf('test/maintenance/dependabot.test.ts')).toEqual(['dependencies']);
     expect(unitsOf('README.md')).toEqual(['root-docs-truth']);
     expect(unitsOf('.claude/workflows/audit-diff.js')).toEqual(['repo-tooling']);
     expect(unitsOf('nowhere.txt')).toEqual([]);
