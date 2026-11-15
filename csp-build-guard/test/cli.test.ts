@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -62,5 +62,22 @@ describe('cli', () => {
     expect(code).toBe(1);
     expect(stdout).toMatch(/^FAIL inline-hashes /m);
     expect(stdout).toMatch(/^PASS policy /m);
+  });
+
+  it('reads a config, a vercel.json and a _headers file saved with a byte order mark', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'csp-guard-'));
+    const BOM = '\uFEFF';
+    for (const name of ['pass', 'netlify']) {
+      cpSync(join(FOLDER, 'fixtures', name), join(tmp, name), { recursive: true });
+      const config = join(tmp, name, 'csp-guard.config.json');
+      writeFileSync(config, BOM + readFileSync(config, 'utf8'));
+      const rules = name === 'pass' ? join(tmp, name, 'vercel.json') : join(tmp, name, 'site', '_headers');
+      writeFileSync(rules, BOM + readFileSync(rules, 'utf8'));
+      const plain = cli(fixture(name));
+      const bom = cli(['--dir', join(tmp, name, 'site'), '--config', config]);
+      expect(bom.stderr).toBe('');
+      expect(bom.code).toBe(plain.code);
+      expect(bom.stdout.split('\n').slice(1)).toEqual(plain.stdout.split('\n').slice(1));
+    }
   });
 });

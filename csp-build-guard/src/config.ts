@@ -119,6 +119,12 @@ export function parseConfig(value: unknown, configDir: string): GuardConfig {
   return { ...parsed.data, configDir };
 }
 
+/**
+ * Reads a text file as UTF-8 without a leading byte order mark. Windows editors write one, and
+ * JSON.parse rejects it as an unexpected token.
+ */
+export const readTextFile = (path: string): string => readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
+
 export class ConfigError extends Error {
   override name = 'ConfigError';
 }
@@ -128,7 +134,7 @@ export async function loadConfig(path: string): Promise<GuardConfig> {
   const absolute = resolve(path);
   let value: unknown;
   try {
-    if (absolute.endsWith('.json')) value = JSON.parse(readFileSync(absolute, 'utf8'));
+    if (absolute.endsWith('.json')) value = JSON.parse(readTextFile(absolute));
     else value = ((await import(pathToFileURL(absolute).href)) as { default?: unknown }).default;
   } catch (error) {
     throw new ConfigError(`cannot load config ${path}: ${(error as Error).message}`);

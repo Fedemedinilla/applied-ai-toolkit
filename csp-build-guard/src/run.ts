@@ -7,7 +7,7 @@ import { checkJsBudget } from './checks/js-budget.ts';
 import { checkLookbehind } from './checks/lookbehind.ts';
 import { checkPolicy } from './checks/policy.ts';
 import { checkSecrets } from './checks/secrets.ts';
-import { ConfigError, type GuardConfig } from './config.ts';
+import { ConfigError, type GuardConfig, readTextFile } from './config.ts';
 import { parseCsp, parseSerializedCsp } from './csp.ts';
 import { parsePage } from './html.ts';
 import { buildOutputRules, type HeaderRule, headerValues, netlifyHeadersRules, vercelJsonRules } from './routes.ts';
@@ -23,7 +23,7 @@ function readRules(config: GuardConfig, site: Site): HeaderRule[] | null {
   else file = csp.file === undefined ? join(site.staticRoot, '_headers') : resolve(config.configDir, csp.file);
   if (!existsSync(file)) throw new ConfigError(`csp source ${csp.from}: ${file} does not exist`);
   const label = relative(process.cwd(), file) || file;
-  const text = readFileSync(file, 'utf8');
+  const text = readTextFile(file);
   try {
     if (csp.from === 'netlify-headers') return netlifyHeadersRules(text, label);
     const json: unknown = JSON.parse(text);
