@@ -124,6 +124,13 @@ function blockUnder(all: readonly Line[], at: number): Line[] {
   return out;
 }
 
+/** The entries of the block under line `at`: the lines at the indentation of its first one. */
+function entriesUnder(all: readonly Line[], at: number): Line[] {
+  const block = blockUnder(all, at);
+  const indent = block[0]?.indent;
+  return block.filter((line) => line.indent === indent);
+}
+
 /** Every line of the step that holds line `at`, from its dash to the next item at its level. */
 function stepOf(all: readonly Line[], at: number): Line[] {
   let start = at;
@@ -217,10 +224,13 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
     }
 
     if (/^\s*env\s*:\s*$/.test(code)) {
-      for (const entry of blockUnder(all, i)) {
-        const pair = /^\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/.exec(entry.code);
-        if (pair?.[1] === undefined || pair[2] === undefined) continue;
-        if (CREDENTIAL_NAME.test(pair[1]) && !policy.placeholder.test(unquote(pair[2]))) add(entry, 'credential-value');
+      // Each entry, the name quoted or not. An entry the check cannot read is a finding, so it
+      // fails closed as the permissions check does; the lines of a multi-line value are skipped.
+      for (const entry of entriesUnder(all, i)) {
+        const pair = KEY_VALUE.exec(entry.code);
+        const [name, value] = [pair?.[2], pair?.[3]];
+        if (name === undefined || value === undefined) add(entry, 'credential-value');
+        else if (CREDENTIAL_NAME.test(name) && !policy.placeholder.test(unquote(value))) add(entry, 'credential-value');
       }
     }
   });

@@ -100,6 +100,15 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('NODE_ENV: test', 'NODE_ENV: production'))).toEqual([]);
   });
 
+  it('reads a quoted or dashed variable name, and reports an env entry it cannot read', () => {
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', '"APP_API_KEY": sk-live-0000'))).toEqual(['10:credential-value']);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', "'APP_API_KEY': ci-placeholder-app-0001"))).toEqual([]);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', 'MY-TOKEN: sk-live-0000'))).toEqual(['10:credential-value']);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', '- APP_API_KEY=sk-live-0000'))).toEqual(['10:credential-value']);
+    // A multi-line value belongs to its entry and is not read as entries of its own.
+    expect(rules(CLEAN.replace('NODE_ENV: test', 'NOTES: |\n        API_KEY: some text'))).toEqual([]);
+  });
+
   it('accepts a quoted placeholder', () => {
     expect(rules(CLEAN.replace('ci-placeholder-app-0001', "'ci-placeholder-app-0001'"))).toEqual([]);
   });
