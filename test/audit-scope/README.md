@@ -31,4 +31,4 @@ Imports are read with the extractor of import-fences, from its public entry, so 
 
 ## Output
 
-The JSON has `root` (the absolute path of the checkout), `base`, `mergeBase`, `head`, `branch`, `dirty`, `files`, `units` (each with `id`, `kind`, `reason` changed or dependent, `files`, `paths` and `context`), `dependents` (each with the imports in `because`) and `unmapped`.
+The JSON has `version` (currently 1; the audit-diff workflow refuses any other value), `root` (the absolute path of the checkout), `base`, `mergeBase`, `head`, `branch`, `dirty`, `files`, `units` (each with `id`, `kind`, `reason` changed or dependent, `files`, `paths` and `context`), `dependents` (each with the imports in `because`) and `unmapped`.
