@@ -1,0 +1,589 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "email",
+  "lang": "en",
+  "items": [
+    {
+      "id": "email-en-01",
+      "kind": "human",
+      "text": "Subject: March stock dashboard · Thursday call\n\nHi Dana,\n\nHere is the March stock dashboard with all 14 branches. The Brumal Park load is on hold until Monday because two sheets are missing.\nDoes Thursday at 10 work for a look?\n\nBest,\nSam",
+      "sentences": [
+        {
+          "text": "Subject: March stock dashboard · Thursday call",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hi Dana,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Here is the March stock dashboard with all 14 branches.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "The Brumal Park load is on hold until Monday because two sheets are missing.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Does Thursday at 10 work for a look?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Sam",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-02",
+      "kind": "human",
+      "text": "Hi Mark,\n\nAttached is invoice 0003 for the October site maintenance. If it needs to go to a different company name, tell me and I will reissue it today.\n\nThanks,\nJulia",
+      "sentences": [
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Attached is invoice 0003 for the October site maintenance.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If it needs to go to a different company name, tell me and I will reissue it today.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Thanks,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-03",
+      "kind": "human",
+      "text": "Subject: Slow load on the Velmora store · measured 2 October\n\nHi Ines,\n\nI am Tom Farran and I build WordPress sites for local shops. On 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product.\nMost of the weight is three cover photos of 2 MB each and a chat plugin that loads even when nobody opens it. With the photos compressed and the chat loaded on click, similar stores I worked on went to under half that time, though yours would need its own measurement.\nI did not touch anything on the site; I only looked at what any visitor sees. If it helps, I can send the two-page note with what I found and what I would do first.\nIf this is not yours to decide, tell me who handles it and I will not write again.\n\nBest,\nTom Farran",
+      "sentences": [
+        {
+          "text": "Subject: Slow load on the Velmora store · measured 2 October",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I am Tom Farran and I build WordPress sites for local shops.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "On 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Most of the weight is three cover photos of 2 MB each and a chat plugin that loads even when nobody opens it.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "With the photos compressed and the chat loaded on click, similar stores I worked on went to under half that time, though yours would need its own measurement.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I did not touch anything on the site; I only looked at what any visitor sees.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If it helps, I can send the two-page note with what I found and what I would do first.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If this is not yours to decide, tell me who handles it and I will not write again.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom Farran",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-04",
+      "kind": "human",
+      "text": "Hi Carla,\n\nThanks for the sales sheets from April to September. I checked them against the till system and found two things worth sorting out before Tuesday.\nFirst, June has 312 receipts that are in the till and not in the sheet, nearly all from the Quillen Street shop. It looks like one day that was never exported, the 14th, but Hernan, who does the closing, has to confirm it.\nSecond, the pensioner discount is sometimes entered as a percentage and sometimes as a fixed amount. That is why the July margin shows 3 points lower than it is.\nI put both cases in a separate sheet, marked in yellow, so the original stays as it was. If we settle that on Tuesday, the dashboard can go out with the whole half year.\n\nCheers,\nNick",
+      "sentences": [
+        {
+          "text": "Hi Carla,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Thanks for the sales sheets from April to September.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I checked them against the till system and found two things worth sorting out before Tuesday.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "First, June has 312 receipts that are in the till and not in the sheet, nearly all from the Quillen Street shop.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "It looks like one day that was never exported, the 14th, but Hernan, who does the closing, has to confirm it.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Second, the pensioner discount is sometimes entered as a percentage and sometimes as a fixed amount.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "That is why the July margin shows 3 points lower than it is.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I put both cases in a separate sheet, marked in yellow, so the original stays as it was.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If we settle that on Tuesday, the dashboard can go out with the whole half year.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Cheers,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Nick",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-05",
+      "kind": "human",
+      "text": "Subject: Quote for the Copo North site\n\nDear Ms Paredes,\n\nHere is the quote you asked for on 3 October for the Copo North site. There are two options: five pages and a form for 480 dollars, or the same with a shop for 950.\nBoth include a month of changes at no cost. I can start on Monday 20 October if you choose one by Friday.\n\nKind regards,\nRodrigo Funes",
+      "sentences": [
+        {
+          "text": "Subject: Quote for the Copo North site",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Dear Ms Paredes,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Here is the quote you asked for on 3 October for the Copo North site.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "There are two options: five pages and a form for 480 dollars, or the same with a shop for 950.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Both include a month of changes at no cost.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I can start on Monday 20 October if you choose one by Friday.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Kind regards,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Rodrigo Funes",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-06",
+      "kind": "human",
+      "text": "Hi Ines,\n\nTo go live on Friday I still need three things:\n- the logo as an SVG\n- the copy for the pricing page\n- the hosting login\nWith those I can publish on Monday morning.\n\nThanks,\nNick",
+      "sentences": [
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "To go live on Friday I still need three things:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- the logo as an SVG",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- the copy for the pricing page",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- the hosting login",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "With those I can publish on Monday morning.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Thanks,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Nick",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-07",
+      "kind": "slop",
+      "text": "Subject: Exciting opportunity\n\nDear Hiring Team,\n\nI am writing to express my keen interest in partnering with your esteemed organization. In today’s fast-paced digital landscape, a robust online presence is crucial.\nIt’s not just about design, it’s about results. With a proven track record of delivering seamless experiences, I am confident I would be a great fit.\n\nThank you for your time and consideration.\n\nBest regards,\nTom",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Subject: Exciting opportunity",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Dear Hiring Team,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I am writing to express my keen interest in partnering with your esteemed organization.",
+          "slop": true,
+          "rules": [
+            "LEX-03",
+            "RET-01"
+          ]
+        },
+        {
+          "text": "In today’s fast-paced digital landscape, a robust online presence is crucial.",
+          "slop": true,
+          "rules": [
+            "EST-04",
+            "LEX-03",
+            "LEX-04"
+          ]
+        },
+        {
+          "text": "It’s not just about design, it’s about results.",
+          "slop": true,
+          "rules": [
+            "EST-01"
+          ]
+        },
+        {
+          "text": "With a proven track record of delivering seamless experiences, I am confident I would be a great fit.",
+          "slop": true,
+          "rules": [
+            "LEX-03",
+            "LEX-04"
+          ]
+        },
+        {
+          "text": "Thank you for your time and consideration.",
+          "slop": true,
+          "rules": [
+            "MAIL-01"
+          ]
+        },
+        {
+          "text": "Best regards,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-08",
+      "kind": "slop",
+      "text": "Hi Laura,\n\nI hope this email finds you well. I wanted to reach out because I am passionate about data.\nAfter reviewing your website, I noticed the home page is slow to load. I measured it with PageSpeed on 2 October and it took 6.1 seconds on a phone.\nWould the full note be useful?\n\nBest,\nAna",
+      "sentences": [
+        {
+          "text": "Hi Laura,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I hope this email finds you well.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "I wanted to reach out because I am passionate about data.",
+          "slop": true,
+          "rules": [
+            "LEX-03"
+          ]
+        },
+        {
+          "text": "After reviewing your website, I noticed the home page is slow to load.",
+          "slop": true,
+          "rules": [
+            "EST-09"
+          ]
+        },
+        {
+          "text": "I measured it with PageSpeed on 2 October and it took 6.1 seconds on a phone.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Would the full note be useful?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Ana",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-09",
+      "kind": "slop",
+      "text": "Hi Ondara team,\n\nTo be honest, I think my profile aligns with your needs. I rebuilt the stock reports for a chain of 14 shops in 2024.\nAdditionally, I showcase meticulous attention to detail. In conclusion, I would love to talk on monday.\n\nBest,\nLucy",
+      "sentences": [
+        {
+          "text": "Hi Ondara team,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "To be honest, I think my profile aligns with your needs.",
+          "slop": true,
+          "rules": [
+            "LEX-06",
+            "LEX-04"
+          ]
+        },
+        {
+          "text": "I rebuilt the stock reports for a chain of 14 shops in 2024.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Additionally, I showcase meticulous attention to detail.",
+          "slop": true,
+          "rules": [
+            "LEX-04"
+          ]
+        },
+        {
+          "text": "In conclusion, I would love to talk on monday.",
+          "slop": true,
+          "rules": [
+            "EST-05",
+            "SIN-EN-06"
+          ]
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Lucy",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-10",
+      "kind": "slop",
+      "text": "Hi Mark,\n\nI help businesses grow their digital presence with a strategic and creative approach. I believe every brand deserves a website that truly reflects its unique identity and values.\nThat is why I would love to learn more about your goals and explore how we could work together. I am sure that together we can achieve great things.\n\nBest,\nJulian",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I help businesses grow their digital presence with a strategic and creative approach.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "I believe every brand deserves a website that truly reflects its unique identity and values.",
+          "slop": true,
+          "rules": [
+            "LEX-05"
+          ]
+        },
+        {
+          "text": "That is why I would love to learn more about your goals and explore how we could work together.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "I am sure that together we can achieve great things.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julian",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-11",
+      "kind": "slop",
+      "text": "Hi [First Name],\n\nI am reaching out from [Company] because your site could load faster. I have built sites with WordPress and Astro since 2021.\nCan I send two examples?\n\nBest,\nPaul",
+      "sentences": [
+        {
+          "text": "Hi [First Name],",
+          "slop": true,
+          "rules": [
+            "FMT-04"
+          ]
+        },
+        {
+          "text": "I am reaching out from [Company] because your site could load faster.",
+          "slop": true,
+          "rules": [
+            "FMT-04"
+          ]
+        },
+        {
+          "text": "I have built sites with WordPress and Astro since 2021.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Can I send two examples?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Paul",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-en-12",
+      "kind": "human",
+      "text": "Hi Paul,\n\nYes, send the two examples. I will look at them with Carla on Wednesday afternoon.\n\nThanks,\nInes",
+      "sentences": [
+        {
+          "text": "Hi Paul,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Yes, send the two examples.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I will look at them with Carla on Wednesday afternoon.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Thanks,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Ines",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}

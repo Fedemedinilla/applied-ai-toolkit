@@ -1,0 +1,266 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "whatsapp",
+  "lang": "es",
+  "items": [
+    {
+      "id": "whatsapp-es-01",
+      "kind": "human",
+      "text": "Hola Caro, te paso el presupuesto actualizado\nBajé la tienda a 950 porque sacamos el blog\nCualquier cosa me decís",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola Caro, te paso el presupuesto actualizado",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Bajé la tienda a 950 porque sacamos el blog",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Cualquier cosa me decís",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-02",
+      "kind": "human",
+      "text": "Listo, ya está online 👍\nFijate si en el celu se ve bien la foto de portada",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Listo, ya está online 👍",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Fijate si en el celu se ve bien la foto de portada",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-03",
+      "kind": "human",
+      "text": "Romina, mañana podés a las 10 o te queda mejor a la tarde?\nEs para ver lo del informe de la semana",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Romina, mañana podés a las 10 o te queda mejor a la tarde?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Es para ver lo del informe de la semana",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-04",
+      "kind": "human",
+      "text": "Hola Inés, te cuento cómo quedó lo de la tienda\nComprimí las tres fotos de portada y ahora pesan 300 KB cada una en vez de 2 MB\nEl chat lo dejé para que cargue recién cuando alguien toca el botón\nMedí de nuevo con el celular y la página de inicio tarda 2,8 segundos, antes eran 6,1\nMañana a la mañana reviso el carrito y te aviso",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola Inés, te cuento cómo quedó lo de la tienda",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Comprimí las tres fotos de portada y ahora pesan 300 KB cada una en vez de 2 MB",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El chat lo dejé para que cargue recién cuando alguien toca el botón",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Medí de nuevo con el celular y la página de inicio tarda 2,8 segundos, antes eran 6,1",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Mañana a la mañana reviso el carrito y te aviso",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-05",
+      "kind": "human",
+      "text": "Perfecto, gracias. El jueves te mando la factura.",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Perfecto, gracias.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El jueves te mando la factura.",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-06",
+      "kind": "slop",
+      "text": "Te paso lo que incluye la propuesta\n✅ Diseño responsive\n✅ Optimización SEO\n✅ Soporte 24/7",
+      "sentences": [
+        {
+          "text": "Te paso lo que incluye la propuesta",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "✅ Diseño responsive",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        },
+        {
+          "text": "✅ Optimización SEO",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        },
+        {
+          "text": "✅ Soporte 24/7",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-07",
+      "kind": "slop",
+      "text": "Estimado Martín:\nPor medio de la presente le envío la **propuesta comercial** para su consideración.\nSaludos cordiales,\nJulia",
+      "sentences": [
+        {
+          "text": "Estimado Martín:",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Por medio de la presente le envío la **propuesta comercial** para su consideración.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Saludos cordiales,",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-08",
+      "kind": "slop",
+      "text": "¡Hola! 😊 Espero que estés teniendo un excelente día.\nQuería comentarte que me apasiona ayudar a negocios como el tuyo a crecer. Si tienes un momento, puedes revisar la propuesta que te envié.\nAvisame qué te parece",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "¡Hola! 😊 Espero que estés teniendo un excelente día.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Quería comentarte que me apasiona ayudar a negocios como el tuyo a crecer.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Si tienes un momento, puedes revisar la propuesta que te envié.",
+          "slop": true,
+          "rules": [
+            "REG-01"
+          ]
+        },
+        {
+          "text": "Avisame qué te parece",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-09",
+      "kind": "slop",
+      "text": "Es importante destacar que tu sitio tarda en cargar. Lo medí hoy: 6,1 segundos en el celu.\nEn resumen, optimizarlo es fundamental para potenciar tus ventas.",
+      "sentences": [
+        {
+          "text": "Es importante destacar que tu sitio tarda en cargar.",
+          "slop": true,
+          "rules": [
+            "EST-04"
+          ]
+        },
+        {
+          "text": "Lo medí hoy: 6,1 segundos en el celu.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "En resumen, optimizarlo es fundamental para potenciar tus ventas.",
+          "slop": true,
+          "rules": [
+            "EST-05",
+            "LEX-02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-es-10",
+      "kind": "human",
+      "text": "Te paso lo que falta\n- el logo en SVG\n- los textos de precios\nCon eso lo subo el lunes",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Te paso lo que falta",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- el logo en SVG",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- los textos de precios",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Con eso lo subo el lunes",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,255 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "whatsapp",
+  "lang": "en",
+  "items": [
+    {
+      "id": "whatsapp-en-01",
+      "kind": "human",
+      "text": "Hey Caro, here is the updated quote\nDropped the shop to 950 since we cut the blog\nLet me know",
+      "sentences": [
+        {
+          "text": "Hey Caro, here is the updated quote",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Dropped the shop to 950 since we cut the blog",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Let me know",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-02",
+      "kind": "human",
+      "text": "Done, it is live 👍\nCan you check the cover photo on your phone",
+      "sentences": [
+        {
+          "text": "Done, it is live 👍",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Can you check the cover photo on your phone",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-03",
+      "kind": "human",
+      "text": "Romina, does 10 tomorrow work or is the afternoon better\nIt is about this week’s report",
+      "sentences": [
+        {
+          "text": "Romina, does 10 tomorrow work or is the afternoon better",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "It is about this week’s report",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-04",
+      "kind": "human",
+      "text": "Hi Ines, quick update on the store\nI compressed the three cover photos and they are 300 KB each now instead of 2 MB\nThe chat only loads when someone taps the button\nMeasured again on my phone and the home page takes 2.8 seconds, it was 6.1\nI will check the cart tomorrow morning and let you know\nNo rush on your side",
+      "sentences": [
+        {
+          "text": "Hi Ines, quick update on the store",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I compressed the three cover photos and they are 300 KB each now instead of 2 MB",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "The chat only loads when someone taps the button",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Measured again on my phone and the home page takes 2.8 seconds, it was 6.1",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I will check the cart tomorrow morning and let you know",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "No rush on your side",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-05",
+      "kind": "human",
+      "text": "Perfect, thanks. I will send the invoice on Thursday.",
+      "sentences": [
+        {
+          "text": "Perfect, thanks.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I will send the invoice on Thursday.",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-06",
+      "kind": "slop",
+      "text": "Here is what the package includes\n🚀 Responsive design\n🚀 SEO optimization\n🚀 24/7 support",
+      "sentences": [
+        {
+          "text": "Here is what the package includes",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "🚀 Responsive design",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        },
+        {
+          "text": "🚀 SEO optimization",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        },
+        {
+          "text": "🚀 24/7 support",
+          "slop": true,
+          "rules": [
+            "WA-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-07",
+      "kind": "slop",
+      "text": "Dear Mark,\nPlease find attached the **commercial proposal** for your consideration.\nKind regards,\nJulia",
+      "sentences": [
+        {
+          "text": "Dear Mark,",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Please find attached the **commercial proposal** for your consideration.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Kind regards,",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-08",
+      "kind": "slop",
+      "text": "Hi there! 😊 I hope you are having an amazing day!\nI am passionate about helping businesses like yours unlock their full potential.\nLet me know what you think",
+      "sentences": [
+        {
+          "text": "Hi there! 😊 I hope you are having an amazing day!",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "I am passionate about helping businesses like yours unlock their full potential.",
+          "slop": true,
+          "rules": [
+            "LEX-03"
+          ]
+        },
+        {
+          "text": "Let me know what you think",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-09",
+      "kind": "slop",
+      "text": "It’s worth noting that your site is slow to load. I measured it today: 6.1 seconds on a phone.\nIn summary, optimizing it is crucial to boost your sales.",
+      "sentences": [
+        {
+          "text": "It’s worth noting that your site is slow to load.",
+          "slop": true,
+          "rules": [
+            "EST-04"
+          ]
+        },
+        {
+          "text": "I measured it today: 6.1 seconds on a phone.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "In summary, optimizing it is crucial to boost your sales.",
+          "slop": true,
+          "rules": [
+            "EST-05",
+            "LEX-04"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whatsapp-en-10",
+      "kind": "human",
+      "text": "Here is what is missing\n- the logo as an SVG\n- the pricing copy\nWith those I can upload it Monday",
+      "sentences": [
+        {
+          "text": "Here is what is missing",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- the logo as an SVG",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- the pricing copy",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "With those I can upload it Monday",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}

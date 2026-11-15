@@ -17,6 +17,8 @@ const rel = (path: string) => relative(REPO, path);
 const CASES = files('prose-rewriter/evals', /\.(md|json|txt)$/);
 const CVS = CASES.filter((f) => rel(f).startsWith('prose-rewriter/evals/cases/cv/'));
 const STYLE_DATA = files('style-refs', /\.json$/);
+// slop-lint's labelled set by genre, read by slop-lint/scripts/genre-eval.ts.
+const LABELED = ['email', 'follow-up', 'whatsapp'].flatMap((genre) => files(`slop-lint/fixtures/${genre}`, /\.json$/));
 
 describe('the fixtures carry no real data', () => {
   it('has a fictional CV in Spanish and one in English', () => {
@@ -32,6 +34,14 @@ describe('the fixtures carry no real data', () => {
     // sources.json links to the works it cites, so real hosts are allowed there.
     const found = STYLE_DATA.flatMap((f) => checkFictional(rel(f), read(f), { realHosts: true }));
     expect(found).toEqual([]);
+  });
+
+  it("keeps slop-lint's labelled set under the same rules, each file marked as fiction", () => {
+    expect(LABELED.length).toBe(6);
+    const found = LABELED.flatMap((f) => checkFictional(rel(f), read(f)));
+    expect(found).toEqual([]);
+    // JSON has no comments, so the marker is the "fictional" field the evaluator also checks.
+    for (const f of LABELED) expect(String((JSON.parse(read(f)) as { fictional?: unknown }).fictional), rel(f)).toMatch(/^Fictional/);
   });
 
   // Witnesses: if the checks stopped seeing real data, the tests above would pass for the wrong reason.

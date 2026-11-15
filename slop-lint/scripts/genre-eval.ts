@@ -21,7 +21,11 @@ export interface LabeledSentence {
   text: string;
   /** The hand label: would a careful reader call this sentence generated? */
   slop: boolean;
-  /** The rules that should report it. Empty for a human sentence, or for slop no rule covers yet. */
+  /**
+   * The rules that should report it. Empty for a human sentence, or for slop no rule covers yet.
+   * Where two rules match the same words, lint() charges them once (dropCovered in lint.ts), so the
+   * label names the rule that is charged: LEX-03 for "passionate about", not ESP-04 as well.
+   */
   rules: string[];
 }
 
@@ -33,7 +37,7 @@ export interface LabeledItem {
   variety?: Variety;
   /** The earlier message of a follow-up, for SEG-03. */
   previous?: string;
-  /** Whole-text rules (DOCUMENT_SCOPE_IDS) that should report the text. */
+  /** Whole-text rules (DOCUMENT_SCOPE_IDS) that should report the text: ESP-02 when the text as a whole gives too few concrete facts. */
   textRules?: string[];
   /** Every sentence of the text, in order; together they cover all of it but whitespace. */
   sentences: LabeledSentence[];
@@ -402,11 +406,13 @@ export function toMarkdown(r: EvalResult): string {
     '',
     'The texts are fictional and were written for this set, with every sentence labelled by hand. The numbers describe this set only. They are a first reading for choosing the false-positive threshold that takes a profile out of experimental (design decision D3); the profiles and thresholds are unchanged.',
     '',
+    'The same hand wrote the texts and knows the catalog, so the slop texts lean on phrases the rules list and the recall here is likely higher than on drafts from a model. A review of a sample by Federico (D3) is still pending.',
+    '',
     '## How to read it',
     '',
     '- A finding counts for the sentence it starts in. ESP-02, EST-11 and OFI-01 judge the whole text, so they count per text against the labels in `textRules`.',
-    '- Per rule: a true positive is a unit (sentence or text) the rule reports and whose label names it; a false positive, one it reports and whose label does not; a false negative, one whose label names it and that it does not report. The false-positive rate divides the false positives by the units whose label does not name the rule.',
-    '- Per level: precision is the share of reported sentences labelled slop; recall, the share of slop sentences that name a rule of that level and are reported at it; the false-positive rate, the share of human sentences reported at it.',
+    '- Per rule, the unit is a sentence, or a text for the three rules above. A true positive is a unit the rule reports and whose label names it. A false positive is one it reports and whose label does not name it. A false negative is one whose label names the rule and that the rule does not report. The false-positive rate divides the false positives by the units whose label does not name the rule.',
+    '- Per level, precision is the share of reported sentences labelled slop. Recall is the share of slop sentences that name a rule of that level and are reported at it. The false-positive rate is the share of human sentences reported at it.',
     '- A ratio reads as value (count/denominator); n/a means the denominator is 0.',
     '',
     '## The set',
@@ -454,14 +460,14 @@ export function toMarkdown(r: EvalResult): string {
     '',
     '## guessGenre',
     '',
-    `${r.guessCases} texts: the labelled set and ${r.extraGuessCases} fictional cover letters from \`slop-lint/fixtures/cover-letters/\`. Rows are the true genre, columns the guess at the current cuts (${GUESS_CUTS.shortWords} and ${GUESS_CUTS.mailWords} words); each cell reads all guesses (high-confidence ones).`,
+    `${r.guessCases} texts, the labelled set and ${r.extraGuessCases} fictional cover letters from \`slop-lint/fixtures/cover-letters/\`. Rows are the true genre, columns the guess at the current cuts (${GUESS_CUTS.shortWords} and ${GUESS_CUTS.mailWords} words); each cell gives every guess, and in parentheses the high-confidence ones.`,
     '',
     ...table(
       ['true \\ guessed', ...GENRES],
       GENRES.map((t) => [t, ...GENRES.map((g) => `${r.confusion[t][g].all} (${r.confusion[t][g].high})`)]),
     ),
     '',
-    '"sure" counts a right guess with high confidence: with `--genre auto` a low guess falls back to cover-letter, so a right but low guess is lost. The short cut decides when a text can be a chat; the mail cut decides when a greeting and a sign-off make a mail, and when a follow-up with no subject line is still a sure one.',
+    '"sure" counts a right guess with high confidence. With `--genre auto` a low guess falls back to cover-letter, so a right but low guess is lost. The short cut decides when a text can be a chat. The mail cut decides when a greeting and a sign-off make a mail, and when a follow-up without a subject line is still a sure guess.',
     '',
     ...table(
       ['short cut', 'mail cut', 'accuracy', 'sure', ...GENRES.map((g) => `sure ${g}`)],
