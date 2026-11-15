@@ -83,6 +83,31 @@ describe('.github/dependabot.yml', () => {
     }
   });
 
+  it('runs every entry on Monday at 06:00 Buenos Aires time with a 7-day cooldown, as MAINTENANCE.md says', () => {
+    for (const e of all) {
+      expect(e.field('day'), e.ecosystem).toBe('monday');
+      expect(e.field('time'), e.ecosystem).toBe('06:00');
+      expect(e.field('timezone'), e.ecosystem).toBe('America/Argentina/Buenos_Aires');
+      expect(e.text, e.ecosystem).toMatch(/^\s+cooldown:\s*\n\s+default-days:\s*7\s*$/m);
+    }
+  });
+
+  // The table in MAINTENANCE.md, "What Dependabot opens".
+  it.each([
+    ['npm', '/', 'deps', 5],
+    ['npm', '/docs-site', 'deps(docs-site)', 3],
+    ['composer', '/wp-hardening', 'deps(wp-hardening)', 3],
+    ['github-actions', '/', 'ci', 3],
+  ] as const)('gives %s %s the prefix and open-PR limit of the MAINTENANCE.md table', (ecosystem, directory, prefix, limit) => {
+    const entry = all.find((e) => e.ecosystem === ecosystem && e.directories.includes(directory));
+    expect(entry?.field('prefix')).toBe(prefix);
+    expect(Number(entry?.field('open-pull-requests-limit'))).toBe(limit);
+  });
+
+  it('gives dev dependencies of the root npm entry their own prefix', () => {
+    expect(all.find((e) => e.ecosystem === 'npm' && e.directories.includes('/'))?.field('prefix-development')).toBe('deps-dev');
+  });
+
   it('groups minor and patch updates into one PR per entry and leaves majors out of every group', () => {
     for (const e of all) {
       expect(e.text, e.ecosystem).toMatch(/^\s+groups:$/m);
