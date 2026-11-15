@@ -314,6 +314,28 @@ describe('batch', () => {
     expect($<HTMLButtonElement>('#run-batch').disabled).toBe(false);
   });
 
+  it('a new batch clears the previous report, so a cancel or an error shows none', () => {
+    let calls = 0;
+    mount({
+      start(request, onMessage) {
+        calls += 1;
+        if (calls === 1) runBatchJob(request, onMessage);
+        else if (calls === 3) onMessage({ type: 'error', message: 'the worker stopped' });
+        return () => undefined;
+      },
+    });
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect($('#batch-result').children.length).toBeGreaterThan(0);
+    $<HTMLInputElement>('#prefix').value = 'other';
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    click('#cancel-batch');
+    expect(text('#batch-status')).toBe('Cancelled. No report.');
+    expect($('#batch-result').children).toHaveLength(0);
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(text('#batch-status')).toBe('The batch failed: the worker stopped.');
+    expect($('#batch-result').children).toHaveLength(0);
+  });
+
   it('a runner that throws on start is reported and the form is usable again', () => {
     mount({
       start() {

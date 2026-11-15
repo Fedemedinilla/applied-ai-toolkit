@@ -362,6 +362,8 @@ export function mountApp(doc: Document, deps: Deps): App {
     progress.hidden = false;
     progress.max = request.runs;
     progress.value = 0;
+    // The previous report goes, so a cancelled or failed batch never sits above an old hash.
+    result.replaceChildren();
     batchStatus.textContent = `Running ${request.runs.toLocaleString('en-US')} runs in a worker...`;
     let announcedQuarter = 0;
     // A runner may answer before start() returns, so the batch is identified by a token set first,
