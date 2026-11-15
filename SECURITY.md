@@ -35,7 +35,7 @@ Out of scope:
 
 Use GitHub private vulnerability reporting: <https://github.com/Fedemedinilla/applied-ai-toolkit/security/advisories/new>. The report stays private between you and the maintainer until an advisory is published.
 
-The form works only while private vulnerability reporting is enabled in the repository (Settings > Security > Private vulnerability reporting). If the link shows no form, open a public issue that asks for a private contact and says nothing else about the problem: no folder, no description, no proof of concept.
+The form works only while private vulnerability reporting is enabled in the repository (Settings > Security > Private vulnerability reporting). If the link shows no form, open an issue with the "Ask for a private security contact" form (<https://github.com/Fedemedinilla/applied-ai-toolkit/issues/new?template=security_contact.yml>). It is public and asks for nothing about the problem, so name no folder and give no description or proof of concept; the maintainer replies with a private channel.
 
 A useful report says:
 
