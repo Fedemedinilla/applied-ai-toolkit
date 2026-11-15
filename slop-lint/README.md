@@ -221,7 +221,7 @@ A cover letter, an email, a follow-up and a WhatsApp message are judged differen
 - **Messages follow the genre.** Seven catalog messages speak of a letter or a candidate. `src/messages.ts` holds their wording for the other genres, and a cover letter keeps the catalog's text.
 - **The genre is never guessed in silence.** `lint()` takes it as given. `--genre auto` calls `guessGenre()`, which reads the subject line, a reference to an earlier message, greeting and sign-off, length, emoji and lines with no closing period. When it is unsure it says so on stderr and lints the file as a cover letter, since a wrong guess turns rules off without a word.
 - **`--variety rioplatense` or `--variety neutral`** makes REG-01 flag every verb form of the other register, even in a text that uses only that one, with a message that names the variety instead of a mix. Without it REG-01 flags the minority register, as before.
-- **`--previous <file>`** passes the earlier message of a follow-up. No rule reads it yet.
+- **`--previous <file>`** passes the earlier message of a follow-up. SEG-03 reads it, in `follow-up` only.
 - **The score keeps its scale.** The 15 points are the cover-letter rubric's. In the other genres they are an inherited scale, not a rubric anyone has validated for that genre.
 - **SARIF names the genre.** A run with a genre other than `cover-letter` carries `run.properties.genres`, the genre per file uri, and each rule is described with the level and severity the profile gave it.
 
@@ -597,6 +597,7 @@ These rules are not in the catalog of 52, so a cover letter and a caller that pa
 | MAIL-01 | Thanks formula as the only closing | email, follow-up | en | 1 | high | 0 as the last sentence | structural | SÍNTESIS | Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line) |
 | MAIL-02 | "Estimado/a" with a slash | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 3 (slop of generated Spanish) |
 | MAIL-03 | Generic subject line | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 8 (subject: role, name and a fact; not "Oportunidad emocionante") |
+| SEG-03 | Follow-up that copies the earlier message | follow-up | both | 2 | medium | 8 words in a row from the earlier message | structural | SÍNTESIS | Section 11, item 5, and ESP-03 in section 13.1 (no more than 8 words in a row from the job posting); applied to the earlier message |
 
 ## Known false positives
 

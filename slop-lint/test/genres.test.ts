@@ -376,7 +376,7 @@ describe('rules only a genre runs', () => {
   const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
 
   it('run in the genres the design gives them and never in a cover letter', () => {
-    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'] };
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'], 'SEG-03': ['follow-up'] };
     for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
     expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
   });
@@ -451,5 +451,33 @@ describe('MAIL-03, a generic subject', () => {
     const notFirst = `Hola, Laura:\nAsunto: Oportunidad emocionante${body}`;
     expect(ids(inBody, { lang: 'es', genre: 'email' })).not.toContain('MAIL-03');
     expect(ids(notFirst, { lang: 'es', genre: 'email' })).not.toContain('MAIL-03');
+  });
+});
+
+describe('SEG-03, a follow-up that copies the earlier message', () => {
+  const previous = 'Hi Dana,\n\nI rebuilt the stock dashboard for the Rosario branch and cut the refresh from 40 minutes to 12.\n\nBest,\nSam';
+  const copy = 'Hi Dana,\n\nLast week I wrote that I rebuilt the stock dashboard for the Rosario branch and cut the refresh. Could we look at it on Thursday?\n\nBest,\nSam';
+
+  it('reports the run of more than 8 words copied in a row, once, in a follow-up only', () => {
+    const result = lint(copy, { lang: 'en', genre: 'follow-up', previous });
+    const seg = result.findings.filter((f) => f.ruleId === 'SEG-03');
+    expect(seg).toHaveLength(1);
+    expect(seg[0]).toMatchObject({ level: 2, severity: 'medium', match: 'I rebuilt the stock dashboard for the Rosario branch and cut the refresh', detail: '13 words in a row from the earlier message' });
+    expect(ids(copy, { lang: 'en', genre: 'email', previous })).not.toContain('SEG-03');
+    expect(ids(copy, { lang: 'en', previous })).not.toContain('SEG-03');
+  });
+
+  it('allows 8 words in a row, ignores case and punctuation, and needs the earlier message', () => {
+    const eight = 'Hi Dana,\n\nAbout the stock dashboard for the Rosario branch and its refresh: could we meet on Thursday?\n\nBest,\nSam';
+    expect(ids(eight, { lang: 'en', genre: 'follow-up', previous })).not.toContain('SEG-03');
+    const shouted = copy.replace('I rebuilt the stock dashboard for the Rosario branch', 'I REBUILT the stock dashboard, for the Rosario branch');
+    expect(ids(shouted, { lang: 'en', genre: 'follow-up', previous })).toContain('SEG-03');
+    expect(ids(copy, { lang: 'en', genre: 'follow-up' })).not.toContain('SEG-03');
+  });
+
+  it('works in Spanish too', () => {
+    const anterior = 'Hola, Laura:\n\nTe mandé el tablero de ventas de la sucursal Rosario con los datos de marzo.\n\nSaludos,\nAna';
+    const seguimiento = 'Hola, Laura:\n\nTe escribo porque te mandé el tablero de ventas de la sucursal Rosario con los datos. ¿Lo pudiste ver?\n\nSaludos,\nAna';
+    expect(ids(seguimiento, { lang: 'es', genre: 'follow-up', previous: anterior })).toContain('SEG-03');
   });
 });

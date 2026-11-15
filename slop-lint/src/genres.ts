@@ -103,7 +103,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
     // Quoting the earlier message is what a follow-up is for, so process narration is off.
     rules: { ...NOT_A_LETTER, 'EST-09': 'off', 'EST-11': 'off' },
     splits: { 'FMT-01': FMT_01_IN_A_MAIL },
-    adds: MAIL_RULES,
+    adds: [...MAIL_RULES, ruleById('SEG-03')],
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: COVER_LETTER.thresholds,
     experimental: true,
