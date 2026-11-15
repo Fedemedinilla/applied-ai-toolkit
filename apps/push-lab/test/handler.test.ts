@@ -213,8 +213,29 @@ describe('POST api/test', () => {
     expect(await first.json()).toEqual({ error: 'push_failed', statusCode: 503 });
     error = new Error('Socket timeout');
     tick(5000);
-    expect(await (await call('api/test', { endpoint: device.endpoint, kind: 'test' })).json()).toEqual({ error: 'push_failed', statusCode: null });
+    expect(await (await call('api/test', { endpoint: device.endpoint, kind: 'test' })).json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'timeout' });
     expect(await store.list()).toHaveLength(1);
+  });
+
+  it('tells a push service that did not answer in time from one the server could not reach', async () => {
+    let error: Error = new Error('Socket timeout');
+    const send: Sender = async () => {
+      throw error;
+    };
+    const { call, tick, device } = await subscribed({ send });
+    const timeout = await call('api/test', { endpoint: device.endpoint, kind: 'test' });
+    expect(await timeout.json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'timeout' });
+    for (const [message, code] of [
+      ['getaddrinfo ENOTFOUND push.example.test', 'ENOTFOUND'],
+      ['connect ECONNREFUSED 10.0.0.1:443', 'ECONNREFUSED'],
+      ['unable to verify the first certificate', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'],
+    ]) {
+      error = Object.assign(new Error(message), { code });
+      tick(5000);
+      const response = await call('api/test', { endpoint: device.endpoint, kind: 'test' });
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'unreachable' });
+    }
   });
 
   it('limits one device to one test every few seconds', async () => {

@@ -6,7 +6,8 @@ export type TestAnswer =
   | { readonly kind: 'not_subscribed' }
   | { readonly kind: 'store_failed' }
   | { readonly kind: 'gone' }
-  | { readonly kind: 'push_failed'; readonly statusCode: number | null }
+  /** `reason` only when there was no status: `timeout`, or `unreachable` for a DNS, connection or TLS failure. */
+  | { readonly kind: 'push_failed'; readonly statusCode: number | null; readonly reason?: 'timeout' | 'unreachable' }
   | { readonly kind: 'too_soon'; readonly seconds: number }
   | { readonly kind: 'not_configured' }
   | { readonly kind: 'other'; readonly status: number };
@@ -24,8 +25,10 @@ export function readTestAnswer(status: number, body: unknown): TestAnswer {
       return { kind: 'store_failed' };
     case 'gone':
       return { kind: 'gone' };
-    case 'push_failed':
-      return { kind: 'push_failed', statusCode: num(b['statusCode']) };
+    case 'push_failed': {
+      const reason = b['reason'] === 'timeout' || b['reason'] === 'unreachable' ? b['reason'] : null;
+      return { kind: 'push_failed', statusCode: num(b['statusCode']), ...(reason === null ? {} : { reason }) };
+    }
     case 'too_soon':
       return { kind: 'too_soon', seconds: num(b['retryAfterSeconds']) ?? 1 };
     case 'not_configured':
@@ -52,9 +55,12 @@ export function testMessage(answer: TestAnswer): string {
     case 'gone':
       return 'El servicio de push dice que esta suscripción ya no existe, y el servidor la borró. Toca Activar para crear una nueva.';
     case 'push_failed':
-      return answer.statusCode === null
-        ? 'El servicio de push no respondió a tiempo. Intenta de nuevo.'
-        : `El servicio de push rechazó el envío (código ${answer.statusCode}). Revisa el diagnóstico del servidor.`;
+      if (answer.statusCode !== null) return `El servicio de push rechazó el envío (código ${answer.statusCode}). Revisa el diagnóstico del servidor.`;
+      // "Try again" is the advice only for a timeout: a server with no way out fails every retry.
+      if (answer.reason === 'unreachable') {
+        return 'El servidor no pudo conectarse con el servicio de push (falla de DNS, conexión o certificado). Reintentar no lo arregla: revisa la red del servidor y su salida a internet.';
+      }
+      return 'El servicio de push no respondió a tiempo. Intenta de nuevo.';
     case 'too_soon':
       return `Espera ${answer.seconds} ${answer.seconds === 1 ? 'segundo' : 'segundos'} entre pruebas.`;
     case 'not_configured':

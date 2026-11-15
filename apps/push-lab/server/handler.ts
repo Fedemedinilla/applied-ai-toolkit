@@ -255,7 +255,11 @@ export function createHandler(deps: HandlerDeps): (request: Request) => Promise<
         if (delivery.status === 'gone') return fail('gone', 410, { statusCode: delivery.statusCode, removed: delivery.removed });
         // The endpoint is on a known push service (refuseHost), so its status says something about
         // that service and nothing about any other host.
-        return fail('push_failed', 502, { statusCode: delivery.statusCode });
+        if (delivery.statusCode !== null) return fail('push_failed', 502, { statusCode: delivery.statusCode });
+        // No answer at all. A timeout is worth retrying; a DNS, connection or TLS failure usually
+        // means this server has no way out, and retrying never helps, so the page says which.
+        const reason = /timeout|ETIMEDOUT/iu.test(delivery.message) ? 'timeout' : 'unreachable';
+        return fail('push_failed', 502, { statusCode: null, reason });
       },
     },
 
