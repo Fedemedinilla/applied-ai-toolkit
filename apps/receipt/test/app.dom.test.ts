@@ -396,5 +396,32 @@ describe('uploaded logo files', () => {
 });
 
 describe('builds that finish late', () => {
+  it('drops an older build that lands after a newer one', async () => {
+    const sample = deferred<Uint8Array | null>();
+    const h = mount({ loadSampleLogo: () => sample.promise });
+    // The first build waits on the sample logo; the second has no logo and lands first.
+    choose('none');
+    await new Promise((r) => setTimeout(r, 10));
+    await h.app.settled();
+    expect($('#download').getAttribute('href')).toBe('blob:test/1');
+    sample.resolve(logo);
+    await tick();
+    await h.app.settled();
+    expect(h.created()).toBe(1);
+    expect($('#download').getAttribute('href')).toBe('blob:test/1');
+    expect($('#status').textContent).toMatch(/^Listo:/u);
+    expect(await hasImage(h)).toBe(false);
+  });
 
+  it('drops a build in flight when destroyed, and builds nothing after', async () => {
+    const sample = deferred<Uint8Array | null>();
+    const h = mount({ loadSampleLogo: () => sample.promise });
+    h.app.destroy();
+    sample.resolve(logo);
+    await tick();
+    $<HTMLButtonElement>('[data-sample="simple"]').click();
+    await tick();
+    expect(h.created()).toBe(0);
+    expect($('#download').hasAttribute('href')).toBe(false);
+  });
 });
