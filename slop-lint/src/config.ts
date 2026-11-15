@@ -108,6 +108,13 @@ function text(value: unknown, path: string): string {
   return value;
 }
 
+/** An anchor term: a string with at least one character that is not whitespace, as --anchors keeps them. */
+function anchor(value: unknown, path: string): string {
+  const term = text(value, path);
+  if (term.trim() === '') throw new ConfigError(path, 'must hold a character other than whitespace; a blank anchor would count in every sentence');
+  return term;
+}
+
 function bool(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') throw new ConfigError(path, 'must be true or false');
   return value;
@@ -181,7 +188,7 @@ function override(value: unknown, path: string): OverrideConfig {
   const out: OverrideConfig = { files };
   if ('lang' in record) out.lang = oneOf(record['lang'], join(path, 'lang'), LANGS);
   if ('format' in record) out.format = oneOf(record['format'], join(path, 'format'), FORMATS);
-  if ('anchors' in record) out.anchors = list(record['anchors'], join(path, 'anchors'), text);
+  if ('anchors' in record) out.anchors = list(record['anchors'], join(path, 'anchors'), anchor);
   if ('ruleSettings' in record) out.ruleSettings = ruleSettings(record['ruleSettings'], join(path, 'ruleSettings'));
   return out;
 }
@@ -216,7 +223,7 @@ export function validateShape(value: unknown): Config {
   }
   if ('lang' in record) config.lang = oneOf(record['lang'], 'lang', LANGS);
   if ('format' in record) config.format = oneOf(record['format'], 'format', FORMATS);
-  if ('anchors' in record) config.anchors = list(record['anchors'], 'anchors', text);
+  if ('anchors' in record) config.anchors = list(record['anchors'], 'anchors', anchor);
   if ('ignore' in record) config.ignore = list(record['ignore'], 'ignore', glob);
   if ('ruleSettings' in record) config.ruleSettings = ruleSettings(record['ruleSettings'], 'ruleSettings');
   if ('rules' in record) config.rules = list(record['rules'], 'rules', customRule);

@@ -166,7 +166,9 @@ const FIRST_PERSON_EN = new Set(['I', "I'm", "I've", "I'd", "I'll", 'Iâ€™m', 'Iâ
 export function countAnchors(sentence: string, lang: Lang, extra: readonly string[] = []): number {
   const ws = words(sentence);
   const numberWords = new Set(NUMBER_WORDS[lang].filter((w) => w !== 'una' && w !== 'one' && w !== 'half' && w !== 'medio'));
-  const terms = [...LOWERCASE_TOOLS, ...extra].map((t) => t.toLowerCase());
+  // Extra terms are trimmed, as --anchors trims them, and a blank one is dropped: it would match everywhere.
+  const extras = extra.map((t) => t.trim()).filter(Boolean);
+  const terms = [...LOWERCASE_TOOLS, ...extras].map((t) => t.toLowerCase());
   let count = 0;
   ws.forEach((w, index) => {
     const lower = w.text.toLowerCase();
@@ -178,7 +180,7 @@ export function countAnchors(sentence: string, lang: Lang, extra: readonly strin
   });
   // Multi-word extra terms ("Power BI", "SQL Server") are matched on the whole sentence, as whole
   // words: "power bill" is not "Power BI". Any run of whitespace stands for the spaces in the term.
-  for (const term of extra) {
+  for (const term of extras) {
     if (!/\s/u.test(term)) continue;
     const source = term.split(/\s+/u).map((part) => part.replace(/[\\^$.*+?()[\]{}|/]/gu, '\\$&')).join(String.raw`\s+`);
     if (compile(`${B}${source}${E}`, 'iu').test(sentence)) count++;

@@ -244,7 +244,7 @@ A team adapts slop-lint to its own writing with a `slop-lint.config.json`, witho
 | `$schema` | Path or address of [`schema/config.schema.json`](schema/config.schema.json), for completion and checks in an editor. The CLI ignores it. |
 | `lang` | `en` or `es`, used when `--lang` is not given. With a `lang` here or in an override, `--lang` is optional. |
 | `format` | `text` or `markdown` for every file, used when `--format` is not given. Left out, a `.md` file is Markdown and anything else is text. |
-| `anchors` | Extra anchor terms. `--anchors` replaces them. |
+| `anchors` | Extra anchor terms, each trimmed and none blank. `--anchors` replaces them. |
 | `ignore` | Globs of files to skip, even when they are named on the command line. Standard input is never skipped. |
 | `ruleSettings` | Per rule id: `"off"`, or an object with a new `level` (1, 2 or 3), a new `severity` (`disqualify`, `high`, `medium`, `low`) or both. The id is a built-in rule's or a custom rule's. |
 | `rules` | Custom pattern rules (below). |

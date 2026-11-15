@@ -74,6 +74,12 @@ describe('globs', () => {
 });
 
 describe('validateConfig', () => {
+  it('rejects an anchor that is only whitespace, at the top level and in an override', () => {
+    expect(problem({ anchors: ['dbt', ' '] })).toMatch(/^anchors\[1\]: must hold a character other than whitespace/u);
+    expect(problem({ overrides: [{ files: ['a.md'], anchors: ['\t\n'] }] })).toMatch(/^overrides\[0\]\.anchors\[0\]: must hold a character other than whitespace/u);
+    expect(problem({ anchors: ['Contoso Agro'] })).toBe('accepted');
+  });
+
   it('rejects __proto__ under ruleSettings as an unknown id, as JSON.parse leaves it an own key', () => {
     for (const value of ['"off"', '{"level":1}', '{"severity":"low"}']) {
       expect(problem(JSON.parse(`{"ruleSettings":{"__proto__":${value}}}`))).toMatch(/^ruleSettings\.__proto__: is not the id of a built-in rule/u);
