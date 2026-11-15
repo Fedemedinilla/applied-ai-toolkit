@@ -399,8 +399,17 @@ describe('applySet', () => {
   });
 
   it('fails on a number field that is not numeric', () => {
-    for (const json of [{ v: 'abc' }, { v: '' }, { v: {} }]) {
+    for (const json of [{ v: 'abc' }, { v: {} }, { v: [1, 2] }]) {
       expect(() => applySet(set([field('amount', '={{ $json.v }}', 'number')]), { json })).toThrow(NodeFailure);
+    }
+  });
+
+  it('turns blank strings, [] and booleans into numbers, as n8n does without strict validation', () => {
+    const cases: [unknown, number][] = [['', 0], ['  ', 0], [[], 0], [true, 1], [false, 0], [['7'], 7]];
+    for (const [v, expected] of cases) {
+      expect(applySet(set([field('amount', '={{ $json.v }}', 'number')]), { json: { v } }), JSON.stringify(v)).toEqual({
+        amount: expected,
+      });
     }
   });
 

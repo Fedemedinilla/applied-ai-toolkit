@@ -129,7 +129,8 @@ const setSchema = z.looseObject({
  * Edit Fields (Set) v3.4 in manual mode without "include other fields": the
  * json of the output item. undefined and null become null; a string field
  * turns objects into JSON and everything else into String(value); a number
- * field accepts numbers and numeric strings and fails on anything else.
+ * field stores Number(value), so '' and [] give 0 and true gives 1, and fails
+ * only when that is NaN.
  */
 export function applySet(node: WorkflowNode, scope: Scope): Record<string, unknown> {
   expectType(node, 'n8n-nodes-base.set');
@@ -146,8 +147,10 @@ export function applySet(node: WorkflowNode, scope: Scope): Record<string, unkno
     } else if (type === 'string') {
       out[name] = typeof resolved === 'object' ? JSON.stringify(resolved) : String(resolved);
     } else if (type === 'number') {
-      const parsed = typeof resolved === 'number' ? resolved : typeof resolved === 'string' ? Number(resolved) : NaN;
-      if (Number.isNaN(parsed) || (typeof resolved === 'string' && resolved.trim() === '')) {
+      // validateFieldType without strict, as Set 3.4 calls it: tryToParseNumber keeps any
+      // value Number() accepts, so '' and [] become 0 and true becomes 1.
+      const parsed = Number(resolved);
+      if (Number.isNaN(parsed)) {
         throw new NodeFailure(`'${name}' expects a number but we got '${String(resolved)}'`);
       }
       out[name] = parsed;
