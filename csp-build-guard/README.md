@@ -98,7 +98,7 @@ A `headers` map in the config checks other response headers (`X-Content-Type-Opt
 
 ### 3. Secrets (`secrets`)
 
-A server-only value can end up in a client bundle through one wrong import, and the build does not complain. The check reads the value of each named environment variable and searches every file under `--dir` for it, server functions included. It also searches the JSON-escaped, URL-encoded, base64 and base64url forms, and the decompressed contents of `.gz` and `.br` files. A variable that is unset or shorter than `minLength` (default 8) fails, because a check that could not run must not pass. Reports name the variable and the file, never the value; a test checks that the value is absent from both the text and the JSON output.
+A server-only value can end up in a client bundle through one wrong import, and the build does not complain. The check reads the value of each named environment variable and searches every file under `--dir` for it, server functions included. It also searches the JSON-escaped, URL-encoded, base64 and base64url forms, and the decompressed contents of `.gz` and `.br` files. The base64 forms are found inside a larger encoded blob too (an encoded JSON config), at any of the three byte offsets, by the characters that only the value's own bits decide. A variable that is unset or shorter than `minLength` (default 8) fails, because a check that could not run must not pass. Reports name the variable and the file, never the value; a test checks that the value is absent from both the text and the JSON output.
 
 ### 4. Regex lookbehind (`lookbehind`)
 
@@ -292,7 +292,7 @@ fixtures/              small builds that pass and fail each check
 - vercel.json patterns support a path-to-regexp subset. They are matched case-insensitively against each URL a page can be served at (`/blog/`, `/blog`, `/blog/index.html`). When two rules set the policy for one page the guard fails instead of guessing how the host merges them.
 - Netlify `_headers` support covers path lines with `*` and `:placeholder` and indented header lines. It does not read `netlify.toml`.
 - The lookbehind check searches text, so a lookbehind inside a string or a comment is also reported. That one only throws if the string reaches `new RegExp`, and the message says the whole script fails only for a regex literal.
-- The secrets search finds standalone encoded forms; a value embedded inside a larger base64 blob at an unaligned offset is not found.
+- The secrets search knows the five forms above. A value encoded twice (base64 of base64) or in another encoding (hex, a split string) is not found.
 - Static imports are found with a regex, not a JavaScript parser. Any quoted specifier after `import` or `export ... from` is followed, so a query string (`./x.js?v=1`) still finds its file and an extensionless one fails as not in the build. Text in a string literal that looks like an import is followed too, and fails the same way. Inline scripts are compressed one by one, which slightly overcounts them.
 - Nonces and `'strict-dynamic'` are outside the model, so a policy that relies on them fails the inline check.
 - The action makes SARIF paths relative to the workspace. A repository checked out into a subfolder (the `path` input of `actions/checkout`) gets paths that code scanning cannot map; run the CLI with `--sarif-base` set to that subfolder instead.

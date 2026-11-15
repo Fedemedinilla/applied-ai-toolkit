@@ -55,6 +55,21 @@ describe('secrets', () => {
     expect(messages(report, 'secrets')).toEqual([`the value of S is in a.js (${form})`]);
   });
 
+  it('finds a value embedded in a larger base64 or base64url blob at any offset', () => {
+    const secret = 'fixture-secret-value-0001'; // 25 characters, not a multiple of 3
+    const files = {
+      'index.html': '<p></p>',
+      'a.js': `atob("${Buffer.from(`{"k":"${secret}"}`).toString('base64')}")`,
+      'b.js': `"${Buffer.from(`${secret}!`).toString('base64')}"`,
+      'd.js': `"${Buffer.from('unrelated-value-0001-unrelated').toString('base64')}"`,
+    };
+    const report = guard(files, { secrets: { env: ['S'] } }, { S: secret });
+    expect(messages(report, 'secrets')).toEqual(['the value of S is in a.js (base64)', 'the value of S is in b.js (base64)']);
+    // VALUE encodes with '+' and '/', so its base64url form differs; here it starts at offset 2.
+    const url = guard({ 'index.html': '<p></p>', 'c.js': `"${Buffer.from(`xy${VALUE}!`).toString('base64url')}"` }, { secrets: { env: ['S'] } }, { S: VALUE });
+    expect(messages(url, 'secrets')).toEqual(['the value of S is in c.js (base64url)']);
+  });
+
   it('decompresses a .br file before searching it', () => {
     const report = guard(
       { 'index.html': '<p></p>', 'a.js.br': brotliCompressSync(Buffer.from(`const k="${VALUE}"`)) },
