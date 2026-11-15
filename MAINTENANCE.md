@@ -80,10 +80,10 @@ Once a quarter, run the full audit's method over the units most likely to break 
 
 ### Run the scoped audit
 
-The `audit-diff` workflow takes any scope JSON. For a quarterly review, write one by hand from the scope against the first commit of the repository, where every file counts as changed. Keep only the units of the review and no dependents. From the root, with the work committed:
+The `audit-diff` workflow takes any scope JSON. For a quarterly review, write one with `--all`, which counts every tracked file as changed, against the first commit of the repository. Keep only the units of the review and no dependents. From the root, with the work committed:
 
 ```sh
-npm run -s audit:scope -- --base "$(git rev-list --max-parents=0 HEAD)" --json \
+npm run -s audit:scope -- --all --base "$(git rev-list --max-parents=0 HEAD)" --json \
   | node -e 'const keep = process.argv.slice(1); let t = ""; process.stdin.on("data", (c) => (t += c)).on("end", () => { const s = JSON.parse(t); s.units = s.units.filter((u) => keep.includes(u.id)); s.files = [...new Set(s.units.flatMap((u) => u.files))]; s.dependents = []; console.log(JSON.stringify(s, null, 2)); });' \
     gateway amount-parser grounded-assistant idempotent-orders apps-caja > scope.json
 ```
