@@ -140,9 +140,11 @@ curl -u ops:"$CHAT_WIDGET_ADMIN_PASSWORD" -H 'content-type: application/json' \
 | `test/loader.dom.test.ts` | jsdom: mounting, no mount on failure, one mount under concurrent tags, text never markup, request shape, history, errors, accessibility |
 | `test/store-contract.test.ts` | One suite on `MemoryStore` and on `SqlStore` in PGlite, plus the schema's checks |
 | `test/guards.test.ts` | IP keys, the limiter, the byte-limited reader, Origin and Referer matching, deadlines, static paths |
+| `test/node-http.test.ts` | The Node server over a socket on 127.0.0.1: a request-target the URL parser rejects answers 400 and the server keeps serving |
+| `test/env.test.ts` | The default public URL uses the validated port |
 | `test/build.test.ts` | The production build: the loader adds no globals, has no HTML-parsing call, and uses relative URLs |
 
-127 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
+140 tests, all offline. [`test/fake-anthropic.ts`](test/fake-anthropic.ts) answers the gateway's real client with server-sent events in the API's format or with an error, and records each request.
 
 ## Layout
 
