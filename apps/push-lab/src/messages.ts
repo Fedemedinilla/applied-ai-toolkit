@@ -64,6 +64,28 @@ export function testMessage(answer: TestAnswer): string {
   }
 }
 
+/** What registering the subscription with the server again came to (src/app.ts, register). */
+export type RegisterResult = 'ok' | 'store_failed' | 'unknown_service' | 'rejected' | 'network';
+
+/**
+ * The answer to a test the server refused as not_subscribed, once the page has tried to register
+ * the device again. "Registered again" only when it was: otherwise the next test fails the same
+ * way and the page has hidden why.
+ */
+export function reRegisterMessage(result: RegisterResult): string {
+  switch (result) {
+    case 'ok':
+      return testMessage({ kind: 'not_subscribed' });
+    case 'store_failed':
+      return 'El servidor no tenía este dispositivo y no pudo volver a guardarlo (su lista de suscripciones falló o está llena). No desactives los avisos: tu suscripción puede estar bien. Intenta de nuevo en un minuto.';
+    case 'network':
+      return 'El servidor no tenía este dispositivo, y no se pudo conectar con él para registrarlo de nuevo. Recarga la página cuando haya conexión.';
+    case 'unknown_service':
+    case 'rejected':
+      return 'El servidor no tenía este dispositivo y no aceptó registrarlo de nuevo. Revisa el diagnóstico del servidor.';
+  }
+}
+
 /** A subscribe failure, as something the person can act on. A bare "it failed" lets nobody debug. */
 export function explainError(error: unknown): string {
   const field = (key: 'name' | 'message'): string | null =>
