@@ -1,17 +1,25 @@
 /** JSONL and output-file helpers shared by the scripts. */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
+/**
+ * One JSON value per non-blank line. A leading byte order mark (Windows
+ * editors write one) is dropped, and an error names the line as counted in
+ * the file, blank lines included.
+ */
 export function readJsonl<T = unknown>(path: string): T[] {
-  return readFileSync(path, 'utf8')
+  const out: T[] = [];
+  readFileSync(path, 'utf8')
+    .replace(/^\uFEFF/, '')
     .split('\n')
-    .filter((l) => l.trim() !== '')
-    .map((l, i) => {
+    .forEach((l, i) => {
+      if (l.trim() === '') return;
       try {
-        return JSON.parse(l) as T;
+        out.push(JSON.parse(l) as T);
       } catch {
         throw new Error(`${path}:${i + 1}: not JSON`);
       }
     });
+  return out;
 }
 
 export const appendJsonl = (path: string, row: unknown) => appendFileSync(path, JSON.stringify(row) + '\n');
