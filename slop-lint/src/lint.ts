@@ -176,7 +176,8 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
   const kept = dropCovered(hits).sort((a, b) => a.start - b.start || a.order - b.order);
   const reported: Hit[] = [];
 
-  const pool = kept.filter((h) => h.rule.level === 3 || (h.rule.kind === 'pattern' && h.rule.tier2Pool));
+  // A level 1 rule always fails the run, so a pool rule a config raised to level 1 leaves the budget.
+  const pool = kept.filter((h) => h.rule.level !== 1 && (h.rule.level === 3 || (h.rule.kind === 'pattern' && h.rule.tier2Pool)));
   const seen = new Set<string>();
   pool.forEach((h, index) => {
     const key = text.slice(h.start, h.end).toLowerCase().replace(/\s+/gu, ' ');

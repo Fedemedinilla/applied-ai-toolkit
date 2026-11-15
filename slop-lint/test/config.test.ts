@@ -196,6 +196,15 @@ describe('settingsFor', () => {
     expect(placeholder.findings.map((f) => [f.ruleId, f.level, f.severity])).toContainEqual(['FMT-04', 2, 'low']);
   });
 
+  it('reports every hit of a Tier 2 pool rule raised to level 1, outside the shared budget', () => {
+    const settings = settingsFor({ ruleSettings: { 'LEX-04': { level: 1, severity: 'high' } } }, undefined);
+    const one = lint('This robust plan works.', { lang: 'en', rules: settings.rules });
+    expect(one.passesTier1).toBe(false);
+    expect(one.findings.map((f) => [f.ruleId, f.level, f.detail])).toEqual([['LEX-04', 1, undefined]]);
+    const three = lint('This robust plan is seamless and pivotal.', { lang: 'en', rules: settings.rules });
+    expect(three.findings.filter((f) => f.ruleId === 'LEX-04')).toHaveLength(3);
+  });
+
   it('applies every matching override in order, and none to stdin or a file outside the folder', () => {
     const config = validateConfig({
       lang: 'en',
