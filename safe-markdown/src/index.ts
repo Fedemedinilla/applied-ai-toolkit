@@ -77,20 +77,30 @@ interface Resolved {
 function resolve(options: MarkdownOptions): Resolved {
   const prefix = options.classPrefix ?? 'md';
   if (!/^[a-z][a-z0-9-]*$/i.test(prefix)) throw new Error('safe-markdown: classPrefix must be letters, digits and hyphens');
+  const max = options.maxLength ?? DEFAULT_MAX;
+  // NaN would turn the cut off silently and a negative value would cut from the end.
+  if (max !== Infinity && !(Number.isInteger(max) && max >= 0)) {
+    throw new Error('safe-markdown: maxLength must be a whole number of zero or more, or Infinity');
+  }
   const norm = (h: string) => h.trim().toLowerCase().replace(/^www\./, '');
   const external = options.externalHosts ?? '*';
-  const internal = options.internalHosts.map(norm);
+  // An empty entry (a trailing comma in a comma-split list) would make the bare-host pattern
+  // match any "/" after a space, so blank entries are dropped.
+  const hostList = (list: readonly string[]) => list.map(norm).filter((h) => h !== '');
+  const internal = hostList(options.internalHosts);
   return {
     internal,
     bareHost: internal.length
       ? new RegExp(`(^|[^\\w./@-])((?:www\\.)?(?:${internal.map(escapeRegex).join('|')})/(?:(?!&(?:quot|#39|lt|gt);)[^\\s()\\u0000])*)`, 'gi')
       : null,
-    external: external === '*' ? '*' : external.map(norm),
+    external: external === '*' ? '*' : hostList(external),
     mailto: options.mailto ?? true,
     prefix,
-    max: options.maxLength ?? DEFAULT_MAX,
+    max,
   };
 }
+
+const MAILTO = /^mailto:[^\s@?%]+@[^\s@?%]+$/i;
 
 function hostIn(hostname: string, list: readonly string[]): boolean {
   const h = hostname.toLowerCase().replace(/^www\./, '');
@@ -111,7 +121,9 @@ function anchor(url: string, label: string, r: Resolved): string | null {
   if (url.includes(Z)) return null;
   const raw = unescapeHtml(url);
   if (/^mailto:/i.test(raw)) {
-    if (!r.mailto || !/^mailto:[^\s@]+@[^\s@]+$/i.test(raw)) return null;
+    // One address and nothing else: "?" would open cc=, bcc= and body= headers, and "%40" would
+    // hide a second "@".
+    if (!r.mailto || !MAILTO.test(raw)) return null;
     return `<a href="${escapeHtml(raw)}">${label}</a>`;
   }
   if (raw.startsWith('#') || (raw.startsWith('/') && !/^\/[/\\]/.test(raw))) {
@@ -153,6 +165,8 @@ const LINK = /\[([^[\]\n]+)\]\(([^()[\]\s]+)\)/g;
 // A bare URL stops at whitespace, a parenthesis, an escaped quote or angle bracket, or a
 // placeholder, so the quotes around "https://site.example" and a code span after it stay outside.
 const BARE_URL = /https?:\/\/(?:(?!&(?:quot|#39|lt|gt);)[^\s()\u0000])+/g;
+/** Punctuation that ends a sentence after a bare URL and is left outside the link. */
+const TRAILING = '.,;:!?';
 const RESTORE = new RegExp(`${Z}(\\d+)${Z}`, 'g');
 
 /** Inline formatting over text that is already escaped and cleaned. */
@@ -160,8 +174,27 @@ function inlineEscaped(s: string, r: Resolved): string {
   const tokens: string[] = [];
   const stash = (html: string) => `${Z}${tokens.push(html) - 1}${Z}`;
   const bare = (m: string) => {
-    const trail = /[.,;:!?]+$/.exec(m)?.[0] ?? '';
-    const core = m.slice(0, m.length - trail.length);
+    // A backward scan: the regex /[.,;:!?]+$/ restarts at every character of a long run.
+    // Trailing stars are the closing emphasis of "**https://x**" when the URL has no star before
+    // them; with one ("https://x/**b**") they are part of the path.
+    let end = m.length;
+    let stars = 0;
+    for (const ch of m) if (ch === '*') stars++;
+    scan: for (;;) {
+      while (end > 0 && TRAILING.includes(m.charAt(end - 1))) {
+        // The ; that closes an escaped & belongs to the URL: cutting it would leave "&amp".
+        if (m.endsWith('&amp;', end)) break scan;
+        end--;
+      }
+      let start = end;
+      while (start > 0 && m.charAt(start - 1) === '*') start--;
+      const run = end - start;
+      if (run === 0 || run < stars) break;
+      end = start;
+      stars = 0;
+    }
+    const trail = m.slice(end);
+    const core = m.slice(0, end);
     const a = anchor(core, core, r);
     return a ? stash(a) + trail : m;
   };
@@ -191,7 +224,11 @@ function escapeRegex(s: string): string {
 
 function prepare(src: string, r: Resolved): string {
   const c = clean(src);
-  return c.length > r.max ? `${c.slice(0, r.max)}…` : c;
+  if (c.length <= r.max) return c;
+  // A cut between the two halves of a surrogate pair would leave a lone high surrogate.
+  const hi = c.charCodeAt(r.max - 1);
+  const end = hi >= 0xd800 && hi <= 0xdbff ? r.max - 1 : r.max;
+  return `${c.slice(0, end)}…`;
 }
 
 /** One line of inline Markdown (code, links, bare URLs, emphasis) as HTML. */
