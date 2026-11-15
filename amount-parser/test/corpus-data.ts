@@ -12,7 +12,7 @@ export interface CorpusCase {
   ambiguous: boolean;
   note: string;
   corrected: boolean;
-  source: 'first-sweep' | 'red-team';
+  source: 'first-sweep' | 'red-team' | 'audit';
   earlier_parser?: string;
   known_conflict?: string;
 }

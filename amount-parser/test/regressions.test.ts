@@ -144,3 +144,33 @@ describe('red-team phrases', () => {
     }
   });
 });
+
+describe('words that name a key of Object.prototype', () => {
+  // The word tables are plain objects, so "constructor" used to look up Object and the parser
+  // multiplied a figure by a function: value NaN with ambiguous:false. Such a word must read like
+  // any other unknown noun.
+  const SENTENCES = ['pague 3 constructor', 'pague 80 mil al albanil y 5 constructor', 'dos constructor', 'pague constructor 20 mil'];
+
+  it.each(SENTENCES)('%j reads like the same sentence with an ordinary noun', (phrase) => {
+    const withoutSpans = (r: ReturnType<typeof parseAmount>) => (r === null ? null : { ...r, spans: [] });
+    const r = parseAmount(phrase);
+    if (r?.value !== null && r?.value !== undefined) expect(Number.isFinite(r.value)).toBe(true);
+    expect(withoutSpans(r)).toStrictEqual(withoutSpans(parseAmount(phrase.replace('constructor', 'carpintero'))));
+  });
+});
+
+describe('caller slang', () => {
+  it('adds a scale word and overrides a built-in one', () => {
+    expect(parseAmount('gaste 20 quinas', { quinas: 500 })?.value).toBe(10_000);
+    expect(parseAmount('gaste 3 gambas', { gambas: 200 })?.value).toBe(600);
+  });
+
+  it('matches a key written with capitals or accents, as the sentence is normalized', () => {
+    expect(parseAmount('gaste 20 Quinas', { Quinas: 500 })?.value).toBe(10_000);
+    expect(parseAmount('gaste 20 lucas', { lucás: 2000 })?.value).toBe(40_000);
+  });
+
+  it.each([-500, 0, Number.NaN, Number.POSITIVE_INFINITY])('rejects a scale of %s instead of returning it as an amount', (bad) => {
+    expect(() => parseAmount('gaste 20 quinas', { quinas: bad })).toThrow(RangeError);
+  });
+});
