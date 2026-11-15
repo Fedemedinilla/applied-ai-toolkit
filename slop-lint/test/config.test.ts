@@ -55,6 +55,12 @@ describe('globs', () => {
     expect(globToRegExp('a|b').test('a')).toBe(false);
   });
 
+  it('reads a hyphen as itself, outside any class', () => {
+    expect(m('cover-letters/*.md', 'cover-letters/a.md')).toBe(true);
+    expect(m('api-docs/**', 'api-docs/x/y.md')).toBe(true);
+    expect(m('a-b.md', 'a_b.md')).toBe(false);
+  });
+
   it('names what is wrong with a pattern it cannot use', () => {
     expect(globProblem('docs/**')).toBeUndefined();
     expect(globProblem('')).toMatch(/empty/u);

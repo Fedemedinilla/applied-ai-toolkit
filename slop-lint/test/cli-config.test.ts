@@ -43,6 +43,20 @@ describe('finding the config file', () => {
     expect(r.stdout).toBe('keep.txt: 0 findings (L1 0, L2 0, L3 0); slop score 15/15; passes tier 1\n');
   });
 
+  it('takes ignore and override globs with a hyphen in a folder name', () => {
+    const dir = project({
+      'slop-lint.config.json': { lang: 'en', ignore: ['cover-letters/*.md'], overrides: [{ files: ['my-docs/*.md'], ruleSettings: { 'LEX-03': 'off', 'ESP-04': 'off' } }] },
+      'cover-letters/a.md': BANNED,
+      'my-docs/b.md': BANNED,
+    });
+    const ignored = run(dir, ['cover-letters/a.md']);
+    expect(ignored.stderr).toMatch(/every input file is ignored/u);
+    expect(ignored.status).toBe(0);
+    const overridden = run(dir, ['my-docs/b.md']);
+    expect(overridden.stderr).toBe('');
+    expect(overridden.status).toBe(0);
+  });
+
   it('stops at the folder that holds .git', () => {
     const dir = project({ 'slop-lint.config.json': { lang: 'en' }, 'inner/.git/HEAD': '', 'inner/letter.txt': BANNED });
     const r = run(join(dir, 'inner'), ['letter.txt']);
