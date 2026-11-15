@@ -8,12 +8,25 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 }
 
+/**
+ * The first `max` UTF-16 units of `s`, without a high surrogate left alone at the end: a cut
+ * through an emoji would otherwise send a broken character that providers show as U+FFFD or refuse.
+ */
+export function cut(s: string, max: number): string {
+  const head = s.slice(0, max);
+  const last = head.charCodeAt(head.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? head.slice(0, -1) : head;
+}
+
 /** A subject or a name is one line: a newline inside would split a header or leave text hanging. */
 export const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
+/** Line endings as `\n`. Browsers send a textarea's newlines as CRLF in a native form post. */
+export const lf = (s: string): string => s.replace(/\r\n?/g, '\n');
+
 /** Paragraphs and line breaks of a plain-text message, kept in the HTML part. */
 export function paragraphs(s: string): string {
-  return s
+  return lf(s)
     .split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 14px">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
     .join('');
@@ -34,13 +47,15 @@ export function htmlDocument(body: string, lang: string, title: string): string 
 }
 
 /**
- * A bare domain with any TLD: labels of letters, digits, `_` or `-` joined by dots, ending in a TLD
- * of two or more letters in any script or a punycode one, plus whatever follows up to whitespace.
+ * A bare domain with any TLD: labels of letters, combining marks, digits, `_` or `-` joined by
+ * dots, ending in a TLD of two or more letters in any script or a punycode one, plus whatever
+ * follows up to whitespace. Marks count because Devanagari or Tamil words (`.भारत`) and a
+ * decomposed accent (`cafe` plus U+0301) carry them inside the label.
  * The edges are lookarounds because `\b` only knows ASCII letters and would miss `пример.рф`. No
  * dot in the lookbehind, so a domain right after an ellipsis still starts a match. The cost is a
  * few false positives in the quote ("gracias.Saludos", "EE.UU."), which is the cheaper mistake.
  */
-const DOMAIN = /(?<![\p{L}\p{N}_-])[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.(?:\p{L}{2,}|xn--[a-z0-9-]+)(?![\p{L}\p{N}_-])\S*/giu;
+const DOMAIN = /(?<![\p{L}\p{M}\p{N}_-])[\p{L}\p{M}\p{N}_-]+(?:\.[\p{L}\p{M}\p{N}_-]+)*\.(?:\p{L}[\p{L}\p{M}]+|xn--[a-z0-9-]+)(?![\p{L}\p{M}\p{N}_-])\S*/giu;
 
 /** Removes Markdown links, URLs, `www.` hosts and bare domains, writing `placeholder` instead. */
 export function stripLinks(s: string, placeholder: string): string {
@@ -58,8 +73,8 @@ export function stripLinks(s: string, placeholder: string): string {
  */
 export function quote(message: string, max: number, placeholder: string): string {
   const clean = stripLinks(message, placeholder).trim();
-  const cut = clean.length > max ? `${clean.slice(0, max).trimEnd()}…` : clean;
-  return stripLinks(cut, placeholder);
+  const short = clean.length > max ? `${cut(clean, max).trimEnd()}…` : clean;
+  return stripLinks(short, placeholder);
 }
 
 /**
@@ -68,6 +83,6 @@ export function quote(message: string, max: number, placeholder: string): string
  * link comes back as `fallback`.
  */
 export function greeting(name: string, max: number, fallback: string): string {
-  const n = oneLine(stripLinks(oneLine(stripLinks(name, '')).slice(0, max), ''));
+  const n = oneLine(stripLinks(cut(oneLine(stripLinks(name, '')), max), ''));
   return n || fallback;
 }
