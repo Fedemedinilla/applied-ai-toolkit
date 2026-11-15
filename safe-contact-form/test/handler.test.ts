@@ -323,6 +323,25 @@ describe('validation', () => {
     expect(res.status).toBe(200);
     expect(s.resend.sent).toHaveLength(2);
   });
+
+  it('a multipart form with a mixed-case boundary, as Chrome sends it', async () => {
+    // undici's FormData boundary is all lowercase, so the test above cannot tell a lowercased
+    // boundary from the real one. A browser's is not.
+    const s = setup();
+    const boundary = '----WebKitFormBoundaryAbCdEfGh12345678';
+    const body =
+      Object.entries(good(s.now))
+        .map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`)
+        .join('') + `--${boundary}--\r\n`;
+    const req = new Request(`${SITE}/api/contact`, {
+      method: 'POST',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}`, origin: SITE },
+      body,
+    });
+    const res = await s.handler(req, ctx());
+    expect(res.status).toBe(200);
+    expect(s.resend.sent).toHaveLength(2);
+  });
 });
 
 describe('request shape', () => {

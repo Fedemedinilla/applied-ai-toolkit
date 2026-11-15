@@ -198,7 +198,10 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
   return async (request, context = {}) => {
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
 
-    const type = (request.headers.get('content-type') ?? '').toLowerCase();
+    // Lowercased only for the type checks: the multipart boundary is case-sensitive, so the parser
+    // gets the header as it came.
+    const rawType = request.headers.get('content-type') ?? '';
+    const type = rawType.toLowerCase();
     const isJson = type.startsWith('application/json');
     const isForm = type.startsWith('application/x-www-form-urlencoded') || type.startsWith('multipart/form-data');
     let lang: Lang = config.defaultLang ?? 'en';
@@ -225,7 +228,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
           for (const [k, v] of Object.entries(parsed)) if (typeof v === 'string' || typeof v === 'number') data.set(k, String(v));
         }
       } else {
-        const form = await new Response(raw, { headers: { 'content-type': type } }).formData().catch(() => null);
+        const form = await new Response(raw, { headers: { 'content-type': rawType } }).formData().catch(() => null);
         form?.forEach((v, k) => {
           if (typeof v === 'string' && !data.has(k)) data.set(k, v);
         });
