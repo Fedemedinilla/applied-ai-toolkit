@@ -297,6 +297,30 @@ describe('the dist checker', () => {
     ]);
   });
 
+  it('takes ids only from opening tags, not from code text or other attributes', () => {
+    build({
+      'index.html': `<a href="${BASE}/gateway/#limits">a</a><a href="${BASE}/gateway/#nope">b</a><a href="${BASE}/gateway/#install">c</a>`,
+      'gateway/index.html': '<h2 data-x="1" id="install">Install</h2><pre><code>&lt;div id="limits"&gt;</code></pre><span data-nope-id="nope"></span>',
+    });
+    expect(brokenLinks(dist)).toEqual([
+      `index.html: ${BASE}/gateway/#limits (no element with id "limits" in gateway/index.html)`,
+      `index.html: ${BASE}/gateway/#nope (no element with id "nope" in gateway/index.html)`,
+    ]);
+  });
+
+  it('reports encoded dot segments that leave the base and malformed percent-encoding, without throwing', () => {
+    // The site sits one level down, so the encoded dot segment points at a file that exists.
+    build({
+      'site/index.html': `<a href="${BASE}/%2e%2e/secret.html">up</a><a href="${BASE}/%E0%A4%A/">bad path</a><a href="${BASE}/#%E0%A4%A">bad hash</a>`,
+      'secret.html': '',
+    });
+    expect(brokenLinks(join(dist, 'site'))).toEqual([
+      `index.html: ${BASE}/%2e%2e/secret.html (outside the base ${BASE}/)`,
+      `index.html: ${BASE}/%E0%A4%A/ (malformed percent-encoding)`,
+      `index.html: ${BASE}/#%E0%A4%A (malformed percent-encoding)`,
+    ]);
+  });
+
   it('compares the built pages with the planned ones', () => {
     build({ 'index.html': '', '404.html': '', 'extra/index.html': '' });
     expect(pageMismatch(dist, ['', 'gateway'])).toEqual(['gateway/index.html: planned but not built', 'extra/index.html: built but not planned']);
