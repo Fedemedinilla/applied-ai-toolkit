@@ -118,6 +118,17 @@ describe('guard-protected-paths', () => {
     expect(bash('cd src/tournament && rm rules-v1.ts')).toEqual(['src/tournament']);
   });
 
+  it('counts every word of a pipeline that feeds names to a writing command through xargs or read', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('echo test/purity.test.ts | xargs rm')).toEqual(['test/purity.test.ts']);
+    expect(bash('echo src/tournament/rules-v1.ts | xargs rm')).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash("ls src/tournament/rules-v1.ts | xargs sed -i 's/a/b/'")).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash('git ls-files test/golden | xargs -n1 truncate -s 0')).toEqual(['test/golden']);
+    expect(bash('echo test/purity.test.ts | while read f; do rm "$f"; done')).toEqual(['test/purity.test.ts']);
+    // A pipeline that only reads still passes.
+    expect(bash('grep -l x src/tournament/rules-v1.ts | xargs wc -l')).toEqual([]);
+  });
+
   it('unquotes the target of a redirect, in both quote styles', () => {
     const bash = (command: string) => bashTargets(command, ROOT, config);
     expect(bash('echo x > "src/tournament/rules-v1.ts"')).toEqual(['src/tournament/rules-v1.ts']);

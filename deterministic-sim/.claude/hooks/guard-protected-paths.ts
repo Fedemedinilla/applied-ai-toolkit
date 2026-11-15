@@ -86,6 +86,9 @@ const WRITE_COMMAND = /\btee\b|\bsed\s+(?:-[a-zA-Z]*\s+)*-i|\bperl\s+-[a-zA-Z]*i
 const TREE_COMMAND = /\b(?:mv|rm|rmdir)\b|\bgit\s+(?:checkout|restore|rm|mv|clean|reset)\b/u;
 const SPLIT = /[\s'"`;|&()<>=]+/u;
 const CHANGE_DIR = /\b(?:cd|pushd|popd)\b/u;
+// Commands that turn their input into arguments: with one in the command, a name written in one part
+// of a pipeline (`echo f | xargs rm`, `ls f | while read x; do rm "$x"; done`) reaches the write in another.
+const STDIN_ARGS = /\b(?:xargs|parallel|read|mapfile|readarray)\b/u;
 
 /**
  * The simple commands of a command list: the text split on ;, newlines, &&, || and |, outside
@@ -220,8 +223,9 @@ export function bashTargets(command: string, root: string, config: GuardConfig):
   const text = command.replace(FD_DUP, ' ');
   const candidates: string[] = [];
   for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(unquote(match[1]));
-  // A cd moves the base of every later relative word, so after one the whole command stays one part.
-  const parts = CHANGE_DIR.test(text) ? [text] : commandParts(text);
+  // A cd moves the base of every later relative word, and xargs or read carries a word from one part
+  // into the write of another, so with either the whole command stays one part.
+  const parts = CHANGE_DIR.test(text) || STDIN_ARGS.test(text) ? [text] : commandParts(text);
   const words: Array<{ word: string; tree: boolean }> = candidates.map((word) => ({ word, tree: false }));
   for (const part of parts) {
     if (!WRITE_COMMAND.test(part)) continue;
