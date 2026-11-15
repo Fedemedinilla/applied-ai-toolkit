@@ -200,6 +200,16 @@ describe('placeOrder', () => {
     expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'already_placed', via: 'reread', order: { status: 'confirmed' } });
   });
 
+  it('does not report a confirmed order with another cart as placed after a lost attempt', async () => {
+    const k = key();
+    const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetB, quantity: 1 }])).id;
+    await db.query('select confirm_order($1, 1, $2)', [id, key()]);
+    // The first attempt is ambiguous, so only the fingerprint tells this order from this call's.
+    fake.fail('place_order', { status: 503 });
+    expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'rejected', reason: 'key_expired', why: 'not_pending', requests: 2 });
+    expect(await count(db, 'orders')).toBe(1);
+  });
+
   it('answers a confirmed order with no lost attempt as key_expired, not_pending', async () => {
     const k = key();
     const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetA, quantity: 2 }, { product_id: widgetB, quantity: 1 }])).id;
