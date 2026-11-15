@@ -63,9 +63,34 @@ export function parse(path: string, content: string): ts.SourceFile {
   return ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, KIND_BY_EXTENSION[ext]);
 }
 
+const lineStartsCache = new WeakMap<ts.SourceFile, readonly number[]>();
+
+/**
+ * Offsets where each line starts, splitting on \n only (so \r\n too). TypeScript's own line map also
+ * breaks on U+2028, U+2029 and a lone \r, which git, GitHub and editors do not count as new lines.
+ */
+function lineStarts(file: ts.SourceFile): readonly number[] {
+  const cached = lineStartsCache.get(file);
+  if (cached !== undefined) return cached;
+  const starts = [0];
+  for (let i = file.text.indexOf('\n'); i !== -1; i = file.text.indexOf('\n', i + 1)) starts.push(i + 1);
+  lineStartsCache.set(file, starts);
+  return starts;
+}
+
 function position(file: ts.SourceFile, node: ts.Node): { line: number; column: number } {
-  const { line, character } = file.getLineAndCharacterOfPosition(node.getStart(file));
-  return { line: line + 1, column: character + 1 };
+  const offset = node.getStart(file);
+  const starts = lineStarts(file);
+  let low = 0;
+  let high = starts.length - 1;
+  while (low < high) {
+    const mid = (low + high + 1) >> 1;
+    if ((starts[mid] ?? 0) <= offset) low = mid;
+    else high = mid - 1;
+  }
+  // A byte order mark is not a column an editor shows.
+  const bom = low === 0 && file.text.startsWith('﻿') ? 1 : 0;
+  return { line: low + 1, column: offset - (starts[low] ?? 0) - bom + 1 };
 }
 
 function excerpt(file: ts.SourceFile, node: ts.Node): string {

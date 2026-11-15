@@ -84,6 +84,15 @@ describe('moduleRefs', () => {
     ]);
   });
 
+  it('counts lines the way git and editors do: U+2028 in a string is not a break, a BOM is not a column', () => {
+    const at = (code: string) => moduleRefs(parse('a.ts', code)).map((r) => [r.line, r.column]);
+    expect(at("const s = 'a b c';\nimport x from 'pkg';\n")).toEqual([[2, 1]]);
+    expect(at("﻿import x from 'pkg';")).toEqual([[1, 1]]);
+    expect(at("﻿const a = 1;\r\n  import x from 'pkg';")).toEqual([[2, 3]]);
+    const leak = reexports(parse('a.ts', "import C from 'pkg';\nconst s = ' ';\nexport default C;"), (s) => s === 'pkg');
+    expect(leak.map((l) => [l.line, l.column])).toEqual([[3, 1]]);
+  });
+
   it('keeps a Vite query suffix in the specifier', () => {
     expect(refs("import code from './x.ts?raw';")[0]?.specifier).toBe('./x.ts?raw');
   });
