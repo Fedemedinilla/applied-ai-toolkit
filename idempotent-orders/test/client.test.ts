@@ -49,6 +49,27 @@ const request = (k = key()): PlaceRequest => ({
   ],
 });
 
+describe('createOrdersClient options', () => {
+  it.each<[string, Partial<OrdersClientOptions>]>([
+    ['maxAttempts NaN', { maxAttempts: Number.NaN }],
+    ['maxAttempts Infinity', { maxAttempts: Number.POSITIVE_INFINITY }],
+    ['timeoutMs Infinity', { timeoutMs: Number.POSITIVE_INFINITY }],
+    ['timeoutMs 2^31', { timeoutMs: 2 ** 31 }],
+    ['timeoutMs NaN', { timeoutMs: Number.NaN }],
+    ['timeoutMs negative', { timeoutMs: -1 }],
+    ['baseDelayMs NaN', { baseDelayMs: Number.NaN }],
+    ['baseDelayMs Infinity', { baseDelayMs: Number.POSITIVE_INFINITY }],
+    ['maxDelayMs Infinity', { maxDelayMs: Number.POSITIVE_INFINITY }],
+    ['maxDelayMs negative', { maxDelayMs: -1 }],
+  ])('throws a RangeError for %s instead of losing the bounds', (_, change) => {
+    expect(() => client(change)).toThrow(RangeError);
+  });
+
+  it('accepts the edges of the valid ranges', () => {
+    expect(() => client({ maxAttempts: 1, timeoutMs: 2_147_483_647, baseDelayMs: 0, maxDelayMs: 0 })).not.toThrow();
+  });
+});
+
 describe('placeOrder', () => {
   it('places an order on the first attempt', async () => {
     const r = await client().placeOrder(request());

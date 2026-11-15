@@ -28,7 +28,7 @@ export interface ActionKeyOptions {
   readonly slot: string;
   /** Usually `localStorage`. Omitted or throwing, the key lives only in memory. */
   readonly storage?: KeyStorage;
-  /** How long a stored key stays the same action. Default 24 hours. */
+  /** How long a stored key stays the same action. Default 24 hours. Not positive (or NaN) throws a RangeError. */
   readonly lifetimeMs?: number;
   readonly now?: () => number;
   readonly makeKey?: () => string;
@@ -59,7 +59,10 @@ export class ActionKey {
   constructor(options: ActionKeyOptions) {
     this.#slot = options.slot;
     this.#storage = options.storage;
-    this.#lifetimeMs = options.lifetimeMs ?? 24 * 60 * 60 * 1000;
+    const lifetimeMs = options.lifetimeMs ?? 24 * 60 * 60 * 1000;
+    // NaN or 0 would make every key stale at once, so every current() would mint a new one.
+    if (!(lifetimeMs > 0)) throw new RangeError('lifetimeMs is a positive number');
+    this.#lifetimeMs = lifetimeMs;
     this.#now = options.now ?? Date.now;
     this.#makeKey = options.makeKey ?? (() => newKey());
   }

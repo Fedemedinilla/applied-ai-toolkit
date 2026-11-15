@@ -75,4 +75,8 @@ describe('ActionKey', () => {
       expect(k).not.toBe('aaaaaaaaaaaaaaaaaaaa');
     }
   });
+
+  it.each([Number.NaN, 0, -1])('throws a RangeError for lifetimeMs %s, which would mint a key on every call', (lifetimeMs) => {
+    expect(() => new ActionKey({ slot: 'checkout', storage: localStorage, lifetimeMs })).toThrow(RangeError);
+  });
 });
