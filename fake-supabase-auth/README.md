@@ -45,7 +45,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 | `fetch` | The fake. It throws for any origin other than `url`, so a test cannot reach the network through it. |
 | `calls`, `requests` | Every request in order: `"GET /auth/v1/user"` strings, and the method, path, query, headers and parsed body. |
 | `user`, `users`, `otherUserId` | The seeded user, all users by id, and the sub a tampered token claims. |
-| `authorize(url)` | Plays the OAuth provider: takes the authorize URL from `signInWithOAuth` and returns the code for `exchangeCodeForSession`, bound to the PKCE challenge in that URL. |
+| `authorize(url, userId?)` | Plays the OAuth provider: takes the authorize URL from `signInWithOAuth` and returns the code for `exchangeCodeForSession`, bound to the PKCE challenge in that URL. The code signs in `userId`, which defaults to `user`. An id with no user is accepted here, and the exchange then answers 404 `user_not_found`. |
 | `deleteUser(id)` | Like `auth.admin.deleteUser`: the user and its refresh tokens are gone. |
 | `knobs` | Mutable fields read on every request (below). |
 

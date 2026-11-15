@@ -135,6 +135,25 @@ describe('OAuth with PKCE', () => {
     const { error } = await client.auth.exchangeCodeForSession(fake.authorize(url.href));
     expect(error).toMatchObject({ status: 403, code: 'bad_code_verifier' });
   });
+
+  it('authorize(url, userId) signs in another seeded user; a userId that does not exist gets 404 user_not_found', async () => {
+    const second = { id: '44444444-4444-4444-8444-444444444444', email: 'second@example.test' };
+    fake = await createFakeSupabase({ users: [DEFAULT_USER, second] });
+    const startFlow = async (client: SupabaseClient): Promise<string> => {
+      const started = await client.auth.signInWithOAuth({ provider: 'google', options: { skipBrowserRedirect: true } });
+      if (started.data.url === null) throw new Error('no authorize URL');
+      return started.data.url;
+    };
+
+    const client = clientFor(fake);
+    const { data, error } = await client.auth.exchangeCodeForSession(fake.authorize(await startFlow(client), second.id));
+    expect(error).toBeNull();
+    expect(data.user?.id).toBe(second.id);
+
+    const other = clientFor(fake);
+    const missing = await other.auth.exchangeCodeForSession(fake.authorize(await startFlow(other), fake.otherUserId));
+    expect(missing.error).toMatchObject({ status: 404, code: 'user_not_found' });
+  });
 });
 
 describe('getClaims', () => {
