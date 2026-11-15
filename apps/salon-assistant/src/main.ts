@@ -41,14 +41,11 @@ let pending = false;
 
 const money = (n: number) => `$${n.toLocaleString('es-AR')}`;
 
-function cardView(card: Card): HTMLElement {
-  const box = document.createElement('div');
-  box.className = 'card';
-  const title = document.createElement('strong');
-  title.textContent = 'Pedido de turno (lo confirma el local)';
-  const dl = document.createElement('dl');
+const CARD_TITLE = 'Pedido de turno (lo confirma el local)';
+
+function cardRows(card: Card): Array<[string, string]> {
   const who = card.stylist ?? (card.candidates ?? []).join(' o ');
-  const rows: Array<[string, string]> = [
+  return [
     ['Servicio', card.service],
     ['Precio', money(card.price)],
     ['Duración', `${card.minutes} min`],
@@ -56,7 +53,15 @@ function cardView(card: Card): HTMLElement {
     ['Hora', card.time ?? 'a convenir'],
     ['Con', who],
   ];
-  for (const [k, v] of rows) {
+}
+
+function cardView(card: Card): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'card';
+  const title = document.createElement('strong');
+  title.textContent = CARD_TITLE;
+  const dl = document.createElement('dl');
+  for (const [k, v] of cardRows(card)) {
     const dt = document.createElement('dt');
     dt.textContent = k;
     const dd = document.createElement('dd');
@@ -67,17 +72,55 @@ function cardView(card: Card): HTMLElement {
   return box;
 }
 
+// Elements the renderer emits inside a line; any other element is a block of its own.
+const INLINE = new Set(['A', 'B', 'CODE', 'DEL', 'EM', 'I', 'S', 'SPAN', 'STRONG']);
+
+/** The text of each block under `root`. textContent alone fuses blocks: "hola.chau". */
+function blockTexts(root: Element): string[] {
+  const out: string[] = [];
+  let line = '';
+  const flush = () => {
+    const t = line.replace(/\s+/gu, ' ').trim();
+    if (t) out.push(t);
+    line = '';
+  };
+  const walk = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) line += child.textContent ?? '';
+      else if (child instanceof Element) {
+        if (child.tagName === 'BR') line += ' ';
+        else if (INLINE.has(child.tagName)) walk(child);
+        else {
+          flush();
+          walk(child);
+          flush();
+        }
+      }
+    }
+  };
+  walk(root);
+  flush();
+  return out;
+}
+
+/** What the live region reads: every block and card row as its own sentence, so a screen reader pauses between them. */
+function spoken(reply: Element, card: Card | null): string {
+  const parts = [...blockTexts(reply), ...(card ? [CARD_TITLE, ...cardRows(card).map(([k, v]) => `${k}: ${v}`)] : [])];
+  return parts.map((p) => (/[.!?…:]$/u.test(p) ? p : `${p}.`)).join(' ');
+}
+
 function add(role: Turn['role'], content: string, card: Card | null = null): HTMLLIElement {
   const li = document.createElement('li');
   li.className = role === 'user' ? 'me' : 'bot';
   if (role === 'user') li.textContent = content;
   else li.innerHTML = renderMarkdown(content, { internalHosts: [], externalHosts: [], mailto: false });
+  const said = role === 'assistant' ? spoken(li, card) : '';
   if (card) li.append(cardView(card));
   log?.append(li);
   li.scrollIntoView({ block: 'nearest' });
   // Only replies are announced, through their own live region: a live log would read the
   // visitor's own message back to them.
-  if (role === 'assistant' && announce) announce.textContent = li.textContent ?? '';
+  if (role === 'assistant' && announce) announce.textContent = said;
   return li;
 }
 
