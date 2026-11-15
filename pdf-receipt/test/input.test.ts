@@ -129,8 +129,18 @@ describe('text never throws; warnings say what changed', () => {
 
   it('prints a placeholder when a field loses all of its text', async () => {
     const warnings: ReceiptWarning[] = [];
-    await buildReceiptPdf(order({ customer: { name: '🌵🌵🌵' } }), { onWarning: (w) => warnings.push(w) });
+    const { drawn } = await record(() => buildReceiptPdf(order({ customer: { name: '🌵🌵🌵' } }), { onWarning: (w) => warnings.push(w) }));
     expect(warnings).toEqual([{ code: 'characters_dropped', field: 'customer.name', count: 3 }]);
+    const all = drawn.map((d) => d.text);
+    expect(all[all.indexOf('Cliente') + 1]).toBe('(texto no imprimible)');
+  });
+
+  it('prints a placeholder when the notes lose all of their text', async () => {
+    const warnings: ReceiptWarning[] = [];
+    const { drawn } = await record(() => buildReceiptPdf(order({ notes: '🌵' }), { onWarning: (w) => warnings.push(w) }));
+    expect(warnings).toEqual([{ code: 'characters_dropped', field: 'notes', count: 1 }]);
+    const all = drawn.map((d) => d.text);
+    expect(all[all.indexOf('Aclaraciones') + 1]).toBe('(texto no imprimible)');
   });
 
   it('names the input line that was clipped, after an empty line before it', async () => {
