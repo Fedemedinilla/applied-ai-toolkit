@@ -62,7 +62,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import __version__
+from . import __version__, domains
 from .config import (
     DEFAULT_KIND,
     DEFAULT_PACE_SECONDS,
@@ -230,6 +230,8 @@ def _check_home_url(url: str, *, test_hooks: bool) -> str | None:
         pass
     if "." not in host.strip("."):
         return "the domain of the URL is not valid"
+    if domains.idna_deviation(host.lower()):
+        return f"the domain of the URL is not valid: {domains.DEVIATION_PROBLEM}"
     is_test_host = host.rstrip(".").lower().endswith(TEST_SUFFIX)
     if test_hooks and not is_test_host:
         return "the test options only work with a .test domain"

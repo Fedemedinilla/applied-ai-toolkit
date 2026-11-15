@@ -282,5 +282,36 @@ class RdapRedirectTest(unittest.TestCase):
         self.assertEqual(pins[-1], ("https://rdap.example.net/domain/example.org", True))
 
 
+class IdnaDeviationTest(unittest.TestCase):
+    """ß, ς, ZWJ and ZWNJ map differently in IDNA 2003 (Python's codec) and in browsers (UTS 46)."""
+
+    NAMES = ("fa\u00df.de", "stra\u00dfe.de", "\u03b1\u03c2.gr", "a\u200db.example", "a\u200cb.example", "FA\u1e9e.de")
+
+    def test_normalize_host_refuses_them(self) -> None:
+        from sitecheck import domains
+
+        for name in self.NAMES:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                domains.normalize_host(name)
+        self.assertEqual(domains.normalize_host("xn--fa-hia.de"), "xn--fa-hia.de")
+        self.assertEqual(domains.normalize_host("ni\u00f1os.example"), "xn--nios-hqa.example")
+
+    def test_exclusion_line_with_them_is_a_problem_not_another_domain(self) -> None:
+        from sitecheck import exclusions
+
+        entries, problem = exclusions.parse_line("stra\u00dfe.de pidio la baja")
+        self.assertNotIn("strasse.de", entries)
+        self.assertIsNotNone(problem)
+        entries, problem = exclusions.parse_line("xn--strae-oqa.de pidio la baja")
+        self.assertEqual((entries, problem), (["xn--strae-oqa.de"], None))
+
+    def test_cli_refuses_such_a_home_url_with_exit_2(self) -> None:
+        # Test hooks pointed at a closed loopback port: nothing leaves the machine even without the fix.
+        with temp_dir() as out:
+            code, _, err = run_cli(["https://fa\u00df.test/", "--name", "X", "--out", str(out), "--test-loopback", "127.0.0.1:1", "--test-services", "http://127.0.0.1:1"])
+            self.assertEqual(code, 2, err)
+            self.assertIn("xn--", err)
+
+
 if __name__ == "__main__":
     unittest.main()
