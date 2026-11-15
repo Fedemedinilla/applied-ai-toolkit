@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
@@ -121,9 +122,14 @@ class BuildTest(unittest.TestCase):
             build = "import sys; from setuptools import build_meta; print(build_meta.build_sdist(sys.argv[1]))"
             done = _python(["-c", build, str(out)], src)
             self.assertEqual(done.returncode, 0, done.stderr[-2000:])
-            archive = out / f"{sitecheck.DIST_NAME}-{sitecheck.__version__}.tar.gz"
+            # setuptools 69.3+ names the sdist after the PEP 625 normalized name (site_check_passive);
+            # older ones keep the project name as written. Take the name the backend returns.
+            stem = done.stdout.strip().splitlines()[-1].removesuffix(".tar.gz")
+            normalized = re.sub(r"[-_.]+", "_", sitecheck.DIST_NAME).lower()
+            self.assertIn(stem, {f"{sitecheck.DIST_NAME}-{sitecheck.__version__}", f"{normalized}-{sitecheck.__version__}"})
+            archive = out / f"{stem}.tar.gz"
             self.assertTrue(archive.is_file(), sorted(p.name for p in out.iterdir()))
-            prefix = f"{sitecheck.DIST_NAME}-{sitecheck.__version__}/"
+            prefix = f"{stem}/"
             with tarfile.open(archive) as tar:
                 names = set(tar.getnames())
                 info = tar.extractfile(prefix + "PKG-INFO")
