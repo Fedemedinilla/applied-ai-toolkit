@@ -25,9 +25,19 @@ export const DOCS_FOLDER = 'docs';
 
 const ROOT = new URL('..', import.meta.url);
 
-/** The app folders the landing page links to, in page order. The link to the docs is not one. */
+/**
+ * The site folders the landing page links to, in page order: the first path segment of every
+ * relative href on an <a> tag, however the tag is written (other attributes first, single quotes,
+ * no ./, no trailing slash, a file inside the folder). Links with a scheme, protocol-relative
+ * links, fragments and the docs folder are left out. assemblePages compares the result with
+ * PAGES_APPS, so a link to a folder that is not published fails the build.
+ */
 export function landingLinks(html: string): string[] {
-  return [...html.matchAll(/<a href="\.\/([a-z-]+)\/">/g)].map((m) => m[1] ?? '').filter((folder) => folder !== DOCS_FOLDER);
+  const hrefs = [...html.matchAll(/<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi)].map((m) => (m[1] ?? m[2] ?? m[3] ?? '').trim());
+  return hrefs
+    .filter((href) => !/^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(href))
+    .map((href) => href.replace(/^(?:\.\/)+/, '').replace(/^\/+/, '').split(/[/?#]/)[0] ?? '')
+    .filter((folder) => folder !== '' && folder !== DOCS_FOLDER);
 }
 
 export function assemblePages(root: URL = ROOT): string {

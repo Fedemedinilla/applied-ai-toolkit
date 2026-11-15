@@ -16,6 +16,24 @@ describe('the landing page', () => {
     expect(landingLinks(landing)).toEqual([...PAGES_APPS]);
   });
 
+  it.each([
+    ['an attribute before href', '<a class="demo-link" href="./writer/">Writer</a>', 'writer'],
+    ['single quotes', "<a href='./push-lab/'>Push</a>", 'push-lab'],
+    ['no trailing slash', '<a href="./chat-widget">Chat</a>', 'chat-widget'],
+    ['no leading ./', '<a href="writer/">Writer</a>', 'writer'],
+    ['a file inside the folder', '<a href="./writer/index.html">Writer</a>', 'writer'],
+    ['a digit in the folder name', '<a href="./app2/">App</a>', 'app2'],
+    ['spaces around =', '<a href = "./salon-assistant/">Salon</a>', 'salon-assistant'],
+  ])('sees a link to an app folder written with %s', (_, link, folder) => {
+    expect(landingLinks(`<a href="./caja/">Caja</a>${link}`)).toEqual(['caja', folder]);
+  });
+
+  it('ignores links that leave the site, fragments, data-href and the docs folder', () => {
+    const html = '<a href="#demos">Skip</a><a href="https://github.com/x">GitHub</a><a href="mailto:a@example.com">m</a>'
+      + '<a href="//example.com/">x</a><a data-href="./writer/">x</a><a href="./docs/">Docs</a><a href="./caja/">Caja</a>';
+    expect(landingLinks(html)).toEqual(['caja']);
+  });
+
   it('links the docs site once, in a folder that no app uses', () => {
     expect(landing.split(`<a href="./${DOCS_FOLDER}/">`).length - 1).toBe(1);
     expect(PAGES_APPS).not.toContain(DOCS_FOLDER);
@@ -86,6 +104,18 @@ describe('assemblePages', () => {
     expect(readdirSync(join(out, 'shared/fonts'))).toEqual(['a.woff2']);
     expect(readFileSync(join(out, 'replay-lab/index.html'), 'utf8')).toBe('<title>replay-lab</title>');
     expect(readdirSync(join(out, 'caja/assets'))).toEqual(['a.js']);
+  });
+
+  it('refuses to assemble when the landing page links an app that PAGES_APPS does not list', () => {
+    const url = tree(PAGES_APPS);
+    writeFileSync(join(root, 'apps/index.html'), landing.replace('</ol>', '<li><a class="x" href="./writer/">Writer</a></li></ol>'));
+    expect(() => assemblePages(url)).toThrow(/apps\/index.html links .*writer; PAGES_APPS lists/);
+  });
+
+  it('refuses to assemble when the landing page leaves out an app that PAGES_APPS lists', () => {
+    const url = tree(PAGES_APPS);
+    writeFileSync(join(root, 'apps/index.html'), landing.replace('<a href="./receipt/">Receipt</a>', 'Receipt'));
+    expect(() => assemblePages(url)).toThrow(/apps\/index.html links caja, replay-lab, checklist; PAGES_APPS lists/);
   });
 
   it('refuses to assemble when a published build is missing', () => {
