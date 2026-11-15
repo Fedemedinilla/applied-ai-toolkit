@@ -50,6 +50,14 @@ describe('one question per ambiguity reason', () => {
     expect(q.options[1]?.label).toBe('No, va aparte (21%): $121.000');
   });
 
+  it('a fractional rate is written the es-AR way, in the prompt, the label and the literal', () => {
+    const d = ask('pagué 20 mil con 10,5% de descuento');
+    expect(d.prompt).toBe('¿Los 20 mil son antes o después del 10,5% de descuento?');
+    expect(d.options[0]?.literal).toBe('20 mil - 10,5%');
+    const t = ask('compré harina 20 mil más 10,5% de iva');
+    expect(t.options[1]).toEqual({ label: 'No, va aparte (10,5%): $22.100', amount: 22100, literal: '20 mil + 10,5%' });
+  });
+
   it('instalments: the whole purchase or this payment', () => {
     const q = ask('compré la heladera en 6 cuotas sin interés de 25 lucas');
     expect(q.reason).toBe('instalments');

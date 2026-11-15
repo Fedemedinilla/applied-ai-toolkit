@@ -28,6 +28,11 @@ export interface Question {
 /** Two decimals, the precision a cash book keeps. */
 const cents = (n: number): number => Math.round(n * 100) / 100;
 
+const RATE = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
+
+/** "10,5%": a rate written like every other number on screen, never "10.5%" (a dot groups thousands). */
+const percent = (n: number): string => `${RATE.format(n)}%`;
+
 interface Figure {
   span: Span;
   value: number;
@@ -128,7 +133,7 @@ function discount(text: string, parsed: ParsedAmount): Question {
   );
   const base = figs.filter((f) => f !== rate).sort((a, b) => b.value - a.value)[0];
   const prompt = rate && base
-    ? `¿Los ${base.span.text} son antes o después del ${rate.value}% de descuento?`
+    ? `¿Los ${base.span.text} son antes o después del ${percent(rate.value)} de descuento?`
     : '¿Cuánto pagaste, ya con el descuento?';
   if (!rate || !base) return typedOnly('discount_unclear', prompt);
   const net = cents(base.value * (1 - rate.value / 100));
@@ -136,7 +141,7 @@ function discount(text: string, parsed: ParsedAmount): Question {
     reason: 'discount_unclear',
     prompt,
     options: [
-      { label: `Antes: con el descuento fueron ${money(net)}`, amount: net, literal: `${base.span.text} - ${rate.value}%` },
+      { label: `Antes: con el descuento fueron ${money(net)}`, amount: net, literal: `${base.span.text} - ${percent(rate.value)}` },
       { label: `Después: fueron ${money(base.value)}`, amount: base.value, literal: base.span.text },
     ],
     typed: true,
@@ -158,7 +163,7 @@ function tax(text: string, parsed: ParsedAmount): Question {
     prompt: `¿El IVA ya está incluido en los ${base.span.text}?`,
     options: [
       { label: `Sí, ya está incluido: ${money(base.value)}`, amount: base.value, literal: base.span.text },
-      { label: `No, va aparte (${rate}%): ${money(gross)}`, amount: gross, literal: `${base.span.text} + ${rate}%` },
+      { label: `No, va aparte (${percent(rate)}): ${money(gross)}`, amount: gross, literal: `${base.span.text} + ${percent(rate)}` },
     ],
     typed: true,
   };
