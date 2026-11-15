@@ -122,6 +122,19 @@ describe('invites', () => {
     expect(pulled).toBeLessThan(12);
   });
 
+  it('takes an operator call with no Origin, as curl sends it, and refuses one from another site', async () => {
+    const s = setup();
+    const body = JSON.stringify({ tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains: ['vivero-nuevo.example'] });
+    const headers = { ...basic(ADMIN), 'content-type': 'application/json' };
+    const foreign = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers: { ...headers, origin: 'https://evil.example' }, body }));
+    expect(foreign.status).toBe(403);
+    expect(s.store.tenants.has('vivero-nuevo')).toBe(false);
+    const cli = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers, body }));
+    expect(cli.status).toBe(200);
+    const unauthenticated = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers: { 'content-type': 'application/json' }, body }));
+    expect(unauthenticated.status).toBe(401);
+  });
+
   it('does not hand a tenant to a second email', async () => {
     const s = setup();
     await invite(s);

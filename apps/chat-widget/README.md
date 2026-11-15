@@ -120,7 +120,15 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 
 **Invites are single-use, and their token never reaches a log.** The operator creates a tenant and an invite with HTTP Basic, compared in constant time and limited per IP on failures. The operator password must be at least 16 characters, because it can reissue any owner's invite. The owner's row stores the nonce of the one invite that still works. Accepting it clears the nonce in the same statement that sets the password, so two tabs cannot both use one link, and issuing a new invite voids the old one. A link that stayed valid until a password existed would be usable for its whole lifetime if it leaked. The token travels in the URL fragment (`/panel/#invite=...`), which browsers send neither to the server nor in `Referer`, and the page removes it from the address bar on load.
 
-**Writes need the panel's own Origin and a JSON body.** A missing Origin is refused, since every browser sends one on a `fetch` POST or PUT. A form from another site cannot send `application/json`, and a cross-origin `fetch` that does gets no CORS answer from the panel routes, even in a browser that ignores `SameSite`.
+The operator route has no page. It is called from a terminal, and a call with no `Origin` header is accepted there:
+
+```sh
+curl -u ops:"$CHAT_WIDGET_ADMIN_PASSWORD" -H 'content-type: application/json' \
+  -d '{"tenantId":"taller-uno","email":"owner@taller-uno.example","allowedDomains":["taller-uno.example"]}' \
+  http://localhost:4331/panel/api/admin/invite
+```
+
+**Writes need the panel's own Origin and a JSON body.** A missing Origin is refused, since every browser sends one on a `fetch` POST or PUT. The one exception is the operator route, whose credential is the Basic header and not a cookie; an Origin other than the panel's is refused there too. A form from another site cannot send `application/json`, and a cross-origin `fetch` that does gets no CORS answer from the panel routes, even in a browser that ignores `SameSite`.
 
 ## What the tests cover
 
