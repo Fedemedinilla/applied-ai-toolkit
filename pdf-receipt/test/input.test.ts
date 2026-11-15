@@ -82,6 +82,16 @@ describe('numbers that cannot be printed truthfully throw, with the field', () =
     expect(await failure(data)).toEqual({ code: 'invalid_option', field: 'items' });
   });
 
+  it.each([
+    ['a missing shop', { shop: undefined }, 'shop'],
+    ['a null customer', { customer: null }, 'customer'],
+    ['party lines as one string', { customer: { name: 'C', lines: 'Pasaje Ficticio 45' } }, 'customer.lines'],
+    ['a null item', { items: [{ name: 'Maceta', quantity: 1, unitPriceCents: 1 }, null] }, 'items[1]'],
+  ])('refuses %s with the documented error', async (_name, patch, field) => {
+    const data = { ...order(), ...patch } as unknown as ReceiptData;
+    expect(await failure(data)).toEqual({ code: 'invalid_option', field });
+  });
+
   it('stops at the first line that takes the items total past the maximum', async () => {
     const lines = Array.from({ length: 900 }, () => ({ name: 'Lote', quantity: 1, unitPriceCents: MAX_CENTS }));
     expect(await failure(order({ items: lines }))).toEqual({ code: 'amount_too_large', field: 'items' });

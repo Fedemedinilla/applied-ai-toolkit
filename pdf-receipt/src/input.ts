@@ -103,6 +103,10 @@ function quantity(value: unknown, field: string): number {
   return value;
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function calendarDate(value: unknown, field: string): string {
@@ -177,7 +181,11 @@ export function prepare(data: ReceiptData, { labels: rawLabels, format, warn }: 
   const money = (c: number): string => printable(formatCents(c, format));
 
   const party = (p: ReceiptParty, field: string): PreparedParty => {
-    const all = p.lines ?? [];
+    // The shape is checked at runtime for JS callers, like `items` below: a missing join or a
+    // column stored as one string would otherwise crash with a TypeError and no field.
+    if (!isObject(p)) throw new ReceiptInputError('invalid_option', field, 'must be an object');
+    const all: unknown = p.lines ?? [];
+    if (!Array.isArray(all)) throw new ReceiptInputError('invalid_option', `${field}.lines`, 'must be an array of strings');
     if (all.length > MAX_PARTY_LINES) warn({ code: 'lines_omitted', field: `${field}.lines`, count: all.length - MAX_PARTY_LINES });
     return {
       name: line(p.name, `${field}.name`),
@@ -190,7 +198,8 @@ export function prepare(data: ReceiptData, { labels: rawLabels, format, warn }: 
 
   if (!Array.isArray(data.items)) throw new ReceiptInputError('invalid_option', 'items', 'must be an array');
   let itemsTotal = 0;
-  const items = data.items.map((item, i) => {
+  const items = data.items.map((item: unknown, i) => {
+    if (!isObject(item)) throw new ReceiptInputError('invalid_option', `items[${i}]`, 'must be an object');
     const q = quantity(item.quantity, `items[${i}].quantity`);
     const price = cents(item.unitPriceCents, `items[${i}].unitPriceCents`, { allowNegative: false });
     const total = lineTotalCents(q, price);
