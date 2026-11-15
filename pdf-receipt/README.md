@@ -36,7 +36,7 @@ const bytes = await buildReceiptPdf(
 // bytes is a Uint8Array: write it to disk, return it from a handler, or wrap it in a Blob.
 ```
 
-`buildReceipt(data, options)` returns `{ bytes, pageCount, warnings }` for callers that want to show them. Options: `logo` (PNG or JPEG bytes), `labels` (any subset; `LABELS_ES` is the default and `LABELS_EN` is included), `locale` (a BCP 47 tag, default `es-AR`), `currencySymbol` (default `$`), `pageSize` (`A4` or `Letter`), `accentColor` (`#rrggbb`), `maxNameLines` (1 to 20, default 3) and `onWarning`.
+`buildReceipt(data, options)` returns `{ bytes, pageCount, warnings }` for callers that want to show them. Options: `logo` (PNG or JPEG bytes), `labels` (any subset; `LABELS_ES` is the default and `LABELS_EN` is included), `locale` (a BCP 47 tag, default `es-AR`), `currencySymbol` (default `$`), `pageSize` (`A4` or `Letter`), `accentColor` (`#rrggbb`), `maxNameLines` (1 to 20, default 3) and `onWarning`. An option outside these values, including a currency symbol the fonts cannot draw such as `₹`, throws `ReceiptInputError` with the code `invalid_option` and the option's name as the field.
 
 ## Design decisions
 

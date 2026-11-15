@@ -104,6 +104,19 @@ function checkLocale(locale: unknown): string {
   throw new ReceiptInputError('invalid_option', 'locale', 'must be a BCP 47 language tag such as es-AR');
 }
 
+/** The symbol printed before every amount. One the fonts cannot draw would leave every amount a bare number. */
+function currencySymbol(value: unknown): string {
+  if (typeof value !== 'string') throw new ReceiptInputError('invalid_option', 'currencySymbol', 'must be a string');
+  const { text, dropped } = toWinAnsiLine(value);
+  if (dropped > 0) throw new ReceiptInputError('invalid_option', 'currencySymbol', 'has characters the PDF fonts cannot draw');
+  return text;
+}
+
+function pageDimensions(value: unknown): readonly [number, number] {
+  if (typeof value === 'string' && Object.hasOwn(PAGE_SIZES, value)) return PAGE_SIZES[value as keyof typeof PAGE_SIZES];
+  throw new ReceiptInputError('invalid_option', 'pageSize', 'must be A4 or Letter');
+}
+
 function logoFormat(bytes: Uint8Array): 'png' | 'jpg' | null {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpg';
@@ -142,7 +155,9 @@ export interface BuiltReceipt {
 }
 
 /** buildReceiptPdf with the page count and the warnings returned next to the bytes. */
-export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = {}): Promise<BuiltReceipt> {
+export async function buildReceipt(data: ReceiptData, maybeOptions: ReceiptOptions = {}): Promise<BuiltReceipt> {
+  // A JS caller can pass null; it means the same as no options.
+  const options: ReceiptOptions = maybeOptions ?? {};
   const warnings: ReceiptWarning[] = [];
   const warn = (w: ReceiptWarning): void => {
     warnings.push(w);
@@ -155,7 +170,8 @@ export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = 
   }
   const locale = checkLocale(options.locale ?? 'es-AR');
   const accent = parseColor(options.accentColor ?? '#1f5f5b');
-  const symbol = toWinAnsiLine(options.currencySymbol ?? '$').text;
+  const symbol = currencySymbol(options.currencySymbol ?? '$');
+  const pageSize = pageDimensions(options.pageSize ?? 'A4');
   const r = prepare(data, {
     labels: mergeLabels(options.labels),
     format: { locale, symbol },
@@ -176,7 +192,7 @@ export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = 
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = options.logo ? await embedLogo(doc, options.logo, warn) : null;
 
-  draw(doc, r, { regular, bold, logo, accent, maxNameLines, pageSize: PAGE_SIZES[options.pageSize ?? 'A4'], warn });
+  draw(doc, r, { regular, bold, logo, accent, maxNameLines, pageSize, warn });
   const saved = await doc.save();
   // pdf-lib types the result over ArrayBufferLike; it is always a plain ArrayBuffer, and the
   // narrower type lets a browser caller pass it to new Blob() without a cast.

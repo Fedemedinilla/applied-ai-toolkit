@@ -57,6 +57,26 @@ describe('numbers that cannot be printed truthfully throw, with the field', () =
     expect(await failure(order(), { locale: '' })).toEqual({ code: 'invalid_option', field: 'locale' });
   });
 
+  it.each(['₲', '₹', '💲'])('refuses a currency symbol the fonts cannot draw: %s', async (currencySymbol) => {
+    expect(await failure(order(), { currencySymbol })).toEqual({ code: 'invalid_option', field: 'currencySymbol' });
+  });
+
+  it('keeps a currency symbol the fonts can draw', async () => {
+    const { drawn } = await record(() => buildReceiptPdf(order(), { currencySymbol: '€' }));
+    expect(drawn.map((d) => d.text)).toContain('€27.000');
+  });
+
+  it('refuses options of the wrong type at runtime with the documented error', async () => {
+    expect(await failure(order(), { pageSize: 'A5' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { pageSize: 'a4' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { pageSize: 'toString' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { currencySymbol: 36 })).toEqual({ code: 'invalid_option', field: 'currencySymbol' });
+  });
+
+  it('treats null options as no options', async () => {
+    await expect(buildReceiptPdf(order(), null as unknown as undefined)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   it('refuses items that are not an array with the documented error', async () => {
     const data = { ...order(), items: undefined } as unknown as ReceiptData;
     expect(await failure(data)).toEqual({ code: 'invalid_option', field: 'items' });
