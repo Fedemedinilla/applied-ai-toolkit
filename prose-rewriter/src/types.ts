@@ -1,0 +1,142 @@
+/**
+ * The contract of the rewriter, as zod schemas: what rewrite() takes, the edits a model proposes,
+ * the fact report and what rewrite() returns. Phase F0 of the design fixes these shapes; the
+ * stages that fill them come in F4 and F5.
+ *
+ * The user's text and CV are data, never instructions. The model never returns a whole text: it
+ * proposes edits over exact quoted spans, and code applies, checks and reverts them.
+ */
+import { z } from 'zod';
+
+export const GENRES = ['cover-letter', 'email', 'follow-up', 'whatsapp'] as const;
+export const Genre = z.enum(GENRES);
+export type Genre = z.infer<typeof Genre>;
+
+export const Lang = z.enum(['es', 'en']);
+export type Lang = z.infer<typeof Lang>;
+
+/** Spanish only. */
+export const Variety = z.enum(['rioplatense', 'neutral']);
+export type Variety = z.infer<typeof Variety>;
+
+export const Register = z.enum(['formal', 'neutral', 'casual']);
+export type Register = z.infer<typeof Register>;
+
+/** How far a rewrite may go: the smallest fix, a polish, or a real rewording by paragraph. */
+export const Mode = z.enum(['minimo', 'pulido', 'reescritura']);
+export type Mode = z.infer<typeof Mode>;
+
+/** WhatsApp defaults to the smallest edit; every other genre to a polish. */
+export function defaultMode(genre: Genre): Mode {
+  return genre === 'whatsapp' ? 'minimo' : 'pulido';
+}
+
+const Text = z.string().min(1);
+
+export const RewriteInput = z
+  .strictObject({
+    text: Text,
+    genre: Genre,
+    lang: Lang,
+    variety: Variety.optional(),
+    register: Register.optional(),
+    mode: Mode.optional(),
+    profile: z.strictObject({
+      cvMarkdown: Text,
+      anchors: z.array(Text).optional(),
+      extraFacts: z.array(Text).optional(),
+    }),
+    recipient: z
+      .strictObject({
+        name: Text.optional(),
+        org: Text.optional(),
+        role: Text.optional(),
+        previousMessage: Text.optional(),
+      })
+      .optional(),
+    goal: Text.optional(),
+    /** Phrases that are never touched. */
+    keep: z.array(Text).optional(),
+    /** Runs the fact judge on WhatsApp in `minimo` mode too. */
+    strict: z.boolean().optional(),
+  })
+  .refine((input) => input.variety === undefined || input.lang === 'es', { message: 'variety applies to Spanish only', path: ['variety'] });
+export type RewriteInput = z.infer<typeof RewriteInput>;
+
+/**
+ * A missing fact is asked for with a labelled marker, `[COMPLETAR: what is missing]`. A bare
+ * `[COMPLETAR]` is refused: slop-lint reports it as FMT-04 (level 1), so the edit would be
+ * reverted anyway, and the label is what tells the user what to fill in.
+ */
+const BARE_PLACEHOLDER = /\[\s*COMPLETAR\s*(?::\s*)?\]/i;
+
+/** One edit a model proposes: the exact text it replaces in one sentence, and the replacement. */
+export const Edit = z.strictObject({
+  sentenceId: z.number().int().nonnegative(),
+  /** Quoted exactly from the text; an edit whose `before` is not found is rejected in code. */
+  before: Text,
+  after: z.string().refine((s) => !BARE_PLACEHOLDER.test(s), { message: 'a placeholder needs a label: [COMPLETAR: ...]' }),
+  reason: Text,
+  ruleId: Text.optional(),
+  principleId: Text.optional(),
+  /** Set when the edit removes a fact on purpose; accepted only if the fact stays in another sentence. */
+  drop: z.boolean().optional(),
+});
+export type Edit = z.infer<typeof Edit>;
+
+/** Every list holds normalized facts (numbers with units, dates, names, tools, anchors). */
+export const FactReport = z.strictObject({
+  kept: z.array(z.string()),
+  dropped: z.array(z.string()),
+  added: z.array(z.string()),
+  /** Taken from the CV or the recipient and not in the original: shown as "added from the CV". */
+  fromCv: z.array(z.string()),
+  /** In the user's text and not in the CV: flagged, never strengthened or removed. */
+  notInCv: z.array(z.string()),
+  placeholders: z.array(z.string()),
+});
+export type FactReport = z.infer<typeof FactReport>;
+
+export const STAGES = ['prepare', 'analyse', 'plan', 'edit', 'style', 'factcheck', 'relint', 'assemble'] as const;
+
+const Span = z.strictObject({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() });
+
+export const DiffHunk = z.strictObject({ span: Span, before: z.string(), after: z.string() });
+export type DiffHunk = z.infer<typeof DiffHunk>;
+
+export const Change = z.strictObject({
+  id: Text,
+  span: Span,
+  before: z.string(),
+  after: z.string(),
+  reason: Text,
+  ruleId: Text.optional(),
+  principleId: Text.optional(),
+  stage: z.enum(STAGES),
+  status: z.enum(['applied', 'reverted']),
+  revertReason: Text.optional(),
+});
+export type Change = z.infer<typeof Change>;
+
+export const Flag = z.strictObject({
+  kind: z.enum(['not-in-cv', 'missing-fact', 'tone-risk', 'length', 'injection']),
+  span: Span.optional(),
+  message: Text,
+});
+export type Flag = z.infer<typeof Flag>;
+
+/** slop-lint's result for the text before and after. Typed against slop-lint once the fences allow it. */
+const Lint = z.unknown();
+
+export const RewriteResult = z.strictObject({
+  rewritten: z.string(),
+  diff: z.array(DiffHunk),
+  changes: z.array(Change),
+  facts: FactReport,
+  lint: z.strictObject({ before: Lint, after: Lint }),
+  flags: z.array(Flag),
+  status: z.enum(['ok', 'needs-review', 'blocked']),
+  /** costUsd is null when the gateway has no price for a model: never an invented number. */
+  usage: z.strictObject({ calls: z.number().int().nonnegative(), costUsd: z.number().nonnegative().nullable() }),
+});
+export type RewriteResult = z.infer<typeof RewriteResult>;

@@ -4,7 +4,7 @@ How this repository is kept in shape between releases. Each section is one routi
 
 ## Diff-scoped audit
 
-After a branch changes a few folders, audit only those folders and the folders that import them, instead of running the full audit over all 30 units and 4 cross-cutting areas. It has two steps.
+After a branch changes a few folders, audit only those folders and the folders that import them, instead of running the full audit over all 31 units and 4 cross-cutting areas. It has two steps.
 
 1. From the repository root, with the branch checked out and its work committed, write the scope:
 

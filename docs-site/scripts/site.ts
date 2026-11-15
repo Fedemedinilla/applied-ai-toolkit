@@ -56,4 +56,4 @@ export const PROJECT_DOCS: ReadonlyArray<{ readonly file: string; readonly slug:
  * Top-level folders with a README that is not a page: this site's own folder, and the folders of
  * the prose rewriter while they are being built (phases F0 to F6). They get a sidebar group in F7.
  */
-export const NOT_DOCUMENTED: readonly string[] = ['docs-site', 'style-refs'];
+export const NOT_DOCUMENTED: readonly string[] = ['docs-site', 'prose-rewriter', 'style-refs'];
