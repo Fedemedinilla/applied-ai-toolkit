@@ -376,7 +376,7 @@ describe('rules only a genre runs', () => {
   const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
 
   it('run in the genres the design gives them and never in a cover letter', () => {
-    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'] };
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'] };
     for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
     expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
   });
@@ -413,5 +413,21 @@ describe('MAIL-01, thanks as the only closing sentence', () => {
     const longer = 'Hi Dana,\n\nThank you for your time and consideration, and for the notes on the brief.\n\nBest,\nSam';
     expect(ids(then, { lang: 'en', genre: 'email' })).not.toContain('MAIL-01');
     expect(ids(longer, { lang: 'en', genre: 'email' })).not.toContain('MAIL-01');
+  });
+});
+
+describe('MAIL-02, "Estimado/a" with a slash', () => {
+  it('fires in email and follow-up, on every spelling of the slash, and not in a cover letter', () => {
+    for (const genre of ['email', 'follow-up'] as const) {
+      for (const greeting of ['Estimado/a', 'Estimada/o', 'Estimados/as', 'estimado / a']) {
+        const f = lint(`${greeting} equipo:\n\nLes paso el tablero de ventas de 2024.`, { lang: 'es', genre }).findings.find((x) => x.ruleId === 'MAIL-02');
+        expect(f, `${genre}: ${greeting}`).toMatchObject({ level: 2, severity: 'medium', match: greeting });
+      }
+    }
+    expect(ids('Estimado/a equipo:\n\nLes paso el tablero.', { lang: 'es' })).not.toContain('MAIL-02');
+  });
+
+  it('leaves a greeting that names the reader alone', () => {
+    expect(ids('Estimada Laura:\n\nTe paso el tablero.', { lang: 'es', genre: 'email' })).not.toContain('MAIL-02');
   });
 });

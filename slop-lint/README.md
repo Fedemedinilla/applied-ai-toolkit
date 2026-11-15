@@ -595,6 +595,7 @@ These rules are not in the catalog of 52, so a cover letter and a caller that pa
 | id | rule | genres | lang | level | severity | budget | kind | evidence | source |
 |---|---|---|---|---|---|---|---|---|---|
 | MAIL-01 | Thanks formula as the only closing | email, follow-up | en | 1 | high | 0 as the last sentence | structural | SÍNTESIS | Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line) |
+| MAIL-02 | "Estimado/a" with a slash | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 3 (slop of generated Spanish) |
 
 ## Known false positives
 
