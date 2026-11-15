@@ -303,6 +303,19 @@ final class AuditTest extends TestCase
         self::assertSame([[1, 'PHP handler inside uploads']], Audit::suspiciousLines('AddHandler application/x-httpd-php .php', true));
     }
 
+    /** The marker comment is no proof of authorship: anyone who can write .htaccess can type it. */
+    public function testRulesBetweenThePluginMarkersAreStillScanned(): void
+    {
+        $injected = [
+            'RewriteCond %{HTTP_USER_AGENT} googlebot [NC]',
+            'RewriteRule ^(.*)$ https://spam.example/ [R=302,L]',
+            'php_value auto_prepend_file /tmp/x.php',
+        ];
+        $expected = [[2, 'condition on the user agent'], [3, 'rewrite to another host'], [4, 'PHP prepend or append file']];
+        self::assertSame($expected, Audit::suspiciousLines(implode("\n", [ServerRules::BEGIN, ...$injected, ServerRules::END]), false));
+        self::assertSame($expected, Audit::suspiciousLines(implode("\n", [ServerRules::BEGIN, ...$injected]), false));
+    }
+
     public function testHtaccessFinding(): void
     {
         self::assertSame(Verdict::Pass, $this->audit()->htaccessRules()->verdict);

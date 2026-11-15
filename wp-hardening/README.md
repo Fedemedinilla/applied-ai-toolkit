@@ -58,7 +58,7 @@ The same toggles are under Settings > Hardening, and each control and each fast 
 | INT-02 | PHP files, and images with PHP inside, under `uploads/` | CLI |
 | INT-03 | Must-use plugins without a `Plugin Name:` header; drop-ins present | CLI |
 | INT-14 | PHP files under `wp-content` changed in the last 30 days | CLI |
-| INT-15 | `.htaccess` lines that rewrite to another host, branch on the user agent, prepend PHP or map PHP to an image extension (the plugin's own block is skipped) | CLI |
+| INT-15 | `.htaccess` lines that rewrite to another host, branch on the user agent, prepend PHP or map PHP to an image extension, inside the plugin's own markers too (its generated blocks hold none of these) | CLI |
 | INT-20 | Scheduled tasks with no code attached | CLI |
 | INT-21 | Posts with `<script`, `<iframe` or `javascript:` | CLI |
 | INT-01 | Core file integrity | Reported as skipped, see Limits |

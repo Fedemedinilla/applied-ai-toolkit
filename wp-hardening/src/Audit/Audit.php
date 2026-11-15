@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WpHardening\Audit;
 
-use WpHardening\Controls\ServerRules;
 use WpHardening\Env\Constants;
 use WpHardening\Env\Paths;
 
@@ -461,22 +460,16 @@ final class Audit
     }
 
     /**
-     * Lines outside this plugin's own block that match a known injection pattern.
+     * Lines that match a known injection pattern. This plugin's own block is scanned too: the
+     * generated blocks hold none of these patterns, and the marker comment proves nothing about who
+     * wrote the lines after it, so skipping it would let injected rules hide behind one comment.
      *
      * @return list<array{0: int, 1: string}>
      */
     public static function suspiciousLines(string $text, bool $inUploads): array
     {
         $out = [];
-        $inside = false;
         foreach (preg_split('/\r\n|\r|\n/', $text) ?: [] as $index => $line) {
-            if (str_starts_with(trim($line), ServerRules::BEGIN)) {
-                $inside = true;
-            }
-            if ($inside) {
-                $inside = !str_starts_with(trim($line), ServerRules::END);
-                continue;
-            }
             $kind = match (true) {
                 preg_match('#^\s*RewriteRule\s+\S+\s+https?://#i', $line) === 1 => 'rewrite to another host',
                 preg_match('/HTTP_USER_AGENT/i', $line) === 1 => 'condition on the user agent',
