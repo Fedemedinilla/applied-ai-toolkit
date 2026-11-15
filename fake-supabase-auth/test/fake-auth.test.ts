@@ -179,6 +179,22 @@ describe('getClaims', () => {
     expect(fake.calls).toEqual(['GET /auth/v1/user']);
   });
 
+  it('with HS256, /user rejects a token with characters outside base64url added to the signature', async () => {
+    fake.knobs.symmetric = true;
+    const session = await signIn(fake, clientFor(fake));
+    const token = session.access_token;
+    const cut = token.length - 4;
+    const userWith = (bearerToken: string) =>
+      fake.fetch(`${fake.url}/auth/v1/user`, { headers: { apikey: fake.publishableKey, authorization: `Bearer ${bearerToken}` } });
+
+    expect((await userWith(token)).status).toBe(200);
+    for (const bad of [`${token}!`, `${token}~`, `${token.slice(0, cut)}!!${token.slice(cut)}`]) {
+      const response = await userWith(bad);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error_code: 'bad_jwt' });
+    }
+  });
+
   it('with Auth answering 503 to the JWKS, returns a retryable error and keeps the session', async () => {
     const storage = memoryStorage();
     const client = clientFor(fake, { storage });
