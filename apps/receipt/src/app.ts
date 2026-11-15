@@ -408,7 +408,12 @@ export function mountApp(doc: Document, deps: AppDeps): App {
         uploadedLogo = bytes;
         schedule();
       },
-      () => fail('No se pudo leer el archivo del logo.'),
+      () => {
+        if (destroyed || read !== logoRead) return;
+        // The input now shows the file that failed, so the previous file's bytes must not print.
+        uploadedLogo = null;
+        fail('No se pudo leer el archivo del logo.');
+      },
     );
   });
   form.addEventListener('submit', (e) => {

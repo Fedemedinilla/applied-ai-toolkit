@@ -362,6 +362,23 @@ describe('uploaded logo files', () => {
     expect(await hasImage(h)).toBe(true);
   });
 
+  it('drops the previous file when the next one cannot be read', async () => {
+    let calls = 0;
+    const h = mount({ readFile: async (file) => (++calls === 1 ? new Uint8Array(await file.arrayBuffer()) : Promise.reject(new Error('unreadable'))) });
+    await h.app.settled();
+    choose('file');
+    await h.app.settled();
+    pick(new File([logo], 'a.png', { type: 'image/png' }));
+    await tick();
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(true);
+    pick(new File(['x'], 'b.png', { type: 'image/png' }));
+    await tick();
+    expect($('#status').textContent).toBe('No se pudo leer el archivo del logo.');
+    type('#notes', 'Otra aclaración');
+    await h.app.settled();
+    expect(await hasImage(h)).toBe(false);
+  });
 });
 
 describe('builds that finish late', () => {
