@@ -74,11 +74,18 @@ const base64url = (bytes: number) =>
 // The endpoint is issued by the browser's push service and is always https. 2000 characters, not
 // less: some services issue long endpoints, and a legitimate device refused as "invalid" sends
 // whoever debugs it to look in the wrong place.
+//
+// Kept in its parsed form (lower-case host, no default port), and the store, the rate limit and
+// the sender all use that form: otherwise each spelling of one endpoint would be its own device
+// with its own limit. A fragment is refused, since no push service issues one and the sender drops
+// it, so it would be another spelling too.
 const endpoint = z
   .string()
   .trim()
   .max(2000)
-  .refine((s) => URL.canParse(s) && new URL(s).protocol === 'https:');
+  .refine((s) => URL.canParse(s) && new URL(s).protocol === 'https:')
+  .transform((s) => new URL(s).href)
+  .refine((s) => !s.includes('#'));
 
 const Keys = z.object({ p256dh: base64url(65).refine((s) => Buffer.from(s, 'base64url')[0] === 0x04), auth: base64url(16) });
 const Kind = z.enum(Object.keys(MESSAGE_KINDS) as [keyof typeof MESSAGE_KINDS]);

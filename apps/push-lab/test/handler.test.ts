@@ -326,6 +326,24 @@ describe('the rate limit', () => {
     expect(sends).toBe(1);
   });
 
+  it('applies to the endpoint, not to its spelling: host case, :443 and a fragment are one device', async () => {
+    const { call, sent, store } = setup({ allowAnyEndpoint: false });
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/dev1';
+    const keys = fakeDevice('spell').keys;
+    await call('api/subscribe', { endpoint, keys });
+    expect((await call('api/test', { endpoint, kind: 'test' })).status).toBe(200);
+    for (const spelling of ['https://FCM.googleapis.com/fcm/send/dev1', 'https://fcm.googleapis.com:443/fcm/send/dev1']) {
+      expect((await call('api/subscribe', { endpoint: spelling, keys })).status).toBe(200);
+      expect((await call('api/test', { endpoint: spelling, kind: 'test' })).status).toBe(429);
+    }
+    for (const spelling of ['https://fcm.googleapis.com/fcm/send/dev1#a', 'https://fcm.googleapis.com/fcm/send/dev1#']) {
+      expect((await call('api/subscribe', { endpoint: spelling, keys })).status).toBe(400);
+      expect((await call('api/test', { endpoint: spelling, kind: 'test' })).status).toBe(400);
+    }
+    expect(sent).toHaveLength(1);
+    expect((await store.list()).map((row) => row.endpoint)).toEqual([endpoint]);
+  });
+
   it('still applies to a device after many others were tested and aged out', async () => {
     const { call, tick } = setup();
     const devices = Array.from({ length: 20 }, (_, i) => fakeDevice(`many-${i}`));
