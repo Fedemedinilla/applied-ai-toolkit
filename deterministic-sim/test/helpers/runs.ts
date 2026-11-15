@@ -9,7 +9,9 @@ export const intent: fc.Arbitrary<Input> = fc.oneof(
 
 export const seed = fc.string({ minLength: 1, maxLength: 24 });
 
-export const intents = fc.array(intent, { maxLength: 20 });
+// size 'max': with fast-check's default size an array stops at 10 elements, so no run would reach
+// round 20 and the end of the game would never be under a property.
+export const intents = fc.array(intent, { maxLength: 20, size: 'max' });
 
 export function legalize(state: State, wanted: Input): Input {
   return canApply(state, wanted) ? wanted : { kind: 'rest' };
