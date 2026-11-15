@@ -2,10 +2,11 @@
 // API. Every refusal is also checked for what did not happen: no request to the API, no turn left.
 
 import { describe, expect, it } from 'vitest';
+import { ConfigError, RequestError, ReservationError, type Gateway } from '../../../gateway/src/index.ts';
 import { RULES } from '../server/prompt.ts';
 import { publicConfig, TenantConfig } from '../server/tenant.ts';
 import { apiError, streamed } from './fake-anthropic.ts';
-import { BAKERY, breakStore, chat, config, setup, WORKSHOP } from './setup.ts';
+import { BAKERY, breakStore, chat, config, SECRET, setup, WORKSHOP } from './setup.ts';
 
 const json = async (response: Response): Promise<Record<string, unknown>> => (await response.json()) as Record<string, unknown>;
 
@@ -303,6 +304,26 @@ describe('POST /widget/chat', () => {
       const { app } = setup({ limits: { ipTurns: 1 }, ip: () => null, replies: [streamed('Ok.')] });
       expect((await app(chat())).status).toBe(200);
       expect((await app(chat())).status).toBe(429);
+    });
+
+    it('drops the reservation when the gateway refuses before calling: config, request or ledger error', async () => {
+      const { createApp } = await import('../server/app.ts');
+      const { createAuth } = await import('../server/auth.ts');
+      const refusals = [new ConfigError('unknown_account', 'no such account'), new RequestError('bad request'), new ReservationError('usage-1')];
+      for (const refusal of refusals) {
+        const { store, api, model } = setup({ replies: [streamed('Ok.')] });
+        const real = model.gateway;
+        const gateway: Gateway = {
+          structured: (schema, request) => real.structured(schema, request),
+          structuredStream: (schema, request) => real.structuredStream(schema, request),
+          text: async () => Promise.reject(refusal),
+        };
+        const app = createApp({ store, gateway, auth: createAuth(SECRET, () => new Date()), publicBaseUrl: 'https://widget.example', adminPassword: null, clientIp: () => '192.0.2.10' });
+        const response = await app(chat());
+        expect([refusal.name, response.status, await json(response)]).toEqual([refusal.name, 503, { error: 'unavailable' }]);
+        expect(api.requests).toHaveLength(0);
+        expect([refusal.name, store.turns.size]).toEqual([refusal.name, 0]);
+      }
     });
   });
 
