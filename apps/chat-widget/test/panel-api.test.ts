@@ -147,6 +147,17 @@ describe('invites', () => {
     expect(unauthenticated.status).toBe(401);
   });
 
+  it('says whether the tenant was created, and leaves the domains of an existing one as they were', async () => {
+    const s = setup();
+    const send = (allowedDomains: string[]): Promise<Response> =>
+      s.app(call('admin/invite', 'POST', { tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains }, basic(ADMIN)));
+    expect(((await (await send(['vivero-nuevo.example'])).json()) as { created: boolean }).created).toBe(true);
+    const again = await send(['otro-dominio.example']);
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { created: boolean }).created).toBe(false);
+    expect(s.store.tenants.get('vivero-nuevo')?.config['allowedDomains']).toEqual(['vivero-nuevo.example']);
+  });
+
   it('does not hand a tenant to a second email', async () => {
     const s = setup();
     await invite(s);

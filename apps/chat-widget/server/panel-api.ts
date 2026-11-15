@@ -7,7 +7,7 @@
 //   PUT  /panel/api/content         a ContentPatch
 //   POST /panel/api/invite/check    {token} -> {email}
 //   POST /panel/api/invite/accept   {token, password}
-//   POST /panel/api/admin/invite    Basic auth; {tenantId, email, allowedDomains} -> {inviteUrl}
+//   POST /panel/api/admin/invite    Basic auth; {tenantId, email, allowedDomains} -> {inviteUrl, created}
 //
 // Every write needs an Origin equal to the panel's own and a JSON content type, so a form or a
 // fetch from another site cannot reach it even before the SameSite cookie is considered. The one
@@ -221,7 +221,8 @@ export function createPanelApi(deps: PanelDeps): PanelApi {
     const nonce = newId();
     await timed(store.setInviteNonce(tenantId, nonce));
     log('invite_issued', { tenant: tenantId, created: created === 'created' });
-    return reply(200, { inviteUrl: inviteUrl(deps.publicBaseUrl, auth.sign('invite', tenantId, nonce, INVITE_MAX_AGE_S)) });
+    // allowedDomains applies only when the tenant is created; `created` tells the operator which case this was.
+    return reply(200, { inviteUrl: inviteUrl(deps.publicBaseUrl, auth.sign('invite', tenantId, nonce, INVITE_MAX_AGE_S)), created: created === 'created' });
   }
 
   async function route(request: Request, path: string): Promise<Response> {
