@@ -62,7 +62,7 @@ The two widget routes answer any origin (`Access-Control-Allow-Origin: *`) and r
 
 ### Tenancy
 
-**Multi-tenant by row.** `widget_tenants`, `widget_owners` and `widget_turns` all carry `tenant_id`, and every statement in [`server/sql-store.ts`](server/sql-store.ts) filters on it. One deployment per client would mean copying every fix into every copy. Here a new business is `createTenant`, and a fix reaches every tenant at once. One suite runs against the in-memory store and against `SqlStore` on [`sql/schema.sql`](sql/schema.sql) in an in-process Postgres (PGlite), and checks that one tenant's writes and counts never touch another's.
+**Multi-tenant by row.** `widget_tenants`, `widget_owners` and `widget_turns` all carry `tenant_id`. Every statement in [`server/sql-store.ts`](server/sql-store.ts) filters on it, with three exceptions. Closing and dropping a turn go by the turn id the server generated. Login finds the owner by the unique email. One deployment per client would mean copying every fix into every copy. Here a new business is `createTenant`, and a fix reaches every tenant at once. One suite runs against the in-memory store and against `SqlStore` on [`sql/schema.sql`](sql/schema.sql) in an in-process Postgres (PGlite), and checks that one tenant's writes and counts never touch another's.
 
 **The panel's tenant comes from the signed session only.** No panel route takes a tenant id from the request. The content schema is strict, so a body that names `tenantId` is refused.
 

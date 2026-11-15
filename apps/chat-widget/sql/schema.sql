@@ -1,6 +1,7 @@
 -- Reference schema for the chat widget, PostgreSQL 15 or newer. Tenancy is by row: every table
--- carries tenant_id, and every query in server/sql-store.ts filters on it. A new business is an
--- insert, not a deploy.
+-- carries tenant_id, and every query in server/sql-store.ts filters on it or on a key the server
+-- chose (the turn id) or that is unique (the owner's email). A new business is an insert, not a
+-- deploy.
 --
 -- The checks repeat the zod schemas in server/tenant.ts and the limits in server/limits.ts, so a
 -- row written by hand or by another tool cannot hold what the handlers would refuse to read.
