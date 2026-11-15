@@ -90,12 +90,24 @@ interface Line {
   readonly code: string;
 }
 
+/** A key whose value is a block scalar (`run: |`, `body: >-`); group 1 runs up to the key. */
+const BLOCK_SCALAR = /^(\s*(?:-\s+)?)\S[^:]*:\s*[|>][-+0-9]*\s*$/;
+
 function lines(text: string): Line[] {
+  // The column of the key that opened the block scalar being read, or -1 outside one.
+  let scalarKey = -1;
   return text.split(/\r?\n/).map((raw, i) => {
+    const indent = raw.length - raw.trimStart().length;
+    if (scalarKey >= 0 && (raw.trim() === '' || indent > scalarKey)) {
+      // Inside a block scalar a # is text, and GitHub still fills in the expressions on that line.
+      return { number: i + 1, indent, code: raw.trimEnd() };
+    }
     // A # starts a comment at the line start or after a space, outside quotes. Workflow values
     // rarely quote a #, and a false cut only hides text from the checks after it.
     const code = raw.replace(/(^|\s)#.*$/, '').trimEnd();
-    return { number: i + 1, indent: raw.length - raw.trimStart().length, code };
+    const scalar = BLOCK_SCALAR.exec(code);
+    scalarKey = scalar?.[1] === undefined ? -1 : scalar[1].length;
+    return { number: i + 1, indent, code };
   });
 }
 

@@ -180,6 +180,16 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    # environment: production\n'))).toEqual([]);
     expect(rules(CLEAN.replace('  contents: read', '  contents: read\n  # packages: write'))).toEqual([]);
   });
+
+  it('keeps a # inside a block scalar, where it is text and GitHub still fills in expressions', () => {
+    const heredoc = '      - run: |\n          cat <<EOF\n          # ${{ secrets.TOKEN }}\n          EOF\n';
+    expect(rules(CLEAN.replace('      - run: npm test\n', heredoc))).toEqual(['19:secret-expression']);
+    const body = `      - uses: ./.github/actions/comment\n        with:\n          body: >-\n            # Report \${{ secrets.API_KEY }}\n`;
+    expect(rules(CLEAN.replace('      - run: npm test\n', body))).toEqual(['20:secret-expression']);
+    // The scalar ends at a line indented no deeper than its key, and comments count again there.
+    const after = '      - run: |\n          echo hi\n      # ${{ secrets.TOKEN }}\n';
+    expect(rules(CLEAN.replace('      - run: npm test\n', after))).toEqual([]);
+  });
 });
 
 /** The shape of release.yml: a version job that can push and open a pull request, a publish job with OIDC. */
