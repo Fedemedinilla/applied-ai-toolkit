@@ -101,7 +101,15 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
       if ((await occupant(path)) !== 'generated') throw new ForgeError('refused', `${relativeSource(entity, `${id}.json`)} changed during promote; ${moved.length} moved before it`);
       await writeJsonAtomic(path, value);
     } else {
-      await writeJsonNew(path, value);
+      try {
+        await writeJsonNew(path, value);
+      } catch (error) {
+        // The link refuses a file that appeared since the check (another promote, a person).
+        if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+          throw new ForgeError('refused', `${relativeSource(entity, `${id}.json`)} appeared during promote; ${moved.length} moved before it`);
+        }
+        throw error;
+      }
     }
     await remove(candidatePath(dir, entity, id));
     moved.push(id);
