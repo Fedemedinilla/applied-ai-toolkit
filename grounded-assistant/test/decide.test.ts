@@ -106,8 +106,9 @@ describe('time', () => {
     const sat = '2026-11-07';
     expect(decide(b({ time: '14:00' }), sat, 'es', '13:00')).toMatchObject({ ok: false, reason: 'too_late_today', say: 'Hoy ya no llega a entrar Balayage antes del cierre. ¿Vemos otro día?' });
     expect(reason(decide(b({ time: '14:00' }), sat, 'en', '12:00'))).toBe('too_late_today');
-    // Before the last start, the refusal still names it.
+    // Before the last start, the refusal still names it, and so it does on any other day.
     expect(decide(b({ time: '14:00' }), sat, 'es', '11:00')).toMatchObject({ reason: 'late_start', say: expect.stringContaining('arranca 12:00') });
+    expect(reason(decide(b({ time: '14:00' }), TODAY, 'es', '13:00'))).toBe('late_start');
   });
 
   it('today with no time lists only the people who can still start', () => {
@@ -174,6 +175,16 @@ describe('services', () => {
     // Words that name nothing do not change the row.
     expect(findService('un balayage, por favor')?.id).toBe('balayage');
     expect(findService('a balayage, please', 'en')?.id).toBe('balayage');
+  });
+
+  it('a refusal quotes the model’s service on one line and cut to 60 characters', () => {
+    expect(decide(b({ service: '  Fade\n  con   diseño ' }), TODAY)).toMatchObject({ say: expect.stringContaining('No tengo cargado "Fade con diseño" como servicio') });
+    const long = `Fade ${'x'.repeat(54)} y más`;
+    expect(decide(b({ service: long }), TODAY)).toMatchObject({ say: expect.stringContaining(`No tengo cargado "Fade ${'x'.repeat(52)}..." como servicio`) });
+    const sixty = `Fade ${'x'.repeat(55)}`;
+    expect(decide(b({ service: sixty }), TODAY)).toMatchObject({ say: expect.stringContaining(`"${sixty}"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(50)}  y` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(50)} y"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(51)}   abcd` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(51)}..."`) });
   });
 
   it('the card carries the row’s price and minutes, never the model’s', () => {

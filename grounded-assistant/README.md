@@ -17,7 +17,7 @@ I extracted it from the assistant demo on [federicomedinilla.com](https://federi
 From the repository root, offline:
 
 ```sh
-npx vitest run grounded-assistant   # 223 tests, under a second, no key
+npx vitest run grounded-assistant   # 224 tests, under a second, no key
 npm run check                       # tsc --noEmit, strict
 ```
 
@@ -89,13 +89,13 @@ npm run mutation:grounded-assistant   # StrykerJS over src/decide.ts and src/mon
 
 Stryker changes the code one small edit at a time and runs this folder's tests against each mutant; a mutant that survives is a line a bug could change with no test failing. The report goes to `reports/mutation/grounded-assistant/`.
 
-Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+Measured on 2026-11-15 with StrykerJS 10.1.1, on 4 cores of a shared cloud container, after the fixes of the 2026-11-15 audit:
 
 | File | Mutants | Killed | Timeout | Survived | Not covered | Score |
 | --- | --- | --- | --- | --- | --- | --- |
-| `src/decide.ts` | 252 | 239 | 0 | 9 | 4 | 94.84% |
-| `src/money-guard.ts` | 659 | 474 | 1 | 165 | 19 | 72.08% |
-| Both | 911 | 713 | 1 | 174 | 23 | 78.38% |
+| `src/decide.ts` | 276 | 263 | 0 | 9 | 4 | 95.29% |
+| `src/money-guard.ts` | 676 | 488 | 2 | 167 | 19 | 72.49% |
+| Both | 952 | 751 | 2 | 176 | 23 | 79.10% |
 
 The first run scored 70.69% (`decide.ts` 86.51%, `money-guard.ts` 64.64%). The gaps it showed, each now a test:
 
@@ -108,16 +108,16 @@ The first run scored 70.69% (`decide.ts` 86.51%, `money-guard.ts` 64.64%). The g
 
 What survives in `decide.ts` (13 mutants) is equivalent on the shipped salon tables. The `too_long` refusal and the window arithmetic before it cannot be reached, because no service is longer than the shortest shift of someone who does it. `upper()` is applied to English service names that already start with a capital. The Spanish staff list is never shorter than two names. They would stop being equivalent if the tables changed, and the tests should grow with them.
 
-What survives in `money-guard.ts` (184 mutants) is not equivalent, and is listed here as untested:
+What survives in `money-guard.ts` (186 mutants) is not equivalent, and is listed here as untested:
 
 | Area | Lines | Left | What is not pinned |
 | --- | --- | --- | --- |
-| Amount readers | 20 to 46 | 10 | The cents arithmetic, which no price can make visible, and a trailing run of punctuation in the raw match |
-| `quantityMentioned` | 48 to 101 | 86 | Most words of the quantity table, the weekday and month lists, and each exclusion taken alone |
-| Figures and sums | 103 to 139 | 5 | The Spanish reading of a figure only the English reader accepts |
-| Price phrase patterns | 141 to 158 | 32 | Each alternative of `STRONG_AFTER`, `WEAK_AFTER`, `STRONG_BEFORE` and `JOINER` needs a phrase of its own |
-| `misstatedRows` | 160 to 200 | 46 | Group totals, the figure before a name, and the boundaries of the quantity multiple |
-| Verdict and output | 201 on | 5 | Staff names with no accent in `withoutControls` |
+| Amount readers | 20 to 52 | 12 | The cents arithmetic, which no price can make visible, a trailing run of punctuation in the raw match, and single members of the format-character and dash classes after the sign |
+| `quantityMentioned` | 53 to 104 | 86 | Most words of the quantity table, the weekday and month lists, and each exclusion taken alone |
+| Figures and sums | 105 to 159 | 7 | The Spanish reading of a figure only the English reader accepts, and the NFC step of `moneyIsOurs` taken alone |
+| Price phrase patterns | 160 to 172 | 30 | Each alternative of `STRONG_AFTER`, `WEAK_AFTER`, `STRONG_BEFORE` and `JOINER` needs a phrase of its own |
+| `misstatedRows` | 173 to 220 | 46 | Group totals, the figure before a name, and the boundaries of the quantity multiple |
+| Verdict and output | 221 on | 5 | Staff names with no accent in `withoutControls` |
 
 The guard's verdict on whole replies is covered by the 55-reply corpus; these mutants are single alternatives inside its heuristics. A wrong one makes the guard stricter or looser on one phrasing, and the next test to write for this file is a phrase per alternative of the four patterns.
 
