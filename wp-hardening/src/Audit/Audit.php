@@ -492,8 +492,9 @@ final class Audit
             return new Finding('INT-04', 'Options holding code', Verdict::Skip, 'No database connection.');
         }
         $sql = $wpdb->prepare(
-            "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s LIMIT 20",
+            "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s LIMIT 20",
             '%<?php%',
+            '%<?=%',
             '%base64_decode(%',
             '%eval(%',
         );
@@ -581,10 +582,15 @@ final class Audit
         return ['files' => $files, 'truncated' => false];
     }
 
+    /**
+     * `<?php`, or a `<?=` short echo (always on since PHP 5.4) followed by code: a variable, a
+     * space and a name, or a function call. A bare `<?=` turns up by chance in about one in twenty
+     * 1 MB images, so it is not enough on its own.
+     */
     private static function containsPhp(string $path): bool
     {
         $head = @file_get_contents($path, false, null, 0, self::MAX_READ);
-        return \is_string($head) && stripos($head, '<?php') !== false;
+        return \is_string($head) && preg_match('/<\?(?:php|=(?:\s*\$|\s+[a-z_]|[a-z_]\w*\s*\())/i', $head) === 1;
     }
 
     private static function relative(string $path, string $base): string

@@ -249,6 +249,43 @@ final class AuditTest extends TestCase
         self::assertCount(2, $finding->evidence);
     }
 
+    /** `<?=` is always on since PHP 5.4; a bare `<?=` in image bytes is not enough on its own. */
+    public function testShortEchoTagsInImagesCountAsPhp(): void
+    {
+        $uploads = $this->root . '/wp-content/uploads/2026/10';
+        file_put_contents($uploads . '/noise.jpg', "\xFF\xD8\xFF<?=\x01\x9C<?=7\xFF");
+        self::assertSame(Verdict::Pass, $this->audit()->uploadsPhp()->verdict);
+        file_put_contents($uploads . '/x.jpg', "\xFF\xD8\xFF<?= system(\$_GET['c']); ?>");
+        file_put_contents($uploads . '/y.gif', "GIF89a<?=\$_GET[0](\$_GET[1]);");
+        file_put_contents($uploads . '/z.png', "\x89PNG<?=passthru(\$x)?>");
+        $finding = $this->audit()->uploadsPhp();
+        self::assertSame(Verdict::Fail, $finding->verdict);
+        self::assertEqualsCanonicalizing(['2026/10/x.jpg (image with PHP inside)', '2026/10/y.gif (image with PHP inside)', '2026/10/z.png (image with PHP inside)'], $finding->evidence);
+    }
+
+    public function testOptionsWithCodeLooksForShortEchoTags(): void
+    {
+        $wpdb = new class () {
+            public string $options = 'wp_options';
+            public string $sql = '';
+
+            public function prepare(string $sql, string ...$args): string
+            {
+                return vsprintf(str_replace('%s', "'%s'", $sql), $args);
+            }
+
+            /** @return list<string> */
+            public function get_col(string $sql): array
+            {
+                $this->sql = $sql;
+                return [];
+            }
+        };
+        $GLOBALS['wpdb'] = $wpdb;
+        $this->audit()->optionsWithCode();
+        self::assertStringContainsString("'%<?=%'", $wpdb->sql);
+    }
+
     public function testMuPluginsAndDropins(): void
     {
         self::assertSame(Verdict::Pass, $this->audit()->muPlugins()->verdict);

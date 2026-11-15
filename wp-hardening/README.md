@@ -54,8 +54,8 @@ The same toggles are under Settings > Hardening, and each control and each fast 
 | INT-10, INT-18 | Inactive plugins, more than three themes, child theme in use | Site Health and CLI |
 | INT-25, INT-12, INT-24 | PHP older than 8.2 or `memory_limit` under 256M; `?p=` permalinks; pingbacks open by default | Site Health and CLI |
 | INT-17 | `wp-config.php` readable or writable by every account on the server | Site Health and CLI |
-| INT-04 | Autoloaded options over 800 KB (CLI also: options holding `<?php`, `base64_decode(` or `eval(`) | Site Health and CLI |
-| INT-02 | PHP files, and images with PHP inside, under `uploads/` | CLI |
+| INT-04 | Autoloaded options over 800 KB (CLI also: options holding `<?php`, `<?=`, `base64_decode(` or `eval(`) | Site Health and CLI |
+| INT-02 | PHP files, and images with PHP inside (`<?php`, or `<?=` followed by code), under `uploads/` | CLI |
 | INT-03 | Must-use plugins without a `Plugin Name:` header; drop-ins present | CLI |
 | INT-14 | PHP files under `wp-content` changed in the last 30 days | CLI |
 | INT-15 | `.htaccess` lines that rewrite to another host, branch on the user agent, prepend PHP or map PHP to an image extension, inside the plugin's own markers too (its generated blocks hold none of these) | CLI |
