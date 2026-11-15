@@ -116,4 +116,13 @@ describe('length', () => {
     expect(renderMarkdown('a\u{1F600}b', { ...opts, maxLength: 2 })).toBe('<p>a…</p>');
     expect(renderMarkdown('\u{1F600}\u{1F600}', { ...opts, maxLength: 3 })).toBe('<p>\u{1F600}…</p>');
   });
+
+  it('maxLength must be a whole number of zero or more, or Infinity', () => {
+    for (const maxLength of [-1, Number.NaN, 1.5, -Infinity]) {
+      expect(() => renderMarkdown('abc', { ...opts, maxLength })).toThrow(/maxLength/);
+      expect(() => renderInline('abc', { ...opts, maxLength })).toThrow(/maxLength/);
+    }
+    expect(renderMarkdown('abc', { ...opts, maxLength: Infinity })).toBe('<p>abc</p>');
+    expect(renderMarkdown('abc', { ...opts, maxLength: 0 })).toBe('<p>…</p>');
+  });
 });

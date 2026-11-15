@@ -77,6 +77,11 @@ interface Resolved {
 function resolve(options: MarkdownOptions): Resolved {
   const prefix = options.classPrefix ?? 'md';
   if (!/^[a-z][a-z0-9-]*$/i.test(prefix)) throw new Error('safe-markdown: classPrefix must be letters, digits and hyphens');
+  const max = options.maxLength ?? DEFAULT_MAX;
+  // NaN would turn the cut off silently and a negative value would cut from the end.
+  if (max !== Infinity && !(Number.isInteger(max) && max >= 0)) {
+    throw new Error('safe-markdown: maxLength must be a whole number of zero or more, or Infinity');
+  }
   const norm = (h: string) => h.trim().toLowerCase().replace(/^www\./, '');
   const external = options.externalHosts ?? '*';
   const internal = options.internalHosts.map(norm);
@@ -88,7 +93,7 @@ function resolve(options: MarkdownOptions): Resolved {
     external: external === '*' ? '*' : external.map(norm),
     mailto: options.mailto ?? true,
     prefix,
-    max: options.maxLength ?? DEFAULT_MAX,
+    max,
   };
 }
 
