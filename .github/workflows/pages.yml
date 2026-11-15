@@ -9,6 +9,8 @@
 # artifact the build job uploaded. agent-playbook/test/workflow-secrets.test.ts checks this file
 # with that policy and every other workflow with none.
 # Actions are pinned to the commit SHA of their release tag, with the version in a comment.
+# upload-pages-artifact is a composite action: v5.0.0 pins the upload-artifact it calls by SHA too
+# (v3 called it by the movable v4 tag). Since v4 it leaves dotfiles out; dist/pages has none.
 name: Pages
 
 on:
@@ -72,7 +74,7 @@ jobs:
           npm run build:docs
           cp -R docs-site/dist dist/pages/docs
 
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist/pages
 
@@ -89,4 +91,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

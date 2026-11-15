@@ -87,6 +87,8 @@ describe('action.yml', () => {
     expect(PIN.exec(ACTION)?.slice(1)).toEqual(expected?.slice(1));
     for (const line of LINES.filter((l) => /^\s*(- )?uses:/.test(l))) expect(line).toMatch(/@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
     expect(ACTION).toMatch(/uses: actions\/setup-node@[0-9a-f]{40} # v[\d.]+\n\s+with:\n\s+node-version: 24\n/);
+    // The action installs its own deps, so setup-node must not turn on npm caching in the consumer's job.
+    expect(ACTION).toMatch(/node-version: 24\n\s+package-manager-cache: false\n/);
   });
 
   it('runs every step in bash and installs the typescript and zod versions of the root package.json, without scripts', () => {

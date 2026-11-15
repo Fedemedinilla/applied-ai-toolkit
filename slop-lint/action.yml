@@ -10,7 +10,7 @@ author: Federico Medinilla
 
 inputs:
   files:
-    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that matches no file fails the step.
+    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that names an existing file is read as that path, brackets included. A pattern that matches no file fails the step.
     required: true
   lang:
     description: Language of the text, en or es. Empty leaves it to the config file, which may set it per folder; with neither, the step fails.
@@ -48,9 +48,12 @@ outputs:
 runs:
   using: composite
   steps:
+    # package-manager-cache: false keeps setup-node from reading the consumer's package.json and
+    # restoring an npm cache in their job; the action installs what it needs on its own.
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24
+        package-manager-cache: false
 
     - id: lint
       shell: bash
@@ -76,6 +79,12 @@ runs:
         (( ${#patterns[@]} > 0 )) || fail "files is empty"
         files=()
         for pattern in "${patterns[@]}"; do
+          # A pattern that names an existing file is that file, so docs/[slug]/page.md works.
+          if [[ -f "$pattern" ]]; then
+            [[ "$pattern" == -* ]] && pattern="./$pattern"
+            files+=("$pattern")
+            continue
+          fi
           matched=0
           for path in $pattern; do
             [[ -f "$path" ]] || continue
@@ -100,7 +109,13 @@ runs:
         node "$cli" "${files[@]}" "${args[@]}" || code=$?
         written=''
         if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
-          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")" || fail "cannot create the folder of $SLOP_SARIF_FILE"
+          # The CLI has run, so a folder that cannot be created still reports exit-code 2.
+          if ! mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")"; then
+            printf 'slop-lint: cannot create the folder of %s\n' "$SLOP_SARIF_FILE" >&2
+            code=2
+          fi
+        fi
+        if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
           sarif_code=0
           node "$cli" "${files[@]}" "${args[@]}" --sarif > "$SLOP_SARIF_FILE" || sarif_code=$?
           # A failed redirect also exits 1, so the file itself has to be there and not empty.

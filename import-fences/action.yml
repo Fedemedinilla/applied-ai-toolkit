@@ -37,9 +37,12 @@ outputs:
 runs:
   using: composite
   steps:
+    # package-manager-cache: false keeps setup-node from reading the consumer's package.json and
+    # restoring an npm cache in their job; the action installs what it needs on its own.
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24
+        package-manager-cache: false
 
     # The checker parses files with the TypeScript compiler API and validates the config with zod,
     # its two npm dependencies. Installed into the action's own folder, at the versions of the

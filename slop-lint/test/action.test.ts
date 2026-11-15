@@ -74,6 +74,8 @@ describe('action.yml', () => {
     const pin = /actions\/setup-node@([0-9a-f]{40})/u;
     expect(pin.exec(action)?.[1]).toBe(pin.exec(ci)?.[1]);
     expect(action).toMatch(/node-version: 24$/mu);
+    // The action installs nothing through the consumer's lockfile, so setup-node must not cache npm.
+    expect(action).toMatch(/^ {8}package-manager-cache: false$/mu);
   });
 
   it('documents every input and output in the README', () => {
@@ -233,6 +235,26 @@ describe('the action script', () => {
     expect(r.status).toBe(2);
     expect(r.outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
     expect(r.stderr).toMatch(/could not write SARIF to out/u);
+  });
+
+  it('reports exit-code 2 when the folder of sarif-file cannot be created, after the CLI ran', () => {
+    // a.md is a regular file, so mkdir -p a.md/sub fails once the text report has printed.
+    const ws = workspace({ 'a.md': CLEAN, 'letter.txt': BANNED });
+    const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'a.md/sub/x.sarif', SLOP_FAIL: 'false' });
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^letter\.txt:1:/mu);
+    expect(r.stderr).toMatch(/cannot create the folder of a\.md\/sub\/x\.sarif/u);
+    expect(r.outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
+  });
+
+  it('takes a pattern that names an existing file as that file, even with [ ] in it', () => {
+    const ws = workspace({ 'README.md': CLEAN, 'docs/[slug]/page.md': CLEAN, 'docs/s/page.md': CLEAN });
+    const r = runAction(ws, { SLOP_FILES: 'README.md docs/[slug]/page.md' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^docs\/\[slug\]\/page\.md: 0 findings/mu);
+    expect(r.stdout).not.toMatch(/^docs\/s\/page\.md/mu);
+    // A pattern that names no file is still a glob.
+    expect(runAction(ws, { SLOP_FILES: 'README.md docs/?/page.md' }).stdout).toMatch(/^docs\/s\/page\.md: 0 findings/mu);
   });
 
   it('refuses a sarif-file with a line break, which could forge another output', () => {
