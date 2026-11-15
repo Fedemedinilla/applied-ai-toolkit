@@ -116,6 +116,15 @@ describe('--variety and --previous', () => {
     expect(missing.stderr).toMatch(/^cannot read none\.txt/u);
   });
 
+  it('reports SEG-03 when the follow-up copies more than 8 words of the earlier message', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slop-previous-'));
+    writeFileSync(join(tmp, 'previous.txt'), 'Last month I wrote to you on 3 March about the Power BI dashboard for the Rosario branch.');
+    const r = run([join(dir, FOLLOW_UP), '--lang', 'en', '--genre', 'follow-up', '--previous', 'previous.txt', '--json', '--no-config'], { cwd: tmp });
+    const result = JSON.parse(r.stdout) as LintResult;
+    expect(result.findings.map((f) => [f.ruleId, f.match])).toEqual([['SEG-03', 'I wrote to you on 3 March about the Power BI dashboard for the Rosario branch']]);
+    expect(r.status).toBe(0);
+  });
+
   it('refuses stdin as both the input and the earlier message', () => {
     const r = run(['-', '--lang', 'en', '--genre', 'follow-up', '--previous', '-'], { input: 'Hi Dana.' });
     expect(r.status).toBe(2);

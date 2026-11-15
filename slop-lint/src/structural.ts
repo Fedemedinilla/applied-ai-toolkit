@@ -87,6 +87,9 @@ const NOMINALIZATION: Record<Lang, RegExp> = {
   en: /^\p{L}{3,}(?:tion|tions|ment|ments|ity|ities|ness|nesses)$/iu,
 };
 
+/** SEG-03: words in a row a follow-up may share with the earlier message (the report's limit for the job posting). */
+const COPIED_RUN = 8;
+
 /** MAIL-01: the thanks formula as a whole sentence. */
 const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration[.!]$/iu;
 
@@ -237,6 +240,31 @@ const checks: Record<string, Check> = {
     const last = prose(ctx).at(-1);
     if (last === undefined || !SOLE_THANKS.test(last.text)) return [];
     return [{ ruleId: 'MAIL-01', start: last.start, end: last.end }];
+  },
+
+  'SEG-03': (ctx) => {
+    if (ctx.previous === undefined) return [];
+    const n = COPIED_RUN + 1;
+    const key = (ws: readonly Span[], i: number): string => ws.slice(i, i + n).map((w) => w.text.toLowerCase()).join(' ');
+    const before = words(ctx.previous);
+    const seen = new Set<string>();
+    for (let i = 0; i + n <= before.length; i++) seen.add(key(before, i));
+    const ws = words(ctx.text);
+    const hits: StructuralHit[] = [];
+    // Windows of n words found in the earlier message; overlapping windows join into one run.
+    let i = 0;
+    while (i + n <= ws.length) {
+      if (!seen.has(key(ws, i))) {
+        i++;
+        continue;
+      }
+      let last = i;
+      while (last + 1 + n <= ws.length && seen.has(key(ws, last + 1))) last++;
+      const count = last - i + n;
+      hits.push({ ruleId: 'SEG-03', start: ws[i]?.start ?? 0, end: ws[last + n - 1]?.end ?? 0, detail: `${count} words in a row from the earlier message` });
+      i = last + n;
+    }
+    return hits;
   },
 
   'MED-01': (ctx) => {

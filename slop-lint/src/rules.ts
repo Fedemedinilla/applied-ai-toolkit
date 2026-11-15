@@ -1323,7 +1323,39 @@ const mail: Rule[] = [
   },
 ];
 
-export const GENRE_RULES: readonly Rule[] = [...mail];
+const followUp: Rule[] = [
+  {
+    kind: 'structural',
+    id: 'SEG-03',
+    threshold: '8 words in a row from the earlier message',
+    name: 'Follow-up that copies the earlier message',
+    lang: 'both',
+    level: 2,
+    severity: 'medium',
+    message: 'The follow-up repeats the earlier message word for word. The reader has that one already.',
+    suggestion: 'Name the earlier message in a few words (its date or subject) and say what is new.',
+    source: {
+      evidence: ['SÍNTESIS'],
+      ref: 'Section 11, item 5, and ESP-03 in section 13.1 (no more than 8 words in a row from the job posting); applied to the earlier message',
+      section: '11, 13.1',
+    },
+    deviation:
+      'The report sets the 8-word limit for text copied from the job posting. Applying it to the earlier message of a follow-up is this ' +
+      "implementation's synthesis. Words are compared without case or punctuation, and a run that crosses a sentence end still counts. " +
+      'It needs the earlier message (`previous`, or --previous on the command line) and does nothing without it.',
+    falsePositives: 'A quotation of the earlier message that the writer wants on purpose, such as the exact question asked.',
+    examples: [
+      {
+        lang: 'en',
+        fire: 'Hi Dana,\n\nLast week I wrote that I rebuilt the stock dashboard for the Rosario branch and cut the refresh.\n\nBest,\nSam',
+        pass: 'Hi Dana,\n\nAbout my note of 3 March on the stock dashboard: could we look at it on Thursday?\n\nBest,\nSam',
+        previous: 'Hi Dana,\n\nI rebuilt the stock dashboard for the Rosario branch and cut the refresh from 40 minutes to 12.\n\nBest,\nSam',
+      },
+    ],
+  },
+];
+
+export const GENRE_RULES: readonly Rule[] = [...mail, ...followUp];
 
 export const TIER2_BUDGET = 2;
 

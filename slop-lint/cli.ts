@@ -3,7 +3,7 @@
 //        node slop-lint/cli.ts --list-rules [--json] [--genre g] [file] [--config file | --no-config]
 // --genre is cover-letter (the default), email, follow-up or whatsapp; the last three are experimental and the CLI says
 // so on stderr. auto guesses each file's genre and falls back to cover-letter, with a note on stderr, when unsure.
-// --previous names the earlier message of a follow-up; no rule reads it yet.
+// --previous names the earlier message of a follow-up; SEG-03 compares the text with it.
 // A file ending in .md is read as Markdown unless --format says otherwise; anything else, stdin included, as text.
 // With several files, each one's findings are followed by its own summary line, prefixed with its name.
 // --sarif prints one SARIF 2.1.0 log for every file instead; --sarif-uri names stdin in it ("stdin" by default).
