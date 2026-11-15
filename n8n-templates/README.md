@@ -127,7 +127,7 @@ The files on kyndredai.com are in Spanish. Node names, notes, prompts and field 
 - WhatsApp to HubSpot got the GET verification branch Meta requires before it delivers anything, a Code node that skips status updates and handles batched messages, and deduplication by message id. The rating goes to custom properties, because HubSpot's `hs_lead_status` only accepts its own values and would reject `hot`.
 - Calendly got a check of the event and the payload and deduplication by invitee URI. Tiendanube got the store id pin and deduplication by order id. Both send WhatsApp template messages instead of free-form text, to digit-only phone numbers.
 - Email triage labels each email by category and urgency instead of discarding those fields, drops the unused summary, avoids `Re: Re:` subjects and sends the draft to the bare address from `From`.
-- The report got an Aggregate node, so a list response gets one Claude call and one email instead of one per item. Its prompt now says when the data is empty instead of inventing a report.
+- The report got an Aggregate node, so a list response gets one Claude call and one email instead of one per item. Its prompt now says when the data is empty or an error instead of inventing a report. An empty list (`[]`) never reaches the prompt, because the HTTP node then outputs no item and n8n runs nothing after it, so that day sends no email.
 - In all flows, JSON bodies go through `JSON.stringify`, Sheets appends use RAW mode with automatic mapping set explicitly, parsers use JSON Schema with enums, and outgoing messages drop the n8n attribution line.
 
 A one-off script (not included) checked the files against the node definitions in `n8n-nodes-base` 2.15.1, `@n8n/n8n-nodes-langchain` 2.45.6 and the filter operators in `n8n-workflow`. Every node type and version exists there, and every parameter name is declared. The changed versions have not been run against live accounts yet.
@@ -151,7 +151,7 @@ There are four groups of tests.
 
 **The harness (`harness/`, tested by `harness/harness.test.ts`).** No n8n runs here, so the harness ports the few rules that decide what a template does with an item. `code-node.ts` runs a Code node's JavaScript in a `node:vm` context frozen to a short list of globals. They are `$input`, `items`, `$json`, `$('Node')`, `$node`, `$env` with only the variables a test passes, `require` limited to `crypto`, `Buffer` and a silent `console`. `expressions.ts` evaluates `={{ }}` parameters with `$json`, `$('Node')` and `$now.toFormat` on a fixed clock. `nodes.ts` ports strict If and Switch conditions, Edit Fields (Set) 3.4, the cross-execution history of Remove Duplicates and the JSON body of an HTTP Request.
 
-The harness does not emulate the mode that runs a Code node once per item, `$execution`, `$workflow`, `$vars`, `$today` or Luxon beyond two formats. It also leaves out n8n's extension methods such as `.isEmail()`, paired items across branches, binary data, credentials and every network call. A test fails if a template starts using a global outside the emulated list, and each port throws on an option it does not cover. The rules were read from the published sources of `n8n-workflow` 2.15.0, `n8n-nodes-base` 2.15.1 and `n8n` 2.15.0. One of them matters for reading the tests. n8n swallows an error raised inside an expression block, so reading a field of a missing object yields an empty value, not a failed node.
+The harness does not emulate the mode that runs a Code node once per item, `$execution`, `$workflow`, `$vars`, `$today` or Luxon beyond two formats. It also leaves out n8n's extension methods such as `.isEmail()`, paired items across branches, binary data, credentials and every network call. A test fails if a template starts using a `$` global outside the emulated list, a global without a `$` such as `DateTime`, or an extension method, and each port throws on an option it does not cover. The rules were read from the published sources of `n8n-workflow` 2.15.0, `n8n-nodes-base` 2.15.1 and `n8n` 2.15.0. One of them matters for reading the tests. n8n swallows most errors raised inside an expression block, so reading a field of a missing object yields an empty value, not a failed node. Extension methods are the exception, because one called on a null or undefined value fails the node.
 
 **One file per workflow (`test/<workflow>.test.ts`).** Each covers the happy path, missing and malformed input, and the paths where a mistake costs money or trust.
 
@@ -164,7 +164,7 @@ The harness does not emulate the mode that runs a Code node once per item, `$exe
 
 **Docs (`test/docs.test.ts`).** The two generated tables and the diagrams match the files, every workflow has a test file and a diagram, and no test file or diagram is left over.
 
-`templates.test.ts` is the older suite and is unchanged. It loads every file in `templates/` and checks, per template:
+`templates.test.ts` is the older suite. It loads every file in `templates/` and checks, per template:
 
 - The file parses, has the expected top-level shape (zod schema), at least one trigger, unique node names and ids, and every working node is connected.
 - Every connection starts and ends at an existing node, and its type matches its slot (`main`, `ai_languageModel`, `ai_outputParser`).
@@ -173,7 +173,7 @@ The harness does not emulate the mode that runs a Code node once per item, `$exe
 - No string looks like a secret: `sk-` keys, Slack tokens and webhook ids, GitHub, Google and AWS keys, JWTs, Telegram bot tokens, long hex or base64 runs, phone numbers. Email addresses must be `@example.com`. URLs must point to the provider APIs the templates use or to an `.example` host, with no numeric ids in the path.
 - Sheet document and tab, Telegram chat id and fixed recipients are placeholders.
 - Each Claude model node holds only a `claude-` model id and options, so the key can only come from the n8n credential. No string mentions the Anthropic API host or an API key header.
-- Every chain has a model, and an output parser when it expects one. Every parser schema is valid JSON Schema with all properties required. Every value inserted into a prompt is cut with `.slice`.
+- Every chain has a model, and an output parser when it expects one. Every parser schema is valid JSON Schema with all properties required. Every `{{ }}` block of a prompt is one value cut with `.slice` at its end, with no `+`, `?:` or template literal that could add an uncut one.
 - JSON bodies use `JSON.stringify`, Sheets appends use RAW, nodes that send to customers or create records elsewhere have no automatic retry, and no accented Spanish characters or common Spanish words are left.
 
 Across the set, there are 13 files with distinct webhook paths, and each one is listed in this README. It also executes two Code nodes with a minimal `$input`, `require` and `Buffer`:
@@ -202,14 +202,15 @@ Graph walks check that no side-effect node in the MercadoPago, Tiendanube and Ca
 - Deduplication history lives in the n8n instance database, per node. Manual test runs count; clear it after testing. A send that fails after its id was recorded is not retried on a redelivery, so it has to be sent by hand.
 - The history holds 10,000 keys by default. In n8n 2.15 the Remove Duplicates node does not evict old keys to make room. Once the history is full it fails every execution. Nothing is sent or invoiced until you raise *History Size* in the node's options or clear the history. The Sheets flow stores one key per payment status, so it gets there first.
 - The MercadoPago flows do not check the notification `type`. Subscribe the webhook only to the payment event, as the setup note says. A signed notification of another type would look up its id as a payment.
-- A payment whose API response has no payer data is invoiced with empty customer fields, because n8n turns a missing field into an empty value. Your invoicing provider decides whether to accept it.
+- A payment whose API response has no payer data is invoiced with empty customer fields, because n8n turns a missing field into an empty value. Your invoicing provider decides whether to accept it. An empty `transaction_amount` becomes a total of 0, in the invoice and in the sheet, because the Set node turns an empty string into 0.
 - The Tiendanube flow does not check the phone before the WhatsApp call. An order without a usable phone is saved to the sheet and then fails at the send.
 - While `YOUR_VERIFY_TOKEN` is not replaced, the WhatsApp verification answers anyone who sends the placeholder.
-- The welcome and review greetings keep Latin letters only. A name in another script gets "Hi there".
+- The welcome and review greetings keep Latin letters only. A name in another script gets "Hi there". The 40 letters and spaces that remain are still caller text, so someone who has the webhook URL can put a short sentence in an email sent from your Gmail.
 - The signature Code node needs `crypto`. On a self-hosted instance that does not allow it, the node fails and no payment is processed until you set `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
 - Sheets appends keep automatic retries, so a timeout after Google accepted the write can add a duplicate row.
 - The HubSpot flow creates a contact per new message. Updating an existing contact needs a search by phone first.
 - The email triage flow reads Gmail's `snippet`, the first part of the body, not the full message.
+- The daily report sends no email on a day the source answers with an empty list, so a quiet day and a broken source look the same. Check the executions list, or make the source return a row that says there is no data.
 - Chains fail the execution if the model's output does not match the schema. There is no retry or fallback branch for that case.
 - The tests run the Code nodes and evaluate expressions in a port of n8n's rules, written from its published source. They do not run n8n's own expression engine or any node's real code, so a difference between the port and n8n would not show up here.
 - The AFIP template assumes an invoicing provider with a REST API. It does not implement WSAA or WSFEv1, and the request body is a shape to adapt, not any provider's real schema.

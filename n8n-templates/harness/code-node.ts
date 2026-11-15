@@ -18,7 +18,8 @@
 // Not emulated: "Run Once for Each Item" mode, $execution, $workflow, $vars,
 // $now and $today (Luxon), $jmespath, $getWorkflowStaticData, this.helpers,
 // binary data, paired items, Python, n8n's task runner limits and its
-// conversion of a returned plain object into an item. A node that reads one of
+// conversion of a returned plain object into an item. An item with a key
+// outside json, binary, pairedItem, error and index fails, as in n8n. A node that reads one of
 // these fails here with a ReferenceError instead of passing by accident.
 //
 // node:vm is not a security boundary. The harness runs the repository's own
@@ -26,6 +27,7 @@
 
 import * as crypto from 'node:crypto';
 import vm from 'node:vm';
+import { codeOnly } from './js-scan.ts';
 
 export interface Item {
   json: Record<string, unknown>;
@@ -40,7 +42,7 @@ export interface CodeNodeOptions {
   env?: Record<string, string>;
   /** Modules `require` may return, by name without the `node:` prefix. Default: crypto. */
   modules?: Record<string, unknown>;
-  /** Milliseconds before a synchronous loop is stopped. */
+  /** Milliseconds before the code is stopped, including what runs after an await. */
   timeoutMs?: number;
 }
 
@@ -56,6 +58,9 @@ export const CODE_NODE_GLOBALS: readonly string[] = [
   'Buffer',
   'console',
 ];
+
+/** Top-level keys n8n allows on an item once one of them is used (REQUIRED_N8N_ITEM_KEYS). */
+const N8N_ITEM_KEYS: ReadonlySet<string> = new Set(['json', 'binary', 'pairedItem', 'error', 'index']);
 
 function accessor(list: Item[]) {
   return Object.freeze({
@@ -103,10 +108,23 @@ export async function runCodeNode(code: string, options: CodeNodeOptions): Promi
     console: Object.freeze({ log() {}, info() {}, warn() {}, error() {}, debug() {} }),
   });
 
-  const script = new vm.Script(`(async () => {\n${code}\n})()`, { filename: 'code-node.js' });
-  const result: unknown = await script.runInContext(vm.createContext(context), {
+  // The context gets its own microtask queue ('afterEvaluate'), drained inside runInContext,
+  // so the timeout also covers code that runs after an await. The promise settles into
+  // `settled` from inside the context; a host-side await would run that code unbounded.
+  const settled: { done: boolean; ok?: boolean; value?: unknown } = { done: false };
+  const settle = (ok: boolean, value: unknown) => {
+    Object.assign(settled, { done: true, ok, value });
+  };
+  const script = new vm.Script(
+    `(async () => {\n${code}\n})().then((v) => __settle(true, v), (e) => __settle(false, e));`,
+    { filename: 'code-node.js' },
+  );
+  script.runInContext(vm.createContext(Object.freeze({ ...context, __settle: settle }), { microtaskMode: 'afterEvaluate' }), {
     timeout: options.timeoutMs ?? 1000,
   });
+  if (!settled.done) throw new Error('Code node did not finish: it awaits something the harness does not provide');
+  if (settled.ok !== true) throw settled.value;
+  const result = settled.value;
 
   if (!Array.isArray(result)) throw new Error('Code node must return an array of items');
   const out = JSON.parse(JSON.stringify(result)) as unknown[];
@@ -116,16 +134,18 @@ export async function runCodeNode(code: string, options: CodeNodeOptions): Promi
       throw new Error('Every returned item must be { json: { ... } }');
     }
   }
+  // Every item has json here, so n8n (result-validation.js) allows only its item keys,
+  // and checks them before undefined fields are dropped.
+  for (const raw of result as object[]) {
+    const unknown = Object.keys(raw).find((key) => !N8N_ITEM_KEYS.has(key));
+    if (unknown !== undefined) {
+      throw new Error(`Invalid output format: an output item contains the reserved key json next to '${unknown}'`);
+    }
+  }
   return out as Item[];
 }
 
 /** `$name` identifiers that a piece of Code node JavaScript reads, for the coverage check. */
 export function dollarGlobals(code: string): string[] {
-  const withoutComments = code.replace(/\/\/[^\n]*/g, '');
-  const withoutStrings = withoutComments.replace(
-    /`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g,
-    // Keep the ${...} parts of a template string: they are code.
-    (s) => (s.startsWith('`') ? [...s.matchAll(/\$\{([^}]*)\}/g)].map((m) => ` ${m[1] ?? ''} `).join('') : ''),
-  );
-  return [...new Set([...withoutStrings.matchAll(/\$[A-Za-z_]*/g)].map((m) => m[0]))].sort();
+  return [...new Set([...codeOnly(code).matchAll(/\$[A-Za-z_]*/g)].map((m) => m[0]))].sort();
 }

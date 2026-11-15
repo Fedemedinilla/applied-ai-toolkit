@@ -84,6 +84,10 @@ describe('Normalize payment', () => {
     expect(() => applySet(node, { json: payment({ transaction_amount: '=1+1' }) })).toThrow(NodeFailure);
     expect(applySet(node, { json: payment({ transaction_amount: '100.50' }) }).amount).toBe(100.5);
   });
+
+  it('stores 0 when the API sends an empty amount, because n8n turns "" into 0', () => {
+    expect(applySet(node, { json: payment({ transaction_amount: '' }) }).amount).toBe(0);
+  });
 });
 
 describe('graph', () => {

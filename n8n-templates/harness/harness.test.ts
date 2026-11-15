@@ -9,6 +9,7 @@ import {
   ExpressionHarnessError,
   evaluate,
   expressionGlobals,
+  extensionCalls,
   splitExpression,
 } from './expressions.ts';
 import { DedupeHistory, NodeFailure, NotEmulated, applySet, dedupeKey, ifPasses, jsonBody, switchOutput } from './nodes.ts';
@@ -92,6 +93,21 @@ describe('runCodeNode', () => {
     await expect(runCodeNode(`return [{ json: [1] }];`, { items: [] })).rejects.toThrow(/\{ json/);
   });
 
+  it('stops a loop that runs after an await, instead of hanging the test run', async () => {
+    await expect(runCodeNode(`await null; for (;;) {}`, { items: [], timeoutMs: 50 })).rejects.toThrow(/timed out/);
+    await expect(runCodeNode(`await Promise.resolve(); throw new Error('late boom');`, { items: [] })).rejects.toThrow('late boom');
+  });
+
+  it('rejects an item with a top-level key outside json, binary, pairedItem, error and index, as n8n does', async () => {
+    await expect(runCodeNode(`return [{ json: {}, extra: 1 }];`, { items: [] })).rejects.toThrow(/Invalid output format.*json/);
+    await expect(runCodeNode(`return [{ json: {} }, { json: {}, message_id: undefined }];`, { items: [] })).rejects.toThrow(
+      /reserved key/,
+    );
+    await expect(runCodeNode(`return [{ json: { a: 1 }, pairedItem: { item: 0 } }];`, { items: [] })).resolves.toEqual([
+      { json: { a: 1 }, pairedItem: { item: 0 } },
+    ]);
+  });
+
   it('awaits asynchronous code', async () => {
     await expect(runCodeNode(`const v = await Promise.resolve(3); return [{ json: { v } }];`, { items: [] })).resolves.toEqual([
       { json: { v: 3 } },
@@ -102,7 +118,16 @@ describe('runCodeNode', () => {
 describe('dollarGlobals', () => {
   it('finds the $ identifiers in code, not the ones in strings, comments or regex ends', () => {
     const code = "// uses $vars in a comment\nconst a = $input.first(); const b = '$env'; const c = `${$json.x} $workflow`; /^[0-9]+$/.test(a);";
-    expect(dollarGlobals(code)).toEqual(['$', '$input', '$json']);
+    // The "$" that ends /^[0-9]+$/ is part of a regex literal, not a call to $('Node').
+    expect(dollarGlobals(code)).toEqual(['$input', '$json']);
+    expect(dollarGlobals(`${code} $('Node').first();`)).toEqual(['$', '$input', '$json']);
+  });
+
+  it('still sees a $ global after a URL string or a regex literal with a quote', () => {
+    expect(dollarGlobals("const u = 'https://api.example'; const v = $vars.token;")).toEqual(['$vars']);
+    expect(dollarGlobals('const r = /["]/; const v = $vars.a; const s = "x";')).toEqual(['$vars']);
+    expect(dollarGlobals("const r = /[/']/g; /* $env */ const w = `a${'}'}b${$workflow.id}`;")).toEqual(['$workflow']);
+    expect(dollarGlobals('const half = total / 2; const v = $vars.a / 3;')).toEqual(['$vars']);
   });
 
   it('every Code node in the templates reads only globals the harness defines', () => {
@@ -149,10 +174,22 @@ describe('evaluate', () => {
     expect(evaluate('={{ $json.id.nope() }}', scope)).toBeUndefined();
   });
 
+  it('fails on a name n8n defines but the harness does not, instead of yielding an empty value', () => {
+    expect(() => evaluate("=Sent {{ DateTime.now().toFormat('yyyy') }}", scope)).toThrow(/DateTime is not emulated/);
+    expect(() => evaluate("={{ /'/.test($json.id) ? $vars.x : 'no' }}", { json: { id: "'" } })).toThrow(ExpressionHarnessError);
+  });
+
   it('fails on a syntax error and on a node without data', () => {
     expect(() => evaluate('={{ $json. }}', scope)).toThrow(ExpressionHarnessError);
     expect(() => evaluate("={{ $('Missing').item.json.x }}", scope)).toThrow(/references node "Missing"/);
     expect(() => evaluate('={{ $json.id ', scope)).toThrow(/unclosed/);
+  });
+
+  it('fails on a single block that is a function and prints its source in mixed text, like n8n', () => {
+    expect(() => evaluate('={{ (() => 1) }}', scope)).toThrow(/this is a function, please add \(\)/);
+    expect(() => evaluate('={{ $json.body.email.trim }}', scope)).toThrow(ExpressionHarnessError);
+    expect(evaluate('=a{{ (()=>1) }}b', scope)).toBe('a()=>1b');
+    expect(evaluate('=Hi {{ $json.body.email.trim }}', scope)).toBe('Hi function trim() { [native code] }');
   });
 
   it("reads earlier nodes through $('Node')", () => {
@@ -167,6 +204,20 @@ describe('evaluate', () => {
       { type: 'code', text: ' {x:{y:1' },
       { type: 'text', text: '.x }} b' },
     ]);
+  });
+
+  it("honors backslash escapes next to the brackets, like n8n's tournament splitter", () => {
+    expect(splitExpression('Use \\{{ name }} literally')).toEqual([{ type: 'text', text: 'Use \\{{ name }} literally' }]);
+    expect(splitExpression('C:\\\\path {{ $json.a }}')).toEqual([
+      { type: 'text', text: 'C:\\path ' },
+      { type: 'code', text: ' $json.a ' },
+    ]);
+    expect(splitExpression('\\\\{{ 1 }}')).toEqual([
+      { type: 'text', text: '\\' },
+      { type: 'code', text: ' 1 ' },
+    ]);
+    expect(splitExpression('{{ "x\\}}y" }}')).toEqual([{ type: 'code', text: ' "x}}y" ' }]);
+    expect(evaluate('={{ "x\\}}y" }}', scope)).toBe('x}}y');
   });
 
   it('formats $now on a fixed clock for the two formats the templates use, and refuses others', () => {
@@ -196,6 +247,13 @@ describe('expressionGlobals', () => {
     expect(expressionGlobals('$json outside an expression')).toEqual([]);
   });
 
+  it("lists n8n's globals without a $, and $ names after a regex literal with a quote", () => {
+    expect(expressionGlobals("=Sent {{ DateTime.now().toFormat('yyyy') }}")).toEqual(['DateTime']);
+    expect(expressionGlobals('={{ Duration.fromObject({ days: 1 }) && max(1, 2) }}')).toEqual(['Duration', 'max']);
+    expect(expressionGlobals('={{ Math.max($json.a, 1) + { min: 1 }.min }}')).toEqual(['$json']);
+    expect(expressionGlobals("={{ /'/.test($json.a) ? $vars.x : '' }}")).toEqual(['$json', '$vars']);
+  });
+
   it('every expression in the templates uses only globals the harness emulates', () => {
     let blocks = 0;
     for (const { file, workflow } of loadTemplates()) {
@@ -210,6 +268,35 @@ describe('expressionGlobals', () => {
       }
     }
     expect(blocks).toBeGreaterThan(100);
+  });
+});
+
+describe('extensionCalls', () => {
+  it("lists calls to n8n's extension methods, which the harness does not emulate", () => {
+    expect(evaluate('={{ $json.email.isEmail() }}', { json: { email: 'ana@example.com' } })).toBeUndefined();
+    expect(extensionCalls('={{ $json.email.isEmail() }}')).toEqual(['isEmail']);
+    expect(extensionCalls('=Items: {{ $json.items?.first() }} {{ $json.d.toDateTime().format("x") }}')).toEqual([
+      'first',
+      'format',
+      'toDateTime',
+    ]);
+  });
+
+  it("leaves out native calls, built-in namespaces and $('Node').first()", () => {
+    const text = "={{ Math.max(1, Math.round($json.n)) + Object.keys($json).length + $('Node').first().json.a + $json.s.trim().slice(0, 9) + '.isEmail()' }}";
+    expect(extensionCalls(text)).toEqual([]);
+    expect(extensionCalls('$json.email.isEmail() outside an expression')).toEqual([]);
+  });
+
+  it('every expression in the templates calls no extension method', () => {
+    for (const { file, workflow } of loadTemplates()) {
+      for (const node of workingNodes(workflow)) {
+        for (const { path, value } of strings(node.parameters)) {
+          if (path.at(-1) === 'jsCode') continue;
+          expect(extensionCalls(value), `${file} / ${node.name} / ${path.join('.')}`).toEqual([]);
+        }
+      }
+    }
   });
 });
 
@@ -341,8 +428,17 @@ describe('applySet', () => {
   });
 
   it('fails on a number field that is not numeric', () => {
-    for (const json of [{ v: 'abc' }, { v: '' }, { v: {} }]) {
+    for (const json of [{ v: 'abc' }, { v: {} }, { v: [1, 2] }]) {
       expect(() => applySet(set([field('amount', '={{ $json.v }}', 'number')]), { json })).toThrow(NodeFailure);
+    }
+  });
+
+  it('turns blank strings, [] and booleans into numbers, as n8n does without strict validation', () => {
+    const cases: [unknown, number][] = [['', 0], ['  ', 0], [[], 0], [true, 1], [false, 0], [['7'], 7]];
+    for (const [v, expected] of cases) {
+      expect(applySet(set([field('amount', '={{ $json.v }}', 'number')]), { json: { v } }), JSON.stringify(v)).toEqual({
+        amount: expected,
+      });
     }
   });
 
@@ -384,6 +480,15 @@ describe('dedupeKey and DedupeHistory', () => {
     const history = new DedupeHistory();
     expect(history.execute(['a', 'a', 'b'])).toEqual([true, true, true]);
     expect(history.execute(['a', 'a'])).toEqual([false, false]);
+  });
+
+  it('fails the whole execution on a key that names an Object.prototype member, as n8n does', () => {
+    const history = new DedupeHistory();
+    for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(() => history.execute(['wamid.1', key]), key).toThrow(NodeFailure);
+    }
+    expect(history.size).toBe(0);
+    expect(history.execute(['wamid.1', 'proto'])).toEqual([true, true]);
   });
 
   it('fails instead of evicting once the history is full', () => {

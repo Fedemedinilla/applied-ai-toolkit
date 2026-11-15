@@ -45,7 +45,7 @@
             {
               "id": "841b21ab-100b-4a98-8f3b-8b07545d7f73",
               "leftValue": "={{ String($json.body.email || '').trim() }}",
-              "rightValue": "^(?=.{1,254}$)[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@,;<>\"]+@[^\\s@,;<>\"]+\\.[^\\s@,;<>\"]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"
@@ -193,8 +193,8 @@
     },
     {
       "parameters": {
-        "content": "### Validation and abuse\n\nSubmissions without a well-formed email are discarded, so no row and no failed send.\n\nThe email does not quote the submitted message. Anyone who finds the webhook URL can make it send mail to any address, so the text they control stays out of it: the greeting keeps only the letters of the name, 40 at most, and falls back to \"Hi there\". Protect the webhook (Header Auth, a captcha on the form) before going live.",
-        "height": 333,
+        "content": "### Validation and abuse\n\nSubmissions without a well-formed email are discarded, so no row and no failed send.\n\nThe email does not quote the submitted message. Anyone who finds the webhook URL can make it send mail to any address, so the email quotes as little of their text as it can. The greeting keeps only the letters, spaces, apostrophes and hyphens of the name and falls back to \"Hi there\". Up to 40 letters of caller text still go in, enough for a short sentence such as a fake warning. Protect the webhook (Header Auth, a captcha on the form) before going live.",
+        "height": 380,
         "width": 320,
         "color": 6
       },

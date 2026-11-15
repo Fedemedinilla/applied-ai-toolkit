@@ -76,6 +76,16 @@ describe('Send welcome email', () => {
     }
   });
 
+  // What is left is still caller text: up to 40 letters and spaces, enough for a
+  // short sentence. The setup note says so instead of promising it stays out.
+  it('lets up to 40 letters of a submitted name into the greeting, as the setup note says', () => {
+    const [greeting] = message({ name: 'Your account is locked reply with password', email: 'victim@example.com' }).split('\n');
+    expect(greeting).toBe('Hi Your account is locked reply with passwo,');
+    const note = String(nodeNamed(workflow, 'Validation note').parameters.content);
+    expect(note).not.toContain('stays out of it');
+    expect(note).toContain('40 letters');
+  });
+
   it('falls back to a neutral greeting when nothing of the name is left', () => {
     for (const name of [undefined, '', '   ', '12345', '://1.2.3.4/', '李雷']) {
       expect(message({ name, email: 'ana@example.com' }).split('\n')[0], String(name)).toBe('Hi there,');

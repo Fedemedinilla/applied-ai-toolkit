@@ -108,6 +108,10 @@ describe('Invoice fields and Issue invoice (AFIP)', () => {
     expect(() => applySet(fields, { json: payment({ transaction_amount: 'abc' }) })).toThrow(NodeFailure);
   });
 
+  it('invoices a total of 0 when the API sends an empty amount, because n8n turns "" into 0', () => {
+    expect(applySet(fields, { json: payment({ transaction_amount: '' }) }).amount).toBe(0);
+  });
+
   it('never retries or hides a failure of the invoice call', () => {
     for (const key of ['retryOnFail', 'continueOnFail', 'onError', 'alwaysOutputData']) {
       expect(invoice, key).not.toHaveProperty(key);

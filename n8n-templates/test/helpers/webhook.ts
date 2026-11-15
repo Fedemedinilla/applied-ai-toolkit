@@ -25,6 +25,11 @@ export const BAD_EMAILS: unknown[] = [
   'ana@',
   'ana @example.com',
   'ana@example.com, other@example.com',
+  // Gmail splits sendTo on "," and rejects a part without "@", after the row is saved.
+  'ana@example.com,x',
+  'ana@example.com;x',
+  '<ana@example.com>',
+  '"ana"@example.com',
   'ana@example.com\nBcc: other@example.com',
   ['ana@example.com', 'other@example.com'],
   { address: 'ana@example.com' },

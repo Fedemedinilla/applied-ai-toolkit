@@ -45,7 +45,7 @@
             {
               "id": "8e45ed98-179c-4a17-8dfd-63eb800753b1",
               "name": "email",
-              "value": "={{ String($json.body.payload.email).trim().slice(0, 200) }}",
+              "value": "={{ String($json.body.payload.email).trim().slice(0, 254) }}",
               "type": "string"
             },
             {
@@ -269,7 +269,7 @@
             {
               "id": "0abbb4b1-b1d4-4e25-b6e5-d5663dd92fc3",
               "leftValue": "={{ String(($json.body.payload || {}).email || '').trim() }}",
-              "rightValue": "^(?=.{1,254}$)[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@,;<>\"]+@[^\\s@,;<>\"]+\\.[^\\s@,;<>\"]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"
