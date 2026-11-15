@@ -159,6 +159,23 @@ describe('services', () => {
     expect(findService('Men’s cut', 'en')?.id).toBe('corte-hombre');
   });
 
+  it('a request that names a row and something more is not a card for that row alone', () => {
+    // The combo row "Corte + barba" is 23000 and 50 minutes; the men's cut alone is 16000 and 30.
+    const cutAndBeard = decide(b({ service: 'Corte de hombre (máquina y tijera) + barba', date: '2026-11-17' }), TODAY);
+    expect(cutAndBeard).toMatchObject({
+      ok: false,
+      reason: 'ambiguous_service',
+      say: '"Corte de hombre (máquina y tijera) + barba" me da para varios: Corte de hombre (máquina y tijera), Perfilado de barba. ¿Cuál de esos?',
+    });
+    expect(reason(decide(b({ service: 'Balayage y corte de mujer' }), TODAY))).toBe('ambiguous_service');
+    expect(reason(decide(b({ service: "Men's cut (clippers and scissors) + beard" }), TODAY, 'en'))).toBe('ambiguous_service');
+    // Something more that is not a row: not loaded, rather than the row it came with.
+    expect(reason(decide(b({ service: 'Balayage y alisado japonés' }), TODAY))).toBe('service_not_loaded');
+    // Words that name nothing do not change the row.
+    expect(findService('un balayage, por favor')?.id).toBe('balayage');
+    expect(findService('a balayage, please', 'en')?.id).toBe('balayage');
+  });
+
   it('the card carries the row’s price and minutes, never the model’s', () => {
     expect(decide(b({}), TODAY)).toMatchObject({ ok: true, card: { service: 'Balayage', price: 78_000, minutes: 180 } });
   });
