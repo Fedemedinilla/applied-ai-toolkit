@@ -233,6 +233,60 @@ export function validateShape(value: unknown): Config {
 }
 
 /**
+ * Whether the pattern, with its lookarounds, \b, \B, ^ and $ removed, matches the empty text.
+ * Assertions only ever narrow where a pattern matches, so a pattern that can match empty anywhere
+ * still matches empty once they are gone. A source that no longer compiles after the cut (a
+ * back-reference into a removed lookaround) gives false and is left to the probe texts.
+ */
+function matchesEmptyWithoutAssertions(source: string, flags: string): boolean {
+  let out = '';
+  let i = 0;
+  // Index just past the class that starts at `from` ("[").
+  const classEnd = (from: number): number => {
+    let j = from + 1;
+    while (j < source.length && source[j] !== ']') j += source[j] === '\\' ? 2 : 1;
+    return j + 1;
+  };
+  while (i < source.length) {
+    const c = source[i];
+    if (c === '\\') {
+      const next = source[i + 1];
+      if (next !== 'b' && next !== 'B') out += source.slice(i, i + 2);
+      i += 2;
+    } else if (c === '[') {
+      const end = classEnd(i);
+      out += source.slice(i, end);
+      i = end;
+    } else if (c === '^' || c === '$') {
+      i++;
+    } else if (/^\(\?(?:=|!|<=|<!)/u.test(source.slice(i))) {
+      // Skip to the parenthesis that closes this lookaround.
+      let depth = 0;
+      let j = i;
+      while (j < source.length) {
+        const d = source[j];
+        if (d === '\\') j += 2;
+        else if (d === '[') j = classEnd(j);
+        else {
+          if (d === '(') depth++;
+          else if (d === ')' && --depth === 0) break;
+          j++;
+        }
+      }
+      i = j + 1;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  try {
+    return new RegExp(`^(?:${out})$`, flags.replace('g', '')).test('');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The checks a JSON Schema cannot state: every custom regex compiles and cannot match the empty
  * string, custom ids are unique, and every id under ruleSettings names a rule that exists.
  */
@@ -256,10 +310,11 @@ export function validateMeaning(config: Config): void {
     }
     // Such a pattern matches between every two characters of a text, and no match of it has any text to report.
     // lint() drops every empty match, so a pattern that matches empty only at some positions, such as a
-    // lookahead or \b, would load and never report. A few probe texts, the pattern's own source among
-    // them for a lookahead that names its word, catch those; it is a heuristic, not a proof.
+    // lookahead or \b, would load and never report. With its assertions taken out, such a pattern
+    // matches the empty text, whatever the lookahead holds (`(?=[Ss]ynergy)`). A few probe texts stay
+    // as a second net for what that misses, such as a back-reference to an empty group.
     const probes = ['', ' ', 'a', 'a b.', 'Ab 1, c-d.\n', rule.pattern];
-    if (probes.some((probe) => [...probe.matchAll(re)].some((m) => m[0] === ''))) {
+    if (matchesEmptyWithoutAssertions(rule.pattern, flags) || probes.some((probe) => [...probe.matchAll(re)].some((m) => m[0] === ''))) {
       throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere or report nothing; make at least one character required');
     }
   });

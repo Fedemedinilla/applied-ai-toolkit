@@ -82,6 +82,15 @@ describe('validateConfig', () => {
     expect(problem({ rules: [{ ...HOUSE, pattern: 'synergi(?=ze)' }] })).toBe('accepted');
   });
 
+  it('rejects a lookaround that matches empty even when its word is not written out in the source', () => {
+    for (const pattern of ['(?=[Ss]ynergy)', '(?=synerg(?:y|ize))', '\\b(?=[Ss]ynergy)', '(?<=[Ss]ynergy)', '(?![\\p{L}])', 'a|(?=[Bb])']) {
+      expect(problem({ rules: [{ ...HOUSE, pattern }] }), pattern).toMatch(/^rules\[0\]\.pattern: matches the empty string/u);
+    }
+    for (const pattern of ['(?<![\\p{L}\\p{N}])[Ss]ynergy(?![\\p{L}\\p{N}])', '\\bsyn(?:ergy|ergize)\\b', '[(?=]x', '\\(?=a\\)', '^a$']) {
+      expect(problem({ rules: [{ ...HOUSE, pattern }] }), pattern).toBe('accepted');
+    }
+  });
+
   it('rejects an anchor that is only whitespace, at the top level and in an override', () => {
     expect(problem({ anchors: ['dbt', ' '] })).toMatch(/^anchors\[1\]: must hold a character other than whitespace/u);
     expect(problem({ overrides: [{ files: ['a.md'], anchors: ['\t\n'] }] })).toMatch(/^overrides\[0\]\.anchors\[0\]: must hold a character other than whitespace/u);
