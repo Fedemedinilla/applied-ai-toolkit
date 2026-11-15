@@ -217,9 +217,17 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
     }
     // actions/checkout keeps the job's token in .git/config unless the step says otherwise.
     // One finding per step, on its uses line, whether the option is missing or set to true.
-    if (uses?.startsWith('actions/checkout@') === true) {
-      const step = stepOf(all, i);
-      const persist = step.map((l) => /^\s*persist-credentials\s*:(.*)$/.exec(l.code)?.[1]).find((v) => v !== undefined);
+    // GitHub resolves owner and repository names in any letter case, so the match ignores it. The
+    // option counts only as an input under the step's own with: block.
+    if (uses?.toLowerCase().startsWith('actions/checkout@') === true) {
+      const [dash] = stepOf(all, i);
+      const inputs = dash === undefined ? undefined : entriesUnder(all, dash.number - 1).find((l) => /^\s*with\s*:\s*$/.test(l.code));
+      const persist =
+        inputs === undefined
+          ? undefined
+          : entriesUnder(all, inputs.number - 1)
+              .map((l) => /^\s*(['"]?)persist-credentials\1\s*:(.*)$/.exec(l.code)?.[2])
+              .find((v) => v !== undefined);
       if (persist === undefined || unquote(persist) !== 'false') add(line, 'persisted-credentials');
     }
 

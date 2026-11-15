@@ -168,6 +168,15 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('persist-credentials: false', "persist-credentials: 'false'"))).toEqual([]);
   });
 
+  it('matches checkout in any letter case, and reads persist-credentials only from with:', () => {
+    expect(rules(CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: Actions/Checkout@${SHA}`))).toEqual([]);
+    const noOption = CLEAN.replace('        with:\n          persist-credentials: false\n', '');
+    expect(rules(noOption.replace(`uses: actions/checkout@${SHA}`, `uses: Actions/Checkout@${SHA}`))).toEqual(['14:persisted-credentials']);
+    // Under env: the setting is not a checkout input and changes nothing. Its name also looks like
+    // a credential, so the env check reports the entry as well.
+    expect(rules(CLEAN.replace('        with:\n', '        env:\n'))).toEqual(['14:persisted-credentials', '16:credential-value']);
+  });
+
   it('reads a quoted uses value, so a quoted checkout is still checked', () => {
     expect(rules(CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: "actions/checkout@${SHA}"`))).toEqual([]);
     const quotedNoOption = CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: 'actions/checkout@${SHA}'`).replace(
