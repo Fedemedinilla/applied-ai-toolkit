@@ -91,6 +91,33 @@ def _stored_run(root: Path, name: str, edit: Any) -> Path:
     return path
 
 
+class MalformedStoredRunTest(unittest.TestCase):
+    """A stored run that is not valid is exit 2 on --rerender, never a traceback and exit 1."""
+
+    def _rerender(self, edit: Any) -> tuple[int, str]:
+        with temp_dir() as root:
+            code, _, err = run_cli(["--rerender", str(_stored_run(root, "run.json", edit))])
+        return code, err
+
+    def test_unknown_state_is_a_usage_error(self) -> None:
+        code, err = self._rerender(lambda d: d["checks"][0].__setitem__("state", "bogus"))
+        self.assertEqual(code, 2, err)
+        self.assertIn("--rerender", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_unknown_colour_is_a_usage_error(self) -> None:
+        code, err = self._rerender(lambda d: d["checks"][0].__setitem__("colour", "purple"))
+        self.assertEqual(code, 2, err)
+        self.assertNotIn("Traceback", err)
+
+    def test_checks_that_are_not_a_list_of_objects_are_a_usage_error(self) -> None:
+        for value in ("abc", ["abc"], {"EXT-01": {}}):
+            with self.subTest(checks=value):
+                code, err = self._rerender(lambda d, v=value: d.__setitem__("checks", v))
+                self.assertEqual(code, 2, err)
+                self.assertNotIn("Traceback", err)
+
+
 class SchemaVersionTypeTest(unittest.TestCase):
     """schema_version is an integer: JSON true is not 1 and 2.0 is not 2."""
 

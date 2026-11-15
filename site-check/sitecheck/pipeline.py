@@ -1254,9 +1254,17 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         return _usage(con, f"--rerender: {exc}")
     meta = old.get("meta") if isinstance(old.get("meta"), dict) else {}
     checks = old.get("checks") or []
-    previous = (old.get("salida") or {}).get("codigo")
+    previous = (old.get("salida") or {}).get("codigo") if isinstance(old.get("salida"), dict) else None
     if not checks:
         return _usage(con, f"--rerender: that run has no checks (it ended with exit {previous}); measure again")
+    if not isinstance(checks, list) or not all(isinstance(c, dict) for c in checks):
+        return _usage(con, "--rerender: checks is not a list of objects; this file is not a valid run")
+    stored = []
+    for n, c in enumerate(checks, start=1):
+        try:
+            stored.append(Finding.from_datos(c))
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            return _usage(con, f"--rerender: check {n} ({c.get('id', '?')}) is not valid: {type(exc).__name__}: {exc}")
     domain = str(meta.get("dominio") or "")
     try:
         run_date = _local_date(meta)
@@ -1272,7 +1280,7 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
         except (ValueError, OSError) as exc:
             return _usage(con, f"--overrides could not be used: {exc}")
 
-    findings = evaluate.recolour([Finding.from_datos(c) for c in checks], overrides)
+    findings = evaluate.recolour(stored, overrides)
     home_unreachable = bool(meta.get("portada_no_respondio"))
     hack_reasons = [] if home_unreachable else list(evaluate.hack_gate_of(findings).reasons)
 
