@@ -174,6 +174,27 @@ describe('the request', () => {
   });
 });
 
+describe('candidates pending from earlier runs', () => {
+  const unit = (id: string, name: string) => ({ id, name, set: 'core', faction: 'grove', rarity: 'common', cost: 2, keywords: [], text: '', body: { type: 'unit', power: 2, health: 3 } });
+
+  it('checks a candidate against them, so a conflict promote would refuse is rejected here', async () => {
+    await writeJson(candidatePath(dir, 'card', 'ember-spark'), unit('ember-spark', 'Ember Spark'));
+    const { model } = setup([message({ candidates: [unit('ember-spark-two', 'Ember Spark'), unit('moss-crawler', 'Moss Crawler')] })]);
+    const report = await run(model, 'card', 2);
+    expect(report.accepted).toEqual(['moss-crawler']);
+    expect(reasons(report, 'ember-spark-two')).toEqual(['references name: card "ember-spark" already has the name "Ember Spark"']);
+  });
+
+  it('refuses before the call when a pending candidate no longer fits the catalogue', async () => {
+    // A pending card that names a set someone removed since its run.
+    await writeJson(candidatePath(dir, 'card', 'ember-spark'), { ...unit('ember-spark', 'Ember Spark'), set: 'moonfall' });
+    const { api, model } = setup([messageText(await response('card-batch'))]);
+    const error = await run(model, 'card', 8).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'refused', problems: [{ where: 'card/ember-spark', path: 'set', message: 'unknown set "moonfall"' }] });
+    expect(api.requests).toHaveLength(0);
+  });
+});
+
 describe('writes after the paid call', () => {
   it('refuses before the call when a pending file is named after another id', async () => {
     await writeJson(join(dir, '_candidates', 'cards', 'old-name.json'), { id: 'brine-scout' });

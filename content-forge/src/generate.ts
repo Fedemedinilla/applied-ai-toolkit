@@ -122,6 +122,25 @@ export function judge<E extends EntityName>(
 }
 
 /**
+ * The catalogue with the candidates pending from earlier runs, so a new candidate is checked
+ * against them too: two runs could otherwise each accept one half of a conflict (a name, a set's
+ * last slot, a release order) that promote then refuses together. Only pending files that parse
+ * are merged, and not those that reuse a catalogue id, since those wait to replace an entry with
+ * --replace. If the merge does not validate, the problems belong to the pending candidates, not to
+ * this run, so generate refuses before the call.
+ */
+function withPendingCandidates(entity: EntityName, raw: RawCatalog, index: CatalogIndex, pending: RawCatalog[EntityName]): { raw: RawCatalog; index: CatalogIndex } {
+  const fresh = pending.filter((e) => SCHEMAS[entity].safeParse(e.value).success && !index[entity].has(idOf(e.value) ?? ''));
+  if (fresh.length === 0) return { raw, index };
+  const merged = emptyRaw();
+  for (const name of ENTITY_NAMES) merged[name].push(...raw[name]);
+  merged[entity].push(...fresh);
+  const checked = checkCatalog(merged);
+  if (!checked.ok) throw new ForgeError('refused', 'The pending candidates do not fit the catalogue; promote, fix or remove them first', checked.problems);
+  return { raw: merged, index: checked.index };
+}
+
+/**
  * Runs one generation. A response the model gave but that cannot be used at all (not JSON, cut by
  * max_tokens, a refusal) is a failed run of this prompt version: it gets a report with no accepted
  * candidate, so the pass rate counts it. Any other gateway failure (a cap, the network, a 5xx) says
@@ -144,6 +163,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
     const pendingId = idOf(e.value);
     return pendingId === null ? [] : [pendingId];
   }));
+  const withPending = withPendingCandidates(entity, raw, index, pendingFiles.raw[entity]);
 
   const now = deps.now();
   const id = runId(now, entity);
@@ -196,7 +216,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
   const rejections: Rejection[] = [];
   considered.forEach((value, i) => {
     const where = label(i, value);
-    const verdict = judge(entity, value, where, { raw, index, pending }, accepted);
+    const verdict = judge(entity, value, where, { ...withPending, pending }, accepted);
     if (verdict.accepted) accepted.push(verdict.accepted);
     else rejections.push({ index: i, id: candidateId(value), problems: [...verdict.problems] });
   });
