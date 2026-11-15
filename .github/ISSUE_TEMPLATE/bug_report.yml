@@ -55,7 +55,7 @@ body:
     attributes:
       label: Version or commit
       description: The package version from npm, or the commit SHA you ran (git rev-parse HEAD).
-      placeholder: "@fedemedinilla/slop-lint 0.1.0, or b6127b9"
+      placeholder: "@fedemedinilla/slop-lint 0.2.0, or b6127b9"
     validations:
       required: true
   - type: input
