@@ -96,7 +96,7 @@ Second, the check must have failed earlier, in its current state or in the recor
 | `test/app.dom.test.ts` | jsdom against the real `index.html`: the initial counts; the profile adding checks; colours as states and evidence change, with focus kept in the evidence box and the counts waiting for a pause; Fixed refused and the select put back; the filters; closing and reopening; "before"; the incident gate, times, notes and untick refusal; the incident inputs disabled and refused on a closed run; importing a `datos.json`, a run JSON and an edited run JSON that is repaired; the three exports; the storage warnings, including an unreadable stored run and a repaired one; the tab keys |
 | `test/build.test.ts` | The production build in a temp folder: the files, relative URLs only, no inline script, style attribute, eval or `innerHTML`, a precache equal to every built file, the catalogue shipped as committed |
 
-143 tests, all offline.
+158 tests, all offline.
 
 ## Limits
 
