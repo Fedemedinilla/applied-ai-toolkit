@@ -98,6 +98,16 @@ describe('runCodeNode', () => {
     await expect(runCodeNode(`await Promise.resolve(); throw new Error('late boom');`, { items: [] })).rejects.toThrow('late boom');
   });
 
+  it('rejects an item with a top-level key outside json, binary, pairedItem, error and index, as n8n does', async () => {
+    await expect(runCodeNode(`return [{ json: {}, extra: 1 }];`, { items: [] })).rejects.toThrow(/Invalid output format.*json/);
+    await expect(runCodeNode(`return [{ json: {} }, { json: {}, message_id: undefined }];`, { items: [] })).rejects.toThrow(
+      /reserved key/,
+    );
+    await expect(runCodeNode(`return [{ json: { a: 1 }, pairedItem: { item: 0 } }];`, { items: [] })).resolves.toEqual([
+      { json: { a: 1 }, pairedItem: { item: 0 } },
+    ]);
+  });
+
   it('awaits asynchronous code', async () => {
     await expect(runCodeNode(`const v = await Promise.resolve(3); return [{ json: { v } }];`, { items: [] })).resolves.toEqual([
       { json: { v: 3 } },

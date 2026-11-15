@@ -18,7 +18,8 @@
 // Not emulated: "Run Once for Each Item" mode, $execution, $workflow, $vars,
 // $now and $today (Luxon), $jmespath, $getWorkflowStaticData, this.helpers,
 // binary data, paired items, Python, n8n's task runner limits and its
-// conversion of a returned plain object into an item. A node that reads one of
+// conversion of a returned plain object into an item. An item with a key
+// outside json, binary, pairedItem, error and index fails, as in n8n. A node that reads one of
 // these fails here with a ReferenceError instead of passing by accident.
 //
 // node:vm is not a security boundary. The harness runs the repository's own
@@ -57,6 +58,9 @@ export const CODE_NODE_GLOBALS: readonly string[] = [
   'Buffer',
   'console',
 ];
+
+/** Top-level keys n8n allows on an item once one of them is used (REQUIRED_N8N_ITEM_KEYS). */
+const N8N_ITEM_KEYS: ReadonlySet<string> = new Set(['json', 'binary', 'pairedItem', 'error', 'index']);
 
 function accessor(list: Item[]) {
   return Object.freeze({
@@ -128,6 +132,14 @@ export async function runCodeNode(code: string, options: CodeNodeOptions): Promi
     const json = (item as { json?: unknown } | null)?.json;
     if (json === null || typeof json !== 'object' || Array.isArray(json)) {
       throw new Error('Every returned item must be { json: { ... } }');
+    }
+  }
+  // Every item has json here, so n8n (result-validation.js) allows only its item keys,
+  // and checks them before undefined fields are dropped.
+  for (const raw of result as object[]) {
+    const unknown = Object.keys(raw).find((key) => !N8N_ITEM_KEYS.has(key));
+    if (unknown !== undefined) {
+      throw new Error(`Invalid output format: an output item contains the reserved key json next to '${unknown}'`);
     }
   }
   return out as Item[];
