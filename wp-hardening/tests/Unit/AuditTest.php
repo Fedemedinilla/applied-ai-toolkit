@@ -303,6 +303,16 @@ final class AuditTest extends TestCase
         self::assertStringContainsString("'%<?=%'", $wpdb->sql);
     }
 
+    public function testDoubleExtensionsInUploadsCountAsPhp(): void
+    {
+        $uploads = $this->root . '/wp-content/uploads/2026/10';
+        file_put_contents($uploads . '/avatar.php.jpg', "\xFF\xD8\xFF");
+        file_put_contents($uploads . '/a.phpx.jpg', "\xFF\xD8\xFF");
+        $finding = $this->audit()->uploadsPhp();
+        self::assertSame(Verdict::Fail, $finding->verdict);
+        self::assertSame(['2026/10/avatar.php.jpg'], $finding->evidence);
+    }
+
     public function testMuPluginsAndDropins(): void
     {
         self::assertSame(Verdict::Pass, $this->audit()->muPlugins()->verdict);

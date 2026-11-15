@@ -59,10 +59,12 @@ final class ServerRulesTest extends TestCase
         $block = $this->rules()->uploadsBlock();
         self::assertSame(1, preg_match('/<FilesMatch "(.+)">/', $block, $m));
         $pattern = '/' . $m[1] . '/';
-        foreach (['shell.php', 'shell.PHP', 'a.php5', 'a.php7', 'x.phtml', 'x.phar', 'x.pht', 'x.phps'] as $name) {
+        // mod_mime runs a handler mapped to .php for any name with .php among its extensions, so
+        // a.php.jpg executes under `AddHandler application/x-httpd-php .php`.
+        foreach (['shell.php', 'shell.PHP', 'a.php5', 'a.php7', 'x.phtml', 'x.phar', 'x.pht', 'x.phps', 'a.php.jpg', 'avatar.PHP.png', 'x.phtml.gif'] as $name) {
             self::assertSame(1, preg_match($pattern, $name), $name);
         }
-        foreach (['photo.jpg', 'doc.pdf', 'php.png', 'notes.phpx', 'a.php.jpg'] as $name) {
+        foreach (['photo.jpg', 'doc.pdf', 'php.png', 'notes.phpx', 'a.phpx.jpg', 'my.photo.jpg'] as $name) {
             self::assertSame(0, preg_match($pattern, $name), $name);
         }
         self::assertStringContainsString('X-Content-Type-Options "nosniff"', $block);

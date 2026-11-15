@@ -38,6 +38,9 @@ final class Audit
 
     private const PHP_EXTENSION = '/\.(?:php\d?|phtml|pht|phps|phar)$/i';
 
+    /** In uploads/ a PHP extension anywhere in the chain counts, as in ServerRules::uploadsBlock(). */
+    private const PHP_IN_EXTENSIONS = '/\.(?:php\d?|phtml|pht|phps|phar)(?:\.|$)/i';
+
     private const IMAGE_EXTENSION = '/\.(?:ico|png|jpe?g|gif|webp|bmp|svg)$/i';
 
     /** Labels for the Site Health list, shown before each test has run. */
@@ -382,7 +385,7 @@ final class Audit
         $hits = [];
         $walk = self::walk($this->paths()->uploads, function (\SplFileInfo $file) use (&$hits): void {
             $name = $file->getFilename();
-            if (preg_match(self::PHP_EXTENSION, $name) === 1) {
+            if (preg_match(self::PHP_IN_EXTENSIONS, $name) === 1) {
                 $hits[] = self::relative($file->getPathname(), $this->paths()->uploads);
             } elseif (preg_match(self::IMAGE_EXTENSION, $name) === 1 && self::containsPhp($file->getPathname())) {
                 $hits[] = self::relative($file->getPathname(), $this->paths()->uploads) . ' (image with PHP inside)';

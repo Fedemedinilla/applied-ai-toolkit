@@ -96,12 +96,16 @@ final class ServerRules implements Control
         return implode("\n", $lines) . "\n";
     }
 
-    /** php, php3 to php8, phtml, pht, phps and phar, in any case: `shell.PHP` is matched too. */
+    /**
+     * php, php3 to php8, phtml, pht, phps and phar, in any case: `shell.PHP` is matched too. The
+     * extension may sit anywhere in the chain (`avatar.php.jpg`), because mod_mime applies a
+     * handler mapped with `AddHandler ... .php` to every name that carries .php among its extensions.
+     */
     public function uploadsBlock(): string
     {
         return implode("\n", [
             self::BEGIN,
-            '<FilesMatch "\.(?i:php\d?|phtml|pht|phps|phar)$">',
+            '<FilesMatch "\.(?i:php\d?|phtml|pht|phps|phar)(?:\.|$)">',
             self::DENY,
             '</FilesMatch>',
             '<IfModule mod_headers.c>',
