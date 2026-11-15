@@ -91,8 +91,14 @@ export const configSchema = z.strictObject({
       z.strictObject({
         /** Browser files to scan, as globs relative to the static root. Inline scripts are always scanned. */
         files: z.array(z.string()).default(['**/*.js', '**/*.mjs']),
-        /** Oldest supported version per browser. Omitted: any lookbehind fails. */
-        targets: z.partialRecord(z.enum(Object.keys(LOOKBEHIND_SUPPORT) as [Browser, ...Browser[]]), version).optional(),
+        /**
+         * Oldest supported version per browser. Omitted: any lookbehind fails. An empty object is
+         * rejected, since it would leave the check nothing to compare against.
+         */
+        targets: z
+          .partialRecord(z.enum(Object.keys(LOOKBEHIND_SUPPORT) as [Browser, ...Browser[]]), version)
+          .refine((targets) => Object.keys(targets).length > 0, 'list at least one browser, or leave targets out')
+          .optional(),
       }),
     ])
     .default({ files: ['**/*.js', '**/*.mjs'] }),
@@ -113,6 +119,12 @@ export function parseConfig(value: unknown, configDir: string): GuardConfig {
   return { ...parsed.data, configDir };
 }
 
+/**
+ * Reads a text file as UTF-8 without a leading byte order mark. Windows editors write one, and
+ * JSON.parse rejects it as an unexpected token.
+ */
+export const readTextFile = (path: string): string => readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
+
 export class ConfigError extends Error {
   override name = 'ConfigError';
 }
@@ -122,7 +134,7 @@ export async function loadConfig(path: string): Promise<GuardConfig> {
   const absolute = resolve(path);
   let value: unknown;
   try {
-    if (absolute.endsWith('.json')) value = JSON.parse(readFileSync(absolute, 'utf8'));
+    if (absolute.endsWith('.json')) value = JSON.parse(readTextFile(absolute));
     else value = ((await import(pathToFileURL(absolute).href)) as { default?: unknown }).default;
   } catch (error) {
     throw new ConfigError(`cannot load config ${path}: ${(error as Error).message}`);

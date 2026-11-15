@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
@@ -9,6 +9,7 @@ import { findLookbehind } from '../src/checks/lookbehind.ts';
 import { needlesFor } from '../src/checks/secrets.ts';
 import { ConfigError, parseConfig } from '../src/config.ts';
 import { normalizeHash } from '../src/csp.ts';
+import { listFiles } from '../src/site.ts';
 import { runGuard } from '../src/run.ts';
 import type { CheckId, GuardReport } from '../src/types.ts';
 
@@ -54,6 +55,21 @@ describe('secrets', () => {
     expect(messages(report, 'secrets')).toEqual([`the value of S is in a.js (${form})`]);
   });
 
+  it('finds a value embedded in a larger base64 or base64url blob at any offset', () => {
+    const secret = 'fixture-secret-value-0001'; // 25 characters, not a multiple of 3
+    const files = {
+      'index.html': '<p></p>',
+      'a.js': `atob("${Buffer.from(`{"k":"${secret}"}`).toString('base64')}")`,
+      'b.js': `"${Buffer.from(`${secret}!`).toString('base64')}"`,
+      'd.js': `"${Buffer.from('unrelated-value-0001-unrelated').toString('base64')}"`,
+    };
+    const report = guard(files, { secrets: { env: ['S'] } }, { S: secret });
+    expect(messages(report, 'secrets')).toEqual(['the value of S is in a.js (base64)', 'the value of S is in b.js (base64)']);
+    // VALUE encodes with '+' and '/', so its base64url form differs; here it starts at offset 2.
+    const url = guard({ 'index.html': '<p></p>', 'c.js': `"${Buffer.from(`xy${VALUE}!`).toString('base64url')}"` }, { secrets: { env: ['S'] } }, { S: VALUE });
+    expect(messages(url, 'secrets')).toEqual(['the value of S is in c.js (base64url)']);
+  });
+
   it('decompresses a .br file before searching it', () => {
     const report = guard(
       { 'index.html': '<p></p>', 'a.js.br': brotliCompressSync(Buffer.from(`const k="${VALUE}"`)) },
@@ -80,6 +96,27 @@ describe('staticImports', () => {
     expect(staticImports(code)).toEqual(['./a.js', './b.js', './c.mjs', './d.js', '/e.js', './g.js?v=1', './h']);
   });
 
+  it('skips import-like text in comments, strings, template text and regex literals', () => {
+    const code = [
+      '// import "./old.js"',
+      '/* import "./older.js" */import"./a.js";',
+      `console.log("please import 'react' first", 'export * from "./s.js"');`,
+      'const t=`see import "./t.js" and ${f({a:1}) ? "x" : `import "./u.js"`} done`;import"./b.js";',
+      `const r=/["'\/]/g;import"./c.js";`,
+      'const q=a/2;import"./d.js";const w=b/3',
+      'if(x)return/import "e"/.test(y);export*from"./f.js"',
+    ].join('\n');
+    expect(staticImports(code)).toEqual(['./a.js', './b.js', './c.js', './d.js', './f.js']);
+    const report = guard(
+      {
+        'index.html': '<script type="module" src="/_astro/app.js"></script>',
+        '_astro/app.js': `// import "./old.js"\nconsole.log("please import 'react' first");`,
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 100 }] },
+    );
+    expect(check(report, 'js-budget')?.status).toBe('pass');
+  });
+
   it('counts a query-string import against the file and fails on an extensionless one', () => {
     const report = guard(
       {
@@ -92,6 +129,65 @@ describe('staticImports', () => {
     const weight = (check(report, 'js-budget')?.details as Array<{ files: Array<{ url: string }> }>)[0];
     expect(weight?.files.map((f) => f.url).sort()).toEqual(['/dep.js', '/main.js']);
     expect(messages(report, 'js-budget')).toEqual(['cannot measure /missing (not in the build), loaded by index.html']);
+  });
+});
+
+describe('js-budget inputs', () => {
+  it('reports a script URL or import specifier that is not a valid URL instead of crashing', () => {
+    const report = guard(
+      {
+        'index.html': '<script src="https://bad host/a.js"></script><script type="module" src="/m.js"></script>',
+        'm.js': 'import"https://bad host/x.js";',
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 10 }] },
+    );
+    expect(messages(report, 'js-budget')).toEqual([
+      'cannot measure https://bad host/a.js (not a valid URL), loaded by index.html',
+      'cannot measure https://bad host/x.js (not a valid URL), loaded by index.html',
+    ]);
+  });
+});
+
+describe('js-budget nomodule', () => {
+  it('leaves out classic nomodule scripts, which a browser with module support never loads', () => {
+    const legacy = 'var x=' + JSON.stringify(Array.from({ length: 4000 }, (_, i) => `legacy-${i}`));
+    const report = guard(
+      {
+        'index.html': `<script type="module" src="/app.js"></script><script nomodule src="/legacy.js"></script><script nomodule>${legacy}</script><script type="module" nomodule src="/m.js"></script>`,
+        'app.js': 'run()',
+        'legacy.js': legacy,
+        'm.js': 'go()',
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 1 }] },
+    );
+    expect(check(report, 'js-budget')?.status).toBe('pass');
+    const weight = (check(report, 'js-budget')?.details as Array<{ files: Array<{ url: string }>; inline: { raw: number } }>)[0];
+    // A module script ignores nomodule, so /m.js counts.
+    expect(weight?.files.map((f) => f.url).sort()).toEqual(['/app.js', '/m.js']);
+    expect(weight?.inline.raw).toBe(0);
+  });
+});
+
+describe('js-budget globs', () => {
+  it('fails a budget whose glob matches no page, which would otherwise measure nothing', () => {
+    const files = { 'index.html': '<script src="/a.js"></script>', 'a.js': 'run()' };
+    const typo = guard(files, { budgets: [{ pages: 'index.htm', gzipKb: 1 }] });
+    expect(check(typo, 'js-budget')?.status).toBe('fail');
+    expect(messages(typo, 'js-budget')).toEqual(['the budget for "index.htm" matches no page, so it measures nothing']);
+    const partly = guard(files, { budgets: [{ pages: 'index.html', gzipKb: 1 }, { pages: 'blog/**', gzipKb: 1 }] });
+    expect(messages(partly, 'js-budget')).toEqual(['the budget for "blog/**" matches no page, so it measures nothing']);
+  });
+});
+
+describe('build folder walk', () => {
+  it('skips a dangling symlink instead of crashing the run', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'csp-guard-'));
+    writeFileSync(join(dir, 'index.html'), '<p></p>');
+    writeFileSync(join(dir, 'a.js'), 'run()');
+    symlinkSync('nowhere', join(dir, 'dangling'));
+    expect(listFiles(dir)).toEqual(['a.js', 'index.html']);
+    const report = runGuard({ dir, config: parseConfig({ secrets: { env: ['S'] } }, dir), env: { S: 'fixture-secret-value-0001' } });
+    expect(check(report, 'secrets')).toMatchObject({ status: 'pass', summary: '2 files searched, no value of S' });
   });
 });
 
@@ -119,6 +215,10 @@ describe('lookbehind targets', () => {
   it('rejects a fractional number, which would read 16.10 as 16.1', () => {
     expect(() => parseConfig({ lookbehind: { targets: { safari: 16.4 } } }, '.')).toThrow(ConfigError);
   });
+
+  it('rejects an empty targets object, which would leave nothing to compare against', () => {
+    expect(() => parseConfig({ lookbehind: { targets: {} } }, '.')).toThrow(/lookbehind\.targets: list at least one browser/);
+  });
 });
 
 describe('inline hashes', () => {
@@ -139,6 +239,46 @@ describe('inline hashes', () => {
     expect(normalizeHash(`'sha256-${url}'`)).toBe(`'sha256-${base64.replace(/=+$/, '')}'`);
     const report = guard({ 'index.html': `<script>${text}</script>` }, literal(`script-src 'self' 'SHA256-${base64}'`));
     expect(check(report, 'inline-hashes')?.status).toBe('pass');
+  });
+
+  it('fails a page whose delivered policy is empty, since it restricts nothing', () => {
+    const page = '<script>alert(1)</script>';
+    const empty = 'index.html: the Content-Security-Policy is empty, so inline content is not restricted and there is nothing to check hashes against';
+    for (const value of ['', ' ', ';']) {
+      expect(messages(guard({ 'index.html': page }, literal(value)), 'inline-hashes')).toEqual([empty]);
+    }
+    const meta = guard({ 'index.html': `<meta http-equiv="Content-Security-Policy" content="">${page}` }, { csp: { from: 'meta' } });
+    expect(messages(meta, 'inline-hashes')).toEqual([empty]);
+    const vercel = JSON.stringify({ headers: [{ source: '/(.*)', headers: [{ key: 'Content-Security-Policy', value: '' }] }] });
+    const header = guard({ 'index.html': page, 'vercel.json': vercel }, { csp: { from: 'vercel-json' } });
+    expect(messages(header, 'inline-hashes')).toEqual([empty]);
+    expect(header.ok).toBe(false);
+  });
+
+  it('runs the guard with a base64url digest: padded it matches, unpadded it does not, as CSP3 compares text', () => {
+    const text = 'run()';
+    const url = createHash('sha256').update(text).digest('base64url');
+    const padded = guard({ 'index.html': `<script>${text}</script>` }, literal(`script-src 'self' 'sha256-${url}='`));
+    expect(check(padded, 'inline-hashes')?.status).toBe('pass');
+    const unpadded = guard({ 'index.html': `<script>${text}</script>` }, literal(`script-src 'self' 'sha256-${url}'`));
+    expect(messages(unpadded, 'inline-hashes')).toEqual([
+      expect.stringContaining(`does not list ${sha256(text)}`),
+      expect.stringContaining(`lists 'sha256-${url}', which matches no inline content`),
+    ]);
+  });
+
+  it("reports only 'unsafe-inline' when it is the reason inline content runs, not a block the browser does not make", () => {
+    const page = '<script>run()</script><p onclick="x()">';
+    const loose = guard({ 'index.html': page }, literal("script-src 'self' 'unsafe-inline'"));
+    expect(messages(loose, 'inline-hashes')).toEqual([
+      "index.html: script-src has 'unsafe-inline', which lets any injected inline script run. Allow inline content by hash instead.",
+    ]);
+    // Next to a hash, CSP3 browsers ignore 'unsafe-inline', so content without its hash is blocked.
+    const mixed = guard({ 'index.html': '<script>run()</script><script>other()</script>' }, literal(`script-src 'self' 'unsafe-inline' ${sha256('run()')}`));
+    expect(messages(mixed, 'inline-hashes')).toEqual([
+      "index.html: script-src has 'unsafe-inline', which lets any injected inline script run. Allow inline content by hash instead.",
+      expect.stringContaining(`does not list ${sha256('other()')}`),
+    ]);
   });
 
   it('reports a hash left in script-src when script-src-elem and script-src-attr shadow it', () => {
@@ -164,6 +304,29 @@ describe('meta policies', () => {
     const report = guard({ 'index.html': meta + meta }, config);
     expect(messages(report, 'policy')).toEqual(['index.html: 2 <meta> policies; the browser enforces each of them, and one is expected']);
     expect(check(report, 'policy')?.summary).toBe('1 of 1 page differs from the expected policy');
+  });
+
+  it('fails a page whose only <meta> policy sits in <body>, since the browser ignores it', () => {
+    const page = `<head><title>x</title></head><body><meta http-equiv="Content-Security-Policy" content="script-src 'self'"><p>hi</p></body>`;
+    const report = guard({ 'index.html': page }, config);
+    expect(messages(report, 'policy')).toEqual([
+      'index.html: a <meta> policy outside <head>, which the browser ignores',
+      'index.html: no Content-Security-Policy',
+    ]);
+    expect(check(report, 'inline-hashes')?.status).toBe('fail');
+  });
+
+  it('checks a <meta> policy next to a header policy, since the browser enforces both', () => {
+    const header = `script-src ${sha256('alert(1)')}`;
+    const vercel = JSON.stringify({ headers: [{ source: '/(.*)', headers: [{ key: 'Content-Security-Policy', value: header }] }] });
+    const page = `<head><meta http-equiv="Content-Security-Policy" content="script-src https://evil.example"><script>alert(1)</script></head>`;
+    const report = guard({ 'index.html': page, 'vercel.json': vercel }, { csp: { from: 'vercel-json' }, policy: { 'script-src': { sources: [], hashes: true } } });
+    expect(messages(report, 'inline-hashes')).toEqual([expect.stringMatching(/^script-src does not list 'sha256-.*on index\.html\. The browser blocks it/)]);
+    expect(messages(report, 'policy')).toEqual([
+      'index.html: the page also carries a <meta> policy, which the browser enforces next to the header; one policy is expected',
+    ]);
+    const literal = guard({ 'index.html': page }, { csp: { from: 'literal', value: header }, policy: { 'script-src': { sources: [], hashes: true } } });
+    expect(messages(literal, 'policy')).toEqual(messages(report, 'policy'));
   });
 
   it('agrees the verb and the nouns with their counts in a passing summary', () => {
