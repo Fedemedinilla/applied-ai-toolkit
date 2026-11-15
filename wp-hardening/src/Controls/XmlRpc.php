@@ -85,7 +85,7 @@ final class XmlRpc implements Control
             return new Report(
                 State::Critical,
                 \sprintf(__('%s uses XML-RPC, but the root .htaccess denies xmlrpc.php, so the server refuses it before WordPress runs.', 'wp-hardening'), implode(', ', $users)),
-                [__('Remove the <Files xmlrpc.php> section from the .htaccess block. `wp harden htaccess` prints the block without it while the integration is detected.', 'wp-hardening')],
+                [__('Remove the rule that denies xmlrpc.php from the root .htaccess (a <Files>, <FilesMatch> or RewriteRule line). `wp harden htaccess` prints the block without it while the integration is detected.', 'wp-hardening')],
             );
         }
         if ($users !== []) {

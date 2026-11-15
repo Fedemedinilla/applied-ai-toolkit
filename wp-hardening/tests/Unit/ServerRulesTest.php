@@ -114,6 +114,32 @@ final class ServerRulesTest extends TestCase
         self::assertNotSame(State::Critical, $jetpack->report(true)->state);
     }
 
+    /** Security plugins and guides write the deny in several forms; a commented-out one denies nothing. */
+    public function testXmlrpcDenyFormsAndComments(): void
+    {
+        $rules = $this->rules();
+        $denies = [
+            "<Files 'xmlrpc.php'>\n  Require all denied\n</Files>\n",
+            "<FilesMatch \"^(xmlrpc\\.php)$\">\n  Require all denied\n</FilesMatch>\n",
+            "RewriteEngine On\nRewriteRule ^xmlrpc\\.php$ - [F,L]\n",
+            "RewriteRule ^xmlrpc\\.php$ - [NC,R=403,L]\n",
+        ];
+        foreach ($denies as $text) {
+            file_put_contents($this->root . '/.htaccess', $text);
+            self::assertTrue($rules->deniesXmlrpc(), $text);
+        }
+        $none = [
+            "# <Files xmlrpc.php>\n#   Require all denied\n# </Files>\n",
+            "  #RewriteRule ^xmlrpc\\.php$ - [F,L]\n",
+            "RewriteRule ^xmlrpc\\.php$ /index.php [L]\n",
+            "<Files xmlrpc.php.bak>\n  Require all denied\n</Files>\n",
+        ];
+        foreach ($none as $text) {
+            file_put_contents($this->root . '/.htaccess', $text);
+            self::assertFalse($rules->deniesXmlrpc(), $text);
+        }
+    }
+
     public function testServerHeadersAreFoundInTheRootHtaccess(): void
     {
         self::assertSame([], $this->rules()->serverHeaders());
