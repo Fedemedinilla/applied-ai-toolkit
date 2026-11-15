@@ -1,3 +1,4 @@
+import { B, compile, E } from './regex.ts';
 import type { Lang } from './types.ts';
 
 export interface Span {
@@ -175,9 +176,12 @@ export function countAnchors(sentence: string, lang: Lang, extra: readonly strin
     else if (index > 0 && /^\p{Lu}/u.test(w.text) && !(lang === 'en' && FIRST_PERSON_EN.has(w.text))) count++;
     else if (terms.includes(lower)) count++;
   });
-  // Multi-word extra terms ("Power BI", "SQL Server") are matched on the whole sentence.
+  // Multi-word extra terms ("Power BI", "SQL Server") are matched on the whole sentence, as whole
+  // words: "power bill" is not "Power BI". Any run of whitespace stands for the spaces in the term.
   for (const term of extra) {
-    if (/\s/u.test(term) && sentence.toLowerCase().includes(term.toLowerCase())) count++;
+    if (!/\s/u.test(term)) continue;
+    const source = term.split(/\s+/u).map((part) => part.replace(/[\\^$.*+?()[\]{}|/]/gu, '\\$&')).join(String.raw`\s+`);
+    if (compile(`${B}${source}${E}`, 'iu').test(sentence)) count++;
   }
   return count;
 }
