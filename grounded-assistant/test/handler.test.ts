@@ -189,6 +189,20 @@ describe('the history', () => {
     expect(() => createAssistantHandler({ historySecret: 'short', propose: async () => say('x') })).toThrow(/32 bytes/);
   });
 
+  it('a padded, over-long history goes back exactly as received, and a trimmed copy is refused', async () => {
+    const s = setup([say('  Hola.  '), say('Dale.')]);
+    const long = `  hola  ${'a'.repeat(700)}`;
+    const first = await turn(s.handler, [{ role: 'user', content: long }]);
+    expect(first.body.reply).toBe('  Hola.  ');
+    const history: Msg[] = [
+      { role: 'user', content: long },
+      { role: 'assistant', content: first.body.reply, signature: first.body.signature },
+    ];
+    expect((await turn(s.handler, [...history, { role: 'user', content: 'gracias' }])).status).toBe(200);
+    const trimmed = history.map((m) => ({ ...m, content: m.content.slice(0, 600).trim() }));
+    expect(await turn(s.handler, [...trimmed, { role: 'user', content: 'gracias' }])).toEqual({ status: 400, body: { error: 'history' } });
+  });
+
   it('signatures are checked on the text exactly as signed, before any trimming', async () => {
     const s = setup([say('  Hola.  ')]);
     // plainText and withoutControls do not trim; the reply as sent is what was signed.
