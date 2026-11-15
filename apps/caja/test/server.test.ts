@@ -115,6 +115,8 @@ describe('extract', () => {
     ['a device two days off', JSON.stringify({ ...BODY, today: '2026-11-06' })],
     ['an extra field', JSON.stringify({ ...BODY, model: 'claude-opus-5-5' })],
     ['a body over the limit', JSON.stringify({ ...BODY, pad: 'x'.repeat(MAX_BODY_BYTES) })],
+    // Valid JSON with valid fields, padded with whitespace: only the byte cap can refuse it.
+    ['a valid body padded over the limit', JSON.stringify(BODY).replace('{', `{${' '.repeat(MAX_BODY_BYTES)}`)],
   ])('refuses %s with 400 and no model call', async (_name, raw) => {
     const { handler, api, stores } = setup([]);
     const res = await handler(post(raw, true));
@@ -160,6 +162,38 @@ describe('extract', () => {
     expect(cancelled).toBe(true);
     // 2,048 bytes is four chunks of 512; the fifth passes the limit, and the stream may have one queued.
     expect(pulled).toBeLessThanOrEqual(6);
+    expect(api.requests).toHaveLength(0);
+  });
+
+  it('accepts the same valid body just under the limit, so the padded case is refused by size', async () => {
+    const { handler } = setup([message(READING)]);
+    const exact = JSON.stringify(BODY);
+    const raw = exact.replace('{', `{${' '.repeat(MAX_BODY_BYTES - new TextEncoder().encode(exact).byteLength)}`);
+    expect(new TextEncoder().encode(raw).byteLength).toBe(MAX_BODY_BYTES);
+    expect((await handler(post(raw, true))).status).toBe(200);
+  });
+
+  it('refuses a declared content-length over the limit without reading the body', async () => {
+    const { handler, api } = setup([message(READING)]);
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(BODY)));
+        controller.close();
+      },
+    }, { highWaterMark: 0 }); // no pull until someone reads
+    const init: RequestInit & { duplex: 'half' } = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': String(MAX_BODY_BYTES + 1) },
+      body,
+      duplex: 'half',
+    };
+    const request = new Request('http://caja.test/api/extract', init);
+    expect(request.headers.get('content-length')).toBe(String(MAX_BODY_BYTES + 1));
+    const res = await handler(request);
+    expect(res.status).toBe(400);
+    expect(pulled).toBe(0);
     expect(api.requests).toHaveLength(0);
   });
 

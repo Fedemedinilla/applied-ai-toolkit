@@ -197,6 +197,31 @@ describe('reading with the model', () => {
     expect(stored[0]).toMatchObject({ amount: 45000, category: 'Servicios', day: '2026-11-03', via: 'model' });
   });
 
+  it('a reading of "hoy" saved after midnight keeps the day it was read on', async () => {
+    let clock = new Date(2026, 10, 14, 23, 59);
+    const e = endpoint(answering({ dateStated: true, date: '2026-11-14' }));
+    const store = mount({ api: e.api, now: () => clock });
+    await waitFor(() => !$('#model-toggle').hidden);
+    $<HTMLInputElement>('#model-mode').click();
+    type('hoy pagué la luz 45 lucas');
+    await waitFor(card);
+    expect(e.extracts[0]).toMatchObject({ today: '2026-11-14' });
+    clock = new Date(2026, 10, 15, 0, 1);
+    save();
+    const stored = JSON.parse(store.getItem(STORAGE_KEY) ?? '[]') as Array<Record<string, unknown>>;
+    expect(stored[0]).toMatchObject({ day: '2026-11-14', via: 'model' });
+    expect(document.querySelector('#days .day[aria-label="Ayer"] .row')).not.toBeNull();
+  });
+
+  it('a reading of "hoy" saved the same day stores no day', async () => {
+    const store = await mountWithModel(endpoint(answering({ dateStated: true, date: '2026-11-04' })));
+    type('hoy pagué la luz 45 lucas');
+    await waitFor(card);
+    save();
+    const stored = JSON.parse(store.getItem(STORAGE_KEY) ?? '[]') as Array<Record<string, unknown>>;
+    expect(stored[0]).not.toHaveProperty('day');
+  });
+
   it('a disagreement on the amount is a question with no button for the model figure', async () => {
     await mountWithModel(endpoint(answering({ kind: 'income', category: 'Ventas', amount: 12000 })));
     type('vendí 3 docenas a 12 mil la docena');
@@ -275,6 +300,27 @@ describe('reading with the model', () => {
     expect(document.querySelector('#days .day[aria-label="Hoy"] .row')).toBeNull();
   });
 
+  it('a date or category the owner clears after a re-render is not saved', async () => {
+    const store = await mountWithModel(endpoint(answering({ kind: 'unclear', category: null, dateStated: true, date: null })));
+    type('el otro día pagué la luz 45 lucas');
+    await waitFor(card);
+    pick('input[name="m-kind"][value="expense"]');
+    $<HTMLInputElement>('#m-date').value = '2026-11-02';
+    $<HTMLSelectElement>('#m-category').value = 'Servicios';
+    // Changing the kind draws the card again, which collects both answers.
+    pick('input[name="m-kind"][value="income"]');
+    pick('input[name="m-kind"][value="expense"]');
+    expect($<HTMLInputElement>('#m-date').value).toBe('2026-11-02');
+    $<HTMLInputElement>('#m-date').value = '';
+    save();
+    expect(text('#preview-error')).toBe('Elegí un día entre hoy y hace 31 días.');
+    $<HTMLInputElement>('#m-date').value = '2026-11-02';
+    $<HTMLSelectElement>('#m-category').value = '';
+    save();
+    expect(text('#preview-error')).toBe('Elegí una categoría.');
+    expect(store.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it('a day the model did read but the window rules out is named in the question', async () => {
     await mountWithModel(endpoint(answering({ dateStated: true, date: '2026-11-10' })));
     type('el martes pagué la luz 45 lucas');
@@ -320,6 +366,17 @@ describe('falling back to the offline reading', () => {
     expect(text('#preview .amount')).toBe('$45.000');
     $<HTMLButtonElement>('[data-action="save"]').click();
     expect(rows()[0]).not.toContain('con IA');
+  });
+
+  it('a failure line is cleared when the next read succeeds with the model', async () => {
+    let calls = 0;
+    await mountWithModel(endpoint(() => (++calls === 1 ? json(503, { error: 'model_unavailable' }) : json(200, { reading: reading({}) }))));
+    type('pagué la luz 45 lucas');
+    await waitFor(() => document.querySelector('[data-action="save"]') !== null);
+    expect(text('#status')).toBe('El modo con IA está ocupado ahora. Abajo está la lectura sin IA.');
+    type('pagué la luz 45 lucas');
+    await waitFor(card);
+    expect($('#status').textContent).toBe('');
   });
 
   it('"Leer sin IA" while waiting shows the offline card, and the late answer is dropped', async () => {

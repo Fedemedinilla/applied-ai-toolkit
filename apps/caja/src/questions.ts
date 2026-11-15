@@ -1,8 +1,9 @@
 // One question per ambiguity reason. The parser refuses to pick a number and says why; this file
 // turns the why into the question a shop owner would be asked across the counter, with a button
-// per reading. Every number on a button comes from the parser, run again on the words it already
-// pointed at. When the figures cannot be recovered that way, the question offers no buttons and
-// asks for the amount instead: a question without a guessed answer beats a button with a wrong one.
+// per reading. Every figure on a button comes from the parser, run again on the words it already
+// pointed at; discount, IVA, instalments and net-or-gross combine those figures with one formula
+// each. When the figures cannot be recovered that way, the question offers no buttons and asks for
+// the amount instead: a question without a guessed answer beats a button with a wrong one.
 
 import { parseAmount, type AmbiguityReason, type ParsedAmount, type Span } from '../../../amount-parser/src/index.ts';
 import { money } from './format.ts';
@@ -27,6 +28,11 @@ export interface Question {
 
 /** Two decimals, the precision a cash book keeps. */
 const cents = (n: number): number => Math.round(n * 100) / 100;
+
+const RATE = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
+
+/** "10,5%": a rate written like every other number on screen, never "10.5%" (a dot groups thousands). */
+const percent = (n: number): string => `${RATE.format(n)}%`;
 
 interface Figure {
   span: Span;
@@ -82,8 +88,8 @@ const after = (text: string, span: Span): string => text.slice(span.end, span.en
 
 function unitOrTotal(text: string): Question {
   // The parser refuses "5 tortas a 8000" and returns no quantity or unit price. Appending "c/u"
-  // pins the per-unit reading, and then the parser hands over both numbers. No arithmetic or regex
-  // of our own decides the amount.
+  // pins the per-unit reading, and then the parser hands over both numbers and the total. No
+  // arithmetic of our own decides this amount.
   const each = parseAmount(`${text} c/u`);
   if (each && !each.ambiguous && each.quantity && each.unitPrice && each.value) {
     const priceSpan = each.spans.find((s) => s.role === 'unit_price');
@@ -121,22 +127,36 @@ function range(parsed: ParsedAmount): Question {
   return typedOnly('range', 'La frase da un rango. ¿Cuánto fue al final?');
 }
 
+/** A whole word, without lookbehind (the build guard forbids it). */
+const word = (pattern: string): RegExp => new RegExp(`(^|[^\\p{L}])(${pattern})([^\\p{L}]|$)`, 'u');
+const NAMES_DISCOUNT = word('descuentos?|desc|off|menos|rebaja|bonificaci[oó]n');
+const NAMES_VAT = word('iva');
+
 function discount(text: string, parsed: ParsedAmount): Question {
+  // The parser also gives this reason for a surcharge ("20 mil + 21% de iva"). Subtracting that
+  // rate would put a button on screen with a figure the sentence never stated, so the code only
+  // builds the discount buttons when the sentence names a discount, asks the IVA question when it
+  // names IVA, and otherwise asks for the amount.
+  const lower = text.toLowerCase();
+  const namesDiscount = NAMES_DISCOUNT.test(lower);
+  if (!namesDiscount && NAMES_VAT.test(lower)) return { ...tax(text, parsed), reason: 'discount_unclear' };
   const figs = figures(parsed);
   const rate = figs.find(
     (f) => f.value < 100 && /^\s*(%|por\s*ciento|puntos|de\s+descuento)/u.test(after(text, f.span)),
   );
   const base = figs.filter((f) => f !== rate).sort((a, b) => b.value - a.value)[0];
   const prompt = rate && base
-    ? `¿Los ${base.span.text} son antes o después del ${rate.value}% de descuento?`
+    ? `¿Los ${base.span.text} son antes o después del ${percent(rate.value)} de descuento?`
     : '¿Cuánto pagaste, ya con el descuento?';
   if (!rate || !base) return typedOnly('discount_unclear', prompt);
+  const minusBefore = /[-−]\s*$/u.test(text.slice(0, rate.span.start));
+  if (!namesDiscount && !minusBefore) return typedOnly('discount_unclear', '¿Cuánto pagaste en total?');
   const net = cents(base.value * (1 - rate.value / 100));
   return {
     reason: 'discount_unclear',
     prompt,
     options: [
-      { label: `Antes: con el descuento fueron ${money(net)}`, amount: net, literal: `${base.span.text} - ${rate.value}%` },
+      { label: `Antes: con el descuento fueron ${money(net)}`, amount: net, literal: `${base.span.text} - ${percent(rate.value)}` },
       { label: `Después: fueron ${money(base.value)}`, amount: base.value, literal: base.span.text },
     ],
     typed: true,
@@ -158,7 +178,7 @@ function tax(text: string, parsed: ParsedAmount): Question {
     prompt: `¿El IVA ya está incluido en los ${base.span.text}?`,
     options: [
       { label: `Sí, ya está incluido: ${money(base.value)}`, amount: base.value, literal: base.span.text },
-      { label: `No, va aparte (${rate}%): ${money(gross)}`, amount: gross, literal: `${base.span.text} + ${rate}%` },
+      { label: `No, va aparte (${percent(rate)}): ${money(gross)}`, amount: gross, literal: `${base.span.text} + ${percent(rate)}` },
     ],
     typed: true,
   };
