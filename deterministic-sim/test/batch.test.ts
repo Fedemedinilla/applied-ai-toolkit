@@ -75,4 +75,12 @@ describe('runBatch', () => {
     expect(() => runBatch({ runs: 100_001, seedPrefix: 'p', policy: REFERENCE_POLICY })).toThrow(RangeError);
     expect(() => fixedDicePolicy(0)).toThrow(RangeError);
   });
+
+  it('fixedDicePolicy refuses more dice than the ruleset allows, which would only ever rest', () => {
+    expect(() => fixedDicePolicy(6)).toThrow(/dice must be an integer from 1 to 5/u);
+    expect(() => fixedDicePolicy(6, 'dice-1')).toThrow(RangeError);
+    expect(() => fixedDicePolicy(3, 'no-such-ruleset')).toThrow(/unknown ruleset/u);
+    expect(fixedDicePolicy(5, 'dice-1').name).toBe('roll-5');
+  });
 });
+
