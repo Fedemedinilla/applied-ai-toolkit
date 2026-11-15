@@ -47,8 +47,9 @@ export async function cacheFirst(request: Request, deps: Deps): Promise<Response
 }
 
 /**
- * Network first. A navigation that gets an error status from the host is treated like no network,
- * so a host's error page does not replace the app; `fallback` is the cached index.html.
+ * Network first. An error status from the host is treated like no network: the cached copy wins
+ * when there is one, so a host's error page replaces neither the app nor catalogue.json. A
+ * navigation also falls back to `fallback`, the cached index.html.
  */
 export async function networkFirst(request: Request, deps: Deps, opts: { navigation: boolean; fallback: string }): Promise<Response> {
   const cache = await deps.cache();
@@ -59,7 +60,7 @@ export async function networkFirst(request: Request, deps: Deps, opts: { navigat
         await cache.put(request, res.clone()).catch(() => undefined);
         return res;
       }
-      return opts.navigation ? ((await fromCache()) ?? res) : res;
+      return (await fromCache()) ?? res;
     },
     async () => (await fromCache()) ?? offline(),
   );
