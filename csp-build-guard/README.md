@@ -106,7 +106,7 @@ Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a m
 
 ### 5. JavaScript budget (`js-budget`)
 
-The JavaScript a page makes the browser download on load is measured against a budget per page glob. It counts external scripts, `modulepreload` links, Astro island URLs and inline scripts, then follows every static `import` and `export ... from` in those files. Dynamic `import()` does not count, since it loads later, on demand. Each file is measured compressed with gzip (level 9) and brotli (quality 11); a budget can limit either or both, in kB of 1000 bytes. A script from another origin, a bare specifier or a URL missing from the build is a failure, since an unmeasured file would read as zero.
+The JavaScript a page makes the browser download on load is measured against a budget per page glob. It counts external scripts, `modulepreload` links, Astro island URLs and inline scripts, then follows every static `import` and `export ... from` in those files. Dynamic `import()` does not count, since it loads later, on demand. Each file is measured compressed with gzip (level 9) and brotli (quality 11); a budget can limit either or both, in kB of 1000 bytes. A script from another origin, a bare specifier, a URL missing from the build or one that is not a valid URL is a failure, since an unmeasured file would read as zero.
 
 ## SARIF output
 

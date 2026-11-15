@@ -65,7 +65,7 @@ export function urlPathsForPage(site: Site, page: string): string[] {
 
 export type Resolved =
   | { readonly kind: 'file'; readonly url: string; readonly file: string }
-  | { readonly kind: 'external' | 'missing' | 'bare'; readonly url: string };
+  | { readonly kind: 'external' | 'missing' | 'bare' | 'invalid'; readonly url: string };
 
 /**
  * Maps a script URL found in a page or a module to a file in the static root. `from` is the URL
@@ -75,6 +75,8 @@ export type Resolved =
  */
 export function resolveUrl(site: Site, from: string, url: string, specifier = false): Resolved {
   if (specifier && !/^(?:[a-z][a-z0-9+.-]*:|\/|\.\.?\/)/i.test(url)) return { kind: 'bare', url };
+  // A URL the browser cannot parse (`https://bad host/a.js`) loads nothing; it is reported, not thrown.
+  if (!URL.canParse(url, new URL(from, 'http://site.invalid'))) return { kind: 'invalid', url };
   const parsed = new URL(url, new URL(from, 'http://site.invalid'));
   if (parsed.origin !== 'http://site.invalid') return { kind: 'external', url };
   let path: string;

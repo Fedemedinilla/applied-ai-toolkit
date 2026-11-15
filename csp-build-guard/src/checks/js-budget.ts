@@ -85,7 +85,7 @@ export function checkJsBudget(ctx: Context): CheckResult {
       const resolved = resolveUrl(ctx.site, next.from, next.url, next.specifier);
       if (resolved.kind !== 'file') {
         if (!unmeasured.some((u) => u.url === resolved.url)) {
-          const reason = { external: 'another origin', bare: 'bare specifier (import map)', missing: 'not in the build' }[resolved.kind];
+          const reason = { external: 'another origin', bare: 'bare specifier (import map)', missing: 'not in the build', invalid: 'not a valid URL' }[resolved.kind];
           unmeasured.push({ url: resolved.url, reason });
         }
         continue;

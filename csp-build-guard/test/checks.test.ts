@@ -95,6 +95,22 @@ describe('staticImports', () => {
   });
 });
 
+describe('js-budget inputs', () => {
+  it('reports a script URL or import specifier that is not a valid URL instead of crashing', () => {
+    const report = guard(
+      {
+        'index.html': '<script src="https://bad host/a.js"></script><script type="module" src="/m.js"></script>',
+        'm.js': 'import"https://bad host/x.js";',
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 10 }] },
+    );
+    expect(messages(report, 'js-budget')).toEqual([
+      'cannot measure https://bad host/a.js (not a valid URL), loaded by index.html',
+      'cannot measure https://bad host/x.js (not a valid URL), loaded by index.html',
+    ]);
+  });
+});
+
 describe('lookbehind targets', () => {
   const files = { 'index.html': '<p></p>', 'a.js': 'const r=/(?<=\\$)\\d+/;' };
 
