@@ -1,8 +1,9 @@
 // One question per ambiguity reason. The parser refuses to pick a number and says why; this file
 // turns the why into the question a shop owner would be asked across the counter, with a button
-// per reading. Every number on a button comes from the parser, run again on the words it already
-// pointed at. When the figures cannot be recovered that way, the question offers no buttons and
-// asks for the amount instead: a question without a guessed answer beats a button with a wrong one.
+// per reading. Every figure on a button comes from the parser, run again on the words it already
+// pointed at; discount, IVA, instalments and net-or-gross combine those figures with one formula
+// each. When the figures cannot be recovered that way, the question offers no buttons and asks for
+// the amount instead: a question without a guessed answer beats a button with a wrong one.
 
 import { parseAmount, type AmbiguityReason, type ParsedAmount, type Span } from '../../../amount-parser/src/index.ts';
 import { money } from './format.ts';
@@ -87,8 +88,8 @@ const after = (text: string, span: Span): string => text.slice(span.end, span.en
 
 function unitOrTotal(text: string): Question {
   // The parser refuses "5 tortas a 8000" and returns no quantity or unit price. Appending "c/u"
-  // pins the per-unit reading, and then the parser hands over both numbers. No arithmetic or regex
-  // of our own decides the amount.
+  // pins the per-unit reading, and then the parser hands over both numbers and the total. No
+  // arithmetic of our own decides this amount.
   const each = parseAmount(`${text} c/u`);
   if (each && !each.ambiguous && each.quantity && each.unitPrice && each.value) {
     const priceSpan = each.spans.find((s) => s.role === 'unit_price');
