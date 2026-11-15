@@ -197,6 +197,14 @@ describe('request shape and limits', () => {
     expect(s.seen).toHaveLength(0);
   });
 
+  it('405 carries the method error and the Allow header, like every other failure', async () => {
+    const s = setup([]);
+    const res = await s.handler(new Request('https://salon.example/api/assistant'));
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST');
+    expect(await res.json()).toEqual({ error: 'method' });
+  });
+
   it('each turn reaches the model cut to maxChars and trimmed', async () => {
     const s = setup([say('ok')]);
     await turn(s.handler, [{ role: 'user', content: `  ${'a'.repeat(700)}` }]);
