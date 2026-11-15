@@ -112,6 +112,12 @@ describe('inline', () => {
     );
   });
 
+  it('a mailto without an address and a scheme-less external host stay text', () => {
+    for (const s of ['[x](mailto:nobody)', '[x](mailto:)', '[x](mailto:a@b@c.example)', '[x](evil.example/a)', '[x](evil.example)']) {
+      expect(renderInline(s, opts)).toBe(s);
+    }
+  });
+
   it('mailto can be turned off', () => {
     expect(renderInline('[c](mailto:a@shop.example)', { ...opts, mailto: false })).toBe('[c](mailto:a@shop.example)');
   });
