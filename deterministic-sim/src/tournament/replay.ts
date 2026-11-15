@@ -105,13 +105,11 @@ export type Verification =
       /** Recomputed from the record. */
       readonly inputsHash: string;
       readonly finalStateHash: string;
-      /** Whether the hashes stated in the file match; null when the file states none. */
+      /** Whether the hashes stated in the file match; null when the file has no such key, false for any value that is not the recomputed hash. */
       readonly inputsHashMatches: boolean | null;
       readonly finalStateHashMatches: boolean | null;
     }
   | { readonly ok: false; readonly error: string };
-
-const HEX64 = /^[0-9a-f]{64}$/u;
 
 /**
  * Parses, replays and compares. A changed input shows as an inputs hash mismatch; a run that replays
@@ -127,21 +125,18 @@ export function verifyRun(value: unknown): Verification {
     return { ok: false, error: error instanceof Error ? error.message : 'the run could not be replayed' };
   }
   const stated = isRecord(value) ? value : {};
-  const statedHash = (key: string): string | null => {
-    const v = stated[key];
-    return typeof v === 'string' && HEX64.test(v) ? v : null;
-  };
   const inputs = inputsHash(record);
   const final = stateHash(state);
-  const statedInputs = statedHash('inputsHash');
-  const statedFinal = statedHash('finalStateHash');
+  // Only an absent key means "states none". Any other value is compared, so a hash that was edited
+  // into garbage, uppercased or cut short shows as a mismatch.
+  const matches = (key: string, recomputed: string): boolean | null => (stated[key] === undefined ? null : stated[key] === recomputed);
   return {
     ok: true,
     record,
     state,
     inputsHash: inputs,
     finalStateHash: final,
-    inputsHashMatches: statedInputs === null ? null : statedInputs === inputs,
-    finalStateHashMatches: statedFinal === null ? null : statedFinal === final,
+    inputsHashMatches: matches('inputsHash', inputs),
+    finalStateHashMatches: matches('finalStateHash', final),
   };
 }

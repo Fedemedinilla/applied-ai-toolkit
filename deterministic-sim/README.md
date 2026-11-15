@@ -53,7 +53,7 @@ After round twenty each chip left is worth one point. Every number above lives i
 
 **Strict input shapes.** `checkInput` accepts `{ kind: 'rest' }` and `{ kind: 'roll', dice }` and nothing else. An extra key would change the hash without changing the game, so two hashes would name one run.
 
-**Seal and verify.** `sealRun` adds the inputs hash and the final state hash to a record; `verifyRun` parses an untrusted value, replays it and compares both ([`src/tournament/replay.ts`](src/tournament/replay.ts)). An edited input fails the first. A run that replays to a different state, under changed rules or on an engine that drifted, fails the second. A file with no hashes reports `null` for both, not `false` and not `true`.
+**Seal and verify.** `sealRun` adds the inputs hash and the final state hash to a record; `verifyRun` parses an untrusted value, replays it and compares both ([`src/tournament/replay.ts`](src/tournament/replay.ts)). An edited input fails the first. A run that replays to a different state, under changed rules or on an engine that drifted, fails the second. A file with no hashes reports `null` for both, not `false` and not `true`. A hash key that holds anything but the recomputed hash, a malformed string or `null` included, reports `false`.
 
 **Rulesets are versioned data.** A state names its ruleset, `rulesFor` refuses an unknown one, and `rules-v1.ts` is deep-frozen. A rules change goes into a new file with a new version string. The six runs in [`test/golden/runs.json`](test/golden/runs.json) must keep replaying to their sealed hashes.
 
@@ -97,7 +97,7 @@ More dice raise the median and widen the spread. In this ruleset nothing makes a
 | `test/canonical.test.ts` | Sorted keys, code-unit order, key order independence and round trip as properties, a `__proto__` key kept as data, -0, every refusal with its path, cycles |
 | `test/fixed.test.ts` | Each rounding mode, a property against a BigInt reference over the safe range, the 2^53 + 1 case, one floor against three, too many multipliers, `lookup` |
 | `test/advance.test.ts` | Start, cost, the scoring formula against the logged factors, streak cap, bust, a cold house flooring to 0, rest cap, the end bonus, an unaffordable roll leaving the state as it was, ten malformed inputs, `canApply` agreeing with `advance` on them, combinations, a frozen ruleset |
-| `test/replay.test.ts` | Replay and prefixes, the inputs hash under key reordering, the state hash over the log, record parsing, seal and verify with an edited input, a wrong state hash, no hashes, an illegal input |
+| `test/replay.test.ts` | Replay and prefixes, the inputs hash under key reordering, the state hash over the log, record parsing, seal and verify with an edited input, a wrong state hash, no hashes, a malformed hash, an illegal input |
 | `test/properties.test.ts` | fast-check, 200 runs each: replay byte-identical, prefixes, no mutation of deep-frozen arguments, bounds after every step, score equal to the logged points, house independent of the dice |
 | `test/batch.test.ts` | Integer summaries and percentiles, negative bins, a batch equal to itself by hash, counts, `summarize` equal to `runBatch`, spread by policy, run-count and dice bounds, the CLI exiting 2 with one line on a bad `--runs`, `--dice` or `--seed-prefix` |
 | `test/golden.test.ts` | Six sealed runs, two of them full 20-round games, still replay to their hashes |
