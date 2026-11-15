@@ -395,6 +395,18 @@ describe('logout', () => {
     expect((await refreshWith(laptopSession.refresh_token)).error).toBeNull();
   });
 
+  it('the default scope is global and revokes the refresh token of every session of the user', async () => {
+    const phone = clientFor(fake);
+    const laptop = clientFor(fake);
+    const phoneSession = await signIn(fake, phone);
+    const laptopSession = await signIn(fake, laptop);
+
+    expect((await phone.auth.signOut()).error).toBeNull();
+    expect(fake.requests.at(-1)?.query.get('scope')).toBe('global');
+    expect((await refreshWith(phoneSession.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_not_found' });
+    expect((await refreshWith(laptopSession.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_not_found' });
+  });
+
   it('scope others keeps this session and revokes every other one', async () => {
     const phone = clientFor(fake);
     const laptop = clientFor(fake);
