@@ -13,7 +13,7 @@ import type { BlindKey, BlindPiece } from '../src/blind.ts';
 import { readJsonl } from '../src/files.ts';
 import { groundedness, JudgeError } from '../src/judge.ts';
 import { judgedRuns, summarize } from '../src/run.ts';
-import { flag, freshOutputOrExit, hasFlag, intFlag, positional, usageError } from './cli.ts';
+import { flag, freshOutputsOrExit, hasFlag, intFlag, positional, usageError } from './cli.ts';
 
 const [piecesPath, keyPath, verdictsPath, prefix] = positional(4, 'usage: node evals/scripts/runs.ts <pieces.jsonl> <key.json> <verdicts.jsonl> <out-prefix> [--judges N] [--allow-missing]') as [string, string, string, string];
 const { key } = JSON.parse(readFileSync(keyPath, 'utf8')) as { key: BlindKey };
@@ -28,9 +28,11 @@ try {
 for (const run of runs) {
   if (!/^[A-Za-z0-9._-]+$/.test(run.label)) usageError(`variant "${run.label}" cannot be used in a file name`);
 }
+const pathOf = (label: string) => `${prefix}-${label}.json`;
+freshOutputsOrExit(runs.map((run) => pathOf(run.label)));
 for (const run of runs) {
-  const path = `${prefix}-${run.label}.json`;
-  writeFileSync(freshOutputOrExit(path), JSON.stringify(run, null, 1) + '\n');
+  const path = pathOf(run.label);
+  writeFileSync(path, JSON.stringify(run, null, 1) + '\n');
   const s = summarize(run);
   console.log(`${run.label}: ${s.passes}/${s.scored} pass -> ${path}`);
 }

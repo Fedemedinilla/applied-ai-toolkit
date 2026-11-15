@@ -1,17 +1,25 @@
 /** JSONL and output-file helpers shared by the scripts. */
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 
+/**
+ * One JSON value per non-blank line. A leading byte order mark (Windows
+ * editors write one) is dropped, and an error names the line as counted in
+ * the file, blank lines included.
+ */
 export function readJsonl<T = unknown>(path: string): T[] {
-  return readFileSync(path, 'utf8')
+  const out: T[] = [];
+  readFileSync(path, 'utf8')
+    .replace(/^\uFEFF/, '')
     .split('\n')
-    .filter((l) => l.trim() !== '')
-    .map((l, i) => {
+    .forEach((l, i) => {
+      if (l.trim() === '') return;
       try {
-        return JSON.parse(l) as T;
+        out.push(JSON.parse(l) as T);
       } catch {
         throw new Error(`${path}:${i + 1}: not JSON`);
       }
     });
+  return out;
 }
 
 export const appendJsonl = (path: string, row: unknown) => appendFileSync(path, JSON.stringify(row) + '\n');
@@ -22,7 +30,13 @@ export const appendJsonl = (path: string, row: unknown) => appendFileSync(path, 
  * would silently mix two runs of a prompt that has changed since.
  */
 export function freshOutput(path: string): string {
-  if (existsSync(path)) throw new Error(`${path} already exists; pick a new file so two runs never mix`);
-  writeFileSync(path, '');
+  // One exclusive create, not a check then a write: two runs started together
+  // on one path cannot both pass.
+  try {
+    writeFileSync(path, '', { flag: 'wx' });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`${path} already exists; pick a new file so two runs never mix`);
+    throw e;
+  }
   return path;
 }

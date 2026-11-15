@@ -119,6 +119,11 @@ describe('aggregate', () => {
     expect(() => aggregate(pieces.slice(0, 4), cut, verdicts.slice(0, 4))).toThrow(/different row counts \(V0 3, V4 1\)/);
   });
 
+  it('refuses a piece the key marks withheld when it was given to the judge anyway', () => {
+    const k: BlindKey = { ...key, r: entry('V4', 'en', 3, { stop: 'refusal', withheld: 'refusal' }) };
+    expect(() => aggregate([...pieces, piece('r', 'en')], k, [...verdicts, verdict('r', false, 5)])).toThrow(/piece r is marked refusal in the key but was given to the judge/);
+  });
+
   it('refuses a key entry whose piece is missing from the pieces file', () => {
     expect(() => aggregate(pieces.slice(1), key, verdicts.slice(1))).toThrow(/1 key entr\(ies\) have no piece: a/);
   });

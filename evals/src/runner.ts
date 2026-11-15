@@ -71,6 +71,18 @@ export function planJobs<C extends { id: string }, L extends string>(
   samples: number,
 ): Job<C, L>[] {
   if (!Number.isInteger(samples) || samples < 1) throw new Error(`samples must be a positive integer, got ${samples}`);
+  // A repeat would pay for the same piece twice and give one variant a
+  // larger denominator than the others, so it stops here, before any call.
+  const once = (what: string, ids: readonly string[]) => {
+    const seen = new Set<string>();
+    for (const id of ids) {
+      if (seen.has(id)) throw new Error(`${what} ${id} is listed twice`);
+      seen.add(id);
+    }
+  };
+  once('variant', variants);
+  once('language', langs);
+  once('case', cases.map((c) => c.id));
   const jobs: Job<C, L>[] = [];
   for (let sample = 1; sample <= samples; sample++)
     for (const c of cases)
@@ -160,6 +172,7 @@ export type RunOptions<C extends { id: string }, L extends string> = {
    * Thursday" and the judge checks all of them against the same TODAY line.
    */
   now?: Date;
+  /** Called once per row. If it throws, no new job starts and runEval rejects with that error. */
   onRow?: (row: EvalRow<L>) => void;
   onFailure?: (failure: EvalFailure) => void;
 };
@@ -168,6 +181,9 @@ export async function runEval<C extends { id: string }, L extends string>(
   opts: RunOptions<C, L>,
 ): Promise<{ rows: EvalRow<L>[]; failures: EvalFailure[] }> {
   const { client, target, variants, jobs } = opts;
+  // NaN would make the worker pool empty, and the run would finish with no
+  // rows and no error, so it is refused rather than clamped.
+  if (Number.isNaN(opts.concurrency)) throw new Error(`concurrency must be a number, got ${opts.concurrency}`);
   const concurrency = Math.max(1, Math.floor(opts.concurrency ?? 3));
   const now = opts.now ?? new Date();
   preflight(target, variants, jobs, now);
@@ -175,8 +191,11 @@ export async function runEval<C extends { id: string }, L extends string>(
   const rows: EvalRow<L>[] = [];
   const failures: EvalFailure[] = [];
   let next = 0;
+  // An error from onRow is not a failed call: the model answered and the row
+  // was paid for. It stops the run and is thrown once the calls in flight end.
+  let stopped: { error: unknown } | undefined;
 
-  async function runOne(j: Job<C, L>) {
+  async function runOne(j: Job<C, L>): Promise<EvalRow<L>> {
     const brief = target.brief(j.c, j.lang);
     const t0 = performance.now();
     const reply = await client.create({
@@ -197,16 +216,16 @@ export async function runEval<C extends { id: string }, L extends string>(
       ms: Math.round(performance.now() - t0),
       usage: reply.usage,
     };
-    rows.push(row);
-    opts.onRow?.(row);
+    return row;
   }
 
   await Promise.all(
     Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
-      while (next < jobs.length) {
+      while (next < jobs.length && !stopped) {
         const j = jobs[next++]!;
+        let row: EvalRow<L>;
         try {
-          await runOne(j);
+          row = await runOne(j);
         } catch (e) {
           const status = (e as { status?: unknown })?.status;
           const failure: EvalFailure = {
@@ -218,9 +237,17 @@ export async function runEval<C extends { id: string }, L extends string>(
           };
           failures.push(failure);
           opts.onFailure?.(failure);
+          continue;
+        }
+        rows.push(row);
+        try {
+          opts.onRow?.(row);
+        } catch (e) {
+          stopped ??= { error: e };
         }
       }
     }),
   );
+  if (stopped) throw stopped.error;
   return { rows, failures };
 }

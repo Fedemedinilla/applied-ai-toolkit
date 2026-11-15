@@ -133,6 +133,11 @@ describe('gate', () => {
     const twice = run('pr', 30, 40);
     twice.results.push({ ...twice.results[0]!, sample: 2 });
     expect(() => gate(base, twice)).toThrow(/different number of samples for 1 case\(s\): case-001 \(1 and 2\)/);
+    const repeated = run('pr', 30, 40);
+    repeated.results[1] = { ...repeated.results[0]!, pass: false };
+    const pairs = run('main', 30, 40);
+    pairs.results[1] = { ...pairs.results[0]!, sample: 2 };
+    expect(() => gate(pairs, repeated)).toThrow(/the candidate holds case-001 sample 1 twice/);
     expect(() => gate(base, twice)).toThrow(GateRefusal);
   });
 
@@ -242,5 +247,24 @@ describe('the gate script', () => {
     expect(readFileSync(summary, 'utf8')).toMatch(/^# earlier step\n### Eval gate: fail\n/);
     const near = file('near.json', run('pr', 178, 200));
     expect(cli(big, near, '--margin', '0.02').status).toBe(3);
+  });
+
+  it('refuses a margin written as --margin=value, or empty, instead of using another one', () => {
+    const same = file('same-margin.json', run('main', 36, 40));
+    const eq = cli(main, same, '--margin=0.5');
+    expect(eq.status).toBe(2);
+    expect(eq.stderr).toContain('--margin=0.5: write the value as a separate argument (--margin 0.5)');
+    const empty = cli(main, same, '--margin', '');
+    expect(empty.status).toBe(2);
+    expect(empty.stderr).toContain('--margin must be a number');
+    expect(cli(main, same, '--margin', '0.5').status).toBe(0);
+  });
+
+  it('exits 2, not 1, when the summary file cannot be written', () => {
+    const same = file('same.json', run('pr', 36, 40));
+    expect(cli(main, same).status).toBe(3);
+    const r = cli(main, same, '--summary', join(dir, 'no-such-dir', 'sum.md'));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/^gate: cannot write the summary to .*sum\.md/);
   });
 });

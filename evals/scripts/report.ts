@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { DEFAULT_MARGIN, GateRefusal } from '../src/gate.ts';
 import { renderComparisonReport, renderRunReport } from '../src/report.ts';
 import { parseRun, type StoredRun } from '../src/run.ts';
-import { flag, freshOutputOrExit, hasFlag, positional, usageError } from './cli.ts';
+import { freshOutputOrExit, hasFlag, numberFlag, positional, usageError } from './cli.ts';
 
 const args = positional(2, 'usage: node evals/scripts/report.ts <run.json> [<candidate.json>] <out.html> [--margin 0.1] [--allow-missing]');
 if (args.length > 3) usageError('report takes one run or two (baseline, candidate) and the output file');
@@ -31,7 +31,7 @@ try {
   html =
     args.length === 2
       ? renderRunReport(load(args[0]!))
-      : renderComparisonReport(load(args[0]!), load(args[1]!), { margin: Number(flag('margin', String(DEFAULT_MARGIN))), allowMissing: hasFlag('allow-missing') });
+      : renderComparisonReport(load(args[0]!), load(args[1]!), { margin: numberFlag('margin', DEFAULT_MARGIN), allowMissing: hasFlag('allow-missing') });
 } catch (e) {
   if (e instanceof GateRefusal) usageError(`report: the runs cannot be compared\n${e.message}`);
   throw e;

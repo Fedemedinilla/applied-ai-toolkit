@@ -19,6 +19,12 @@ describe('planJobs', () => {
     expect(firstSample.every((j) => j.sample === 1)).toBe(true);
   });
 
+  it('rejects a variant, language or case listed twice', () => {
+    expect(() => planJobs(PROBES, ['V0', 'V4', 'V0'], ['en'], 1)).toThrow(/variant V0 is listed twice/);
+    expect(() => planJobs(PROBES, ['V0'], ['en', 'en'], 1)).toThrow(/language en is listed twice/);
+    expect(() => planJobs([PROBES[0]!, PROBES[0]!], ['V0'], ['en'], 1)).toThrow(`case ${PROBES[0]!.id} is listed twice`);
+  });
+
   it('rejects a sample count that is not a positive integer', () => {
     expect(() => planJobs(PROBES, ids, ['en'], 0)).toThrow();
     expect(() => planJobs(PROBES, ids, ['en'], 1.5)).toThrow();
@@ -83,6 +89,35 @@ describe('runEval', () => {
     await runEval({ client, target, variants: VARIANTS, jobs, concurrency: 3 });
     expect(peak).toBe(3);
     expect(client.requests).toHaveLength(jobs.length);
+  });
+
+  it('stops the run when onRow throws, without counting the job as a failed call', async () => {
+    const client = recordingClient(() => reply('ok'));
+    const failures: unknown[] = [];
+    const jobs = planJobs(PROBES.slice(0, 3), ['V0'], ['en'], 1);
+    const run = runEval({
+      client,
+      target,
+      variants: VARIANTS,
+      jobs,
+      concurrency: 1,
+      onRow: () => {
+        throw new Error('disk full');
+      },
+      onFailure: (f) => failures.push(f),
+    });
+    await expect(run).rejects.toThrow('disk full');
+    expect(failures).toEqual([]);
+    expect(client.requests).toHaveLength(1);
+  });
+
+  it('refuses a concurrency that is not a number instead of running nothing', async () => {
+    const client = recordingClient(() => reply('ok'));
+    const jobs = planJobs(PROBES.slice(0, 2), ['V0'], ['en'], 1);
+    await expect(runEval({ client, target, variants: VARIANTS, jobs, concurrency: NaN })).rejects.toThrow(/concurrency must be a number/);
+    expect(client.requests).toHaveLength(0);
+    const all = await runEval({ client, target, variants: VARIANTS, jobs, concurrency: Infinity });
+    expect(all.rows).toHaveLength(2);
   });
 });
 
