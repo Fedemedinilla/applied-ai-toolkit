@@ -30,7 +30,7 @@ The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp
 
 **One turn at a time.** The page keeps a pending flag and ignores Enter and the reset button while a turn is in flight. `requestSubmit()` does not check a disabled submit button, so without the flag a second Enter started another request from the same history. Whichever reply landed last then dropped the other exchange from what the page sent next. A turn that fails puts its text back in the box and marks its bubble "(no enviado)", because it is not part of the conversation any more.
 
-**The local server never hands the app a request it cannot build.** Node accepts methods such as `TRACE` that `new Request` throws on, so `serve.ts` answers those 405 before building one. A body above the 32 KiB limit gets 413 instead of being cut and parsed as broken JSON, and any rejection in the chain answers 500 rather than ending the process with an unhandled rejection.
+**The local server never hands the app a request it cannot build.** Node accepts methods such as `TRACE` that `new Request` throws on, so the server (`server/static.ts`, which `serve.ts` starts) answers those 405 before building one. It also accepts request targets such as `http://[` that `new URL` throws on; those get 400, because a throw in the request listener would end the process. A body above the 32 KiB limit gets 413 instead of being cut and parsed as broken JSON, and any rejection in the chain answers 500 rather than ending the process with an unhandled rejection.
 
 **Replies render as text.** The page uses `renderMarkdown` with no internal or external hosts and `mailto` off, so lists and bold work and nothing in a reply becomes a link. User turns are set with `textContent`.
 

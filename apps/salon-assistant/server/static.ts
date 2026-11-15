@@ -63,7 +63,15 @@ async function api(app: App, req: IncomingMessage, res: ServerResponse, url: URL
 export function createStaticServer(options: StaticServerOptions): Server {
   const root = resolve(options.root);
   return createServer((req, res) => {
-    const url = new URL(req.url ?? '/', options.origin);
+    // Node's parser accepts targets such as `http://[` that `new URL` throws on. A throw here is
+    // not inside any promise, so it would end the process: answer 400 instead.
+    let url: URL;
+    try {
+      url = new URL(req.url ?? '/', options.origin);
+    } catch {
+      res.writeHead(400, { connection: 'close' }).end();
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       api(options.app, req, res, url).catch((e: unknown) => {
         if (res.headersSent) return void res.end();

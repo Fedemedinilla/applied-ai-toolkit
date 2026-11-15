@@ -3,7 +3,7 @@
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { connect, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -50,7 +50,24 @@ function send(method: string, path: string, body?: string): Promise<{ status: nu
   });
 }
 
+/** Raw bytes on a socket, for request targets an HTTP client would refuse to send. */
+function raw(bytes: string): Promise<string> {
+  return new Promise((done, fail) => {
+    const socket = connect(port, '127.0.0.1', () => socket.end(bytes));
+    const parts: Buffer[] = [];
+    socket.on('data', (c: Buffer) => parts.push(c));
+    socket.on('end', () => done(Buffer.concat(parts).toString('latin1')));
+    socket.on('error', fail);
+  });
+}
+
 describe('the local server', () => {
+  it('answers 400 to a request target the URL parser rejects, and keeps serving', async () => {
+    const reply = await raw('GET http://[ HTTP/1.1\r\nHost: x\r\n\r\n');
+    expect(reply.startsWith('HTTP/1.1 400')).toBe(true);
+    expect((await send('GET', '/')).status).toBe(200);
+  });
+
   it('serves the page with the CSP header', async () => {
     const r = await send('GET', '/');
     expect(r.status).toBe(200);
