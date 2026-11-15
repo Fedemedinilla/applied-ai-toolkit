@@ -26,7 +26,7 @@ The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp
 
 **A history secret of its own.** `server/env.ts` reads `ASSISTANT_HISTORY_SECRET` and the API key separately. The source derived the signing key from the API key, so rotating the key ended every conversation.
 
-**JSON only, small bodies, a per-IP minute.** The handler refuses anything but `application/json` (a cross-site page can POST `text/plain` without a preflight), bodies above 24 KiB, and a thirteenth turn from one IP within a minute, counting only accepted ones. The limiter lives in one process.
+**JSON only, small bodies, a per-IP minute.** The handler refuses anything but `application/json` (a cross-site page can POST `text/plain` without a preflight), bodies above 24 KiB, and a thirteenth JSON request from one IP within a minute. The handler asks the limiter before it reads the body, so a request later refused as broken JSON, a bad history or a failed model call still counts; one the limiter refuses does not. The limiter lives in one process.
 
 **One turn at a time.** The page keeps a pending flag and ignores Enter and the reset button while a turn is in flight. `requestSubmit()` does not check a disabled submit button, so without the flag a second Enter started another request from the same history. Whichever reply landed last then dropped the other exchange from what the page sent next. A turn that fails puts its text back in the box and marks its bubble "(no enviado)", because it is not part of the conversation any more.
 
@@ -42,7 +42,7 @@ The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp
 
 | File | Covers |
 |---|---|
-| `test/app.test.ts` | A turn over the real gateway and SDK client against a fake Messages API: the request body (model, `max_tokens`, no `temperature`, two system blocks with the clock line, a JSON schema with `booking` before `reply`), the card from `decide()`; a signed second turn; a forged turn that never reaches the API; the cap refusing the second call; 529, 400, schema failure and `max_tokens` mapped to their answers; no key; the env readers; the per-minute limiter, including that past 10,000 addresses it drops an idle one and keeps an active one |
+| `test/app.test.ts` | A turn over the real gateway and SDK client against a fake Messages API: the request body (model, `max_tokens`, no `temperature`, two system blocks with the clock line, a JSON schema with `booking` before `reply`), the card from `decide()`; a signed second turn; a forged turn that never reaches the API; the cap refusing the second call; 529, 400, schema failure and `max_tokens` mapped to their answers; no key; the env readers; the per-minute limiter, including that past 10,000 addresses it drops an idle one and keeps an active one; through the app, the 429 past `perMinute`, the default of 12 and that malformed requests count too; the health body with and without a key |
 | `test/build.test.ts` | The production build: relative URLs, one script and one stylesheet, the renderer included, and no server code, secret name or prompt in the bundle |
 
 ## Limits

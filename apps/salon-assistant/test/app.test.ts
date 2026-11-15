@@ -181,6 +181,17 @@ describe('the per-IP limit on the app', () => {
     expect(statuses).toEqual([...Array<number>(12).fill(200), 429]);
     expect(api.seen).toHaveLength(12);
   });
+
+  it('counts a malformed request too: the handler asks the limiter before reading the body', async () => {
+    const { api, handle } = app([message({ booking: null, reply: 'Hola.' })]);
+    const junk = () => new Request('http://127.0.0.1:8791/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' });
+    const statuses: number[] = [];
+    for (let i = 0; i < 12; i++) statuses.push((await handle(junk())).status);
+    expect(statuses).toEqual(Array<number>(12).fill(400));
+    const res = await handle(post([{ role: 'user', content: 'hola' }]));
+    expect([res.status, await res.json()]).toEqual([429, { error: 'limited' }]);
+    expect(api.seen).toHaveLength(0);
+  });
 });
 
 describe('env', () => {

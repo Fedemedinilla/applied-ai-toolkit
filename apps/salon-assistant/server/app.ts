@@ -12,11 +12,15 @@ export interface AppOptions {
   readonly now?: () => Date;
   readonly monthlyCapUsd?: number;
   readonly log?: (line: string) => void;
-  /** Per-IP turns per minute. Default 12, the source's figure. */
+  /** Per-IP JSON requests per minute, counted as the limiter below counts them. Default 12, the source's figure. */
   readonly perMinute?: number;
 }
 
-/** Turns per IP in the last minute, counting only accepted ones. One process only, at most 10,000 addresses. */
+/**
+ * Requests per IP in the last minute. A request this limiter refuses is not counted. The handler
+ * asks it before reading the body, so every JSON POST counts, including one later refused as
+ * invalid JSON, a bad history or a model failure. One process only, at most 10,000 addresses.
+ */
 export function perMinuteLimiter(max: number, now: () => number): (ip: string) => boolean {
   const hits = new Map<string, number[]>();
   return (ip) => {
