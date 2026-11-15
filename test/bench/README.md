@@ -18,7 +18,7 @@ npm run bench:baseline   # records the last run as the new baseline (commit the 
 
 | Bench | File | One iteration |
 | --- | --- | --- |
-| `amount-parser/parse-corpus` | `amount-parser/test/parse.bench.ts` | `parseAmount` over the 165 corpus phrases |
+| `amount-parser/parse-corpus` | `amount-parser/test/parse.bench.ts` | `parseAmount` over the 194 corpus phrases |
 | `safe-markdown/render-long-reply` | `safe-markdown/test/render.bench.ts` | `renderMarkdown` of a reply of about 19,000 characters with lists, tables, code and links |
 | `slop-lint/lint-long-en` | `slop-lint/test/lint.bench.ts` | `lint` of an English document of about 29,000 characters |
 | `slop-lint/lint-long-es` | `slop-lint/test/lint.bench.ts` | `lint` of a Spanish document of about 33,000 characters |
