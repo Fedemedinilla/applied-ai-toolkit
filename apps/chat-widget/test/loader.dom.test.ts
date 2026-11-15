@@ -206,6 +206,20 @@ describe('sending', () => {
     expect(widget.root.querySelector('.chip')).toBeNull();
   });
 
+  it('keeps the chips and sends nothing when a chip is pressed while a reply is pending', async () => {
+    let release: (r: Response) => void = () => undefined;
+    const { widget, calls } = await mount([() => new Promise<Response>((resolve) => (release = resolve)), ok({ reply: 'No, de martes a sábado.' })]);
+    const first = widget.send('uno');
+    q<HTMLButtonElement>(widget.root, '.chip').click();
+    expect(calls).toHaveLength(2);
+    expect(widget.root.querySelector('.chip')).not.toBeNull();
+    release(new Response(JSON.stringify({ reply: 'Ok.' })));
+    await first;
+    q<HTMLButtonElement>(widget.root, '.chip').click();
+    await vi.waitFor(() => expect(texts(widget.root)).toContain('No, de martes a sábado.'));
+    expect(JSON.parse(String(calls[2]?.init.body)).messages.at(-1)).toEqual({ role: 'user', content: '¿Abren los domingos?' });
+  });
+
   it('keeps a long reply on screen whole and in the history cut to the server bound', async () => {
     const long = 'a'.repeat(MAX_REPLY_CHARS + 500);
     const { widget, calls } = await mount([ok({ reply: long }), ok({ reply: 'Ok.' })]);
