@@ -25,7 +25,8 @@
  *    its runtime exports with the source module's, then does the same with require() from
  *    CommonJS: the types resolve for a CommonJS consumer too, so the runtime must as well.
  *    Compares the declared exports (values and types) of each `.d.ts` entry with the source
- *    module's, through the TypeScript compiler API.
+ *    module's, through the TypeScript compiler API. A JSON entry is imported with
+ *    `{ type: 'json' }` and must be byte for byte its source file.
  * 5. Typechecks a small consumer against the installed package with the repository's strict
  *    options and `skipLibCheck: false`. A `@ts-expect-error` line in it fails if the types
  *    collapse to `any`.
@@ -60,6 +61,8 @@ interface PackageSpec {
   readonly folder: string;
   readonly name: string;
   readonly entries: readonly Entry[];
+  /** JSON files exported by subpath, each imported by package name and compared with its source file. */
+  readonly jsonEntries?: readonly Entry[];
   /** Dependencies linked from the repository's node_modules when the tarball is extracted. */
   readonly linkDependencies?: readonly string[];
   /** A consumer typechecked against the installed package. */
@@ -112,7 +115,9 @@ const PACKAGES: readonly PackageSpec[] = [
     entries: [
       { subpath: '.', source: 'src/lint.ts' },
       { subpath: './types', source: 'src/types.ts' },
+      { subpath: './config', source: 'src/config.ts' },
     ],
+    jsonEntries: [{ subpath: './config.schema.json', source: 'schema/config.schema.json' }],
     bin: 'slop-lint',
     consumer: `import { lint, RULES } from '@fedemedinilla/slop-lint';
 import type { LintOptions, LintResult } from '@fedemedinilla/slop-lint/types';
@@ -429,6 +434,20 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
     const sourceDeclared = declaredExports(join(packageDir, entry.source), SOURCE_OPTIONS);
     sameList(`the declared exports of ${specifier} and ${spec.folder}/${entry.source}`, declared, sourceDeclared);
     say(`entry ${entry.subpath}: ${runtime.length} runtime exports, through import and require(), and ${declared.length} declared exports match the source`);
+  }
+
+  // A JSON entry, through import with { type: 'json' }: the same bytes as the source file.
+  for (const entry of spec.jsonEntries ?? []) {
+    const specifier = `${spec.name}/${entry.subpath.replace(/^\.\//, '')}`;
+    const script = `import { readFileSync } from 'node:fs'; import { fileURLToPath } from 'node:url';
+const m = await import(${JSON.stringify(specifier)}, { with: { type: 'json' } });
+const file = fileURLToPath(import.meta.resolve(${JSON.stringify(specifier)}));
+console.log(JSON.stringify({ parsed: m.default, text: readFileSync(file, 'utf8') }));`;
+    const got = JSON.parse(mustRun(process.execPath, ['--input-type=module', '-e', script], { cwd: consumer })) as { parsed: unknown; text: string };
+    const sourceText = readFileSync(join(packageDir, entry.source), 'utf8');
+    if (got.text !== sourceText) fail(`${specifier} is not byte for byte ${spec.folder}/${entry.source}`);
+    if (JSON.stringify(got.parsed) !== JSON.stringify(JSON.parse(sourceText))) fail(`${specifier} imports as JSON different from ${spec.folder}/${entry.source}`);
+    say(`entry ${entry.subpath}: imports as JSON by package name, byte for byte ${entry.source}`);
   }
 
   // 5. A strict consumer typechecks against the installed declarations.
