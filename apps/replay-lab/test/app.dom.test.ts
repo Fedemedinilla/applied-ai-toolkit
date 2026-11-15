@@ -187,19 +187,25 @@ describe('run file', () => {
   });
 
   it('import replays the file, reports both hashes as matching and loads the run', async () => {
-    const { urls, app } = mount();
+    const { urls } = mount();
     startSeed('lab-2');
     click('[data-dice="4"]');
     click('#rest');
     click('#export');
     const exported = urls.get($<HTMLAnchorElement>('#download').getAttribute('href') ?? '') ?? '';
-    mount();
+    // A fresh page, so the session checked below can only come from the import.
+    const { app } = mount();
+    expect(app.session()).toBeNull();
     chooseFile('run.json', exported);
     await vi.waitFor(() => expect(text('#import-result')).toContain('Final state hash'));
     expect([...document.querySelectorAll('#import-result li')].map((li) => li.className)).toEqual(['good', 'good']);
     expect(text('#import-result')).toContain('run.json: seed "lab-2", 2 inputs, ruleset dice-1.');
     expect($<HTMLInputElement>('#seed').value).toBe('lab-2');
     expect(app.session()).not.toBeNull();
+    expect(app.session()?.state).toEqual(replay('lab-2', [{ kind: 'roll', dice: 4 }, { kind: 'rest' }]));
+    expect(app.session()?.inputs).toEqual([{ kind: 'roll', dice: 4 }, { kind: 'rest' }]);
+    expect($('#play').hidden).toBe(false);
+    expect(text('#st-round')).toBe('2 of 20');
   });
 
   it('an edited file still replays, and the inputs hash is reported as not matching', async () => {
