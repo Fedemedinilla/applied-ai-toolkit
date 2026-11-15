@@ -41,7 +41,7 @@ The salon's data, the context the model reads and both prompts (Spanish and Engl
 3. Each turn is cut to 600 characters and trimmed; the last one must be a user turn.
 4. `propose` gets the rules and the context (one stable block), today's date and time in the salon's zone (a second block), the schema and the messages. A reply with a control character in it gets one more try.
 5. Links and `www.` come out of the prose, and control characters are mended.
-6. A proposed booking goes through `decide()`. A refusal replaces the prose with a sentence that names the failed check, and `bookingRejected` carries its code.
+6. A proposed booking goes through `decide()`. A refusal replaces the prose with a sentence that names the failed check, and `bookingRejected` carries its code. A refusal that quotes the model's `service` quotes at most 60 characters of it and goes through the same cleaning as step 5.
 7. The money guard judges the prose. An invented figure replaces the reply with an apology and withdraws the card (`bookingWithdrawn`). A wrong price on the card's own service keeps the card and rewrites the reply as the card in words. On the English path, figures are rewritten as `$16,000`.
 8. A reply that contains an email address is replaced.
 9. The reply is signed together with the conversation it closes, and sent.

@@ -111,6 +111,29 @@ describe('a turn', () => {
     expect(body.reply).not.toContain('$52.000');
   });
 
+  it('a refusal that quotes the model’s service gets the same link and control cleaning as prose', async () => {
+    const booking = (service: string) => ({ service, stylist: null, date: '2026-11-07', time: null });
+    const s = setup([
+      say('Dale.', booking('visitá https://evil.example/pago ya')),
+      say('Dale.', booking('mirá www.evil.example')),
+      say('Dale.', booking('[clic](https://evil.example)')),
+      say('Dale.', booking('tin\u0007te')),
+      say('Dale.', booking(`servicio ${'x'.repeat(3000)}`)),
+    ]);
+    const replies: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const { status, body } = await turn(s.handler, [{ role: 'user', content: 'hola' }]);
+      expect(status).toBe(200);
+      expect(body.bookingRejected).toBe('service_not_loaded');
+      replies.push(body.reply);
+    }
+    for (const r of replies) {
+      expect(r).not.toMatch(/https?:\/\/|www\.|\]\(|[\u0000-\u0009\u000B-\u001F\u007F]/);
+      expect(r.length).toBeLessThan(250);
+    }
+    expect(replies[2]).toContain('"clic"');
+  });
+
   it('links and addresses never go out', async () => {
     const s = setup([say('Mirá [la lista](https://www.peluqueria-los-pelados.example/precios).'), say('Escribinos a turnos@peluqueria-los-pelados.example')]);
     expect((await turn(s.handler, [{ role: 'user', content: 'lista' }])).body.reply).toBe('Mirá la lista.');

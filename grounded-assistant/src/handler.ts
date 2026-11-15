@@ -234,8 +234,9 @@ export function createAssistantHandler(config: AssistantConfig): (request: Reque
       if (d.ok) card = d.card;
       else {
         // The prose was written for a booking that is not happening.
+        // It can quote the model's `service` verbatim, so it gets the same cleaning as the prose.
         rejected = d.reason;
-        reply = d.say;
+        reply = withoutControls(plainText(d.say.normalize('NFC')));
       }
     }
 
