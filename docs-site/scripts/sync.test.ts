@@ -148,6 +148,14 @@ describe('splitDocument and renderPage', () => {
     expect(splitDocument(`# T\n\nSee README.md now. ${long}\n`, 'x').description).toBe('See README.md now.');
   });
 
+  it('reads a document checked out with CRLF line endings or a byte order mark', () => {
+    const lf = splitDocument('# Title\n\nFirst para.\n\n## Use\n', 'x');
+    expect(splitDocument('# Title\r\n\r\nFirst para.\r\n\r\n## Use\r\n', 'x')).toEqual(lf);
+    expect(splitDocument('\uFEFF# Title\n\nFirst para.\n\n## Use\n', 'x')).toEqual(lf);
+    const page = { source: 'gateway/README.md', slug: 'gateway', label: 'gateway' };
+    expect(renderPage('\uFEFF# T\r\n\r\nSee [e](../evals/).\r\n', page, ctx).content).toBe(renderPage('# T\n\nSee [e](../evals/).\n', page, ctx).content);
+  });
+
   it('refuses a document with no H1 or no first paragraph', () => {
     expect(() => splitDocument('Text first.\n\n# Late\n', 'x/README.md')).toThrow(/x\/README.md: the first line is not an H1/);
     expect(() => splitDocument('# Title\n\n## Section\n', 'x/README.md')).toThrow(/no paragraph after the H1/);

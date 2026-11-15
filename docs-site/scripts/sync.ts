@@ -231,9 +231,12 @@ function shorten(paragraph: string): string {
   return out.trim();
 }
 
-/** The H1, the first paragraph after it, and the document without the H1. */
+/**
+ * The H1, the first paragraph after it, and the document without the H1. A leading byte order
+ * mark and CRLF line endings (a Windows checkout with core.autocrlf) are normalized first.
+ */
 export function splitDocument(markdown: string, source: string): { title: string; description: string; body: string } {
-  const lines = markdown.split('\n');
+  const lines = markdown.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
   const at = lines.findIndex((line) => line.trim() !== '');
   const title = /^# (.+)$/.exec(lines[at] ?? '')?.[1];
   if (title === undefined) throw new Error(`${source}: the first line is not an H1, so the page has no title`);
