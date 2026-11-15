@@ -17,6 +17,14 @@
       "$ref": "#/$defs/format",
       "description": "How every file is read when --format is not given. Left out, a .md file is Markdown and anything else is text."
     },
+    "genre": {
+      "$ref": "#/$defs/genre",
+      "description": "The kind of text when --genre is not given. Left out, cover-letter. The other genres are experimental."
+    },
+    "variety": {
+      "$ref": "#/$defs/variety",
+      "description": "The Spanish variety when --variety is not given. Set, REG-01 flags every form of the other register."
+    },
     "anchors": {
       "$ref": "#/$defs/anchors",
       "description": "Extra anchor terms, such as tool names written in lowercase. --anchors replaces them."
@@ -60,6 +68,20 @@
       "enum": [
         "text",
         "markdown"
+      ]
+    },
+    "genre": {
+      "enum": [
+        "cover-letter",
+        "email",
+        "follow-up",
+        "whatsapp"
+      ]
+    },
+    "variety": {
+      "enum": [
+        "rioplatense",
+        "neutral"
       ]
     },
     "level": {
@@ -193,6 +215,12 @@
         },
         "format": {
           "$ref": "#/$defs/format"
+        },
+        "genre": {
+          "$ref": "#/$defs/genre"
+        },
+        "variety": {
+          "$ref": "#/$defs/variety"
         },
         "anchors": {
           "$ref": "#/$defs/anchors",

@@ -68,10 +68,10 @@ describe('the config schema and the hand validator', () => {
   it('declares the same top-level keys the validator knows', () => {
     const keys = Object.keys(schemaJson['properties'] as Record<string, unknown>);
     for (const key of keys) {
-      const value = key === '$schema' ? 'x' : key === 'lang' ? 'en' : key === 'format' ? 'text' : key === 'ruleSettings' || key === 'suppressions' ? {} : [];
+      const value = key === '$schema' ? 'x' : key === 'lang' ? 'en' : key === 'format' ? 'text' : key === 'genre' ? 'email' : key === 'variety' ? 'neutral' : key === 'ruleSettings' || key === 'suppressions' ? {} : [];
       expect(accepts(() => validateShape({ [key]: value })), key).toBe(true);
     }
-    expect(keys).toHaveLength(9);
+    expect(keys).toHaveLength(11);
   });
 
   it('is a draft 2020-12 schema that closes every object', () => {

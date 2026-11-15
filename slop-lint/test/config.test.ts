@@ -247,3 +247,31 @@ describe('settingsFor', () => {
     expect(isIgnored({}, 'a.md')).toBe(false);
   });
 });
+
+describe('genre and variety in the config', () => {
+  it('applies the genre profile inside settingsFor, with the config winning over the genre', () => {
+    const settings = settingsFor(validateConfig({ genre: 'whatsapp', ruleSettings: { 'FMT-02': { severity: 'low' } } }), undefined);
+    expect(settings.genre).toBe('whatsapp');
+    expect(settings.off).toContain('FMT-01');
+    expect(settings.rules.find((r) => r.id === 'FMT-01')).toBeUndefined();
+    // The profile turns FMT-02 off; the config's own setting brings it back, as the config says.
+    expect(settings.rules.find((r) => r.id === 'FMT-02')).toMatchObject({ level: 1, severity: 'low', message: 'Emoji in a professional message.' });
+    expect(settings.rules.find((r) => r.id === 'REG-01')?.severity).toBe('disqualify');
+  });
+
+  it('takes the genre and the variety from an override, and the flags win over both', () => {
+    const config = validateConfig({ genre: 'email', overrides: [{ files: ['chat/**'], genre: 'whatsapp', variety: 'rioplatense' }] });
+    expect(settingsFor(config, 'mail/a.txt')).toMatchObject({ genre: 'email', variety: undefined });
+    expect(settingsFor(config, 'chat/a.txt')).toMatchObject({ genre: 'whatsapp', variety: 'rioplatense' });
+    expect(settingsFor(config, 'chat/a.txt', 'config file', { genre: 'follow-up', variety: 'neutral' })).toMatchObject({ genre: 'follow-up', variety: 'neutral' });
+  });
+
+  it('defaults to the cover letter, whose rules are the catalog', () => {
+    expect(settingsFor({}, undefined)).toMatchObject({ genre: 'cover-letter', variety: undefined });
+  });
+
+  it('rejects an unknown genre or variety with its key path', () => {
+    expect(() => validateConfig({ genre: 'sms' })).toThrow(/^genre: must be one of/u);
+    expect(() => validateConfig({ overrides: [{ files: ['a.md'], variety: 'argentina' }] })).toThrow(/^overrides\[0\]\.variety: must be one of/u);
+  });
+});

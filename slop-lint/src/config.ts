@@ -7,9 +7,11 @@
  * schema/config.schema.json describes the same shape for editors, and test/config-schema.test.ts
  * runs both over one fixture set so they cannot drift apart.
  */
+import { applySetting, GENRE_PROFILES, GENRES } from './genres.ts';
 import { globProblem, matchesAny } from './glob.ts';
+import { messageFor } from './messages.ts';
 import { RULES } from './rules.ts';
-import type { Format, Lang, Level, PatternRule, Rule, RuleLang, Severity } from './types.ts';
+import type { Format, Genre, Lang, Level, PatternRule, Rule, RuleLang, Severity, Variety } from './types.ts';
 
 export const CONFIG_FILE = 'slop-lint.config.json';
 
@@ -41,6 +43,8 @@ export interface OverrideConfig {
   files: string[];
   lang?: Lang;
   format?: Format;
+  genre?: Genre;
+  variety?: Variety;
   anchors?: string[];
   ruleSettings?: Record<string, RuleSetting>;
 }
@@ -58,6 +62,10 @@ export interface Config {
   $schema?: string;
   lang?: Lang;
   format?: Format;
+  /** The genre of every file when --genre is not given. 'cover-letter' when left out. */
+  genre?: Genre;
+  /** The Spanish variety when --variety is not given. */
+  variety?: Variety;
   anchors?: string[];
   ignore?: string[];
   ruleSettings?: Record<string, RuleSetting>;
@@ -79,6 +87,7 @@ export class ConfigError extends Error {
 const LANGS: readonly Lang[] = ['en', 'es'];
 const RULE_LANGS: readonly RuleLang[] = ['en', 'es', 'both'];
 const FORMATS: readonly Format[] = ['text', 'markdown'];
+const VARIETIES: readonly Variety[] = ['rioplatense', 'neutral'];
 const LEVELS: readonly Level[] = [1, 2, 3];
 const SEVERITIES: readonly Severity[] = ['disqualify', 'high', 'medium', 'low'];
 
@@ -182,12 +191,14 @@ function customRule(value: unknown, path: string): CustomRuleConfig {
 }
 
 function override(value: unknown, path: string): OverrideConfig {
-  const record = object(value, path, ['files', 'lang', 'format', 'anchors', 'ruleSettings'], ['files']);
+  const record = object(value, path, ['files', 'lang', 'format', 'genre', 'variety', 'anchors', 'ruleSettings'], ['files']);
   const files = list(record['files'], join(path, 'files'), glob);
   if (files.length === 0) throw new ConfigError(join(path, 'files'), 'must hold at least one pattern');
   const out: OverrideConfig = { files };
   if ('lang' in record) out.lang = oneOf(record['lang'], join(path, 'lang'), LANGS);
   if ('format' in record) out.format = oneOf(record['format'], join(path, 'format'), FORMATS);
+  if ('genre' in record) out.genre = oneOf(record['genre'], join(path, 'genre'), GENRES);
+  if ('variety' in record) out.variety = oneOf(record['variety'], join(path, 'variety'), VARIETIES);
   if ('anchors' in record) out.anchors = list(record['anchors'], join(path, 'anchors'), anchor);
   if ('ruleSettings' in record) out.ruleSettings = ruleSettings(record['ruleSettings'], join(path, 'ruleSettings'));
   return out;
@@ -214,7 +225,7 @@ export function customFlags(flags: string | undefined): string {
  * the flag letters, the glob syntax. Throws a ConfigError that names the key path.
  */
 export function validateShape(value: unknown): Config {
-  const known = ['$schema', 'lang', 'format', 'anchors', 'ignore', 'ruleSettings', 'rules', 'overrides', 'suppressions'];
+  const known = ['$schema', 'lang', 'format', 'genre', 'variety', 'anchors', 'ignore', 'ruleSettings', 'rules', 'overrides', 'suppressions'];
   const record = object(value, '', known);
   const config: Config = {};
   if ('$schema' in record) {
@@ -223,6 +234,8 @@ export function validateShape(value: unknown): Config {
   }
   if ('lang' in record) config.lang = oneOf(record['lang'], 'lang', LANGS);
   if ('format' in record) config.format = oneOf(record['format'], 'format', FORMATS);
+  if ('genre' in record) config.genre = oneOf(record['genre'], 'genre', GENRES);
+  if ('variety' in record) config.variety = oneOf(record['variety'], 'variety', VARIETIES);
   if ('anchors' in record) config.anchors = list(record['anchors'], 'anchors', anchor);
   if ('ignore' in record) config.ignore = list(record['ignore'], 'ignore', glob);
   if ('ruleSettings' in record) config.ruleSettings = ruleSettings(record['ruleSettings'], 'ruleSettings');
@@ -364,10 +377,13 @@ export function toRule(custom: CustomRuleConfig, origin: string = 'config file')
 export interface Settings {
   lang: Lang | undefined;
   format: Format | undefined;
+  /** The genre whose profile the rules hold: the one passed in, else the config's, else 'cover-letter'. */
+  genre: Genre;
+  variety: Variety | undefined;
   anchors: string[];
   /** The rules that apply, in catalog order with the custom rules after them. Rules set to "off" are left out. */
   rules: Rule[];
-  /** Ids of the rules set to "off". */
+  /** Ids of the rules set to "off", by the config or by the genre's profile. */
   off: string[];
   suppressions: Required<SuppressionConfig>;
 }
@@ -382,29 +398,44 @@ export const DEFAULT_SUPPRESSIONS: Required<SuppressionConfig> = { allowDisquali
  * Every override whose `files` match applies, in the order written, so a later one wins. `lang`
  * and `format` replace, `anchors` are added to the top-level ones, and a rule's setting replaces
  * the earlier setting of that rule as a whole.
+ *
+ * `flags` holds the command line's --genre and --variety, which win over the config. The genre's
+ * profile (genres.ts) applies to the catalog first, and a rule's setting in the config replaces
+ * the profile's setting for that rule as a whole, so the config wins over the genre.
  */
-export function settingsFor(config: Config, path: string | undefined, origin: string = 'config file'): Settings {
+export function settingsFor(config: Config, path: string | undefined, origin: string = 'config file', flags: { genre?: Genre; variety?: Variety } = {}): Settings {
   let lang = config.lang;
   let format = config.format;
+  let genre = config.genre;
+  let variety = config.variety;
   const anchors = [...(config.anchors ?? [])];
   const settings: Record<string, RuleSetting> = { ...config.ruleSettings };
   for (const o of config.overrides ?? []) {
     if (path === undefined || !matchesAny(o.files, path)) continue;
     if (o.lang !== undefined) lang = o.lang;
     if (o.format !== undefined) format = o.format;
+    if (o.genre !== undefined) genre = o.genre;
+    if (o.variety !== undefined) variety = o.variety;
     anchors.push(...(o.anchors ?? []));
     Object.assign(settings, o.ruleSettings);
   }
+  const resolvedGenre = flags.genre ?? genre ?? 'cover-letter';
+  const resolvedVariety = flags.variety ?? variety;
+  const profile = GENRE_PROFILES[resolvedGenre].rules;
   const all: Rule[] = [...RULES, ...(config.rules ?? []).map((r) => toRule(r, origin))];
   const rules: Rule[] = [];
   const off: string[] = [];
   for (const rule of all) {
-    const setting = settings[rule.id];
-    if (setting === 'off') off.push(rule.id);
-    else if (setting === undefined) rules.push(rule);
-    else rules.push({ ...rule, level: setting.level ?? rule.level, severity: setting.severity ?? rule.severity });
+    // The config's setting for a rule replaces the genre's as a whole: the config wins over the genre.
+    const applied = applySetting(rule, settings[rule.id] ?? profile[rule.id]);
+    if (applied === undefined) {
+      off.push(rule.id);
+      continue;
+    }
+    const message = messageFor(applied, resolvedGenre);
+    rules.push(message === applied.message ? applied : { ...applied, message });
   }
-  return { lang, format, anchors, rules, off, suppressions: { ...DEFAULT_SUPPRESSIONS, ...config.suppressions } };
+  return { lang, format, genre: resolvedGenre, variety: resolvedVariety, anchors, rules, off, suppressions: { ...DEFAULT_SUPPRESSIONS, ...config.suppressions } };
 }
 
 /** True when the config's `ignore` globs match the file. Standard input (undefined) is never ignored. */
