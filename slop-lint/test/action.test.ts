@@ -74,6 +74,8 @@ describe('action.yml', () => {
     const pin = /actions\/setup-node@([0-9a-f]{40})/u;
     expect(pin.exec(action)?.[1]).toBe(pin.exec(ci)?.[1]);
     expect(action).toMatch(/node-version: 24$/mu);
+    // The action installs nothing through the consumer's lockfile, so setup-node must not cache npm.
+    expect(action).toMatch(/^ {8}package-manager-cache: false$/mu);
   });
 
   it('documents every input and output in the README', () => {
