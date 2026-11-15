@@ -43,7 +43,7 @@ class _Rig:
 
 
 class Nat64AddressTest(unittest.TestCase):
-    """public_address looks through the IPv4 address that NAT64 and 6to4 embed."""
+    """public_address looks through the IPv4 address that NAT64, 6to4, IPv4-compatible and SIIT addresses embed."""
 
     def test_well_known_nat64_prefix_to_private_ipv4_is_refused(self) -> None:
         for ip in ("64:ff9b::a00:1", "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::c0a8:101"):
@@ -61,6 +61,14 @@ class Nat64AddressTest(unittest.TestCase):
         self.assertTrue(public_address("64:ff9b::101:101"))  # 1.1.1.1
         self.assertTrue(public_address("2606:4700:4700::1111"))
         self.assertFalse(public_address("::ffff:10.0.0.1"))
+
+    def test_ipv4_compatible_and_translated_to_private_ipv4_are_refused(self) -> None:
+        for ip in ("::127.0.0.1", "::10.0.0.1", "::a9fe:a9fe", "::ffff:0:7f00:1", "::ffff:0:10.0.0.1", "::ffff:0:c0a8:101"):
+            with self.subTest(ip=ip):
+                self.assertFalse(public_address(ip))
+        self.assertFalse(public_address("::1"))
+        self.assertFalse(public_address("::"))
+        self.assertTrue(public_address("::ffff:0:101:101"))  # 1.1.1.1
 
 
 class NonAsciiDigitHeaderTest(unittest.TestCase):

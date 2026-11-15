@@ -404,6 +404,10 @@ def body_sha256(body: bytes) -> str:
 
 
 _NAT64_WELL_KNOWN = ipaddress.IPv6Network("64:ff9b::/96")
+# The deprecated IPv4-compatible range (RFC 4291 2.5.5.1) and the SIIT
+# IPv4-translated range (RFC 2765). Python reports most of both as global.
+_IPV4_COMPATIBLE = ipaddress.IPv6Network("::/96")
+_IPV4_TRANSLATED = ipaddress.IPv6Network("::ffff:0:0:0/96")
 
 
 def public_address(ip: str) -> bool:
@@ -415,10 +419,11 @@ def public_address(ip: str) -> bool:
     if isinstance(addr, ipaddress.IPv6Address):
         # An IPv6 address that carries an IPv4 one reaches that IPv4 address:
         # ::ffff:a.b.c.d directly, 64:ff9b::/96 through a DNS64/NAT64 gateway
-        # (RFC 6052), and 2002::/16 through a 6to4 relay.
+        # (RFC 6052), 2002::/16 through a 6to4 relay, and ::a.b.c.d and
+        # ::ffff:0:a.b.c.d on a host with sit tunnels or SIIT translation.
         if addr.ipv4_mapped is not None:
             addr = addr.ipv4_mapped
-        elif addr in _NAT64_WELL_KNOWN:
+        elif addr in _NAT64_WELL_KNOWN or addr in _IPV4_COMPATIBLE or addr in _IPV4_TRANSLATED:
             addr = ipaddress.IPv4Address(int(addr) & 0xFFFFFFFF)
         elif addr.sixtofour is not None and not public_address(str(addr.sixtofour)):
             return False
