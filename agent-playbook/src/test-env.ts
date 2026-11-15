@@ -43,7 +43,8 @@ export function isIsolated(name: string, policy: IsolationPolicy): boolean {
 
 function readFile(path: string): Record<string, string> {
   const values: Record<string, string> = {};
-  for (const [name, value] of Object.entries(parseEnv(readFileSync(path, 'utf8')))) {
+  // parseEnv keeps a byte order mark in the first name, which would drop that variable's value.
+  for (const [name, value] of Object.entries(parseEnv(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')))) {
     if (value !== undefined) values[name] = value;
   }
   return values;

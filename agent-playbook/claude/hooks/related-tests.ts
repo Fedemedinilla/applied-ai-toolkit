@@ -19,7 +19,9 @@ const TIMEOUT_MS = 120_000;
 export function relatedTestArgs(rel: string): string[] | null {
   if (rel.startsWith('../') || isAbsolute(rel)) return null;
   if (!/\.(ts|tsx|mts)$/.test(rel) || /(^|\/)(node_modules|dist)\//.test(rel)) return null;
-  return ['vitest', 'related', rel, '--run', '--passWithNoTests', '--reporter=dot'];
+  // A file named like an option ('--config=x.ts') would be read as one and could swap the config
+  // that cleans the test environment, so such a name goes in as ./ plus the name.
+  return ['vitest', 'related', rel.startsWith('-') ? `./${rel}` : rel, '--run', '--passWithNoTests', '--reporter=dot'];
 }
 
 export function tail(text: string, lines: number): string {

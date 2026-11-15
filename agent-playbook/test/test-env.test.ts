@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
@@ -84,6 +84,16 @@ describe('applyTestEnv', () => {
     expect(envLeaks(root, POLICY, env)).toEqual([]);
   });
 
+  it('reads a test file saved with a byte order mark and CRLF line ends', () => {
+    writeFileSync(join(root, '.env.test'), '\uFEFFAPP_ANTHROPIC_KEY=placeholder-test\r\nSUPABASE_SECRET_KEY=placeholder-test\r\n');
+    const env = session();
+    applyTestEnv(root, POLICY, env);
+    expect(env['APP_ANTHROPIC_KEY']).toBe('placeholder-test');
+    expect(env['SUPABASE_SECRET_KEY']).toBe('placeholder-test');
+    expect(Object.keys(env).filter((name) => name.includes('\uFEFF'))).toEqual([]);
+    expect(envLeaks(root, POLICY, env)).toEqual([]);
+  });
+
   it('throws without the test file, because the suite would run on the session values', () => {
     rmSync(join(root, '.env.test'));
     expect(() => applyTestEnv(root, POLICY, session())).toThrow(/Missing .*\.env\.test/);
@@ -129,10 +139,17 @@ describe('the Anthropic SDK and the session environment', () => {
     const root = mkdtempSync(join(tmpdir(), 'agent-playbook-sdk-'));
     try {
       writeFileSync(join(root, '.env.test'), 'APP_ANTHROPIC_KEY=placeholder-test\n');
-      const env: NodeJS.ProcessEnv = { ANTHROPIC_BASE_URL: 'https://proxy.example.test', ANTHROPIC_LOG: 'debug' };
+      // The session values are in process.env, as in the test above, so the client below would
+      // take them if the isolation left them in place. afterEach restores what was there.
+      process.env['ANTHROPIC_BASE_URL'] = 'https://proxy.example.test';
+      process.env['ANTHROPIC_LOG'] = 'debug';
+      const env: NodeJS.ProcessEnv = { ANTHROPIC_BASE_URL: process.env['ANTHROPIC_BASE_URL'], ANTHROPIC_LOG: process.env['ANTHROPIC_LOG'] };
       applyTestEnv(root, DEFAULT_POLICY, env);
+      expect(Object.keys(env)).toEqual(['APP_ANTHROPIC_KEY']);
       for (const name of NAMES) {
-        if (env[name] === undefined) delete process.env[name];
+        const value = env[name];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
       }
       const client = new Anthropic({ apiKey: 'placeholder-test' });
       expect(client.baseURL).toBe('https://api.anthropic.com');
@@ -147,5 +164,15 @@ describe('crossingNames', () => {
   it('flags an app variable that shares a prefix with the agent session', () => {
     expect(crossingNames(['APP_ANTHROPIC_KEY', 'ANTHROPIC_API_KEY', 'PUBLIC_APP_URL'])).toEqual(['ANTHROPIC_API_KEY']);
     expect(crossingNames(['APP_ANTHROPIC_KEY', 'APP_DATABASE_URL'])).toEqual([]);
+  });
+});
+
+// The template's exclude replaces Vitest's default '**/node_modules/**'. With a root-only glob, a
+// subfolder with its own node_modules (a docs site, say) has its dependencies' tests collected.
+describe('templates/vitest-config.ts', () => {
+  it('excludes node_modules and dist at any depth, as the root config of this repository does', () => {
+    const template = readFileSync(new URL('../templates/vitest-config.ts', import.meta.url), 'utf8');
+    const exclude = /exclude:\s*\[([^\]]*)\]/.exec(template)?.[1]?.split(',').map((g) => g.trim().replace(/^'|'$/g, ''));
+    expect(exclude).toEqual(['**/node_modules/**', '**/dist/**']);
   });
 });
