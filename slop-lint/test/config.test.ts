@@ -74,6 +74,14 @@ describe('globs', () => {
 });
 
 describe('validateConfig', () => {
+  it('rejects a pattern that matches the empty string at some position, not only on an empty text', () => {
+    for (const pattern of ['(?=synergize)|\\b', '(?=synergize)', '\\b', '$', 'x?(?= )']) {
+      expect(problem({ rules: [{ ...HOUSE, pattern }] }), pattern).toMatch(/^rules\[0\]\.pattern: matches the empty string/u);
+    }
+    expect(problem({ rules: [HOUSE] })).toBe('accepted');
+    expect(problem({ rules: [{ ...HOUSE, pattern: 'synergi(?=ze)' }] })).toBe('accepted');
+  });
+
   it('rejects an anchor that is only whitespace, at the top level and in an override', () => {
     expect(problem({ anchors: ['dbt', ' '] })).toMatch(/^anchors\[1\]: must hold a character other than whitespace/u);
     expect(problem({ overrides: [{ files: ['a.md'], anchors: ['\t\n'] }] })).toMatch(/^overrides\[0\]\.anchors\[0\]: must hold a character other than whitespace/u);

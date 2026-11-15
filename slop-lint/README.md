@@ -283,7 +283,7 @@ A custom finding looks like a built-in one in the text output, in `--json` and i
 What is checked about the regex, and what is not:
 
 - It has to compile with its flags. If it does not, that is a usage error with the engine's own message.
-- It may not match the empty string. Such a pattern matches between every two characters and has no text to report.
+- It may not match the empty string, on an empty text or at any position of one. Such a pattern matches between every two characters and has no text to report. The validator tries it on a few short texts and on its own source, so a lookahead such as `(?=synergize)` or a bare `\b` is refused too.
 - **Nothing limits how long it runs.** A pattern with nested quantifiers, such as `(a+)+$`, can take exponential time on some inputs, and JavaScript has no way to stop a regex that is running. A time budget would have to measure the clock, so the same file could pass on one machine and fail on a slower one, and the lint would stop being deterministic. A static check for dangerous patterns would miss some and refuse safe ones. So there is neither. The config file is reviewed like code, and the performance of a custom regex belongs to whoever adds it.
 
 ### A worked example

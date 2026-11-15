@@ -255,7 +255,13 @@ export function validateMeaning(config: Config): void {
       throw new ConfigError(`${path}.pattern`, `does not compile: ${(error as Error).message}`);
     }
     // Such a pattern matches between every two characters of a text, and no match of it has any text to report.
-    if (re.test('')) throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere; make at least one character required');
+    // lint() drops every empty match, so a pattern that matches empty only at some positions, such as a
+    // lookahead or \b, would load and never report. A few probe texts, the pattern's own source among
+    // them for a lookahead that names its word, catch those; it is a heuristic, not a proof.
+    const probes = ['', ' ', 'a', 'a b.', 'Ab 1, c-d.\n', rule.pattern];
+    if (probes.some((probe) => [...probe.matchAll(re)].some((m) => m[0] === ''))) {
+      throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere or report nothing; make at least one character required');
+    }
   });
   const check = (settings: Record<string, RuleSetting> | undefined, path: string): void => {
     for (const id of Object.keys(settings ?? {})) {
