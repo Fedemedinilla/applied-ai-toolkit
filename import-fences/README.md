@@ -66,7 +66,7 @@ export default defineConfig({
 });
 ```
 
-Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file, and are written without a leading `./` or `/` and with forward slashes; a glob written otherwise, or with unbalanced braces, stops the run with exit code 2, since it would match nothing. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
+Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file, and are written without a leading `./` or `/` and with forward slashes; a glob written otherwise, or with unbalanced braces, stops the run with exit code 2, since it would match nothing. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. An `ignore` glob drops the files it matches. It drops a whole folder when it ends in `/**` (`**/vendor/**`) or names the folder without a wildcard in the last name (`**/vendor`, `dist/`). A glob such as `src/*` or `**/*.js` never drops a folder, so `src/a/x.ts` and `chart.js/index.ts` are still read. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
 
 ### A JSON config, and a minimal example
 
@@ -244,6 +244,7 @@ The same test removes `gateway/src/client.ts` from the SDK exception and checks 
 | `test/output-regression.test.ts` | The text and JSON output of a tree with eight of the ten rule ids, and of a clean one, byte for byte against `test/golden/`, written by the CLI before `--sarif` existed |
 | `test/schema.test.ts` | The committed JSON Schema equals the generated one; a JSON config gives the result of the same config as a module; default lookup; malformed JSON configs; the README's JSON example on the layout it describes |
 | `test/action.test.ts` | `action.yml` read as text: no expression in a run block, inputs only through `env:`, the pinned setup-node, the dependency versions; the run step executed in bash on passing, failing, invalid and hostile inputs |
+| `test/files.test.ts` | The disk and in-memory sources list the same files for the same ignore list; a glob that matches a folder's name drops only the files it matches; a folder named with or without `/**` is dropped whole |
 | `test/glob.test.ts` | `**`, `*`, `?`, alternation, escaping and the folder matched by a trailing `/**` |
 | `test/repo.test.ts` | This repository's fences, the witness and the folder-fence tree described above |
 
