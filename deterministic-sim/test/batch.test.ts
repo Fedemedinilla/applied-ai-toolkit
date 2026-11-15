@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   batchSeed,
@@ -84,3 +85,31 @@ describe('runBatch', () => {
   });
 });
 
+describe('the batch CLI', () => {
+  const CLI = new URL('../batch.ts', import.meta.url).pathname;
+  const cli = (...args: string[]) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
+
+  it.each([
+    [['--runs', '0'], '--runs'],
+    [['--runs', '100001'], '--runs'],
+    [['--runs', '1e1'], '--runs'],
+    [['--runs', '0x10'], '--runs'],
+    [['--runs', ' 5'], '--runs'],
+    [['--dice', '6'], '--dice'],
+    [['--dice', '0'], '--dice'],
+    [['--runs', '2', '--seed-prefix', 'a'.repeat(130)], '--seed-prefix'],
+  ])('exits 2 with a one-line message for %j', (args, flag) => {
+    const run = cli(...args);
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain(flag);
+    expect(run.stderr.trim().split('\n')).toHaveLength(1);
+    expect(run.stdout).toBe('');
+  });
+
+  it('runs a small batch and prints the report as JSON', () => {
+    const run = cli('--runs', '3', '--dice', '5', '--json');
+    expect(run.status).toBe(0);
+    const out = JSON.parse(run.stdout) as { report: { runs: number; policy: string } };
+    expect(out.report).toMatchObject({ runs: 3, policy: 'roll-5' });
+  });
+});
