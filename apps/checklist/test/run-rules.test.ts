@@ -7,6 +7,8 @@ import {
   ackPreChange,
   applies,
   closeRun,
+  fixedBlocking,
+  fixedBlockingText,
   matrixApplies,
   parseRun,
   postChangePending,
@@ -136,8 +138,17 @@ describe('the "before" snapshot', () => {
     let run = ok(setState(catalogue, runWith(catalogue, 'wordpress'), 'EXT-02', 'fail', at(1)));
     run = ok(setEvidence(catalogue, run, 'EXT-03', 'only a note', at(2)));
     run = ok(recordBaseline(run, at(3)));
-    expect(run.baseline).toEqual({ at: at(3).toISOString(), states: { 'EXT-02': 'fail' }, evidence: { 'EXT-02': '' } });
+    expect(run.baseline).toEqual({ at: at(3).toISOString(), states: { 'EXT-02': 'fail' }, evidence: { 'EXT-02': '' }, profile: run.profile, catalogueId: catalogue.id });
     expect(recordBaseline(run, at(4))).toEqual({ ok: false, reason: 'baseline_exists' });
+  });
+
+  it('is refused while a check is marked Fixed, so a fix made before it cannot hide in both columns', () => {
+    let run = ok(setState(catalogue, runWith(catalogue, 'wordpress', [], true), 'SEG-06', 'fail', at(1)));
+    run = ackAllPre(run);
+    run = ok(setState(catalogue, run, 'SEG-06', 'fixed', at(30)));
+    expect(recordBaseline(run, at(31))).toEqual({ ok: false, reason: 'fixed_before_baseline' });
+    run = ok(setState(catalogue, run, 'SEG-06', 'fail', at(32)));
+    expect(ok(recordBaseline(run, at(33))).baseline?.states['SEG-06']).toBe('fail');
   });
 });
 
@@ -164,6 +175,17 @@ describe('the run JSON', () => {
       { ...good, imports: [{ source: 'other' }] },
     ];
     for (const value of broken) expect(parseRun(JSON.stringify(value)), JSON.stringify(value).slice(0, 80)).toEqual({ ok: false, reason: 'not_a_run' });
+  });
+
+  it('refuses a time that does not exist, such as 30 February or hour 24', () => {
+    const base = runWith(catalogue, 'wordpress');
+    for (const bad of ['2026-02-30T00:00:00Z', '2026-02-29T24:00:00Z', '2026-04-31T10:00:00.000Z', '2026-01-01T10:60:00Z']) {
+      expect(parseRun(serialiseRun({ ...base, createdAt: bad })), bad).toEqual({ ok: false, reason: 'not_a_run' });
+      expect(parseRun(serialiseRun({ ...base, incident: { 'site-isolated': { at: bad, note: '' } } })), bad).toEqual({ ok: false, reason: 'not_a_run' });
+    }
+    for (const good of ['2028-02-29T23:59:59Z', '2026-11-04T13:00:00.5Z', '2026-11-04T13:00:00.123456Z']) {
+      expect(parseRun(serialiseRun({ ...base, createdAt: good })).ok, good).toBe(true);
+    }
   });
 
   it('names files after the host, without www', () => {
@@ -249,5 +271,29 @@ describe('the incident log of a closed run', () => {
     if (!result.ok) throw new Error(result.reason);
     expect(setIncident(run, result.log)).toEqual({ ok: false, reason: 'run_closed' });
     expect(ok(setIncident(reopenRun(run), result.log)).incident['site-isolated']?.at).toBe(at(2).toISOString());
+  });
+});
+
+describe('a Fixed mark the list cannot show', () => {
+  const allPre = (): Record<string, string> => Object.fromEntries(catalogue.preChange.map((r) => [r.id, at(1).toISOString()]));
+  const ghost = { state: 'fixed' as const, evidence: 'from an older catalogue', at: at(5).toISOString(), fixedFrom: 'fail' as const };
+
+  it('is undone on load when the catalogue does not know the check, so the pre-change list can be unticked again', () => {
+    const run: Run = { ...runWith(catalogue, 'wordpress', [], true), preChange: allPre(), marks: { 'EXT-999': ghost } };
+    const { run: next, dropped } = repairRun(catalogue, run);
+    expect(next.marks['EXT-999']).toEqual({ state: null, evidence: 'from an older catalogue', at: at(5).toISOString() });
+    expect(dropped).toEqual(['EXT-999 was Fixed but is not in this catalogue; it is unmarked now.']);
+    expect(ackPreChange(catalogue, next, 'window', false, at(6)).ok).toBe(true);
+  });
+
+  it('is named when it blocks the pre-change list, with a note when it is outside the profile', () => {
+    let run = ok(setState(catalogue, runWith(catalogue, 'wordpress', [], true), 'SEG-06', 'fail', at(1)));
+    run = ackAllPre(run);
+    run = ok(setState(catalogue, run, 'SEG-06', 'fixed', at(30)));
+    expect(fixedBlocking(catalogue, run)).toEqual([{ id: 'SEG-06', inProfile: true }]);
+    run = ok(setProfile(run, { ...run.profile, authorized: false }));
+    expect(ackPreChange(catalogue, run, 'window', false, at(31))).toEqual({ ok: false, reason: 'fixed_items_exist' });
+    expect(fixedBlocking(catalogue, run)).toEqual([{ id: 'SEG-06', inProfile: false }]);
+    expect(fixedBlockingText(catalogue, run)).toBe('Marked Fixed: SEG-06 (outside the current site profile; change the profile back to see it).');
   });
 });

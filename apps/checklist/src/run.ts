@@ -61,6 +61,9 @@ export interface Baseline {
   readonly at: string;
   readonly states: Readonly<Record<string, State>>;
   readonly evidence: Readonly<Record<string, string>>;
+  /** The site profile and catalogue when "before" was recorded. Runs from before they were kept lack them. */
+  readonly profile?: Profile;
+  readonly catalogueId?: string;
 }
 
 export interface Run {
@@ -124,7 +127,8 @@ export type Refusal =
   | 'not_failed'
   | 'fixed_items_exist'
   | 'post_change_pending'
-  | 'baseline_exists';
+  | 'baseline_exists'
+  | 'fixed_before_baseline';
 
 export const REFUSALS: Readonly<Record<Refusal, string>> = {
   run_closed: 'This run is closed. Reopen it to change anything.',
@@ -135,6 +139,7 @@ export const REFUSALS: Readonly<Record<Refusal, string>> = {
   fixed_items_exist: 'Some checks are marked Fixed. The pre-change list stays acknowledged while they are.',
   post_change_pending: 'Closing needs every row of the post-change matrix acknowledged (Change control tab).',
   baseline_exists: '"Before" is already recorded for this run.',
+  fixed_before_baseline: '"Before" is the state before any change, so it cannot be recorded while a check is marked Fixed. Set those checks back to Fails first.',
 };
 
 export type Result = { readonly ok: true; readonly run: Run } | { readonly ok: false; readonly reason: Refusal };
@@ -194,6 +199,24 @@ export function ackPreChange(catalogue: Catalogue, run: Run, rowId: string, on: 
   return { ok: true, run: { ...run, preChange: next } };
 }
 
+/** The Fixed marks that keep the pre-change list acknowledged, and whether each is on screen. */
+export function fixedBlocking(catalogue: Catalogue, run: Run): { readonly id: string; readonly inProfile: boolean }[] {
+  return Object.entries(run.marks)
+    .filter(([, m]) => m.state === 'fixed')
+    .map(([id]) => {
+      const item = catalogue.items.find((i) => i.id === id);
+      return { id, inProfile: item !== undefined && applies(item, run.profile) };
+    });
+}
+
+/** One sentence naming the Fixed checks behind a fixed_items_exist refusal, empty when there are none. */
+export function fixedBlockingText(catalogue: Catalogue, run: Run): string {
+  const blocking = fixedBlocking(catalogue, run);
+  if (!blocking.length) return '';
+  const names = blocking.map((b) => (b.inProfile ? b.id : `${b.id} (outside the current site profile; change the profile back to see it)`));
+  return `Marked Fixed: ${names.join(', ')}.`;
+}
+
 export function ackPostChange(catalogue: Catalogue, run: Run, rowId: string, on: boolean, now: Date): Result {
   if (run.closedAt) return refuse('run_closed');
   if (!catalogue.postChange.some((r) => r.id === rowId)) return refuse('unknown_item');
@@ -207,6 +230,8 @@ export function ackPostChange(catalogue: Catalogue, run: Run, rowId: string, on:
 export function recordBaseline(run: Run, now: Date): Result {
   if (run.closedAt) return refuse('run_closed');
   if (run.baseline) return refuse('baseline_exists');
+  // A Fixed check frozen as "before" would show as good in both columns and hide the change.
+  if (Object.values(run.marks).some((m) => m.state === 'fixed')) return refuse('fixed_before_baseline');
   const states: Record<string, State> = {};
   const evidence: Record<string, string> = {};
   for (const [id, mark] of Object.entries(run.marks)) {
@@ -214,7 +239,7 @@ export function recordBaseline(run: Run, now: Date): Result {
     states[id] = mark.state;
     evidence[id] = mark.evidence;
   }
-  return { ok: true, run: { ...run, baseline: { at: now.toISOString(), states, evidence } } };
+  return { ok: true, run: { ...run, baseline: { at: now.toISOString(), states, evidence, profile: run.profile, catalogueId: run.catalogueId } } };
 }
 
 export function closeRun(catalogue: Catalogue, run: Run, now: Date): Result {
@@ -247,23 +272,47 @@ export function setSite(run: Run, site: { name: string; url: string }): Result {
 const PLATFORM_IDS: readonly string[] = PLATFORMS.map((p) => p.id);
 const FEATURE_IDS: readonly string[] = FEATURES.map((f) => f.id);
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isIso = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/u.test(v) && !Number.isNaN(Date.parse(v));
+// Date.parse rolls 30 February or hour 24 over to a real time, so the date and time are compared
+// with the time they parse to: a value that does not exist does not come back as itself.
+const isIso = (v: unknown): v is string => {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/u.test(v)) return false;
+  const t = Date.parse(v);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 19) === v.slice(0, 19);
+};
 const isState = (v: unknown): v is State => (STATES as readonly unknown[]).includes(v);
 const allValues = (v: unknown, test: (x: unknown) => boolean): boolean => isRecord(v) && Object.values(v).every(test);
+
+const isProfile = (p: unknown): p is Profile =>
+  isRecord(p) &&
+  PLATFORM_IDS.includes(String(p.platform)) &&
+  typeof p.authorized === 'boolean' &&
+  Array.isArray(p.features) &&
+  p.features.every((f) => FEATURE_IDS.includes(String(f)));
 
 export function isRun(v: unknown): v is Run {
   if (!isRecord(v) || v.format !== 'site-checklist-run' || v.version !== 1) return false;
   if (typeof v.catalogueId !== 'string' || !isIso(v.createdAt)) return false;
   const { site, profile, baseline, closedAt, imports } = v;
   if (!isRecord(site) || typeof site.name !== 'string' || typeof site.url !== 'string') return false;
-  if (!isRecord(profile) || !PLATFORM_IDS.includes(String(profile.platform)) || typeof profile.authorized !== 'boolean') return false;
-  if (!Array.isArray(profile.features) || !profile.features.every((f) => FEATURE_IDS.includes(String(f)))) return false;
+  if (!isProfile(profile)) return false;
   if (
     !allValues(v.marks, (m) => isRecord(m) && (m.state === null || isState(m.state)) && typeof m.evidence === 'string' && isIso(m.at) && (m.fixedFrom === undefined || m.fixedFrom === 'fail'))
   ) {
     return false;
   }
-  if (baseline !== null && !(isRecord(baseline) && isIso(baseline.at) && allValues(baseline.states, isState) && allValues(baseline.evidence, (e) => typeof e === 'string'))) return false;
+  if (
+    baseline !== null &&
+    !(
+      isRecord(baseline) &&
+      isIso(baseline.at) &&
+      allValues(baseline.states, isState) &&
+      allValues(baseline.evidence, (e) => typeof e === 'string') &&
+      (baseline.profile === undefined || isProfile(baseline.profile)) &&
+      (baseline.catalogueId === undefined || typeof baseline.catalogueId === 'string')
+    )
+  ) {
+    return false;
+  }
   if (!allValues(v.preChange, isIso) || !allValues(v.postChange, isIso)) return false;
   if (closedAt !== null && !isIso(closedAt)) return false;
   if (
@@ -294,6 +343,13 @@ export function repairRun(catalogue: Catalogue, run: Run): Repair {
   const preDone = preChangeDone(catalogue, run);
   for (const [id, mark] of Object.entries(run.marks)) {
     if (mark.state !== 'fixed') continue;
+    // A Fixed check this catalogue does not list cannot be shown or changed, and would keep the
+    // pre-change list locked for good.
+    if (!catalogue.items.some((i) => i.id === id)) {
+      marks[id] = { state: null, evidence: mark.evidence, at: mark.at };
+      dropped.push(`${id} was Fixed but is not in this catalogue; it is unmarked now.`);
+      continue;
+    }
     const earned = run.baseline?.states[id] === 'fail' || mark.fixedFrom === 'fail';
     if (preDone && earned) continue;
     // The evidence note stays: only the claim that a change was made and tested is undone.

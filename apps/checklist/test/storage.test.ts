@@ -114,6 +114,18 @@ describe('the IndexedDB store', () => {
     expect(idb.stores.get('runs')?.get('current')).toEqual({ format: 'something else' });
   });
 
+  it('writes nothing over an invalid stored value it could not copy aside', async () => {
+    const idb = new FakeIdb();
+    const old = { format: 'something else' };
+    idb.stores.set('runs', new Map<string, unknown>([['current', old]]));
+    idb.failWrites = true;
+    const store = await openStore(idb.factory());
+    expect(await store.load()).toEqual({ run: null, invalid: true, unreadable: true });
+    idb.failWrites = false;
+    expect(await store.save(runWith(catalogue, 'wordpress'))).toBe(false);
+    expect(idb.stores.get('runs')?.get('current')).toEqual(old);
+  });
+
   it('says a failed read is unreadable, and writes nothing over the stored run until a read succeeds', async () => {
     const idb = new FakeIdb();
     const stored = ok(setState(catalogue, runWith(catalogue, 'wordpress'), 'EXT-01', 'fail', at(1)));

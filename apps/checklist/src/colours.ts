@@ -105,7 +105,8 @@ export function summarise(catalogue: Catalogue, run: Run, phase: number | null =
   let noEvidence = 0;
   for (const item of catalogue.items) {
     if (phase !== null && item.phase !== phase) continue;
-    if (!applies(item, run.profile)) continue;
+    // "Before" counts the checks of the profile it was recorded with, when it has one.
+    if (!applies(item, before?.profile ?? run.profile)) continue;
     inProfile++;
     const mark = run.marks[item.id];
     const state = before ? (before.states[item.id] ?? null) : (mark?.state ?? null);

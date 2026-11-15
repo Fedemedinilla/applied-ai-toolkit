@@ -65,6 +65,18 @@ describe('networkFirst', () => {
     expect(await hostError.text()).toBe('app shell');
   });
 
+  it('serves the cached copy of a file other than a page when the host answers with an error, and the error when nothing is cached', async () => {
+    const catalogueUrl = new URL('catalogue.json', SCOPE).href;
+    const cache = fakeCache({ [catalogueUrl]: '{"cached":true}' });
+    const hostError = async () => new Response('Service Unavailable', { status: 503 });
+    const res = await networkFirst(new Request(catalogueUrl), deps(cache, hostError), { navigation: false, fallback: index });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('{"cached":true}');
+    const miss = await networkFirst(new Request(new URL('manifest.webmanifest', SCOPE).href), deps(cache, hostError), { navigation: false, fallback: index });
+    expect(miss.status).toBe(503);
+    expect(await miss.text()).toBe('Service Unavailable');
+  });
+
   it('serves the cache after the timeout when the network hangs', async () => {
     const cache = fakeCache({ [page]: 'cached' });
     let waited = 0;

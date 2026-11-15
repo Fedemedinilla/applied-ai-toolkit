@@ -126,6 +126,21 @@ describe('the checklist tab', () => {
     expect(text('#msg-EXT-02')).toBe('');
   });
 
+  it('names the Fixed check that keeps the pre-change list ticked, even when the profile hides it', async () => {
+    await mount();
+    toggle('#authorized');
+    choose('SEG-06', 'fail');
+    for (const row of catalogue.preChange) toggle(`#pre-${row.id}`);
+    choose('SEG-06', 'fixed');
+    toggle('#authorized', false);
+    expect(document.querySelector('#item-SEG-06')).toBeNull();
+    toggle('#pre-window', false);
+    expect($<HTMLInputElement>('#pre-window').checked).toBe(true);
+    expect(text('#pre-status')).toBe(
+      'Some checks are marked Fixed. The pre-change list stays acknowledged while they are. Marked Fixed: SEG-06 (outside the current site profile; change the profile back to see it).',
+    );
+  });
+
   it('filters by phase, colour and text', async () => {
     await mount();
     toggle('#authorized');
