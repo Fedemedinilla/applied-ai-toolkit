@@ -141,8 +141,11 @@ export function ownOrigins(request: Request, trustForwarded: boolean, extra: rea
   if (trustForwarded) {
     // A proxy chain can append: "public.example, internal:8080". The first one is the client's.
     const fHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-    const fProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || url.protocol.replace(':', '');
+    const sentProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const fProto = sentProto || url.protocol.replace(':', '');
     if (fHost) own.add(`${fProto}://${fHost}`);
+    // A TLS proxy that keeps Host and only says the scheme (nginx's common setup).
+    if (host && sentProto) own.add(`${sentProto}://${host}`);
   }
   return own;
 }

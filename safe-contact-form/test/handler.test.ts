@@ -246,6 +246,30 @@ describe('origin', () => {
     expect((await s.handler(req, ctx())).status).toBe(200);
   });
 
+  const behind = (url: string, headers: Record<string, string>, over: Partial<ContactConfig> = {}) => {
+    const s = setup(over);
+    const req = new Request(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(good(s.now)) });
+    return s.handler(req, ctx());
+  };
+
+  it('the Host header counts as an own origin when the URL is internal', async () => {
+    const res = await behind('http://internal:3000/api/contact', { host: 'studio.example', origin: 'http://studio.example' });
+    expect(res.status).toBe(200);
+  });
+
+  it('a TLS proxy that keeps Host and sets only X-Forwarded-Proto', async () => {
+    // nginx with `proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme`.
+    const headers = { host: 'studio.example', 'x-forwarded-proto': 'https', origin: SITE };
+    expect((await behind('http://studio.example/api/contact', headers)).status).toBe(200);
+    expect((await behind('http://studio.example/api/contact', headers, { trustForwardedHeaders: false })).status).toBe(403);
+  });
+
+  it('X-Forwarded-Host without X-Forwarded-Proto takes the scheme of the URL', async () => {
+    const headers = { 'x-forwarded-host': 'studio.example', origin: 'http://studio.example' };
+    expect((await behind('http://internal:3000/api/contact', headers)).status).toBe(200);
+    expect((await behind('http://internal:3000/api/contact', { ...headers, origin: SITE })).status).toBe(403);
+  });
+
   it('forwarded headers are ignored when the config says so', async () => {
     const s = setup({ trustForwardedHeaders: false });
     const req = new Request('http://localhost:3000/api/contact', {
