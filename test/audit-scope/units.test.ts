@@ -7,8 +7,8 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const tracked = (): string[] => execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }).split('\0').filter(Boolean);
 
 describe('the audit areas', () => {
-  it('are the 29 units and 4 cross-cutting areas of the full audit, plus the extra area', () => {
-    expect(UNITS).toHaveLength(29);
+  it('are the 30 units and 4 cross-cutting areas of the full audit, plus the extra area', () => {
+    expect(UNITS).toHaveLength(30);
     expect(CROSS.map((a) => a.id)).toEqual(['ci-workflows-actions', 'packaging-release', 'root-docs-truth', 'dependencies']);
     expect(EXTRA.map((a) => a.id)).toEqual(['repo-tooling']);
     expect(new Set(AREAS.map((a) => a.id)).size).toBe(AREAS.length);
