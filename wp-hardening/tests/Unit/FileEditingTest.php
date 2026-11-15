@@ -39,4 +39,17 @@ final class FileEditingTest extends TestCase
         self::assertSame(State::Good, $control->report(false)->state);
         self::assertStringContainsString('nothing changes', $control->plan()[0]);
     }
+
+    /** WordPress tests the constant as truthy, so define('DISALLOW_FILE_EDIT', 1) already turns the editors off. */
+    public function testATruthyValueInWpConfigCountsAsOn(): void
+    {
+        $control = new FileEditing(new FakeConstants(['DISALLOW_FILE_EDIT' => 1]));
+        $report = $control->report(false);
+        self::assertSame(State::Good, $report->state);
+        self::assertStringContainsString('is 1', $report->summary);
+        self::assertStringContainsString('defined as 1', $control->plan()[0]);
+        $zero = new FileEditing(new FakeConstants(['DISALLOW_FILE_EDIT' => 0]));
+        self::assertSame(State::Recommended, $zero->report(true)->state);
+        self::assertStringContainsString('defined as 0', $zero->report(true)->summary);
+    }
 }
