@@ -2187,5 +2187,57 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "1000000"
+ },
+ {
+  "phrase": "le pague 10 mil al mejor gasista y 5 mil de repuestos",
+  "family": "voice-transcription",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 15000,
+  "ambiguous": false,
+  "note": "\"mejor\" is the adjective here, not a self-correction: 10.000 + 5.000 = 15.000. As a correction it sits right before the new figure (\"mejor treinta\", \"mejor dicho treinta\").",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "5000"
+ },
+ {
+  "phrase": "compre 3 kilos del mejor jamon a 18 mil el kilo",
+  "family": "quantity-unit-price",
+  "kind": "expense",
+  "quantity": 3,
+  "unit_price": 18000,
+  "total": 54000,
+  "ambiguous": false,
+  "note": "The adjective \"mejor\" used to wipe the count, and the price per kilo was left with nothing to multiply: 3 x 18.000 = 54.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "ambiguous unit_or_total"
+ },
+ {
+  "phrase": "gaste veinte mil mejor dicho treinta mil en la ferreteria",
+  "family": "voice-transcription",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 30000,
+  "ambiguous": false,
+  "note": "CONTROL. \"mejor dicho\" right before a figure is a self-correction: the figure after it, 30.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "30000"
+ },
+ {
+  "phrase": "le pague veinte mil digo treinta mil al plomero",
+  "family": "voice-transcription",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 30000,
+  "ambiguous": false,
+  "note": "CONTROL. \"digo\" right before a figure corrects the one before it: 30.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "30000"
  }
 ]

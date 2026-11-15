@@ -103,7 +103,8 @@ export const MONTHS: ReadonlySet<string> = new Set([
 
 /**
  * "gaste veinte, no, pera, treinta mil": everything up to the marker is discarded. "no" and "para"
- * are also ordinary words, and the README lists what that costs.
+ * are also ordinary words, and the README lists what that costs. "mejor" and "digo" are too, so
+ * applyCorrections only lets them correct right before a figure.
  */
 export const CORRECTION_MARKERS: ReadonlySet<string> = new Set(['no', 'pera', 'para', 'perdon', 'perdona', 'digo', 'mejor']);
 

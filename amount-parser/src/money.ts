@@ -233,11 +233,23 @@ function excludedPhrases(s: Sentence): ParsedAmount | null | undefined {
 
 // ── 3. Self-corrections ──────────────────────────────────────────────────────────────────────
 
-/** "gaste veinte no pera treinta mil": a marker with a figure on each side wipes what came before. */
+const ONLY_BEFORE_A_FIGURE: ReadonlySet<string> = new Set(['mejor', 'digo']);
+
+/**
+ * "gaste veinte no pera treinta mil": a marker with a figure on each side wipes what came before.
+ * "mejor" and "digo" are also an adjective and a verb ("al mejor gasista"), so they correct only
+ * right before the new figure ("mejor treinta", "mejor dicho treinta", "digo treinta").
+ */
 function applyCorrections(s: Sentence): Sentence {
   const { tokens } = s;
+  const correctsHere = (i: number) => {
+    const w = tokens[i]!.text;
+    if (!CORRECTION_MARKERS.has(w)) return false;
+    if (!ONLY_BEFORE_A_FIGURE.has(w)) return true;
+    return isNumber(tokens[i + 1]) || (w === 'mejor' && tokens[i + 1]?.text === 'dicho' && isNumber(tokens[i + 2]));
+  };
   const at = tokens.findIndex(
-    (t, i) => CORRECTION_MARKERS.has(t.text) && tokens.slice(0, i).some(isNumber) && tokens.slice(i).some(isNumber),
+    (_t, i) => correctsHere(i) && tokens.slice(0, i).some(isNumber) && tokens.slice(i).some(isNumber),
   );
   return at > 0 ? withTokens(s, tokens.slice(at + 1)) : s;
 }
