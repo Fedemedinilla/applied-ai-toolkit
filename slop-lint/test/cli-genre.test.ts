@@ -50,6 +50,18 @@ describe('--genre', () => {
     expect(unsure.stderr).toMatch(/^slop-lint: -: unsure of the genre \(.+\); linting it as cover-letter\n$/u);
   });
 
+  it('lints a low guess of another genre as a cover letter, not as that genre', () => {
+    // guessGenre reads this chat as whatsapp, with low confidence.
+    const r = run(['-', '--lang', 'es', '--genre', 'auto', '--json', '--no-config'], { input: 'hola che\nmañana paso por el local\n' });
+    expect('genre' in (JSON.parse(r.stdout) as LintResult)).toBe(false);
+    expect(r.stderr).toMatch(/^slop-lint: -: unsure of the genre \(.+\); linting it as cover-letter\n$/u);
+  });
+
+  it('says the experimental note once per run, however many files use the profile', () => {
+    const r = run([EMAIL, EMAIL_LIST, '--lang', 'es', '--genre', 'email']);
+    expect(r.stderr.match(/the email profile is experimental/gu)?.length).toBe(1);
+  });
+
   it('rejects an unknown genre or variety, and a flag with no value', () => {
     for (const args of [['--genre', 'sms'], ['--variety', 'argentina'], ['--genre'], ['--previous']]) {
       const r = run([EMAIL, '--lang', 'es', ...args]);
@@ -90,6 +102,21 @@ describe('--variety and --previous', () => {
     const missing = run([join(dir, FOLLOW_UP), '--lang', 'en', '--genre', 'follow-up', '--previous', 'none.txt'], { cwd: tmp });
     expect(missing.status).toBe(2);
     expect(missing.stderr).toMatch(/^cannot read none\.txt/u);
+  });
+
+  it('refuses stdin as both the input and the earlier message', () => {
+    const r = run(['-', '--lang', 'en', '--genre', 'follow-up', '--previous', '-'], { input: 'Hi Dana.' });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/^stdin can be read only once\n/u);
+  });
+
+  it('keeps the JSON result as it is when --previous is given', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slop-previous-'));
+    writeFileSync(join(tmp, 'previous.txt'), 'Hi Dana, I built a dashboard for the Rosario branch.');
+    const args = [join(dir, FOLLOW_UP), '--lang', 'en', '--genre', 'follow-up', '--json', '--no-config'];
+    const withPrevious = run([...args, '--previous', 'previous.txt'], { cwd: tmp });
+    expect(withPrevious.status).toBe(0);
+    expect(withPrevious.stdout).toBe(run(args, { cwd: tmp }).stdout);
   });
 });
 
