@@ -368,6 +368,17 @@ describe('falling back to the offline reading', () => {
     expect(rows()[0]).not.toContain('con IA');
   });
 
+  it('a failure line is cleared when the next read succeeds with the model', async () => {
+    let calls = 0;
+    await mountWithModel(endpoint(() => (++calls === 1 ? json(503, { error: 'model_unavailable' }) : json(200, { reading: reading({}) }))));
+    type('pagué la luz 45 lucas');
+    await waitFor(() => document.querySelector('[data-action="save"]') !== null);
+    expect(text('#status')).toBe('El modo con IA está ocupado ahora. Abajo está la lectura sin IA.');
+    type('pagué la luz 45 lucas');
+    await waitFor(card);
+    expect($('#status').textContent).toBe('');
+  });
+
   it('"Leer sin IA" while waiting shows the offline card, and the late answer is dropped', async () => {
     let release: (r: Response) => void = () => undefined;
     const late = new Promise<Response>((resolve) => {
