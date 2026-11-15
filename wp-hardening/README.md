@@ -14,7 +14,7 @@ composer install          # PHPUnit 10.5.66, Brain Monkey 2.7.0, Mockery 1.6.15,
 vendor/bin/phpunit        # offline; no WordPress, no database, no network
 ```
 
-The suite stubs WordPress functions with Brain Monkey and uses temporary directories for the file checks, so it needs neither a WordPress install nor a database. On 2026-11-04 it ran 171 tests with 649 assertions on PHP 8.3.6. That run was as root, so the one test that needs an unreadable directory was skipped; it runs under a normal user, as in CI.
+The suite stubs WordPress functions with Brain Monkey and uses temporary directories for the file checks, so it needs neither a WordPress install nor a database. On 2026-11-15 it ran 192 tests with 724 assertions on PHP 8.3.6. That run was as root, so the one test that needs an unreadable directory was skipped; it runs under a normal user, as in CI.
 
 To try it on a site, copy the folder (without `vendor/`) to `wp-content/plugins/wp-hardening` and activate it. Activation changes nothing. Then:
 
