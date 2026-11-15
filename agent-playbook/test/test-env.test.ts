@@ -139,10 +139,17 @@ describe('the Anthropic SDK and the session environment', () => {
     const root = mkdtempSync(join(tmpdir(), 'agent-playbook-sdk-'));
     try {
       writeFileSync(join(root, '.env.test'), 'APP_ANTHROPIC_KEY=placeholder-test\n');
-      const env: NodeJS.ProcessEnv = { ANTHROPIC_BASE_URL: 'https://proxy.example.test', ANTHROPIC_LOG: 'debug' };
+      // The session values are in process.env, as in the test above, so the client below would
+      // take them if the isolation left them in place. afterEach restores what was there.
+      process.env['ANTHROPIC_BASE_URL'] = 'https://proxy.example.test';
+      process.env['ANTHROPIC_LOG'] = 'debug';
+      const env: NodeJS.ProcessEnv = { ANTHROPIC_BASE_URL: process.env['ANTHROPIC_BASE_URL'], ANTHROPIC_LOG: process.env['ANTHROPIC_LOG'] };
       applyTestEnv(root, DEFAULT_POLICY, env);
+      expect(Object.keys(env)).toEqual(['APP_ANTHROPIC_KEY']);
       for (const name of NAMES) {
-        if (env[name] === undefined) delete process.env[name];
+        const value = env[name];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
       }
       const client = new Anthropic({ apiKey: 'placeholder-test' });
       expect(client.baseURL).toBe('https://api.anthropic.com');
