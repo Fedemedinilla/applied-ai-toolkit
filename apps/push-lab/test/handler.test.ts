@@ -306,6 +306,21 @@ describe('the rate limit', () => {
     expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(429);
   });
 
+  it('is not reset by a 410 that removed the row: subscribing again and testing at once is refused', async () => {
+    let sends = 0;
+    const send: Sender = async () => {
+      sends += 1;
+      throw Object.assign(new Error('Received unexpected response code'), { statusCode: 410 });
+    };
+    const { call } = setup({ send });
+    const device = fakeDevice('gone');
+    await call('api/subscribe', device);
+    expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(410);
+    expect((await call('api/subscribe', device)).status).toBe(201);
+    expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(429);
+    expect(sends).toBe(1);
+  });
+
   it('still applies to a device after many others were tested and aged out', async () => {
     const { call, tick } = setup();
     const devices = Array.from({ length: 20 }, (_, i) => fakeDevice(`many-${i}`));

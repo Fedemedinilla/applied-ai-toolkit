@@ -243,10 +243,9 @@ export function createHandler(deps: HandlerDeps): (request: Request) => Promise<
         const delivery = await deliver(deps.store, deps.send, subscription, payload);
         const ttl = MESSAGE_KINDS[kind].ttl;
         if (delivery.status === 'delivered') return json({ status: 'delivered', kind, ttl });
-        if (delivery.status === 'gone') {
-          lastSent.delete(subscription.endpoint);
-          return fail('gone', 410, { statusCode: delivery.statusCode, removed: delivery.removed });
-        }
+        // The limit stays after a 404 or 410 too: deliver() has removed the row, so clearing the
+        // entry here would let subscribe and test loop with no limit at all.
+        if (delivery.status === 'gone') return fail('gone', 410, { statusCode: delivery.statusCode, removed: delivery.removed });
         // The endpoint is on a known push service (refuseHost), so its status says something about
         // that service and nothing about any other host.
         return fail('push_failed', 502, { statusCode: delivery.statusCode });
