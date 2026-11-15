@@ -354,15 +354,24 @@ export function createOrdersClient(options: OrdersClientOptions): OrdersClient {
   };
 }
 
+/** A key that is a string matching KEY_PATTERN. test() alone would coerce an array or a number. */
+function keyProblem(key: unknown): string | null {
+  return typeof key === 'string' && KEY_PATTERN.test(key) ? null : 'the key does not match KEY_PATTERN';
+}
+
 function placeProblem(request: PlaceRequest): string | null {
-  if (!KEY_PATTERN.test(request.key)) return 'the key does not match KEY_PATTERN';
-  const customerLength = [...request.customerId].length;
+  const keyIssue = keyProblem(request.key);
+  if (keyIssue) return keyIssue;
+  const customer: unknown = request.customerId;
+  if (typeof customer !== 'string') return 'customerId has 1 to 64 characters';
+  const customerLength = [...customer].length;
   if (customerLength < 1 || customerLength > 64) return 'customerId has 1 to 64 characters';
   return linesProblem(request.lines);
 }
 
 function confirmProblem(request: ConfirmRequest): string | null {
-  if (!KEY_PATTERN.test(request.key)) return 'the key does not match KEY_PATTERN';
+  const keyIssue = keyProblem(request.key);
+  if (keyIssue) return keyIssue;
   if (!Number.isSafeInteger(request.orderId) || request.orderId < 1) return 'orderId is a positive integer';
   if (!Number.isInteger(request.expectedVersion) || request.expectedVersion < 1 || request.expectedVersion > 2_147_483_647) {
     return 'expectedVersion is a positive integer';

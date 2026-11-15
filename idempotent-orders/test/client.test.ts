@@ -297,6 +297,24 @@ describe('placeOrder', () => {
   });
 });
 
+describe('placeOrder with an untrusted body', () => {
+  // What a server handler can pass straight from request JSON, as in the README.
+  it.each<[string, Record<string, unknown>]>([
+    ['lines null', { lines: null }],
+    ['lines undefined', { lines: undefined }],
+    ['lines an object', { lines: {} }],
+    ['a null line', { lines: [null] }],
+    ['a string line', { lines: ['1x2'] }],
+    ['a key in an array', { key: ['key-cccccccccccccccc'] }],
+    ['a numeric key', { key: 1234567890123456789 }],
+    ['a null customer', { customerId: null }],
+  ])('answers invalid_request for %s and sends nothing', async (_, change) => {
+    const r = await client().placeOrder({ ...request(), ...change } as never);
+    expect(r).toMatchObject({ kind: 'rejected', reason: 'invalid_request', requests: 0 });
+    expect(fake.requests).toHaveLength(0);
+  });
+});
+
 describe('confirmOrder', () => {
   async function pendingOrder(): Promise<number> {
     return orderOf(await place(db, key(), 'shop-1', [{ product_id: widgetA, quantity: 4 }])).id;
@@ -348,6 +366,12 @@ describe('confirmOrder', () => {
     ]);
     expect([a.kind, b.kind].sort()).toEqual(['confirmed', 'rejected']);
     expect(await onHand(db, widgetA)).toBe(6);
+  });
+
+  it('answers invalid_request for a key that is not a string and sends nothing', async () => {
+    const r = await client().confirmOrder({ orderId: 1, expectedVersion: 1, key: ['key-cccccccccccccccc'] } as never);
+    expect(r).toMatchObject({ kind: 'rejected', reason: 'invalid_request', requests: 0 });
+    expect(fake.requests).toHaveLength(0);
   });
 
   it('passes on version conflicts and shortages', async () => {
