@@ -6,11 +6,15 @@ import {
   createAssistantHandler,
   createHistorySigner,
   ModelUnavailable,
+  SALON,
+  SALON_STAFF,
+  SYSTEM_RULES,
   type ModelReply,
   type ProposeInput,
   type Turn,
   type TurnResponse,
 } from '../src/index.ts';
+import { CONTEXT_HEADINGS } from '../src/salon.ts';
 
 const SECRET = 'test-only-history-secret-0123456789abcdef';
 // Wednesday 2026-11-04, 15:00 in Buenos Aires (UTC-3).
@@ -232,6 +236,17 @@ describe('the history', () => {
     const first = await turn(s.handler, [{ role: 'user', content: 'hola' }]);
     const signer = createHistorySigner(SECRET);
     expect(signer.verify([{ role: 'user', content: 'hola' }, { role: 'assistant', content: first.body.reply }], first.body.signature)).toBe(true);
+  });
+});
+
+describe('the rules quote the salon tables', () => {
+  it.each(['es', 'en'] as const)('%s: the name, every person and both context headings come from salon.ts', (lang) => {
+    const rules = SYSTEM_RULES[lang];
+    expect(rules).toContain(`"${SALON.name}"`);
+    expect(rules).toContain(`context section "${CONTEXT_HEADINGS[lang].notDone}"`);
+    expect(rules).toContain(`context section "${CONTEXT_HEADINGS[lang].notLoaded}"`);
+    for (const { name } of SALON_STAFF) expect(rules).toContain(name);
+    expect(rules).toContain('There are exactly four people: Rubén, Damián, Carla and Vanina.');
   });
 });
 
