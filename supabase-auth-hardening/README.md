@@ -127,7 +127,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 5. Load the list from the SQL editor, never from a migration: `insert into public.allowed_emails (email, role) values ('<address>', 'admin');`
 6. Call `reserve_otp_attempt` before every `verifyOtp` on the server, as above.
-7. Run `sql/audit.sql` in the SQL editor. An empty result means every object in `public` follows rules 1 to 5 of `0001_conventions.sql`. Run it again after adding tables. The audit encodes this folder's strict profile: authenticated never writes and never executes a function, and every table has a comment. If your app grants authenticated an INSERT behind a policy, or exposes an RPC to it, delete the `authenticated can write` and `anon or authenticated can execute` branches, or filter their rows by object name.
+7. Run `sql/audit.sql` in the SQL editor. An empty result means every object in `public` follows rules 1 to 5 of `0001_conventions.sql`. Run it again after adding tables. EXECUTE for `service_role` and `supabase_auth_admin` is checked only on trigger functions; a grant of any other function to those roles is not reported, since the server and Auth call functions granted back to them. The audit encodes this folder's strict profile: authenticated never writes and never executes a function, and every table has a comment. If your app grants authenticated an INSERT behind a policy, or exposes an RPC to it, delete the `authenticated can write` and `anon or authenticated can execute` branches, or filter their rows by object name.
 
 `pgtap/` holds the same checks as pgTAP files for a real Supabase database. Copy them to `supabase/tests/database/` and run `supabase test db`. They are not part of CI here; see Limits for where they have run.
 

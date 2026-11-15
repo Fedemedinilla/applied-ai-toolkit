@@ -120,6 +120,19 @@ describe('sql/audit.sql', () => {
     }
   }, FRESH_DB_TIMEOUT);
 
+  it.each(['service_role', 'supabase_auth_admin', 'public'] as const)('reports a trigger function executable by %s', async (grantee) => {
+    // Rule 4: a trigger function is never granted to anyone. A grant to public reaches every role.
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`grant execute on function public.create_account() to ${grantee}`);
+      const rows = await audit(scratch);
+      expect(rows).toContainEqual({ violation: 'trigger function executable by service_role or supabase_auth_admin', object: 'create_account()' });
+      expect(rows.filter((r) => r.violation.startsWith('trigger function'))).toHaveLength(1);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
   it('does not ask an aggregate for a search_path, which Postgres cannot set on one', async () => {
     const scratch = await openDb();
     try {

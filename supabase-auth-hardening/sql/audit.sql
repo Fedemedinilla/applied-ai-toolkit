@@ -7,6 +7,10 @@
 -- RPC, gets rows here that break no rule of its own. Delete the branches it does not follow, or
 -- filter their rows by object name.
 --
+-- Rule 4's revoke from service_role is checked only on trigger functions, which nobody may execute.
+-- Any other function may be granted back to service_role or supabase_auth_admin, as
+-- reserve_otp_attempt and before_user_created_hook are, so a grant to those roles is not reported.
+--
 -- MAINTAIN (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH MATERIALIZED VIEW, LOCK TABLE) exists from
 -- PostgreSQL 17, and Supabase's default grant all includes it there. It is checked only on 17 and later, so the query also runs on 16.
 --
@@ -75,6 +79,16 @@ select 'anon or authenticated can execute', f.name
 from functions as f
 where pg_catalog.has_function_privilege('anon', f.oid, 'EXECUTE')
    or pg_catalog.has_function_privilege('authenticated', f.oid, 'EXECUTE')
+
+union all
+-- Rule 4: a trigger function runs as a trigger and is granted to nobody. anon and authenticated are
+-- already reported above. Other functions may be granted back to service_role or
+-- supabase_auth_admin when the server or Auth calls them, so this check is not made for them.
+select 'trigger function executable by service_role or supabase_auth_admin', f.name
+from functions as f
+where f.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype
+  and (pg_catalog.has_function_privilege('service_role', f.oid, 'EXECUTE')
+       or pg_catalog.has_function_privilege('supabase_auth_admin', f.oid, 'EXECUTE'))
 
 union all
 -- Only functions and procedures: Postgres refuses SET on an aggregate or a window function, so a
