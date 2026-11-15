@@ -110,6 +110,10 @@ describe('draftReport', () => {
     expect(codes(report('aviso-general', `${words(60)} 🎉`))).toContain('emoji');
     expect(codes(report('aviso-general', `${words(60)} Programa Lectores© y Ciencia® ™ ‼`))).not.toContain('emoji');
     expect(codes(report('aviso-general', `${words(60)} ❤`))).toContain('emoji');
+    // Flags and keycaps are emoji but not Extended_Pictographic.
+    expect(codes(report('salud', `Hola \u{1F1E6}\u{1F1F7} familias. ${words(80)}`, words(80)))).toContain('emoji');
+    expect(codes(report('aviso-general', `${words(60)} 1\uFE0F\u20E3 #\uFE0F\u20E3`))).toContain('emoji');
+    expect(codes(report('aviso-general', `${words(60)} 1 # 2026`))).not.toContain('emoji');
     expect(codes(report('logros', `${words(60)} 🎉`, `${words(60)} 🎉`))).not.toContain('emoji');
     expect(codes(report('salud', `${words(80)} ¡Atención!`, words(80)))).toContain('exclamation');
     expect(codes(report('aviso-general', `${words(60)} ¡Gracias!`))).not.toContain('exclamation');
