@@ -102,7 +102,16 @@ describe('runCodeNode', () => {
 describe('dollarGlobals', () => {
   it('finds the $ identifiers in code, not the ones in strings, comments or regex ends', () => {
     const code = "// uses $vars in a comment\nconst a = $input.first(); const b = '$env'; const c = `${$json.x} $workflow`; /^[0-9]+$/.test(a);";
-    expect(dollarGlobals(code)).toEqual(['$', '$input', '$json']);
+    // The "$" that ends /^[0-9]+$/ is part of a regex literal, not a call to $('Node').
+    expect(dollarGlobals(code)).toEqual(['$input', '$json']);
+    expect(dollarGlobals(`${code} $('Node').first();`)).toEqual(['$', '$input', '$json']);
+  });
+
+  it('still sees a $ global after a URL string or a regex literal with a quote', () => {
+    expect(dollarGlobals("const u = 'https://api.example'; const v = $vars.token;")).toEqual(['$vars']);
+    expect(dollarGlobals('const r = /["]/; const v = $vars.a; const s = "x";')).toEqual(['$vars']);
+    expect(dollarGlobals("const r = /[/']/g; /* $env */ const w = `a${'}'}b${$workflow.id}`;")).toEqual(['$workflow']);
+    expect(dollarGlobals('const half = total / 2; const v = $vars.a / 3;')).toEqual(['$vars']);
   });
 
   it('every Code node in the templates reads only globals the harness defines', () => {

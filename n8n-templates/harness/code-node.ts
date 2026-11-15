@@ -26,6 +26,7 @@
 
 import * as crypto from 'node:crypto';
 import vm from 'node:vm';
+import { codeOnly } from './js-scan.ts';
 
 export interface Item {
   json: Record<string, unknown>;
@@ -121,11 +122,5 @@ export async function runCodeNode(code: string, options: CodeNodeOptions): Promi
 
 /** `$name` identifiers that a piece of Code node JavaScript reads, for the coverage check. */
 export function dollarGlobals(code: string): string[] {
-  const withoutComments = code.replace(/\/\/[^\n]*/g, '');
-  const withoutStrings = withoutComments.replace(
-    /`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g,
-    // Keep the ${...} parts of a template string: they are code.
-    (s) => (s.startsWith('`') ? [...s.matchAll(/\$\{([^}]*)\}/g)].map((m) => ` ${m[1] ?? ''} `).join('') : ''),
-  );
-  return [...new Set([...withoutStrings.matchAll(/\$[A-Za-z_]*/g)].map((m) => m[0]))].sort();
+  return [...new Set([...codeOnly(code).matchAll(/\$[A-Za-z_]*/g)].map((m) => m[0]))].sort();
 }
