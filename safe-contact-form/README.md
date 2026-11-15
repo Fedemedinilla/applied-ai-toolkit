@@ -7,7 +7,7 @@ A contact form endpoint that sends two emails: the message to the site owner, an
 From the repository root, offline:
 
 ```sh
-npx vitest run safe-contact-form                          # 68 tests, under a second, no key
+npx vitest run safe-contact-form                          # 88 tests, under a second, no key
 npm run check                                             # tsc --noEmit, strict
 node safe-contact-form/examples/serve.ts --print-mail     # http://127.0.0.1:8790, prints both emails to the terminal
 ```
@@ -71,25 +71,26 @@ JSON requests get `{ ok, acknowledged }` or `{ ok: false, error }` with a stable
 
 **Logs carry codes, not content.** Events are `{ kind, reason }`. The source logged the visitor's address on a failed send. Here no event carries anything the visitor typed, and a test checks it.
 
-**A no-JS page for every outcome.** In the source the native submit had a page only on success, so a mistyped address left the visitor looking at raw JSON. Every outcome now has a page in the visitor's language, light or dark by `prefers-color-scheme`, with `role="status"` on the message and a visible focus ring on the link back.
+**A no-JS page for every outcome.** In the source the native submit had a page only on success, so a mistyped address left the visitor looking at raw JSON. Every outcome now has a page, in the visitor's language except for 413 and 415, which answer before the `lang` field is read and use `defaultLang`. Pages are light or dark by `prefers-color-scheme`, with `role="status"` on the message and a visible focus ring on the link back.
 
 ## What the tests cover
 
 | File | Covers |
 |---|---|
-| `test/handler.test.ts` | Both emails in both languages as whole documents with text parts, recipients and Reply-To, no dash in what the visitor receives; the destination never taken from the request; one-line subjects; configurable field names; link stripping with any TLD and the cut-then-filter case, ported from the source's script; the trap, the clock with skew, no clock without JS; origin with forwarded headers, `null`, extra origins, no header; eleven invalid addresses and fields; 405, 415, 413 on a streamed body; 503 with no transport on both paths; five provider failures; a failed acknowledgment; logs without content; the limit with a fake clock and patient retries |
-| `test/parts.test.ts` | `stripLinks` cases and its known false positives, `quote`, `greeting`, `htmlDocument` escaping, the limiter's bound and eviction, the Resend adapter's request shape and errors |
+| `test/handler.test.ts` | Both emails in both languages as whole documents with text parts, recipients and Reply-To, no dash in what the visitor receives; the destination never taken from the request; one-line subjects; configurable field names; link stripping with any TLD and the cut-then-filter case, ported from the source's script; the trap, the clock with skew, no clock without JS; origin with `Host`, forwarded headers and a TLS proxy that sets only the scheme, `null`, extra origins, no header; eleven invalid addresses and fields; a multipart post with a browser's mixed-case boundary, CRLF paragraphs from a native post, cuts through an emoji; 405, 415, 413 on a streamed body and its own page, a native CJK post at the form's caps; 503 with no transport on both paths; five provider failures; a failed acknowledgment; logs without content; the limit with a fake clock and patient retries, and no send spent by a provider failure or a missing transport |
+| `test/parts.test.ts` | `stripLinks` cases (Devanagari, Tamil, a combining accent) and its known false positives, `quote`, `greeting` and cuts through an emoji, `paragraphs` with CRLF, `htmlDocument` escaping, the limiter's bound, eviction and refund, the Resend adapter's request shape and errors |
 
 `test/helpers/fake-resend.ts` is a `fetch` that answers like Resend's `POST /emails`, with 200 and an id, 401 without the key and 422 for a missing field. It also scripts failures, such as a 422 that echoes the body, a 403, a network error, a 200 with no id and an HTML 502.
 
 ## Departures from the source
 
-The live form's field names, thresholds and texts are not used here; all are options. The destination address is a required option instead of a constant. The limiter is LRU-bounded. Non-string JSON fields are ignored instead of stringified, so an array of addresses cannot become `"a,b"`. Content types other than JSON and form data get 415 instead of being parsed as a form. Visitor texts are in English and neutral Spanish.
+The live form's field names, thresholds and texts are not used here; all are options. The destination address is a required option instead of a constant. The limiter is LRU-bounded. JSON fields that are neither strings nor numbers are ignored instead of stringified, so an array of addresses cannot become `"a,b"`. Numbers are kept as text in any field, which is what lets `rendered_at` arrive as a number. Content types other than JSON and form data get 415 instead of being parsed as a form. Visitor texts are in English and neutral Spanish.
 
 ## Limits
 
 - The per-IP limit is per process. A real limit across instances needs a shared store.
 - The clock trap only works with the page's script; a bot that waits three seconds passes it. The trap field catches only naive bots.
 - `clientAddress` must come from the platform. If it is read from a header the client controls, the limit can be dodged.
+- Without `clientAddress` (a plain `POST(request)`), every visitor shares one `unknown` key, so five sends from anyone block the form for everyone for fifteen minutes. Pass the client IP the platform reports.
 - Bare-domain stripping has false positives in the quote, by design.
 - Only a Resend adapter is included. Another provider needs a `MailTransport` of a few lines.
