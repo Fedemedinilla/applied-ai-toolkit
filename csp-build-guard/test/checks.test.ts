@@ -96,6 +96,27 @@ describe('staticImports', () => {
     expect(staticImports(code)).toEqual(['./a.js', './b.js', './c.mjs', './d.js', '/e.js', './g.js?v=1', './h']);
   });
 
+  it('skips import-like text in comments, strings, template text and regex literals', () => {
+    const code = [
+      '// import "./old.js"',
+      '/* import "./older.js" */import"./a.js";',
+      `console.log("please import 'react' first", 'export * from "./s.js"');`,
+      'const t=`see import "./t.js" and ${f({a:1}) ? "x" : `import "./u.js"`} done`;import"./b.js";',
+      `const r=/["'\/]/g;import"./c.js";`,
+      'const q=a/2;import"./d.js";const w=b/3',
+      'if(x)return/import "e"/.test(y);export*from"./f.js"',
+    ].join('\n');
+    expect(staticImports(code)).toEqual(['./a.js', './b.js', './c.js', './d.js', './f.js']);
+    const report = guard(
+      {
+        'index.html': '<script type="module" src="/_astro/app.js"></script>',
+        '_astro/app.js': `// import "./old.js"\nconsole.log("please import 'react' first");`,
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 100 }] },
+    );
+    expect(check(report, 'js-budget')?.status).toBe('pass');
+  });
+
   it('counts a query-string import against the file and fails on an extensionless one', () => {
     const report = guard(
       {
