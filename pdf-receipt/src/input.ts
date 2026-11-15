@@ -94,10 +94,17 @@ function quantity(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_QUANTITY) {
     throw new ReceiptInputError('invalid_quantity', field, `must be a number above 0 and at most ${MAX_QUANTITY}`);
   }
-  if (Math.abs(value * 1000 - Math.round(value * 1000)) > 1e-6) {
+  const thousandths = Math.round(value * 1000);
+  // The tolerance absorbs float noise (1.375 * 1000); a positive value under 0.0005 would still pass
+  // it and print as quantity 0 with a $0 line, so it is refused too.
+  if (Math.abs(value * 1000 - thousandths) > 1e-6 || thousandths < 1) {
     throw new ReceiptInputError('invalid_quantity', field, 'must have at most three decimals');
   }
   return value;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -112,13 +119,19 @@ function calendarDate(value: unknown, field: string): string {
   return value as string;
 }
 
+/** A party's lines keep the input path, so a warning from the layout names the line the caller wrote. */
+export interface PreparedParty {
+  readonly name: string;
+  readonly lines: ReadonlyArray<{ readonly text: string; readonly field: string }>;
+}
+
 /** Everything the layout draws, already validated, computed and made safe for the font. */
 export interface PreparedReceipt {
   readonly number: string;
   readonly issuedOn: string;
   readonly issuedText: string;
-  readonly shop: { readonly name: string; readonly lines: readonly string[] };
-  readonly customer: { readonly name: string; readonly lines: readonly string[] };
+  readonly shop: PreparedParty;
+  readonly customer: PreparedParty;
   readonly deliveryText: string | null;
   readonly items: ReadonlyArray<{
     readonly name: string;
@@ -167,21 +180,26 @@ export function prepare(data: ReceiptData, { labels: rawLabels, format, warn }: 
   };
   const money = (c: number): string => printable(formatCents(c, format));
 
-  const party = (p: ReceiptParty, field: string) => {
-    const all = p.lines ?? [];
+  const party = (p: ReceiptParty, field: string): PreparedParty => {
+    // The shape is checked at runtime for JS callers, like `items` below: a missing join or a
+    // column stored as one string would otherwise crash with a TypeError and no field.
+    if (!isObject(p)) throw new ReceiptInputError('invalid_option', field, 'must be an object');
+    const all: unknown = p.lines ?? [];
+    if (!Array.isArray(all)) throw new ReceiptInputError('invalid_option', `${field}.lines`, 'must be an array of strings');
     if (all.length > MAX_PARTY_LINES) warn({ code: 'lines_omitted', field: `${field}.lines`, count: all.length - MAX_PARTY_LINES });
     return {
       name: line(p.name, `${field}.name`),
       lines: all
         .slice(0, MAX_PARTY_LINES)
-        .map((l, i) => line(l, `${field}.lines[${i}]`))
-        .filter((l) => l.length > 0),
+        .map((l, i) => ({ text: line(l, `${field}.lines[${i}]`), field: `${field}.lines[${i}]` }))
+        .filter((l) => l.text.length > 0),
     };
   };
 
   if (!Array.isArray(data.items)) throw new ReceiptInputError('invalid_option', 'items', 'must be an array');
   let itemsTotal = 0;
-  const items = data.items.map((item, i) => {
+  const items = data.items.map((item: unknown, i) => {
+    if (!isObject(item)) throw new ReceiptInputError('invalid_option', `items[${i}]`, 'must be an object');
     const q = quantity(item.quantity, `items[${i}].quantity`);
     const price = cents(item.unitPriceCents, `items[${i}].unitPriceCents`, { allowNegative: false });
     const total = lineTotalCents(q, price);

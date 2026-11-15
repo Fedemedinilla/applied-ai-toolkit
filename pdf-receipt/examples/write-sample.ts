@@ -7,12 +7,18 @@
 import { writeFileSync } from 'node:fs';
 import { buildReceiptPdf, type ReceiptItem } from '../src/index.ts';
 
+const USAGE = 'usage: node pdf-receipt/examples/write-sample.ts <out.pdf> [lines]';
 const [out, linesArg] = process.argv.slice(2);
 if (!out) {
-  console.error('usage: node pdf-receipt/examples/write-sample.ts <out.pdf> [lines]');
+  console.error(USAGE);
   process.exit(2);
 }
 const count = Number(linesArg ?? 4);
+// "abc" would give NaN and a receipt with no lines, "2.5" two lines: both with exit 0.
+if (!Number.isInteger(count) || count < 1) {
+  console.error(`lines must be a whole number of 1 or more\n${USAGE}`);
+  process.exit(2);
+}
 const catalog: ReceiptItem[] = [
   { name: 'Maceta de barro 20 cm', detail: 'x6', quantity: 2, unitPriceCents: 1_250_000 },
   { name: 'Tierra fértil', detail: '50 l', quantity: 3, unitPriceCents: 680_050 },

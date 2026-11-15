@@ -36,13 +36,13 @@ const bytes = await buildReceiptPdf(
 // bytes is a Uint8Array: write it to disk, return it from a handler, or wrap it in a Blob.
 ```
 
-`buildReceipt(data, options)` returns `{ bytes, pageCount, warnings }` for callers that want to show them. Options: `logo` (PNG or JPEG bytes), `labels` (any subset; `LABELS_ES` is the default and `LABELS_EN` is included), `locale` (a BCP 47 tag, default `es-AR`), `currencySymbol` (default `$`), `pageSize` (`A4` or `Letter`), `accentColor` (`#rrggbb`), `maxNameLines` (1 to 20, default 3) and `onWarning`.
+`buildReceipt(data, options)` returns `{ bytes, pageCount, warnings }` for callers that want to show them. Options: `logo` (PNG or JPEG bytes), `labels` (any subset; `LABELS_ES` is the default and `LABELS_EN` is included), `locale` (a BCP 47 tag, default `es-AR`), `currencySymbol` (default `$`), `pageSize` (`A4` or `Letter`), `accentColor` (`#rrggbb`), `maxNameLines` (1 to 20, default 3) and `onWarning`. An option outside these values, including a currency symbol the fonts cannot draw such as `₹`, throws `ReceiptInputError` with the code `invalid_option` and the option's name as the field.
 
 ## Design decisions
 
 ### Text
 
-**Every string is made WinAnsi before it is measured or drawn.** The standard PDF fonts encode text as WinAnsi (Windows code page 1252), and pdf-lib throws `WinAnsi cannot encode` on any other character. In the source app, one emoji in a customer name meant the order's PDF was never produced. [`src/winansi.ts`](src/winansi.ts) applies NFC first, because some phone keyboards send "é" as "e" plus a combining accent. It keeps the 217 characters the fonts can draw and maps exact stand-ins (the minus sign U+2212, non-breaking hyphens, thin and narrow spaces). It then tries NFKC ("ＡＢＣ" to "ABC", "ﬁ" to "fi") and the base letter without its marks ("ő" to "o", "ș" to "s") before dropping a character. A fast-check property feeds 500 random strings over all of Unicode, lone surrogates included, and checks that both fonts encode every result.
+**Every string is made WinAnsi before it is measured or drawn.** The standard PDF fonts encode text as WinAnsi (Windows code page 1252), and pdf-lib throws `WinAnsi cannot encode` on any other character. In the source app, one emoji in a customer name meant the order's PDF was never produced. [`src/winansi.ts`](src/winansi.ts) applies NFC first, because some phone keyboards send "é" as "e" plus a combining accent. It keeps the 217 characters the fonts can draw and maps exact stand-ins (the minus sign U+2212, non-breaking hyphens, thin and narrow spaces). It then tries NFKC ("ＡＢＣ" to "ABC", "ﬁ" to "fi") and the base letter without its marks ("ő" to "o", "ș" to "s") before dropping a character. The stand-ins apply to the NFKC result too, so "⅓" prints "1/3". A fast-check property feeds 500 random strings over all of Unicode, lone surrogates included, and checks that both fonts encode every result.
 
 **Removed text is reported, and a field never goes silently blank.** Dropped visible characters raise a `characters_dropped` warning with the field path (`items[3].name`) and the count. Zero-width joiners, bidi overrides and variation selectors are dropped without a warning, because nothing visible was lost. A field that had text and lost all of it, such as a name made only of emoji, prints "(texto no imprimible)" instead of an empty cell. A reader of the paper can then tell that the line had a name. Bidi controls are removed rather than applied: U+202E (right-to-left override) would make a viewer that honours it display the following letters backwards, and pdf-lib does no bidi reordering anyway.
 
@@ -76,7 +76,7 @@ const bytes = await buildReceiptPdf(
 
 ### The document
 
-**The logo travels as bytes.** A serverless function has no `public/` folder to read a file from, so the caller passes PNG or JPEG bytes, typically a base64 constant in the bundle. The format is detected from the file signature, not from a name or a type the caller could get wrong. A logo that is not an image, or a PNG that fails to decode, prints the shop name instead with a `logo_unreadable` warning, because a broken brand asset must not take an order's document down.
+**The logo travels as bytes.** A serverless function has no `public/` folder to read a file from, so the caller passes PNG or JPEG bytes, typically a base64 constant in the bundle. The format is detected from the file signature, not from a name or a type the caller could get wrong. A logo that is not an image, a PNG that fails to decode, or a JPEG whose header gives a width or height of 0 is not drawn. The shop name is printed instead with a `logo_unreadable` warning, because a broken brand asset must not take an order's document down.
 
 **Dates come from the data, not the clock.** `issuedOn` and `deliveryOn` are calendar dates (`YYYY-MM-DD`) formatted in UTC from their parts. The source formatted timestamps with the server's UTC day. An order confirmed at 22:00 local time was then dated the next day. pdf-lib also stamps the creation and modification dates with the clock. Here they are set from `issuedOn`, so a test builds the same order twice, a second apart, and gets the same bytes. A stored PDF can then be rebuilt and checked against its data.
 
@@ -94,15 +94,15 @@ const bytes = await buildReceiptPdf(
 
 | File | Covers |
 |---|---|
-| `test/winansi.test.ts` | Latin-1 and CP1252 kept; NFD composed; emoji with skin tones and ZWJ families counted; CJK, Arabic and Hebrew dropped; bidi overrides and zero-width characters removed silently; stand-ins, NFKC and mark stripping; line breaks; control characters, lone surrogates and the soft hyphen; a fast-check property over all of Unicode against both fonts; all 217 characters encode |
+| `test/winansi.test.ts` | Latin-1 and CP1252 kept; NFD composed; emoji with skin tones and ZWJ families counted; CJK, Arabic and Hebrew dropped; bidi overrides and zero-width characters removed silently; stand-ins, NFKC (fractions and superscript minus through the stand-ins) and mark stripping; line breaks; control characters, lone surrogates and the soft hyphen; a fast-check property over all of Unicode against both fonts; all 217 characters encode |
 | `test/text.test.ts` | The 0.1 em bound over every glyph; clipping with an ellipsis and none to spare; the number and length of measurements for a 10,000-character word and for 10,000 characters of prose; wrapping between words, breaking long words, clipping the last line; progress when nothing fits; `fitSize` exact at the zone width |
 | `test/money.test.ts` | Whole and cent amounts, the sign, the largest amount exact, another locale, Latin digits for `ar-EG` and `fa-IR`; BigInt line totals with half-up rounding; quantities; calendar dates with no zone shift |
-| `test/input.test.ts` | NaN, floats, strings, negatives and out-of-range values refused with the field path; quantity rules; impossible dates; bad options, a malformed locale tag included; `items` that is not an array; a running total that passes the maximum; a label override that is not a string; no field text in error messages; warnings per field; the unprintable placeholder; party lines beyond four |
-| `test/receipt.test.ts` | Every amount drawn, in order, with whole and cent values; credit balance below the totals; shipping 0 and absent extras; the adaptive size against the label edge and at the largest values; emoji, CJK, RTL, zero-width and combining text in every field; 10,000-character names in three lines; 500 lines in 20 pages; a fast-check property over every text field; PNG logo from `Uint8Array` and `ArrayBuffer`, bad bytes and a broken PNG; identical bytes a second apart; English labels, `en-US` and Letter size; every amount and date drawn with Latin digits under `ar-EG` and `fa-IR`; `buildReceipt` |
+| `test/input.test.ts` | NaN, floats, strings, negatives and out-of-range values refused with the field path; quantity rules; impossible dates; bad options, a malformed locale tag included; `items` that is not an array; a running total that passes the maximum; a label override that is not a string; no field text in error messages; warnings per field; the unprintable placeholder drawn for a name and for notes; party lines beyond four |
+| `test/receipt.test.ts` | Every amount drawn, in order, with whole and cent values; credit balance below the totals; shipping 0 and absent extras; the adaptive size against the label edge and at the largest values; emoji, CJK, RTL, zero-width and combining text in every field; 10,000-character names in three lines; 500 lines in 20 pages; a fast-check property over every text field; PNG logo from `Uint8Array` and `ArrayBuffer`, a JPEG logo, the smaller logo on each continuation page, bad bytes, a broken PNG and a JPEG header with no size; identical bytes a second apart; English labels, `en-US` and Letter size; every amount and date drawn with Latin digits under `ar-EG` and `fa-IR`; `buildReceipt` |
 | `test/pagination.test.ts` | The row count at which the totals move to page 2 alone, with no table head there; the row count at which a row moves under a repeated head; room reserved only for drawn extras; equal rows on full continuation pages; wrapped names as taller rows; notes over several pages in order; every text above the footer zone and inside the margins, the footer and page count on every page; the tallest allowed rows |
 | `test/browser.dom.test.ts` | A build under jsdom, wrapped in a `Blob` |
 
-89 tests, all offline. The assertions on what reached the paper intercept `PDFPage.prototype.drawText`, the way the source's regression script did ([`test/helpers/record.ts`](test/helpers/record.ts)). Each call records the text, position, size, font and measured width, and pages are numbered in the order they first receive text. The expected strings are written out in full.
+108 tests, all offline. The assertions on what reached the paper intercept `PDFPage.prototype.drawText`, the way the source's regression script did ([`test/helpers/record.ts`](test/helpers/record.ts)). Each call records the text, position, size, font and measured width, and pages are numbered in the order they first receive text. The expected strings are written out in full.
 
 The timings below are the median of five runs on Node 24 in this environment, after a warm-up. A 3-line order builds in about 5 ms (1,915 bytes). A 500-line order takes about 142 ms (20 pages, 70,481 bytes).
 
@@ -119,7 +119,7 @@ src/
   labels.ts     LABELS_ES and LABELS_EN
 examples/
   write-sample.ts
-test/           Vitest suites; helpers/ has the drawText recorder, a PNG encoder and fixtures
+test/           Vitest suites; helpers/ has the drawText recorder, a PNG encoder, JPEG bytes and fixtures
 ```
 
 ## Limits

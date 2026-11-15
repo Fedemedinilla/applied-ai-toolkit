@@ -26,12 +26,16 @@ function counting() {
 
 describe('the 0.1 em bound behind the search limits', () => {
   it('holds for every WinAnsi character in both faces', () => {
+    let checked = 0;
     for (let c = 0; c <= 0xffff; c++) {
       const ch = String.fromCharCode(c);
-      if (!isWinAnsi(ch) || ch === ' ' || ch === ' ') continue;
+      if (!isWinAnsi(ch)) continue;
+      checked++;
       expect(regular.widthOfTextAtSize(ch, 1), ch).toBeGreaterThanOrEqual(0.1);
       expect(bold.widthOfTextAtSize(ch, 1), ch).toBeGreaterThanOrEqual(0.1);
     }
+    // The space and the no-break space are included: they are the commonest characters in clipped text.
+    expect(checked).toBe(217);
   });
 });
 

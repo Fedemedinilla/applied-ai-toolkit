@@ -53,6 +53,15 @@ describe('toWinAnsiLine', () => {
     expect(line('Łódź')).toEqual({ text: 'ódz', dropped: 1 });
   });
 
+  it('maps the stand-ins inside an NFKC form, so fractions and superscript minus keep their meaning', () => {
+    expect(line('⅓ kg')).toEqual({ text: '1/3 kg', dropped: 0 });
+    expect(line('Queso ⅛ horma ⅔')).toEqual({ text: 'Queso 1/8 horma 2/3', dropped: 0 });
+    expect(line('x⁻¹ y₋')).toEqual({ text: 'x-¹ y-', dropped: 0 });
+    expect(line('5‴')).toEqual({ text: "5'''", dropped: 0 });
+    // A whole number before the fraction keeps a space, or "1⅓" would read as eleven thirds.
+    expect(line('1⅓ kg')).toEqual({ text: '1 1/3 kg', dropped: 0 });
+  });
+
   it('turns line breaks into a visible separator and collapses spaces', () => {
     expect(line('uno\r\ndos\nTRES\u2028cuatro').text).toBe('uno · dos · TRES · cuatro');
     expect(line('  a \t\t b  \n\n  c ').text).toBe('a b · c');

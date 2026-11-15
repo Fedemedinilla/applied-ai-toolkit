@@ -7,6 +7,7 @@ import { PDFDocument, PDFPage } from 'pdf-lib';
 import { buildReceipt, buildReceiptPdf, LABELS_EN, MAX_CENTS, type ReceiptData, type ReceiptOptions, type ReceiptWarning } from '../src/index.ts';
 import { columns, LAYOUT } from '../src/receipt.ts';
 import { items, order } from './helpers/fixtures.ts';
+import { jpegHeaderOnly, SOLID_JPEG_16X8 } from './helpers/jpeg.ts';
 import { solidPng } from './helpers/png.ts';
 import { amounts, pageCount, record, texts, type Drawn } from './helpers/record.ts';
 
@@ -232,6 +233,51 @@ describe('logo', () => {
       const drawn = await drawnOf(order(), { logo, onWarning: (w) => warnings.push(w) });
       expect(warnings).toEqual([{ code: 'logo_unreadable', reason }]);
       expect(drawn.filter((d) => d.text === 'Vivero Ejemplo').map((d) => d.size)).toContain(20);
+    }
+  });
+
+  /** The options of every drawImage call, with the page they were drawn on. */
+  async function images(data: ReceiptData, options: ReceiptOptions) {
+    const calls: { page: PDFPage; width: number; height: number }[] = [];
+    const real = PDFPage.prototype.drawImage;
+    PDFPage.prototype.drawImage = function (this: PDFPage, ...args: Parameters<PDFPage['drawImage']>) {
+      calls.push({ page: this, width: args[1]?.width ?? 0, height: args[1]?.height ?? 0 });
+      real.apply(this, args);
+    };
+    try {
+      return { calls, result: await buildReceipt(data, options) };
+    } finally {
+      PDFPage.prototype.drawImage = real;
+    }
+  }
+
+  it('embeds JPEG bytes, detected from the signature', async () => {
+    const { calls, result } = await images(order(), { logo: SOLID_JPEG_16X8 });
+    expect(result.warnings).toEqual([]);
+    expect(calls).toEqual([expect.objectContaining({ width: 16 * (44 / 8), height: 44 })]);
+    const doc = await PDFDocument.load(result.bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+
+  it('draws a smaller logo on every continuation page', async () => {
+    const { calls, result } = await images(order({ items: items(60) }), { logo: solidPng(120, 40, [31, 95, 91, 255]) });
+    expect(result.pageCount).toBeGreaterThan(1);
+    expect(result.warnings).toEqual([]);
+    expect(new Set(calls.map((c) => c.page)).size).toBe(result.pageCount);
+    expect(calls).toHaveLength(result.pageCount);
+    expect(calls[0]).toMatchObject({ width: 120 * (44 / 40), height: 44 });
+    for (const c of calls.slice(1)) {
+      expect(c.height).toBeLessThanOrEqual(18 + EPS);
+      expect(c.width).toBeLessThanOrEqual(LAYOUT.logoMaxWidth / 2 + EPS);
+      expect(c).toMatchObject({ width: 120 * (18 / 40), height: 18 });
+    }
+  });
+
+  it('falls back to the shop name for a JPEG whose header gives no size', async () => {
+    for (const logo of [jpegHeaderOnly(0, 0), jpegHeaderOnly(10, 0), jpegHeaderOnly(0, 10)]) {
+      const result = await buildReceipt(order({ items: items(60) }), { logo });
+      expect(result.warnings).toEqual([{ code: 'logo_unreadable', reason: 'embed_failed' }]);
+      expect(result.pageCount).toBeGreaterThan(1);
     }
   });
 });

@@ -104,6 +104,19 @@ function checkLocale(locale: unknown): string {
   throw new ReceiptInputError('invalid_option', 'locale', 'must be a BCP 47 language tag such as es-AR');
 }
 
+/** The symbol printed before every amount. One the fonts cannot draw would leave every amount a bare number. */
+function currencySymbol(value: unknown): string {
+  if (typeof value !== 'string') throw new ReceiptInputError('invalid_option', 'currencySymbol', 'must be a string');
+  const { text, dropped } = toWinAnsiLine(value);
+  if (dropped > 0) throw new ReceiptInputError('invalid_option', 'currencySymbol', 'has characters the PDF fonts cannot draw');
+  return text;
+}
+
+function pageDimensions(value: unknown): readonly [number, number] {
+  if (typeof value === 'string' && Object.hasOwn(PAGE_SIZES, value)) return PAGE_SIZES[value as keyof typeof PAGE_SIZES];
+  throw new ReceiptInputError('invalid_option', 'pageSize', 'must be A4 or Letter');
+}
+
 function logoFormat(bytes: Uint8Array): 'png' | 'jpg' | null {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpg';
@@ -117,13 +130,17 @@ async function embedLogo(doc: PDFDocument, logo: Uint8Array | ArrayBuffer, warn:
     warn({ code: 'logo_unreadable', reason: 'unknown_format' });
     return null;
   }
+  let image: PDFImage | null = null;
   try {
-    return format === 'png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    image = format === 'png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
   } catch {
     // A broken logo must not take the document down with it: the shop name is printed instead.
-    warn({ code: 'logo_unreadable', reason: 'embed_failed' });
-    return null;
   }
+  // pdf-lib takes a JPEG's size from its header unchecked; a 0 there would scale the logo to NaN.
+  const usable = (n: number): boolean => Number.isFinite(n) && n > 0;
+  if (image && usable(image.width) && usable(image.height)) return image;
+  warn({ code: 'logo_unreadable', reason: 'embed_failed' });
+  return null;
 }
 
 /**
@@ -142,7 +159,9 @@ export interface BuiltReceipt {
 }
 
 /** buildReceiptPdf with the page count and the warnings returned next to the bytes. */
-export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = {}): Promise<BuiltReceipt> {
+export async function buildReceipt(data: ReceiptData, maybeOptions: ReceiptOptions = {}): Promise<BuiltReceipt> {
+  // A JS caller can pass null; it means the same as no options.
+  const options: ReceiptOptions = maybeOptions ?? {};
   const warnings: ReceiptWarning[] = [];
   const warn = (w: ReceiptWarning): void => {
     warnings.push(w);
@@ -155,7 +174,8 @@ export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = 
   }
   const locale = checkLocale(options.locale ?? 'es-AR');
   const accent = parseColor(options.accentColor ?? '#1f5f5b');
-  const symbol = toWinAnsiLine(options.currencySymbol ?? '$').text;
+  const symbol = currencySymbol(options.currencySymbol ?? '$');
+  const pageSize = pageDimensions(options.pageSize ?? 'A4');
   const r = prepare(data, {
     labels: mergeLabels(options.labels),
     format: { locale, symbol },
@@ -176,7 +196,7 @@ export async function buildReceipt(data: ReceiptData, options: ReceiptOptions = 
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = options.logo ? await embedLogo(doc, options.logo, warn) : null;
 
-  draw(doc, r, { regular, bold, logo, accent, maxNameLines, pageSize: PAGE_SIZES[options.pageSize ?? 'A4'], warn });
+  draw(doc, r, { regular, bold, logo, accent, maxNameLines, pageSize, warn });
   const saved = await doc.save();
   // pdf-lib types the result over ArrayBufferLike; it is always a plain ArrayBuffer, and the
   // narrower type lets a browser caller pass it to new Blob() without a cast.
@@ -230,7 +250,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
 
   const tableHead = (): void => {
     page.drawRectangle({ x: M - 6, y: y - 7, width: contentWidth + 12, height: 22, color: BAND });
-    text(L.product, col.nameLeft, y, bold, 9);
+    text(clip(bold, L.product, 9, col.nameWidth).text, col.nameLeft, y, bold, 9);
     text(clip(bold, L.detail, 9, col.detailWidth).text, col.detailLeft, y, bold, 9);
     right(clip(bold, L.quantity, 9, col.quantityWidth).text, col.quantityRight, y, bold, 9);
     right(clip(bold, L.unitPrice, 9, col.unitPriceWidth).text, col.unitPriceRight, y, bold, 9);
@@ -277,9 +297,9 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
     left = top - 20;
     text(fitted(r.shop.name, bold, 20, half, 'shop.name'), M, left, bold, 20, accent);
   }
-  r.shop.lines.forEach((l, i) => {
+  r.shop.lines.forEach((l) => {
     left -= 13;
-    text(fitted(l, regular, 9, half, `shop.lines[${i}]`), M, left, regular, 9, MUTED);
+    text(fitted(l.text, regular, 9, half, l.field), M, left, regular, 9, MUTED);
   });
   let rightY = top - 18;
   right(L.title, W - M, rightY, bold, fitSize(bold, L.title, 18, half));
@@ -292,16 +312,16 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
   rule(y, 1);
   y -= 24;
 
-  text(L.customer, M, y, bold, 9, MUTED);
+  text(clip(bold, L.customer, 9, contentWidth).text, M, y, bold, 9, MUTED);
   y -= 17;
   text(fitted(r.customer.name, bold, 14, contentWidth, 'customer.name'), M, y, bold, 14);
-  r.customer.lines.forEach((l, i) => {
+  r.customer.lines.forEach((l) => {
     y -= 15;
-    text(fitted(l, regular, 10, contentWidth, `customer.lines[${i}]`), M, y, regular, 10, MUTED);
+    text(fitted(l.text, regular, 10, contentWidth, l.field), M, y, regular, 10, MUTED);
   });
   if (r.deliveryText !== null) {
     y -= 15;
-    text(`${L.delivery}: ${r.deliveryText}`, M, y, regular, 10, INK);
+    text(clip(regular, `${L.delivery}: ${r.deliveryText}`, 10, contentWidth).text, M, y, regular, 10, INK);
   }
   y -= 28;
 
@@ -380,7 +400,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
       const chunk = lines.slice(next, next + room);
       const boxHeight = 30 + lh * chunk.length;
       page.drawRectangle({ x: M - 6, y: y - boxHeight + 12, width: contentWidth + 12, height: boxHeight, color: BAND });
-      text(first ? L.notes : `${L.notes} (${L.continued})`, M, y, bold, 9);
+      text(clip(bold, first ? L.notes : `${L.notes} (${L.continued})`, 9, contentWidth).text, M, y, bold, 9);
       chunk.forEach((l, k) => text(l, M, y - 16 - lh * k, regular, 10));
       y -= boxHeight + 8;
       next += chunk.length;

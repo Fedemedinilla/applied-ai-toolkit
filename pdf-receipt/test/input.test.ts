@@ -31,7 +31,7 @@ describe('numbers that cannot be printed truthfully throw, with the field', () =
     expect(await failure(item({ quantity: 2, unitPriceCents: MAX_CENTS }))).toEqual({ code: 'amount_too_large', field: 'items[0]' });
   });
 
-  it.each([0, -1, 1.0001, Number.NaN, 1_000_001])('quantity %s', async (q) => {
+  it.each([0, -1, 1.0001, 1e-10, 0.0004, Number.NaN, 1_000_001])('quantity %s', async (q) => {
     expect(await failure(item({ quantity: q }))).toEqual({ code: 'invalid_quantity', field: 'items[0].quantity' });
   });
 
@@ -57,9 +57,39 @@ describe('numbers that cannot be printed truthfully throw, with the field', () =
     expect(await failure(order(), { locale: '' })).toEqual({ code: 'invalid_option', field: 'locale' });
   });
 
+  it.each(['₲', '₹', '💲'])('refuses a currency symbol the fonts cannot draw: %s', async (currencySymbol) => {
+    expect(await failure(order(), { currencySymbol })).toEqual({ code: 'invalid_option', field: 'currencySymbol' });
+  });
+
+  it('keeps a currency symbol the fonts can draw', async () => {
+    const { drawn } = await record(() => buildReceiptPdf(order(), { currencySymbol: '€' }));
+    expect(drawn.map((d) => d.text)).toContain('€27.000');
+  });
+
+  it('refuses options of the wrong type at runtime with the documented error', async () => {
+    expect(await failure(order(), { pageSize: 'A5' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { pageSize: 'a4' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { pageSize: 'toString' })).toEqual({ code: 'invalid_option', field: 'pageSize' });
+    expect(await failure(order(), { currencySymbol: 36 })).toEqual({ code: 'invalid_option', field: 'currencySymbol' });
+  });
+
+  it('treats null options as no options', async () => {
+    await expect(buildReceiptPdf(order(), null as unknown as undefined)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   it('refuses items that are not an array with the documented error', async () => {
     const data = { ...order(), items: undefined } as unknown as ReceiptData;
     expect(await failure(data)).toEqual({ code: 'invalid_option', field: 'items' });
+  });
+
+  it.each([
+    ['a missing shop', { shop: undefined }, 'shop'],
+    ['a null customer', { customer: null }, 'customer'],
+    ['party lines as one string', { customer: { name: 'C', lines: 'Pasaje Ficticio 45' } }, 'customer.lines'],
+    ['a null item', { items: [{ name: 'Maceta', quantity: 1, unitPriceCents: 1 }, null] }, 'items[1]'],
+  ])('refuses %s with the documented error', async (_name, patch, field) => {
+    const data = { ...order(), ...patch } as unknown as ReceiptData;
+    expect(await failure(data)).toEqual({ code: 'invalid_option', field });
   });
 
   it('stops at the first line that takes the items total past the maximum', async () => {
@@ -99,8 +129,30 @@ describe('text never throws; warnings say what changed', () => {
 
   it('prints a placeholder when a field loses all of its text', async () => {
     const warnings: ReceiptWarning[] = [];
-    await buildReceiptPdf(order({ customer: { name: '🌵🌵🌵' } }), { onWarning: (w) => warnings.push(w) });
+    const { drawn } = await record(() => buildReceiptPdf(order({ customer: { name: '🌵🌵🌵' } }), { onWarning: (w) => warnings.push(w) }));
     expect(warnings).toEqual([{ code: 'characters_dropped', field: 'customer.name', count: 3 }]);
+    const all = drawn.map((d) => d.text);
+    expect(all[all.indexOf('Cliente') + 1]).toBe('(texto no imprimible)');
+  });
+
+  it('prints a placeholder when the notes lose all of their text', async () => {
+    const warnings: ReceiptWarning[] = [];
+    const { drawn } = await record(() => buildReceiptPdf(order({ notes: '🌵' }), { onWarning: (w) => warnings.push(w) }));
+    expect(warnings).toEqual([{ code: 'characters_dropped', field: 'notes', count: 1 }]);
+    const all = drawn.map((d) => d.text);
+    expect(all[all.indexOf('Aclaraciones') + 1]).toBe('(texto no imprimible)');
+  });
+
+  it('names the input line that was clipped, after an empty line before it', async () => {
+    const warnings: ReceiptWarning[] = [];
+    const long = 'x'.repeat(400);
+    await buildReceiptPdf(order({ shop: { name: 'V', lines: ['', long] }, customer: { name: 'C', lines: ['', '🌵', long] } }), {
+      onWarning: (w) => warnings.push(w),
+    });
+    expect(warnings.filter((w) => w.code === 'text_clipped')).toEqual([
+      { code: 'text_clipped', field: 'shop.lines[1]' },
+      { code: 'text_clipped', field: 'customer.lines[2]' },
+    ]);
   });
 
   it('reports party lines beyond the fourth', async () => {
