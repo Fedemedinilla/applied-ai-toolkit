@@ -77,7 +77,7 @@ export interface Knobs {
 }
 
 export interface FakeSupabaseOptions {
-  /** Defaults to http://supabase.test. Only the fake ever sees it. */
+  /** An origin with no path. Defaults to http://supabase.test. Only the fake ever sees it. */
   readonly url?: string;
   /** Defaults to sb_publishable_fake. A request with any other apikey gets a 401. */
   readonly publishableKey?: string;
@@ -189,7 +189,12 @@ function field(body: unknown, name: string): unknown {
 
 export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Promise<FakeSupabase> {
   const url = (options.url ?? 'http://supabase.test').replace(/\/$/, '');
-  const origin = new URL(url).origin;
+  const parsedUrl = new URL(url);
+  // Routing matches /auth/v1/ and /rest/v1/ from the root, so a base path would make every call 404.
+  if (parsedUrl.pathname !== '/' || parsedUrl.search !== '' || parsedUrl.hash !== '') {
+    throw new Error(`createFakeSupabase: url must be an origin such as http://supabase.test, not ${url}`);
+  }
+  const origin = parsedUrl.origin;
   const publishableKey = options.publishableKey ?? 'sb_publishable_fake';
   const otpCode = options.otpCode ?? '123456';
   const seeded = options.users ?? [DEFAULT_USER];

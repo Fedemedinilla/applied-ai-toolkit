@@ -38,7 +38,7 @@ it('verifies the session locally with ES256', async () => {
 
 supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one option covers both. Code that builds its own client from the global fetch can use `vi.stubGlobal('fetch', fake.fetch)` instead.
 
-`createFakeSupabase(options)` takes an optional `url` (default `http://supabase.test`), `publishableKey`, seed `users` and `otpCode`. It returns:
+`createFakeSupabase(options)` takes an optional `url`, an origin with no path (default `http://supabase.test`; a path throws), `publishableKey`, seed `users` and `otpCode`. It returns:
 
 | Field | What it is |
 |---|---|

@@ -532,6 +532,11 @@ describe('PostgREST', () => {
 });
 
 describe('the fake itself', () => {
+  it('refuses a url with a path at creation, since it routes /auth/v1 and /rest/v1 from the root', async () => {
+    await expect(createFakeSupabase({ url: 'http://supabase.test/proj' })).rejects.toThrow(/must be an origin/);
+    expect((await createFakeSupabase({ url: 'http://supabase.test/' })).url).toBe('http://supabase.test');
+  });
+
   it('refuses any other origin, so a test cannot reach the network through it by mistake', async () => {
     await expect(fake.fetch('https://api.example.test/v1')).rejects.toThrow(/only answers http:\/\/supabase.test/);
     expect(fake.calls).toEqual([]);
