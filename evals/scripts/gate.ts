@@ -47,6 +47,13 @@ try {
 }
 
 const summary = flag('summary', '');
-if (summary) appendFileSync(summary, gateMarkdown(result) + '\n');
+if (summary) {
+  // Uncaught, a write error would exit 1, the code for "the candidate is worse".
+  try {
+    appendFileSync(summary, gateMarkdown(result) + '\n');
+  } catch (e) {
+    usageError(`gate: cannot write the summary to ${summary} (${String((e as Error).message).slice(0, 120)})`);
+  }
+}
 console.log(hasFlag('json') ? JSON.stringify(result, null, 1) : hasFlag('markdown') ? gateMarkdown(result) : gateText(result));
 process.exitCode = result.exitCode;

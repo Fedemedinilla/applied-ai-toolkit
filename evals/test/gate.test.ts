@@ -243,4 +243,12 @@ describe('the gate script', () => {
     const near = file('near.json', run('pr', 178, 200));
     expect(cli(big, near, '--margin', '0.02').status).toBe(3);
   });
+
+  it('exits 2, not 1, when the summary file cannot be written', () => {
+    const same = file('same.json', run('pr', 36, 40));
+    expect(cli(main, same).status).toBe(3);
+    const r = cli(main, same, '--summary', join(dir, 'no-such-dir', 'sum.md'));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/^gate: cannot write the summary to .*sum\.md/);
+  });
 });
