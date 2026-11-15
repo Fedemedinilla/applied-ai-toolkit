@@ -242,16 +242,16 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 ## What the tests cover
 
-151 tests in 9 files, all offline.
+170 tests in 9 files, all offline.
 
 | File | Covers |
 |---|---|
 | `test/csp.test.ts` | The parser: whitespace, empty and repeated directives, non-ASCII drops, comma-joined policies; the exact comparison: extra and missing sources, hashes only where allowed, unlisted directives, case; CSP3 fallback lists |
-| `test/html.test.ts` | Inline script and style extraction with CRLF normalization, empty scripts, data blocks, import maps, comments, quoted `>` in attributes, event handlers, meta policies and their position |
+| `test/html.test.ts` | Inline script and style extraction with CRLF normalization in content and attributes, empty scripts, data blocks, import maps, comments, `style-*` and `script-*` custom elements, quoted `>` in attributes, event handlers, `nomodule` scripts, meta policies and their position, including `<body>`, `<noscript>` and `<template>` |
 | `test/routes.test.ts` | vercel.json `source` patterns, Build Output routes, Netlify `_headers`, unsupported syntax, globs |
 | `test/fixtures.test.ts` | Every committed fixture through the full run, with the exact failures each one must produce |
-| `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies |
-| `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config |
+| `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies; a secret inside a base64 blob at each offset, import-like text in comments and literals, invalid script URLs, `nomodule` bundles, a budget glob that matches nothing, an empty `targets`, an empty delivered policy, `'unsafe-inline'` without hashes, a `<meta>` next to a header policy or in `<body>`, a dangling symlink |
+| `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config, files saved with a byte order mark, a build folder with no HTML page |
 | `test/sarif.test.ts` | The SARIF log against a zod schema of what code scanning requires; every failure of every failing fixture as one error result; a check that could not run as an error at the config file; skipped checks as notes; regions only where a line is known; paths relative to the current folder and to `--sarif-base`; fingerprints equal across two builds whose asset names carry different hashes; identical output on two runs; `--json` with `--sarif` as a usage error; the text and JSON reports unchanged |
 | `test/output-regression.test.ts` | The text and `--json` output of six fixtures, byte for byte against `test/golden/`, which the CLI of the commit before `--sarif` wrote; `meta` and `meta-misplaced` pin the SKIP lines. `sarif.test.ts` compares the CLI with the report functions it calls, so only these files catch an edit to `formatReport` or to the report shape |
 | `test/action.test.ts` | `action.yml` read as text: no `${{ }}` in a `run:` script, each input passed only through `env:`, setup-node pinned to the commit SHA of `ci.yml`, the zod version of `package.json`, every input and output in this README; its shell step run with bash as GitHub runs it: the default SARIF path, `fail: false`, exit code 2 failing whatever `fail` says, a `sarif-file` that is a folder or cannot be created, `dir` and `config` paths that start with `-`, shell syntax in an input left unrun |
