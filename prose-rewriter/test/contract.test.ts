@@ -1,5 +1,6 @@
 // The skeleton contract of phase F0: the shapes rewrite() will take and return.
 import { describe, expect, it } from 'vitest';
+import { lint } from '../../slop-lint/src/lint.ts';
 import { defaultMode, Edit, GENRES, RewriteInput, RewriteResult, STAGES } from '../src/index.ts';
 
 const input = {
@@ -48,7 +49,7 @@ describe('RewriteResult', () => {
       { id: 'c1', span: { start: 0, end: 14 }, before: 'Te escribo por', after: 'Sigo con', reason: 'arranque directo', stage: 'edit', status: 'applied' },
     ],
     facts: { kept: ['3/11'], dropped: [], added: [], fromCv: [], notInCv: [], placeholders: [] },
-    lint: { before: null, after: null },
+    lint: { before: lint('Te escribo por la propuesta del 3/11.', { lang: 'es' }), after: lint('Sigo con la propuesta del 3/11.', { lang: 'es' }) },
     flags: [],
     status: 'ok',
     usage: { calls: 2, costUsd: null },
@@ -58,6 +59,10 @@ describe('RewriteResult', () => {
     expect(RewriteResult.safeParse(result).success).toBe(true);
     const change = { ...result.changes[0], stage: 'polish' };
     expect(RewriteResult.safeParse({ ...result, changes: [change] }).success).toBe(false);
+  });
+
+  it("holds slop-lint's own result, and refuses something that is not one", () => {
+    expect(RewriteResult.safeParse({ ...result, lint: { before: null, after: null } }).success).toBe(false);
   });
 });
 

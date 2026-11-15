@@ -16,6 +16,8 @@ export {
   Register,
   RewriteInput,
   RewriteResult,
+  type JudgeClient,
+  type RewriteOptions,
   STAGES,
   Variety,
 } from './types.ts';

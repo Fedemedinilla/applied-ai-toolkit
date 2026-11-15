@@ -44,6 +44,9 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'safe-markdown': ['safe-markdown/src/index.ts'],
   // The example run that the report and the checklist app agree on; read by the checklist's tests.
   'site-check': ['site-check/examples/datos.json', 'site-check/examples/run.json'],
+  // The package entries of @fedemedinilla/slop-lint: '.' is src/lint.ts, './types' is src/types.ts.
+  'slop-lint': ['slop-lint/src/lint.ts', 'slop-lint/src/types.ts'],
+  'style-refs': ['style-refs/src/index.ts'],
 };
 
 /**
@@ -69,6 +72,9 @@ export const APP_USES: Readonly<Record<string, readonly string[]>> = {
  */
 export const LIBRARY_USES: Readonly<Record<string, readonly string[]>> = {
   'content-forge': ['gateway/src/index.ts'],
+  // The rewriter lints with slop-lint, calls the model through the gateway, judges facts with
+  // evals' judge and reads the genre list and writing references from style-refs.
+  'prose-rewriter': ['evals/src/index.ts', 'gateway/src/index.ts', 'slop-lint/src/lint.ts', 'slop-lint/src/types.ts', 'style-refs/src/index.ts'],
   // The diff-scoped audit (test/audit-scope/) maps files with the glob matcher and reads imports
   // with the same extractor the fences use, so its dependents match what the fences see.
   test: ['import-fences/src/index.ts'],

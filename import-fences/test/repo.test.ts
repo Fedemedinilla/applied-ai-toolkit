@@ -115,7 +115,10 @@ describe('folder fences', () => {
       'repo.config.ts:0 stale-allow',
       'repo.config.ts:0 stale-allow',
     ]);
-    expect(() => folderFences({ ...layout, uses: { caja: ['slop-lint/src/index.ts'] } })).toThrow(/which slop-lint does not publish in PUBLIC_SURFACE \(it publishes nothing\)/);
+    // csp-build-guard is a library that publishes nothing to apps (it is not in PUBLIC_SURFACE).
+    const withGuard = { ...layout, libraries: [...layout.libraries, 'csp-build-guard'] };
+    expect(() => folderFences({ ...withGuard, uses: { caja: ['csp-build-guard/src/index.ts'] } })).toThrow(/which csp-build-guard does not publish in PUBLIC_SURFACE \(it publishes nothing\)/);
+    expect(() => folderFences({ ...layout, uses: { caja: ['slop-lint/src/index.ts'] } })).toThrow(/which slop-lint does not publish in PUBLIC_SURFACE \(it publishes slop-lint\/src\/lint.ts, slop-lint\/src\/types.ts\)/);
     expect(() => folderFences({ ...layout, uses: { caja: ['gateway/src/gateway.ts'] } })).toThrow(/which gateway does not publish in PUBLIC_SURFACE \(it publishes gateway\/src\/index.ts\)/);
     expect(() => folderFences({ ...layout, uses: { caja: ['amount-parser/src/money.ts'] } })).toThrow(/which amount-parser does not publish/);
     expect(() => folderFences({ ...layout, uses: { caja: ['site/src/index.ts'] } })).toThrow(/which is not in a library folder/);
