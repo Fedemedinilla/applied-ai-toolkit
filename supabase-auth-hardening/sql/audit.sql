@@ -32,7 +32,7 @@ maintain as (
              else false end
 ),
 functions as (
-  select p.oid, p.oid::regprocedure::text as name, p.prosecdef, p.proconfig
+  select p.oid, p.oid::regprocedure::text as name, p.prokind, p.prorettype, p.prosecdef, p.proconfig
   from pg_catalog.pg_proc as p
   where p.pronamespace = 'public'::regnamespace
     -- Functions that belong to an installed extension follow the extension's own rules.
@@ -77,9 +77,12 @@ where pg_catalog.has_function_privilege('anon', f.oid, 'EXECUTE')
    or pg_catalog.has_function_privilege('authenticated', f.oid, 'EXECUTE')
 
 union all
+-- Only functions and procedures: Postgres refuses SET on an aggregate or a window function, so a
+-- row for one could never be cleared.
 select 'function without an empty search_path', f.name
 from functions as f
-where not coalesce(f.proconfig @> array['search_path=""'], false)
+where f.prokind in ('f', 'p')
+  and not coalesce(f.proconfig @> array['search_path=""'], false)
 
 union all
 select 'table without a comment', r.name

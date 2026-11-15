@@ -120,6 +120,22 @@ describe('sql/audit.sql', () => {
     }
   }, FRESH_DB_TIMEOUT);
 
+  it('does not ask an aggregate for a search_path, which Postgres cannot set on one', async () => {
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`
+        create aggregate public.total(int) (sfunc = int4pl, stype = int);
+        revoke execute on function public.total(int) from public, anon, authenticated, service_role;
+      `);
+      expect(await audit(scratch)).toEqual([]);
+      // Still checked for EXECUTE like any other function.
+      await scratch.exec('grant execute on function public.total(int) to authenticated');
+      expect(await audit(scratch)).toEqual([{ violation: 'anon or authenticated can execute', object: 'total(integer)' }]);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
   it.each(['anon', 'authenticated', 'service_role'] as const)('reports MAINTAIN left to %s on a table that is otherwise closed', async (role) => {
     // PostgreSQL 17 added MAINTAIN, and Supabase's default grant all includes it.
     const scratch = await openDb();
