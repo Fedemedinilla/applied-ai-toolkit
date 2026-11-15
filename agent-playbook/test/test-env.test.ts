@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
@@ -164,5 +164,15 @@ describe('crossingNames', () => {
   it('flags an app variable that shares a prefix with the agent session', () => {
     expect(crossingNames(['APP_ANTHROPIC_KEY', 'ANTHROPIC_API_KEY', 'PUBLIC_APP_URL'])).toEqual(['ANTHROPIC_API_KEY']);
     expect(crossingNames(['APP_ANTHROPIC_KEY', 'APP_DATABASE_URL'])).toEqual([]);
+  });
+});
+
+// The template's exclude replaces Vitest's default '**/node_modules/**'. With a root-only glob, a
+// subfolder with its own node_modules (a docs site, say) has its dependencies' tests collected.
+describe('templates/vitest-config.ts', () => {
+  it('excludes node_modules and dist at any depth, as the root config of this repository does', () => {
+    const template = readFileSync(new URL('../templates/vitest-config.ts', import.meta.url), 'utf8');
+    const exclude = /exclude:\s*\[([^\]]*)\]/.exec(template)?.[1]?.split(',').map((g) => g.trim().replace(/^'|'$/g, ''));
+    expect(exclude).toEqual(['**/node_modules/**', '**/dist/**']);
   });
 });
