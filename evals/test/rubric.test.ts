@@ -106,9 +106,26 @@ describe('judgedRuns', () => {
     const key: BlindKey = { a: entry('V0', 1) };
     expect(() => judgedRuns(groundedness, [piece('a')], key, [{ ...verdict('a', false, 4), quality: 9 }])).toThrow(/verdict 1 has the wrong shape/);
     expect(() => judgedRuns(groundedness, [piece('a')], key, [{ ...verdict('a', false, 4), judge: 0 }])).toThrow(/judge must be a positive integer/);
+    expect(() => judgedRuns(groundedness, [piece('a')], key, [{ ...verdict('a', false, 4), id: '' }])).toThrow(/verdict 1 has the wrong shape: id must be a non-empty string/);
+    const { id: _id, ...noId } = verdict('a', false, 4);
+    expect(() => judgedRuns(groundedness, [piece('a')], key, [noId])).toThrow(/verdict 1 has the wrong shape: id must be a non-empty string/);
     const twoLines = { ...verdict('a', false, 4), lines: [1, 2].map((line) => ({ line, support: 'no-claim', note: '' })) };
     expect(() => judgedRuns(groundedness, [piece('a')], key, [twoLines])).toThrow(/expected 1..1/);
     expect(() => judgedRuns(groundedness, [piece('a')], key, [])).toThrow(/1 piece\(s\) have no verdict/);
+  });
+});
+
+describe('the finite-metric guard', () => {
+  const piece: BlindPiece = { id: 'a', case: 'c', lang: 'en', now: '2026-03-04T12:00:00.000Z', brief: 'b', text: 't' };
+  const key: BlindKey = { a: { variant: 'V0', lang: 'en', case: 'c', sample: 1, stop: 'end_turn' } };
+  const stored = { id: 'a', judge: 1, lines: [{ line: 1, support: 'no-claim', note: '' }], voice: 'on', robotic: false, quality: 4, note: '' };
+
+  it('refuses a judge rubric whose reduce returns NaN or Infinity', () => {
+    for (const bad of [NaN, Infinity]) {
+      const broken = { ...groundedness, reduce: () => ({ pass: true, metrics: { x: bad } }) };
+      expect(() => judgedRuns(broken, [piece], key, [stored])).toThrow(RubricError);
+      expect(() => judgedRuns(broken, [piece], key, [stored])).toThrow(`piece a judge 1: metric "x" is ${bad}; a metric must be a finite number`);
+    }
   });
 });
 

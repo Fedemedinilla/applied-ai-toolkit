@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { classification, classificationReport } from '../src/classification.ts';
 import { gate } from '../src/gate.ts';
+import { RubricError, type CodeRubric } from '../src/rubric.ts';
 import { parseRun, RUN_FORMAT, scoreItems, summarize } from '../src/run.ts';
 
 const LABELS = ['price', 'hours', 'repair', 'other'];
@@ -172,5 +174,48 @@ describe('scoreItems', () => {
     expect(() => parseRun({ ...run, results: [{ ...run.results[0], pass: null }] })).toThrow(/pass must be set exactly when status is "scored"/);
     const first = run.results[0]!;
     expect(() => parseRun({ ...run, results: [first, { ...first, pass: !first.pass }] }, 'dup.json')).toThrow(/dup.json is not a stored run \(evals-run\/1\): results\.1: case .* sample 1 appears twice/);
+  });
+});
+
+describe('scoreItems runs the rubric\'s own checks', () => {
+  // A code rubric over records: the verdict lists the fields it compared.
+  type V = { fields: string[] };
+  const base: CodeRubric<V, Record<string, string>> = {
+    kind: 'code',
+    name: 'fields',
+    version: '1',
+    verdict: z.strictObject({ fields: z.array(z.string()) }),
+    expected: z.record(z.string(), z.string()),
+    // Skips the field "b", which complete() has to catch.
+    score: (_output, expected) => ({ fields: Object.keys(expected).filter((k) => k !== 'b') }),
+    complete(v, expected) {
+      const missing = Object.keys(expected).filter((k) => !v.fields.includes(k));
+      if (missing.length) throw new RubricError(`verdict skipped field(s) ${missing.join(', ')}`);
+    },
+    reduce: () => ({ pass: true, metrics: {} }),
+  };
+
+  it('calls complete on every scored item', () => {
+    expect(scoreItems(base, 'x', [{ case: 'a', output: '{}', expected: { a: '1' } }]).results).toHaveLength(1);
+    expect(() => scoreItems(base, 'x', [{ case: 'a', output: '{}', expected: { a: '1', b: '2' } }])).toThrow('verdict skipped field(s) b');
+  });
+
+  it('refuses a metric that is NaN or Infinity', () => {
+    for (const bad of [NaN, Infinity]) {
+      const broken = { ...base, reduce: () => ({ pass: true, metrics: { x: bad } }) };
+      expect(() => scoreItems(broken, 'x', [{ case: 'a', output: '{}', expected: { a: '1' } }])).toThrow(RubricError);
+      expect(() => scoreItems(broken, 'x', [{ case: 'a', output: '{}', expected: { a: '1' } }])).toThrow(`item 1 (case a): metric "x" is ${bad}; a metric must be a finite number`);
+    }
+  });
+});
+
+describe('the confusion matrix with multi outputs', () => {
+  it('puts a known label mixed with an out-of-set token in the out-of-set column', () => {
+    const multi = classification({ labels: LABELS, multi: true });
+    const report = classificationReport([multi.score('price, maybe', ['price'])], LABELS);
+    const { columns, labels, matrix } = report.confusion!;
+    const row = matrix[labels.indexOf('price')]!;
+    expect(row[columns.indexOf('(out of set)')]).toBe(1);
+    expect(row[columns.indexOf('price')]).toBe(0);
   });
 });
