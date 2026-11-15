@@ -33,7 +33,7 @@ The build (Vite 8.3.4) writes 449.32 kB of JavaScript, 186.94 kB gzipped, and 4.
 
 ## Design decisions
 
-**A download never carries an order the form no longer shows.** Each edit removes the `href` of Descargar and Abrir until the rebuild lands. An anchor with no `href` is not focusable and cannot be clicked. The anchors carry `role="link"` so that their `aria-disabled` is honoured, and a visually hidden "(se está actualizando)" joins their accessible name while they wait. Each build has a sequence number, and a result for an older build is dropped, so a slow build cannot replace a newer one. The previous blob URL is revoked when the new one is in place.
+**A download never carries an order the form no longer shows.** Each edit removes the `href` of Descargar and Abrir until the rebuild lands. An anchor with no `href` is not focusable and cannot be clicked. The anchors carry `role="link"` so that their `aria-disabled` is honoured, and a visually hidden "(se está actualizando)" joins their accessible name while they wait. The preview frame is blanked at the same time and the previous blob URL is revoked, because a desktop PDF viewer in the frame has its own save button. Each build has a sequence number, and a result for an older build is dropped, so a slow build cannot replace a newer one.
 
 **A normal link, not a script download.** Descargar is an `<a href="blob:..." download="remito-R-0042.pdf">`. It works with a middle click, a long press or "Save link as", and screen readers announce it as a link. The file name keeps only letters, digits and dashes from the document number after removing accents, so "R 0099 ★ Ñandú" becomes `remito-R-0099-Nandu.pdf`.
 

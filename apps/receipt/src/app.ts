@@ -257,6 +257,10 @@ export function mountApp(doc: Document, deps: AppDeps): App {
       a.setAttribute('aria-disabled', 'true');
     }
     for (const p of pending) p.hidden = false;
+    // The frame's PDF viewer has its own save button, so it must not keep the old order either.
+    preview.removeAttribute('src');
+    if (currentUrl) deps.revokeUrl(currentUrl);
+    currentUrl = null;
   };
 
   /** A notice's target, or the logo choice in use when the file input is hidden. */

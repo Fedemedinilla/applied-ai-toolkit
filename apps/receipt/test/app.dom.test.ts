@@ -260,6 +260,17 @@ describe('the receipt page', () => {
     expect($('#download').getAttribute('download')).toBe('remito-R-0120.pdf');
   });
 
+  it('blanks the preview frame while an edit is pending and while the form has an error', async () => {
+    type('#customer-name', 'Otro Jardín');
+    expect($('#preview').hasAttribute('src')).toBe(false);
+    await h.app.settled();
+    expect($('#preview').getAttribute('src')).toBe('blob:test/2');
+    type('#item-1-price', '6800.50');
+    await h.app.settled();
+    expect($('#preview').hasAttribute('src')).toBe(false);
+    expect(h.revoked).toEqual(['blob:test/1', 'blob:test/2']);
+  });
+
   it('cancels a scheduled rebuild when destroyed', async () => {
     type('#customer-name', 'Otro Jardín');
     h.app.destroy();
