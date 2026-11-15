@@ -135,5 +135,11 @@ describe('pass rate', () => {
       expect(loaded.reports).toHaveLength(1);
       expect(loaded.invalid).toEqual(['b.json', 'c.json']);
     });
+
+    it('reads a report saved with a byte order mark', async () => {
+      await mkdir(reportsDir(dir), { recursive: true });
+      await writeFile(`${reportsDir(dir)}/a.json`, `\uFEFF${JSON.stringify(report(PROMPT_VERSIONS.card, 2, 1))}`);
+      expect(await loadReports(dir)).toMatchObject({ reports: [{ requested: 2 }], invalid: [] });
+    });
   });
 });

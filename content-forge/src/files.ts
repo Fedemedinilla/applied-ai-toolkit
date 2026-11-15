@@ -28,6 +28,12 @@ export const relativeSource = (entity: EntityName, file: string): string => `${E
 export const idOf = (value: unknown): string | null =>
   typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' ? value.id : null;
 
+/**
+ * JSON.parse after one leading byte order mark is dropped. Some Windows editors save JSON with
+ * U+FEFF first, and JSON.parse rejects it.
+ */
+export const parseJson = (text: string): unknown => JSON.parse(text.startsWith('\uFEFF') ? text.slice(1) : text);
+
 function isErrno(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
 }
@@ -61,7 +67,7 @@ async function loadTree(root: string, prefix: string, only?: EntityName): Promis
       }
       let value: unknown;
       try {
-        value = JSON.parse(await readFile(join(folder, file), 'utf8'));
+        value = parseJson(await readFile(join(folder, file), 'utf8'));
       } catch {
         problems.push({ where, path: '', message: 'not valid JSON' });
         continue;
@@ -132,7 +138,7 @@ export async function occupant(path: string): Promise<Occupant> {
     return 'unreadable';
   }
   try {
-    const value: unknown = JSON.parse(text);
+    const value: unknown = parseJson(text);
     if (typeof value !== 'object' || value === null) return 'unreadable';
     return 'handwritten' in value && value.handwritten === true ? 'handwritten' : 'generated';
   } catch {

@@ -11,7 +11,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { reportsDir } from './files.ts';
+import { parseJson, reportsDir } from './files.ts';
 import { ENTITY_NAMES } from './schemas.ts';
 
 export const STAGES = ['schema', 'rules', 'references'] as const;
@@ -149,7 +149,7 @@ export async function loadReports(dir: string): Promise<LoadedReports> {
   for (const file of files) {
     let json: unknown;
     try {
-      json = JSON.parse(await readFile(join(folder, file), 'utf8'));
+      json = parseJson(await readFile(join(folder, file), 'utf8'));
     } catch {
       invalid.push(file);
       continue;

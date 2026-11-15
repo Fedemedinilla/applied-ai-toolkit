@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkCatalog, formatProblem } from '../src/catalog.ts';
 import { ForgeError } from '../src/errors.ts';
-import { candidatePath, entityPath, loadCatalog, writeJsonNew } from '../src/files.ts';
+import { candidatePath, entityPath, loadCatalog, occupant, writeJsonNew } from '../src/files.ts';
 import { promote } from '../src/promote.ts';
 import { copyCatalog, readJson, writeJson } from './helpers/catalog-dir.ts';
 
@@ -159,5 +159,20 @@ describe('writeJsonNew', () => {
     expect(checkCatalog(loaded.raw).ok).toBe(true);
     await writeJsonNew(entityPath(dir, 'card', 'moss-crawler'), card('moss-crawler'));
     expect(await readJson(entityPath(dir, 'card', 'moss-crawler'))).toMatchObject({ id: 'moss-crawler' });
+  });
+});
+
+describe('files saved with a byte order mark', () => {
+  // Some Windows editors start a JSON file with U+FEFF, which JSON.parse rejects.
+  it('reads a hand-written catalogue file and a generated target that start with one', async () => {
+    const path = entityPath(dir, 'card', 'flare');
+    await writeFile(path, `\uFEFF${await fileText(path)}`);
+    const loaded = await loadCatalog(dir);
+    expect(loaded.problems).toEqual([]);
+    expect(checkCatalog(loaded.raw).ok).toBe(true);
+
+    const target = entityPath(dir, 'card', 'quick-study');
+    await writeFile(target, `\uFEFF${await fileText(target)}`);
+    expect(await occupant(target)).toBe('generated');
   });
 });
