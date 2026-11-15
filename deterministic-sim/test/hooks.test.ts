@@ -50,6 +50,26 @@ describe('guard-protected-paths', () => {
     }
   });
 
+  it('lets an agent create and work on a new ruleset file, and keeps the committed ones protected', () => {
+    for (const tool of ['Write', 'Edit']) {
+      expect(decide(edit('src/tournament/rules-v2.ts', tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit(join(ROOT, 'src/tournament/rules-v2.ts'), tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit('src/tournament/rules-v1.ts', tool), ROOT, config, {}).block).toBe(true);
+    }
+    expect(bashTargets('echo x > src/tournament/rules-v2.ts', ROOT, config)).toEqual([]);
+    expect(bashTargets('echo x > src/tournament/rules-v1.ts', ROOT, config)).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bashTargets('rm -rf src', ROOT, config)).toEqual(['src']);
+  });
+
+  it('protects every ruleset file when it cannot tell which ones are committed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
+    try {
+      expect(decide(edit('src/tournament/rules-v2.ts', 'Write'), dir, config, {}).block).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('blocks a JSON file marked "handwritten": true', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
     try {
