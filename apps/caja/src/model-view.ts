@@ -243,10 +243,19 @@ export function collectAnswers(card: ParentNode, answers: ModelAnswers): ModelAn
   if (amount !== undefined) next.amount = amount;
   const typed = card.querySelector<HTMLInputElement>('#m-typed');
   if (typed) next.typed = typed.value;
+  // A field on the card that is now empty clears its answer, so a day or category the owner
+  // removed after a re-render is never saved. A category from the other side's list is kept: the
+  // select could not show it, and it comes back if the owner flips the kind again.
   const category = card.querySelector<HTMLSelectElement>('#m-category');
-  if (category && category.value !== '') next.category = category.value;
+  if (category) {
+    if (category.value !== '') next.category = category.value;
+    else if ([...category.options].some((o) => o.value === next.category)) delete next.category;
+  }
   const date = card.querySelector<HTMLInputElement>('#m-date');
-  if (date && date.value !== '') next.date = date.value;
+  if (date) {
+    if (date.value !== '') next.date = date.value;
+    else delete next.date;
+  }
   return next;
 }
 

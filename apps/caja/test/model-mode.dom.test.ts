@@ -300,6 +300,27 @@ describe('reading with the model', () => {
     expect(document.querySelector('#days .day[aria-label="Hoy"] .row')).toBeNull();
   });
 
+  it('a date or category the owner clears after a re-render is not saved', async () => {
+    const store = await mountWithModel(endpoint(answering({ kind: 'unclear', category: null, dateStated: true, date: null })));
+    type('el otro día pagué la luz 45 lucas');
+    await waitFor(card);
+    pick('input[name="m-kind"][value="expense"]');
+    $<HTMLInputElement>('#m-date').value = '2026-11-02';
+    $<HTMLSelectElement>('#m-category').value = 'Servicios';
+    // Changing the kind draws the card again, which collects both answers.
+    pick('input[name="m-kind"][value="income"]');
+    pick('input[name="m-kind"][value="expense"]');
+    expect($<HTMLInputElement>('#m-date').value).toBe('2026-11-02');
+    $<HTMLInputElement>('#m-date').value = '';
+    save();
+    expect(text('#preview-error')).toBe('Elegí un día entre hoy y hace 31 días.');
+    $<HTMLInputElement>('#m-date').value = '2026-11-02';
+    $<HTMLSelectElement>('#m-category').value = '';
+    save();
+    expect(text('#preview-error')).toBe('Elegí una categoría.');
+    expect(store.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it('a day the model did read but the window rules out is named in the question', async () => {
     await mountWithModel(endpoint(answering({ dateStated: true, date: '2026-11-10' })));
     type('el martes pagué la luz 45 lucas');
