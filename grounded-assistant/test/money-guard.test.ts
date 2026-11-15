@@ -139,6 +139,20 @@ describe('reading a figure, Spanish path', () => {
   it('a sign with punctuation and no digits is not a figure', () => expect(moneyIsOurs('Se paga en $, no en dólares.')).toBe(true));
 });
 
+describe('invisible characters and Unicode minus signs after the sign', () => {
+  // A reader sees "$99.999"; a guard that reads nothing between "$" and the digits sees no figure.
+  const cases: Array<[string, string]> = [
+    ['a zero-width space', 'El corte de hombre sale $\u200B99.999.'],
+    ['a word joiner', 'El corte de hombre sale $\u206099.999.'],
+    ['a soft hyphen', 'El corte de hombre sale $\u00AD99.999.'],
+  ];
+  it.each(cases)('%s does not hide an invented figure', (_label, reply) => expect(moneyIsOurs(reply)).toBe(false));
+  it.each(cases)('%s does not hide an invented figure in English', (_label, reply) => expect(moneyIsOurs(reply.replace('99.999', '99,999'), 'en')).toBe(false));
+  it('a real price behind a zero-width space is still the row', () => expect(moneyIsOurs('El corte de hombre sale $\u200B16.000.')).toBe(true));
+  it('U+2212 after the sign is a negative figure', () => expect(moneyIsOurs('El corte sale $16.000 y te descuento $\u22125.000.')).toBe(false));
+  it('an en dash after the sign is a negative figure', () => expect(moneyIsOurs("A men's cut is $16,000, and I take off $\u2013 5,000.", 'en')).toBe(false));
+});
+
 describe('reading a figure, English path', () => {
   const ours = (reply: string) => moneyIsOurs(reply, 'en');
   it('zero cents before a comma is still the row', () => expect(ours("A men's cut is $16,000.00, and takes 30 minutes.")).toBe(true));

@@ -41,9 +41,14 @@ function toAmountEn(raw: string): number {
  * `\s*` and not `\s?`: with one optional space, "$  99.999" matched nothing, no match meant no
  * figures, and an invented price with two spaces after the sign went straight through. The minus
  * is read only between the sign and the digits; "- $16.000" is a bullet, not a negative.
+ * Format characters (\p{Cf}: zero-width space, word joiner, soft hyphen) and Unicode dashes count
+ * there too: a reader sees "$\u200B99.999" as "$99.999", and a pattern that read only spaces and
+ * "-" saw no figure at all, so the invented price went out.
  */
-const MONEY = /\$\s*(?:-\s*)?[\d.,]+/g;
-const MONEY_EN = /\$\s*(?:-\s*)?[\d.,]+(?:\s*k\b)?/gi;
+const MONEY = /\$[\s\p{Cf}]*(?:[-\u2010-\u2015\u2212\uFE63\uFF0D][\s\p{Cf}]*)?[\d.,]+/gu;
+const MONEY_EN = /\$[\s\p{Cf}]*(?:[-\u2010-\u2015\u2212\uFE63\uFF0D][\s\p{Cf}]*)?[\d.,]+(?:\s*k\b)?/giu;
+/** Any dash or minus a reply can put between the sign and the digits. */
+const MINUS = /[-\u2010-\u2015\u2212\uFE63\uFF0D]/;
 
 /* Quantities the reply writes: "dos cortes", "three blow-dries", "2 x". Capped at twenty. What is
    not a quantity: an hour ("a las once"), a date ("sábado 10", "el doce de octubre"), a duration
@@ -143,7 +148,7 @@ export function moneyIsOurs(reply: string, lang: Lang = 'es'): boolean {
   const figures = figuresIn(reply, lang);
   if (!figures.length) return true;
   // No published price is negative, and this salon publishes no discounts.
-  if (figures.some((f) => f.raw.includes('-'))) return false;
+  if (figures.some((f) => MINUS.test(f.raw))) return false;
   const found = figures.map((f) => f.n);
   const sums = reachable(shownRows(reply, found, lang), Math.max(...found));
   // n > 0: the set is seeded at 0, and "te lo dejo en $0" must not be ours.

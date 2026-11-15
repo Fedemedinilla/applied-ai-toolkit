@@ -89,6 +89,12 @@ describe('a turn', () => {
     expect(body).toMatchObject({ booking: null, bookingWithdrawn: true, reply: expect.stringContaining('Prefiero no tirarte un número') });
   });
 
+  it('a zero-width space after the sign does not let an invented figure out', async () => {
+    const s = setup([say('El corte de hombre sale $\u200B99.999.'), say("The men's cut is $\u200B99,999.")]);
+    expect((await turn(s.handler, [{ role: 'user', content: 'cuánto sale' }])).body.reply).toContain('Prefiero no tirarte un número');
+    expect((await turn(s.handler, [{ role: 'user', content: 'how much' }], 'en')).body.reply).toContain("I'd rather not give you a figure");
+  });
+
   it('a wrong price on the card’s own service: the card is kept and said in words', async () => {
     const s = setup([say('Balayage: $65.000. Te lo paso.', { service: 'Balayage', stylist: null, date: '2026-11-07', time: '10:00' })]);
     const { body } = await turn(s.handler, [{ role: 'user', content: 'balayage' }]);
