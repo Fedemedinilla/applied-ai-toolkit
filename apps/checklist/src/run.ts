@@ -124,7 +124,8 @@ export type Refusal =
   | 'not_failed'
   | 'fixed_items_exist'
   | 'post_change_pending'
-  | 'baseline_exists';
+  | 'baseline_exists'
+  | 'fixed_before_baseline';
 
 export const REFUSALS: Readonly<Record<Refusal, string>> = {
   run_closed: 'This run is closed. Reopen it to change anything.',
@@ -135,6 +136,7 @@ export const REFUSALS: Readonly<Record<Refusal, string>> = {
   fixed_items_exist: 'Some checks are marked Fixed. The pre-change list stays acknowledged while they are.',
   post_change_pending: 'Closing needs every row of the post-change matrix acknowledged (Change control tab).',
   baseline_exists: '"Before" is already recorded for this run.',
+  fixed_before_baseline: '"Before" is the state before any change, so it cannot be recorded while a check is marked Fixed. Set those checks back to Fails first.',
 };
 
 export type Result = { readonly ok: true; readonly run: Run } | { readonly ok: false; readonly reason: Refusal };
@@ -225,6 +227,8 @@ export function ackPostChange(catalogue: Catalogue, run: Run, rowId: string, on:
 export function recordBaseline(run: Run, now: Date): Result {
   if (run.closedAt) return refuse('run_closed');
   if (run.baseline) return refuse('baseline_exists');
+  // A Fixed check frozen as "before" would show as good in both columns and hide the change.
+  if (Object.values(run.marks).some((m) => m.state === 'fixed')) return refuse('fixed_before_baseline');
   const states: Record<string, State> = {};
   const evidence: Record<string, string> = {};
   for (const [id, mark] of Object.entries(run.marks)) {

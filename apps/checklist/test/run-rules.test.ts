@@ -141,6 +141,15 @@ describe('the "before" snapshot', () => {
     expect(run.baseline).toEqual({ at: at(3).toISOString(), states: { 'EXT-02': 'fail' }, evidence: { 'EXT-02': '' } });
     expect(recordBaseline(run, at(4))).toEqual({ ok: false, reason: 'baseline_exists' });
   });
+
+  it('is refused while a check is marked Fixed, so a fix made before it cannot hide in both columns', () => {
+    let run = ok(setState(catalogue, runWith(catalogue, 'wordpress', [], true), 'SEG-06', 'fail', at(1)));
+    run = ackAllPre(run);
+    run = ok(setState(catalogue, run, 'SEG-06', 'fixed', at(30)));
+    expect(recordBaseline(run, at(31))).toEqual({ ok: false, reason: 'fixed_before_baseline' });
+    run = ok(setState(catalogue, run, 'SEG-06', 'fail', at(32)));
+    expect(ok(recordBaseline(run, at(33))).baseline?.states['SEG-06']).toBe('fail');
+  });
 });
 
 describe('the run JSON', () => {

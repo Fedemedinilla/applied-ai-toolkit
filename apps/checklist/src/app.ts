@@ -421,7 +421,14 @@ export async function startApp(options: AppOptions): Promise<App> {
     }
     apply(result, { focus: t.id });
   });
-  $('record-baseline').addEventListener('click', () => apply(recordBaseline(run, now()), { message: '"Before" recorded.' }));
+  $('record-baseline').addEventListener('click', () => {
+    const result = recordBaseline(run, now());
+    if (!result.ok && result.reason === 'fixed_before_baseline') {
+      say(`${REFUSALS[result.reason]} ${fixedBlockingText(catalogue, run)}`);
+      return;
+    }
+    apply(result, { message: '"Before" recorded.' });
+  });
   $('close-run').addEventListener('click', () => {
     const result = closeRun(catalogue, run, now());
     if (!result.ok) {
