@@ -85,6 +85,26 @@ describe('runEval', () => {
     expect(client.requests).toHaveLength(jobs.length);
   });
 
+  it('stops the run when onRow throws, without counting the job as a failed call', async () => {
+    const client = recordingClient(() => reply('ok'));
+    const failures: unknown[] = [];
+    const jobs = planJobs(PROBES.slice(0, 3), ['V0'], ['en'], 1);
+    const run = runEval({
+      client,
+      target,
+      variants: VARIANTS,
+      jobs,
+      concurrency: 1,
+      onRow: () => {
+        throw new Error('disk full');
+      },
+      onFailure: (f) => failures.push(f),
+    });
+    await expect(run).rejects.toThrow('disk full');
+    expect(failures).toEqual([]);
+    expect(client.requests).toHaveLength(1);
+  });
+
   it('refuses a concurrency that is not a number instead of running nothing', async () => {
     const client = recordingClient(() => reply('ok'));
     const jobs = planJobs(PROBES.slice(0, 2), ['V0'], ['en'], 1);

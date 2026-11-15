@@ -160,6 +160,7 @@ export type RunOptions<C extends { id: string }, L extends string> = {
    * Thursday" and the judge checks all of them against the same TODAY line.
    */
   now?: Date;
+  /** Called once per row. If it throws, no new job starts and runEval rejects with that error. */
   onRow?: (row: EvalRow<L>) => void;
   onFailure?: (failure: EvalFailure) => void;
 };
@@ -178,8 +179,11 @@ export async function runEval<C extends { id: string }, L extends string>(
   const rows: EvalRow<L>[] = [];
   const failures: EvalFailure[] = [];
   let next = 0;
+  // An error from onRow is not a failed call: the model answered and the row
+  // was paid for. It stops the run and is thrown once the calls in flight end.
+  let stopped: { error: unknown } | undefined;
 
-  async function runOne(j: Job<C, L>) {
+  async function runOne(j: Job<C, L>): Promise<EvalRow<L>> {
     const brief = target.brief(j.c, j.lang);
     const t0 = performance.now();
     const reply = await client.create({
@@ -200,16 +204,16 @@ export async function runEval<C extends { id: string }, L extends string>(
       ms: Math.round(performance.now() - t0),
       usage: reply.usage,
     };
-    rows.push(row);
-    opts.onRow?.(row);
+    return row;
   }
 
   await Promise.all(
     Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
-      while (next < jobs.length) {
+      while (next < jobs.length && !stopped) {
         const j = jobs[next++]!;
+        let row: EvalRow<L>;
         try {
-          await runOne(j);
+          row = await runOne(j);
         } catch (e) {
           const status = (e as { status?: unknown })?.status;
           const failure: EvalFailure = {
@@ -221,9 +225,17 @@ export async function runEval<C extends { id: string }, L extends string>(
           };
           failures.push(failure);
           opts.onFailure?.(failure);
+          continue;
+        }
+        rows.push(row);
+        try {
+          opts.onRow?.(row);
+        } catch (e) {
+          stopped ??= { error: e };
         }
       }
     }),
   );
+  if (stopped) throw stopped.error;
   return { rows, failures };
 }
