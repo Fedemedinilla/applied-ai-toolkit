@@ -6,7 +6,8 @@
 //
 // The work runs as named steps, in this order. The first step that recognises its shape returns:
 //
-//   1. readSentence        normalize, spell commas out, split, fold numbers ("dos lucas" -> 2000)
+//   1. readSentence        normalize, spell commas out, split, fold numbers ("dos lucas" -> 2000,
+//                          "un millon 200 mil" -> 1200000)
 //   2. excludedPhrases     idioms with no amount ("dos mangos"), foreign currency
 //   3. applyCorrections    "gaste veinte, no, treinta mil" keeps what follows the correction
 //   4. sentenceAmbiguity   ranges, tax added on, net or gross, mixed directions, discounts by %,
@@ -31,6 +32,7 @@
 import {
   buildOffsetMap,
   foldLooseScales,
+  foldLowerGroups,
   foldNumbers,
   isNumber,
   splitWords,
@@ -208,7 +210,7 @@ function computed(
 function readSentence(text: string, clean: string, scales: Readonly<Record<string, number>>): Sentence {
   const listed = spellOutCommas(clean);
   const raw = splitWords(listed);
-  const tokens = foldLooseScales(foldNumbers(raw.map((w) => w.text), scales), scales);
+  const tokens = foldLowerGroups(foldLooseScales(foldNumbers(raw.map((w) => w.text), scales), scales));
   const offsets = buildOffsetMap(text, clean, listed);
   return withTokens({ text, clean, scales, tokens, words: [], numeric: [], raw, offsets }, tokens);
 }

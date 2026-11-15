@@ -2161,5 +2161,31 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "8000"
+ },
+ {
+  "phrase": "pague un millon 200 mil por el auto",
+  "family": "voice-transcription",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1200000,
+  "ambiguous": false,
+  "note": "A transcriber writing the thousands group as digits after a spelled-out million. Said \"un millon doscientos mil\": 1.200.000. The 200 mil used to be dropped.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1000000"
+ },
+ {
+  "phrase": "gaste 1 millon 200 mil en la obra",
+  "family": "voice-transcription",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1200000,
+  "ambiguous": false,
+  "note": "The same with the million in digits too: 1.000.000 + 200.000 = 1.200.000, one figure with no joiner between its groups.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1000000"
  }
 ]
