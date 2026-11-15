@@ -50,6 +50,23 @@ describe('block_email_change trigger', () => {
     expect(await sqlState(() => authWrite('update auth.users set email = $1 where id = $2', [to(), ana]))).toBe('42501');
   });
 
+  it('names the user id in the refusal and neither address, because the message reaches the Auth logs', async () => {
+    const to = address('logged');
+    let message = '';
+    const state = await sqlState(async () => {
+      try {
+        await authWrite('update auth.users set email = $1 where id = $2', [to, ana]);
+      } catch (error) {
+        message = error instanceof Error ? error.message : '';
+        throw error;
+      }
+    });
+    expect(state).toBe('42501');
+    expect(message).toContain(ana);
+    expect(message).not.toContain(anaEmail);
+    expect(message).not.toContain(to);
+  });
+
   it('refuses a change request, as PUT /auth/v1/user with a new address stores it', async () => {
     const state = await sqlState(() =>
       authWrite("update auth.users set email_change = $1, email_change_token_new = 'token', email_change_sent_at = now() where id = $2", [address('new'), ana]),

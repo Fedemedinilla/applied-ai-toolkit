@@ -55,7 +55,7 @@ select is(
   'rows only for addresses that can hold a code: 20 for ana, 1 for ben, 20 for cara, 2 for dora'
 );
 
-update public.otp_attempts set created_at = now() - interval '25 hours'
+update public.otp_attempts set created_at = now() - interval '24 hours 1 second'
 where id in (select id from public.otp_attempts where email_hash = sha256(convert_to('ana@example.test', 'UTF8')) limit 5);
 set local role service_role;
 select is(

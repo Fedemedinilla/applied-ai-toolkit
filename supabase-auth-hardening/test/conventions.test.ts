@@ -120,6 +120,53 @@ describe('sql/audit.sql', () => {
     }
   }, FRESH_DB_TIMEOUT);
 
+  it.each([
+    ['a view without security_invoker', 'create view public.account_list as select user_id, role from public.accounts', true],
+    ['a view with security_invoker = on', 'create view public.account_list with (security_invoker = on) as select user_id, role from public.accounts', false],
+    ['a materialized view', 'create materialized view public.account_list as select user_id, role from public.accounts', true],
+  ] as const)('checks %s readable by authenticated, which reads past RLS on accounts unless it runs as the caller', async (_, create, reported) => {
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`
+        ${create};
+        revoke all on public.account_list from public, anon, authenticated, service_role;
+        grant select on public.account_list to authenticated;
+      `);
+      expect(await audit(scratch)).toEqual(reported ? [{ violation: 'view readable by authenticated that bypasses RLS', object: 'account_list' }] : []);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
+  it.each(['service_role', 'supabase_auth_admin', 'public'] as const)('reports a trigger function executable by %s', async (grantee) => {
+    // Rule 4: a trigger function is never granted to anyone. A grant to public reaches every role.
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`grant execute on function public.create_account() to ${grantee}`);
+      const rows = await audit(scratch);
+      expect(rows).toContainEqual({ violation: 'trigger function executable by service_role or supabase_auth_admin', object: 'create_account()' });
+      expect(rows.filter((r) => r.violation.startsWith('trigger function'))).toHaveLength(1);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
+  it('does not ask an aggregate for a search_path, which Postgres cannot set on one', async () => {
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`
+        create aggregate public.total(int) (sfunc = int4pl, stype = int);
+        revoke execute on function public.total(int) from public, anon, authenticated, service_role;
+      `);
+      expect(await audit(scratch)).toEqual([]);
+      // Still checked for EXECUTE like any other function.
+      await scratch.exec('grant execute on function public.total(int) to authenticated');
+      expect(await audit(scratch)).toEqual([{ violation: 'anon or authenticated can execute', object: 'total(integer)' }]);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
   it.each(['anon', 'authenticated', 'service_role'] as const)('reports MAINTAIN left to %s on a table that is otherwise closed', async (role) => {
     // PostgreSQL 17 added MAINTAIN, and Supabase's default grant all includes it.
     const scratch = await openDb();
