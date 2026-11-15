@@ -86,13 +86,14 @@ export interface ImportSummary {
   readonly invalid: number;
 }
 
-export type ImportRefusal = 'not_json' | 'not_site_check' | 'unsupported_version' | 'domain_mismatch' | 'run_closed';
+export type ImportRefusal = 'not_json' | 'not_site_check' | 'unsupported_version' | 'domain_mismatch' | 'bad_site_url' | 'run_closed';
 
 export const IMPORT_REFUSALS: Readonly<Record<ImportRefusal, string>> = {
   not_json: 'The file is not JSON.',
   not_site_check: 'The file does not look like a site-check run.json or datos.json (no checks list or no domain).',
   unsupported_version: 'This site-check run has a schema version this app does not read (it reads versions 1 and 2).',
   domain_mismatch: 'The file is for another domain than the site of this run.',
+  bad_site_url: 'The site address of this run is not a web address, so the file cannot be matched to it. Correct the address first.',
   run_closed: 'This run is closed. Reopen it to import.',
 };
 
@@ -111,6 +112,9 @@ function hostOf(url: string): string | null {
     return null;
   }
 }
+
+/** The host of an address as a person types it: `mysite.test` reads as `https://mysite.test`. */
+const typedHostOf = (url: string): string | null => hostOf(/^[a-z][a-z0-9+.-]*:/iu.test(url) ? url : `https://${url}`);
 
 const EVIDENCE_LIMIT = 1200;
 
@@ -158,7 +162,10 @@ export function importSiteCheck(catalogue: Catalogue, run: Run, text: string, no
   if (!str(meta[names.domain])) return { ok: false, reason: 'not_site_check', detail: '' };
 
   const domain = bareHost(str(meta[names.domain]));
-  const runHost = run.site.url ? hostOf(run.site.url) : null;
+  // An address that is there but does not parse is not "no site yet": the file is refused, and the
+  // address is never replaced.
+  const runHost = run.site.url ? typedHostOf(run.site.url) : null;
+  if (run.site.url && !runHost) return { ok: false, reason: 'bad_site_url', detail: run.site.url };
   if (runHost !== null && runHost !== domain) {
     return { ok: false, reason: 'domain_mismatch', detail: `the file is for ${domain}, this run is for ${runHost}` };
   }
@@ -208,7 +215,7 @@ export function importSiteCheck(catalogue: Catalogue, run: Run, text: string, no
   // The canonical URL is taken only when it is on the file's own domain; a redirect elsewhere is not this site.
   const canonical = str(meta[names.canonicalUrl]);
   const url = canonical && hostOf(canonical) === domain ? canonical : `https://${domain}/`;
-  const site = runHost === null ? { name: run.site.name || str(meta[names.organisation]), url } : run.site;
+  const site = !run.site.url ? { name: run.site.name || str(meta[names.organisation]), url } : run.site;
   const next: Run = {
     ...run,
     site,

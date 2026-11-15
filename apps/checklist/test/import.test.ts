@@ -105,6 +105,15 @@ describe('what an import does not touch', () => {
     expect(importSiteCheck(catalogue, run, datos, at(1))).toEqual({ ok: false, reason: 'domain_mismatch', detail: 'the file is for workshop.test, this run is for other.test' });
   });
 
+  it('reads an address typed without a scheme, and refuses one that is not an address, never replacing it', () => {
+    const typed = { ...runWith(catalogue, 'wordpress'), site: { name: 'Mine', url: 'other.test' } };
+    expect(importSiteCheck(catalogue, typed, datos, at(1))).toEqual({ ok: false, reason: 'domain_mismatch', detail: 'the file is for workshop.test, this run is for other.test' });
+    const same = { ...runWith(catalogue, 'wordpress'), site: { name: 'Mine', url: 'www.workshop.test' } };
+    expect(imported(importSiteCheck(catalogue, same, datos, at(1))).run.site).toEqual({ name: 'Mine', url: 'www.workshop.test' });
+    const broken = { ...runWith(catalogue, 'wordpress'), site: { name: 'Mine', url: 'not an address' } };
+    expect(importSiteCheck(catalogue, broken, datos, at(1))).toEqual({ ok: false, reason: 'bad_site_url', detail: 'not an address' });
+  });
+
   it('accepts the same domain with or without www', () => {
     const run = { ...runWith(catalogue, 'wordpress'), site: { name: '', url: 'https://workshop.test' } };
     expect(imported(importSiteCheck(catalogue, run, datos, at(1))).run.site.url).toBe('https://workshop.test');
