@@ -63,6 +63,38 @@ describe('storage', () => {
     expect(store.getItem(`${BACKUP_PREFIX}b`)).toBe('{"a":1}');
   });
 
+  it('reuses a copy of the same text instead of writing one per load', () => {
+    // Like window.localStorage, this store lists its keys, and it refuses a write past its quota.
+    class ListedStore extends MemoryStore {
+      quota = Infinity;
+      get length(): number {
+        return this.data.size;
+      }
+      key(index: number): string | null {
+        return [...this.data.keys()][index] ?? null;
+      }
+      override setItem(key: string, value: string): void {
+        const used = [...this.data].reduce((n, [k, v]) => (k === key ? n : n + k.length + v.length), 0);
+        if (used + key.length + value.length > this.quota) throw new Error('QuotaExceededError');
+        super.setItem(key, value);
+      }
+    }
+    const store = new ListedStore();
+    const raw = JSON.stringify([good, { bad: 1 }]);
+    store.setItem(STORAGE_KEY, raw);
+    store.quota = 2 * (STORAGE_KEY.length + raw.length) + 40;
+    const first = loadRows(store, '1000');
+    expect(first).toMatchObject({ dropped: 1, backupKey: `${BACKUP_PREFIX}1000`, writable: true });
+    for (const stamp of ['1001', '1002', '1003']) {
+      expect(loadRows(store, stamp)).toEqual(first);
+    }
+    expect([...store.data.keys()]).toEqual([STORAGE_KEY, `${BACKUP_PREFIX}1000`]);
+    // Different text gets its own copy.
+    store.quota = Infinity;
+    store.setItem(STORAGE_KEY, '{oops');
+    expect(loadRows(store, '2000').backupKey).toBe(`${BACKUP_PREFIX}2000`);
+  });
+
   it('refuses to write when the copy cannot be made, so the unread text is never overwritten', () => {
     const readOnly: KeyValue = {
       getItem: () => '{oops',

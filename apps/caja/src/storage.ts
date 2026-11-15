@@ -19,6 +19,23 @@ export const BACKUP_PREFIX = `${STORAGE_KEY}.corrupt-`;
 export interface KeyValue {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  /** Optional key listing (window.localStorage has it), used to reuse an existing backup. */
+  readonly length?: number;
+  key?(index: number): string | null;
+}
+
+/** A backup key that already holds exactly `raw`, so a reload does not write the same copy again. */
+function existingBackup(store: KeyValue, raw: string): string | null {
+  if (typeof store.length !== 'number' || typeof store.key !== 'function') return null;
+  try {
+    for (let i = 0; i < store.length; i++) {
+      const key = store.key(i);
+      if (key?.startsWith(BACKUP_PREFIX) && store.getItem(key) === raw) return key;
+    }
+  } catch {
+    // Listing failed: fall back to writing a new copy.
+  }
+  return null;
 }
 
 const CATEGORIES: ReadonlySet<string> = new Set([...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES]);
@@ -81,6 +98,10 @@ export function loadRows(store: KeyValue | null, stamp: string): LoadResult {
     // Not JSON: nothing loads, and the whole text is kept in the backup below.
   }
   if (dropped === 0) return { rows, dropped, available: true, backupKey: null, writable: true };
+  // The main key is rewritten only on a save, so every load before one sees the same text. Without
+  // this, each reload would add a full copy until the quota refused one and the app stopped saving.
+  const kept = existingBackup(store, raw);
+  if (kept) return { rows, dropped, available: true, backupKey: kept, writable: true };
   const backupKey = `${BACKUP_PREFIX}${stamp}`;
   try {
     store.setItem(backupKey, raw);
