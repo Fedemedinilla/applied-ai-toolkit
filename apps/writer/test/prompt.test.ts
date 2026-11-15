@@ -22,6 +22,17 @@ function positions(text: string, needles: readonly string[]): number[] {
 }
 const increasing = (xs: readonly number[]) => xs.every((x, i) => i === 0 || x > (xs[i - 1] ?? -1));
 
+describe('the sizes the README states', () => {
+  const bytes = (blocks: readonly string[]) => blocks.map((b) => Buffer.byteLength(b, 'utf8'));
+  const sum = (xs: readonly number[]) => xs.reduce((n, x) => n + x, 0);
+
+  it('an event by a coordinator, and the range over every category and every author, at the draft step', () => {
+    expect(bytes(buildSystem(config, role('coordinacion'), cat('evento'), 'draft', NOW))).toEqual([2205, 5222, 756, 134]);
+    const totals = config.catalog.categories.flatMap((c) => c.roles.map((r) => sum(bytes(buildSystem(config, role(r), c, 'draft', NOW)))));
+    expect([Math.min(...totals), Math.max(...totals)]).toEqual([8118, 8447]);
+  });
+});
+
 describe('block order', () => {
   it('is rules, school, category, turn', () => {
     const blocks = buildSystem(config, role('coordinacion'), cat('evento'), 'titles', NOW);
