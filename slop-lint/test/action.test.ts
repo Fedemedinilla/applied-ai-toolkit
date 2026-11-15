@@ -80,7 +80,7 @@ describe('action.yml', () => {
 
   it('documents every input and output in the README', () => {
     const inputs = keysOf('inputs');
-    expect(inputs).toEqual(['files', 'lang', 'format', 'anchors', 'config', 'sarif-file', 'fail']);
+    expect(inputs).toEqual(['files', 'lang', 'format', 'genre', 'anchors', 'config', 'sarif-file', 'fail']);
     const outputs = keysOf('outputs');
     expect(outputs).toEqual(['sarif-file', 'exit-code']);
     const at = readme.indexOf('\n## Use it in CI\n');
@@ -119,6 +119,7 @@ describe('the action script', () => {
       SLOP_FILES: '',
       SLOP_LANG: 'en',
       SLOP_FORMAT: '',
+      SLOP_GENRE: '',
       SLOP_ANCHORS: '',
       SLOP_CONFIG: '',
       SLOP_SARIF_FILE: '',
@@ -143,6 +144,15 @@ describe('the action script', () => {
     expect(r.stdout).toMatch(/^docs\/deep\/b\.md: 0 findings/mu);
     expect(r.stdout).toMatch(/^notes\.txt: /mu);
     expect(r.outputs).toEqual({ 'exit-code': '0', 'sarif-file': '' });
+  });
+
+  it('passes the genre input to the CLI', () => {
+    const ws = workspace({ 'chat.txt': 'Te paso el link del tablero de 2023 🚀\n' });
+    expect(runAction(ws, { SLOP_FILES: 'chat.txt', SLOP_LANG: 'es' }).status).toBe(1);
+    const r = runAction(ws, { SLOP_FILES: 'chat.txt', SLOP_LANG: 'es', SLOP_GENRE: 'whatsapp' });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/whatsapp profile is experimental/u);
+    expect(runAction(ws, { SLOP_FILES: 'chat.txt', SLOP_LANG: 'es', SLOP_GENRE: 'sms' }).outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
   });
 
   it('fails on a level 1 finding, and not with fail: false', () => {
