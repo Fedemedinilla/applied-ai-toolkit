@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// Usage: node slop-lint/cli.ts <file|-> [file...] --lang en|es [--format text|markdown] [--json | --sarif [--sarif-uri uri]] [--anchors "dbt,pandas,Contoso Agro"] [--config file | --no-config]
-//        node slop-lint/cli.ts --list-rules [--json] [file] [--config file | --no-config]
+// Usage: node slop-lint/cli.ts <file|-> [file...] --lang en|es [--format text|markdown] [--genre g|auto] [--variety rioplatense|neutral] [--previous file] [--json | --sarif [--sarif-uri uri]] [--anchors "dbt,pandas,Contoso Agro"] [--config file | --no-config]
+//        node slop-lint/cli.ts --list-rules [--json] [--genre g] [file] [--config file | --no-config]
+// --genre is cover-letter (the default), email, follow-up or whatsapp; the last three are experimental and the CLI says
+// so on stderr. auto guesses each file's genre and falls back to cover-letter, with a note on stderr, when unsure.
+// --previous names the earlier message of a follow-up; no rule reads it yet.
 // A file ending in .md is read as Markdown unless --format says otherwise; anything else, stdin included, as text.
 // With several files, each one's findings are followed by its own summary line, prefixed with its name.
 // --sarif prints one SARIF 2.1.0 log for every file instead; --sarif-uri names stdin in it ("stdin" by default).
@@ -12,20 +15,25 @@
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { isCustomId, isIgnored, settingsFor, type Config, type Settings } from './src/config.ts';
+import { GENRE_PROFILES, guessGenre, isGenre, resolveRules } from './src/genres.ts';
 import { configPath, findConfig, loadConfig, type LoadedConfig } from './src/config-file.ts';
 import { lint } from './src/lint.ts';
 import { RULES } from './src/rules.ts';
 import { artifactUri, toSarif } from './src/sarif.ts';
-import type { Finding, Format, Lang, LintOptions, LintResult, Rule } from './src/types.ts';
+import type { Finding, Format, Genre, Lang, LintOptions, LintResult, Rule, Variety } from './src/types.ts';
 
 const USAGE =
-  'usage: node slop-lint/cli.ts <file|-> [file...] --lang en|es [--format text|markdown] [--json | --sarif [--sarif-uri uri]] [--anchors a,b,c] [--config file | --no-config]\n' +
-  '       node slop-lint/cli.ts --list-rules [--json] [file] [--config file | --no-config]';
+  'usage: node slop-lint/cli.ts <file|-> [file...] --lang en|es [--format text|markdown] [--genre g|auto] [--variety rioplatense|neutral] [--previous file] [--json | --sarif [--sarif-uri uri]] [--anchors a,b,c] [--config file | --no-config]\n' +
+  '       node slop-lint/cli.ts --list-rules [--json] [--genre g] [file] [--config file | --no-config]';
 
 interface Args {
   files: string[];
   lang: Lang | undefined;
   format: Format | undefined;
+  /** Undefined when --genre was not given, so the config file's genre applies. */
+  genre: Genre | 'auto' | undefined;
+  variety: Variety | undefined;
+  previous: string | undefined;
   json: boolean;
   sarif: boolean;
   /** The uri stdin gets in the SARIF log. */
@@ -41,6 +49,9 @@ function parseArgs(argv: readonly string[]): Args | string {
   const files: string[] = [];
   let lang: string | undefined;
   let format: string | undefined;
+  let genre: string | undefined;
+  let variety: string | undefined;
+  let previous: string | undefined;
   let json = false;
   let sarif = false;
   let sarifUri: string | undefined;
@@ -58,6 +69,12 @@ function parseArgs(argv: readonly string[]): Args | string {
     else if (arg.startsWith('--lang=')) lang = arg.slice('--lang='.length);
     else if (arg === '--format') format = argv[++i] ?? '';
     else if (arg.startsWith('--format=')) format = arg.slice('--format='.length);
+    else if (arg === '--genre') genre = argv[++i] ?? '';
+    else if (arg.startsWith('--genre=')) genre = arg.slice('--genre='.length);
+    else if (arg === '--variety') variety = argv[++i] ?? '';
+    else if (arg.startsWith('--variety=')) variety = arg.slice('--variety='.length);
+    else if (arg === '--previous') previous = argv[++i] ?? '';
+    else if (arg.startsWith('--previous=')) previous = arg.slice('--previous='.length);
     else if (arg === '--anchors') anchors = (argv[++i] ?? '').split(',');
     else if (arg.startsWith('--anchors=')) anchors = arg.slice('--anchors='.length).split(',');
     else if (arg === '--config') config = argv[++i] ?? '';
@@ -70,6 +87,9 @@ function parseArgs(argv: readonly string[]): Args | string {
   // A flag given last has no value; '' keeps that apart from a flag not given at all.
   if (lang === '') return '--lang needs a value';
   if (format === '') return '--format needs a value';
+  if (genre === '') return '--genre needs a value';
+  if (variety === '') return '--variety needs a value';
+  if (previous === '') return '--previous needs a file';
   if (config === '') return '--config needs a file';
   if (config !== undefined && noConfig) return '--config and --no-config cannot be used together';
   if (listRules) {
@@ -82,11 +102,30 @@ function parseArgs(argv: readonly string[]): Args | string {
   // A missing --lang is judged later, file by file: the config file may supply it.
   if (lang !== undefined && lang !== 'en' && lang !== 'es') return '--lang must be en or es';
   if (format !== undefined && format !== 'text' && format !== 'markdown') return '--format must be text or markdown';
+  if (genre !== undefined && genre !== 'auto' && !isGenre(genre)) return '--genre must be cover-letter, email, follow-up, whatsapp or auto';
+  if (genre === 'auto' && listRules) return '--list-rules needs a genre, not auto';
+  if (variety !== undefined && variety !== 'rioplatense' && variety !== 'neutral') return '--variety must be rioplatense or neutral';
+  if (previous !== undefined && listRules) return '--previous is read when linting, not by --list-rules';
+  if (previous !== undefined && files.includes('-') && previous === '-') return 'stdin can be read only once';
   if (json && sarif) return '--json and --sarif cannot be used together';
   if (sarifUri !== undefined && !sarif) return '--sarif-uri needs --sarif';
   if (sarifUri !== undefined && !files.includes('-')) return '--sarif-uri names stdin, and no input is -';
   if (sarifUri === '') return '--sarif-uri needs a value';
-  return { files, lang, format, json, sarif, sarifUri, anchors: anchors?.map((a) => a.trim()).filter(Boolean), config, noConfig, listRules };
+  return {
+    files,
+    lang,
+    format,
+    genre: genre as Genre | 'auto' | undefined,
+    variety: variety as Variety | undefined,
+    previous,
+    json,
+    sarif,
+    sarifUri,
+    anchors: anchors?.map((a) => a.trim()).filter(Boolean),
+    config,
+    noConfig,
+    listRules,
+  };
 }
 
 /** --format when given; otherwise Markdown for a .md file and text for anything else, stdin included. */
@@ -170,9 +209,22 @@ function main(): number {
   const shownConfig = loaded === undefined ? null : relative(cwd, loaded.path) || loaded.path;
   const pathOf = (file: string): string | undefined => (loaded === undefined || file === '-' ? undefined : configPath(loaded.dir, file, cwd));
 
+  // --genre auto is settled file by file, once each file is read.
+  const flags: { genre?: Genre; variety?: Variety } = {};
+  if (args.genre !== undefined && args.genre !== 'auto') flags.genre = args.genre;
+  if (args.variety !== undefined) flags.variety = args.variety;
+  const warned = new Set<Genre>();
+  const warnExperimental = (genre: Genre): void => {
+    if (!GENRE_PROFILES[genre].experimental || warned.has(genre)) return;
+    warned.add(genre);
+    process.stderr.write(`slop-lint: the ${genre} profile is experimental; no labelled set has measured its false positives yet\n`);
+  };
+
   if (args.listRules) {
     const [file] = args.files;
-    process.stdout.write(listRules(settingsFor(config, file === undefined ? undefined : pathOf(file)), shownConfig, args.json));
+    const settings = settingsFor(config, file === undefined ? undefined : pathOf(file), undefined, flags);
+    warnExperimental(settings.genre);
+    process.stdout.write(listRules(settings, shownConfig, args.json));
     return 0;
   }
 
@@ -180,7 +232,7 @@ function main(): number {
   // The language of every file is settled before any is read: a file without one is a usage error.
   const plans = new Map<string, { settings: Settings; lang: Lang }>();
   for (const file of files) {
-    const settings = settingsFor(config, pathOf(file));
+    const settings = settingsFor(config, pathOf(file), undefined, flags);
     const lang = args.lang ?? settings.lang;
     if (lang === undefined) {
       const hint = loaded === undefined ? '' : `; ${shownConfig ?? ''} sets no lang for ${file}`;
@@ -201,6 +253,15 @@ function main(): number {
       }
     }
   }
+  let previous: string | undefined;
+  if (args.previous !== undefined) {
+    try {
+      previous = readFileSync(args.previous === '-' ? 0 : args.previous, 'utf8').replace(/^\uFEFF/u, '');
+    } catch (error) {
+      process.stderr.write(`cannot read ${args.previous}: ${(error as Error).message}\n`);
+      return 2;
+    }
+  }
   const runs: Array<{ file: string; format: Format; text: string; result: LintResult; rules: readonly Rule[] | undefined }> = [];
   let failOnProblems = false;
   for (const file of files) {
@@ -214,16 +275,31 @@ function main(): number {
     }
     const plan = plans.get(file);
     if (!plan) continue;
-    const { settings, lang } = plan;
+    const { lang } = plan;
+    let { settings } = plan;
+    if (args.genre === 'auto') {
+      const guess = guessGenre(text);
+      const genre = guess.confidence === 'high' ? guess.genre : 'cover-letter';
+      const seen = guess.signals.length > 0 ? guess.signals.join(', ') : 'no signal';
+      if (guess.confidence === 'low') process.stderr.write(`slop-lint: ${file}: unsure of the genre (${seen}); linting it as cover-letter\n`);
+      settings = settingsFor(config, pathOf(file), undefined, { ...flags, genre });
+    }
+    warnExperimental(settings.genre);
     const format = formatFor(file, args.format ?? settings.format);
     const options: LintOptions = { lang, anchors: args.anchors ?? settings.anchors, format };
+    // The keys are set only when they say something, so a run without them passes the options it always did.
+    if (settings.genre !== 'cover-letter') options.genre = settings.genre;
+    if (settings.variety !== undefined) options.variety = settings.variety;
+    if (previous !== undefined) options.previous = previous;
     // Without a config file lint() gets exactly the options it always got.
     if (loaded !== undefined) {
       options.rules = settings.rules;
       options.suppressions = { allowDisqualify: settings.suppressions.allowDisqualify, mask: settings.suppressions.mask };
       failOnProblems = failOnProblems || settings.suppressions.failOnProblems;
     }
-    runs.push({ file, format, text, result: lint(text, options), rules: options.rules });
+    // SARIF describes the rules as they ran: the profile's levels and messages, not the catalog's.
+    const rules = options.rules ?? (options.genre === undefined ? undefined : resolveRules(RULES, options.genre));
+    runs.push({ file, format, text, result: lint(text, options), rules });
   }
   if (files.length < args.files.length && files.length === 0) {
     process.stderr.write(`slop-lint: every input file is ignored by ${shownConfig ?? 'the config file'}\n`);
