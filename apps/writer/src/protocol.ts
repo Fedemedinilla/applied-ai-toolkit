@@ -24,6 +24,8 @@ export const EN_SPLIT = '[[EN]]';
 /**
  * brief, titles, pick, draft, then three rounds of changes (each a request and a new draft):
  * a request is at most 9 messages long, ending on the third change. The server refuses longer ones.
+ * The cap counts messages, not rounds: a model that drafts on the first turn leaves brief, draft,
+ * and room for four changes.
  */
 export const MAX_MESSAGES = 9;
 

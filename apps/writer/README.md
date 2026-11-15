@@ -30,7 +30,7 @@ The eval case for the `[COMPLETAR]` rule has one opt-in live script and one offl
 3. "Proponer títulos" sends `{role, category, messages}` to `POST ./api/draft`. The server builds the prompt for the titles step, the model answers with a `[[TITULOS]]` block, and the page shows three titles as a radio group.
 4. "Redactar con este título" sends the history with the chosen title. The model answers with a `[[COMUNICADO]]` block, Spanish first and, for a bilingual category, an English version after an `[[EN]]` line.
 5. The draft shows with each gap highlighted. Under it is the measured length of each language next to the category's range. Then come the warnings about the text, such as a gap, an emoji where none are allowed or a word the style guide replaces. Last come the category's reminders about the call to action, attachments, photos, graphics and reviewer.
-6. "Ajustar la extensión" appears when a language is out of range and sends a change request with the measured numbers in it. "Pedir un cambio" sends any other change. Three rounds of changes fit in one draft.
+6. "Ajustar la extensión" appears when a language is out of range and sends a change request with the measured numbers in it. "Pedir un cambio" sends any other change. Three rounds of changes fit in one draft. The cap counts messages, so a draft that came on the first turn, with no titles, leaves room for four.
 7. "Copiar" writes `text/html` and `text/plain` in one clipboard item, so a mail client keeps the bold and the lists. If the browser refuses, it copies plain text, and the status line says how many gaps are left.
 
 ## Configuration as data
