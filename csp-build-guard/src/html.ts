@@ -27,8 +27,14 @@ export interface PageParts {
   readonly modulePreloads: readonly string[];
   /** `component-url`, `renderer-url` and `before-hydration-url` of `<astro-island>` elements. */
   readonly islandUrls: readonly string[];
-  /** Content of each `<meta http-equiv="Content-Security-Policy">`, entities decoded. */
+  /** Content of each `<meta http-equiv="Content-Security-Policy">` in `<head>`, entities decoded. */
   readonly metaPolicies: readonly string[];
+  /**
+   * `<meta>` policies the browser ignores: outside `<head>` (CSP3 applies a meta policy only when
+   * the element is a child of head), inside `<noscript>` (raw text when scripts run) or inside
+   * `<template>` (inert content). They are not in `metaPolicies`.
+   */
+  readonly ignoredMetaPolicies: ReadonlyArray<{ readonly content: string; readonly where: string }>;
   /** Text of inline scripts that run as JavaScript (classic or module), for import and syntax scans. */
   readonly inlineJs: readonly string[];
   /**
@@ -92,10 +98,14 @@ export function hashSources(text: string): InlineItem['hashes'] {
   return { sha256: digest('sha256'), sha384: digest('sha384'), sha512: digest('sha512') };
 }
 
-// One pass over the document, in order: comments, raw-text elements with their content, other start tags.
+// Elements the parser keeps in <head>. Any other start tag (and <body>) begins the body.
+const HEAD_ELEMENTS = new Set(['base', 'basefont', 'bgsound', 'link', 'meta', 'noframes', 'noscript', 'script', 'style', 'template', 'title']);
+
+// One pass over the document, in order: comments, raw-text elements with their content, other start
+// tags, end tags.
 // The raw-text tag name must end at whitespace, "/" or ">", so a custom element such as
 // <style-switcher> or <script-loader> is an ordinary tag (a \b would match before the "-").
-const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|<\/([a-zA-Z][\w:-]*)[^>]*>/gi;
 
 export function parsePage(html: string): PageParts {
   const inline: InlineItem[] = [];
@@ -103,7 +113,14 @@ export function parsePage(html: string): PageParts {
   const modulePreloads: string[] = [];
   const islandUrls: string[] = [];
   const metaPolicies: string[] = [];
+  const ignoredMetaPolicies: Array<{ content: string; where: string }> = [];
   const inlineJs: string[] = [];
+  // Where the tree builder is, reduced to what decides whether a <meta> lands in <head>: before or
+  // in head, after </head> (a head element there still goes into head), or in the body. Text is not
+  // tracked, so non-whitespace text before the first body tag does not end the head here.
+  let where: 'head' | 'after-head' | 'body' = 'head';
+  let noscript = 0;
+  let template = 0;
   let contentSeen = false;
   let metaAfterContent = false;
   const add = (kind: InlineKind, text: string, label: string) => inline.push({ kind, text, label, hashes: hashSources(text) });
@@ -113,8 +130,20 @@ export function parsePage(html: string): PageParts {
   for (const m of html.replace(/\r\n?/g, '\n').matchAll(TOKENS)) {
     const whole = m[0];
     if (whole.startsWith('<!--')) continue;
+    const endTag = m[5]?.toLowerCase();
+    if (endTag !== undefined) {
+      if (endTag === 'template') template = Math.max(0, template - 1);
+      else if (endTag === 'noscript') noscript = Math.max(0, noscript - 1);
+      else if (endTag === 'head' && where === 'head' && template === 0) where = 'after-head';
+      continue;
+    }
     const rawElement = m[1]?.toLowerCase();
     const tagName = rawElement ?? m[4]?.toLowerCase() ?? '';
+    // Inside a template nothing joins the document, so the head does not end there.
+    const metaPlace = template ? 'inside <template>' : noscript ? 'inside <noscript>' : where === 'body' ? 'outside <head>' : undefined;
+    if (template === 0 && tagName !== 'html' && tagName !== 'head' && !HEAD_ELEMENTS.has(tagName)) where = 'body';
+    if (tagName === 'template') template++;
+    else if (tagName === 'noscript') noscript++;
     const attrs = parseAttributes(rawElement === undefined ? whole : `<${rawElement}${m[2] ?? ''}>`);
 
     for (const [name, value] of attrs) {
@@ -149,9 +178,13 @@ export function parsePage(html: string): PageParts {
         if (url) islandUrls.push(url);
       }
     } else if (tagName === 'meta' && (attrs.get('http-equiv') ?? '').toLowerCase() === 'content-security-policy') {
-      metaPolicies.push(attrs.get('content') ?? '');
-      if (contentSeen) metaAfterContent = true;
+      const content = attrs.get('content') ?? '';
+      if (metaPlace !== undefined) ignoredMetaPolicies.push({ content, where: metaPlace });
+      else {
+        metaPolicies.push(content);
+        if (contentSeen) metaAfterContent = true;
+      }
     }
   }
-  return { inline, scriptSrcs, modulePreloads, islandUrls, metaPolicies, inlineJs, metaAfterContent };
+  return { inline, scriptSrcs, modulePreloads, islandUrls, metaPolicies, ignoredMetaPolicies, inlineJs, metaAfterContent };
 }

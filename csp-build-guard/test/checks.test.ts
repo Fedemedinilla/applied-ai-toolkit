@@ -237,6 +237,16 @@ describe('meta policies', () => {
     expect(check(report, 'policy')?.summary).toBe('1 of 1 page differs from the expected policy');
   });
 
+  it('fails a page whose only <meta> policy sits in <body>, since the browser ignores it', () => {
+    const page = `<head><title>x</title></head><body><meta http-equiv="Content-Security-Policy" content="script-src 'self'"><p>hi</p></body>`;
+    const report = guard({ 'index.html': page }, config);
+    expect(messages(report, 'policy')).toEqual([
+      'index.html: a <meta> policy outside <head>, which the browser ignores',
+      'index.html: no Content-Security-Policy',
+    ]);
+    expect(check(report, 'inline-hashes')?.status).toBe('fail');
+  });
+
   it('agrees the verb and the nouns with their counts in a passing summary', () => {
     const meta = `<meta http-equiv="Content-Security-Policy" content="script-src 'self'">`;
     expect(check(guard({ 'index.html': meta }, config), 'policy')?.summary).toBe('1 page sends exactly the expected policy (1 directive)');

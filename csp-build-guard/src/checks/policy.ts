@@ -13,6 +13,7 @@ export function checkPolicy(ctx: Context): CheckResult {
   const problems: Array<{ page: string; message: string }> = [];
   for (const page of ctx.pages) {
     const add = (message: string) => problems.push({ page: page.display, message });
+    for (const where of new Set(page.parts.ignoredMetaPolicies.map((m) => m.where))) add(`a <meta> policy ${where}, which the browser ignores`);
     if (page.csp.length === 0) {
       add('no Content-Security-Policy');
       continue;

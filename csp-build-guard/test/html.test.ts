@@ -80,6 +80,31 @@ describe('parsePage', () => {
   });
 });
 
+describe('meta policy placement', () => {
+  const meta = (value: string) => `<meta http-equiv="Content-Security-Policy" content="${value}">`;
+
+  it('keeps a <meta> policy in <head>, explicit or implied, and one placed after </head> before <body>', () => {
+    expect(parsePage(`<html><head><title>t</title>${meta('a')}</head><body><p>x</p></body>`).metaPolicies).toEqual(['a']);
+    expect(parsePage(`${meta('a')}<title>t</title><p>x</p>`).metaPolicies).toEqual(['a']);
+    // The parser moves a head element met between </head> and <body> into the head.
+    expect(parsePage(`<head></head>${meta('a')}<body></body>`).metaPolicies).toEqual(['a']);
+  });
+
+  it('leaves out a <meta> policy in <body>, in <noscript> or in <template>, which the browser ignores', () => {
+    const body = parsePage(`<head><title>t</title></head><body>${meta('a')}<p>hi</p></body>`);
+    expect(body.metaPolicies).toEqual([]);
+    expect(body.ignoredMetaPolicies).toEqual([{ content: 'a', where: 'outside <head>' }]);
+    const implied = parsePage(`<head></head><p>hi</p>${meta('a')}`);
+    expect(implied.ignoredMetaPolicies).toEqual([{ content: 'a', where: 'outside <head>' }]);
+    const noscript = parsePage(`<head><noscript>${meta('a')}</noscript>${meta('b')}</head>`);
+    expect(noscript.metaPolicies).toEqual(['b']);
+    expect(noscript.ignoredMetaPolicies).toEqual([{ content: 'a', where: 'inside <noscript>' }]);
+    const template = parsePage(`<head><template><div></div>${meta('a')}</template>${meta('b')}</head>`);
+    expect(template.metaPolicies).toEqual(['b']);
+    expect(template.ignoredMetaPolicies).toEqual([{ content: 'a', where: 'inside <template>' }]);
+  });
+});
+
 describe('helpers', () => {
   it('classifies script types by MIME essence', () => {
     expect(scriptKind(undefined)).toBe('js');
