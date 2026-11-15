@@ -11,3 +11,5 @@ A `specifiers`, `external` or `package` entry with a `*` anywhere but at the end
 The text and JSON reports sort violations in code-unit order, as SARIF already did, so the same tree prints the same bytes under every locale.
 
 A JSON config saved with a UTF-8 byte order mark now loads; before, it failed as invalid JSON with exit code 2.
+
+`loadConfig` imports a `.ts` config again when the file changed since the last call in the same process, instead of returning Node's cached first version.

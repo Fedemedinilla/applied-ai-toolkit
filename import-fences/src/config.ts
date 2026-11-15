@@ -4,6 +4,7 @@
  * schema/config.schema.json. Either one is validated again with zod when the CLI loads it, because
  * a typo in a rule name must stop the run instead of turning a fence off.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -195,7 +196,8 @@ function readJsonConfig(absolute: string): unknown {
 
 /**
  * Loads a config and returns it with its root resolved to an absolute path. A path ending in .json
- * is read as JSON; anything else is imported as a module whose default export is the config.
+ * is read as JSON; anything else is imported as a module whose default export is the config. A
+ * module config edited since the last call is imported again; the modules it imports are not.
  */
 export async function loadConfig(path: string): Promise<{ config: FencesConfig; root: string }> {
   const absolute = resolve(path);
@@ -209,7 +211,10 @@ export async function loadConfig(path: string): Promise<{ config: FencesConfig; 
   } else {
     let module: { default?: unknown };
     try {
-      module = (await import(pathToFileURL(absolute).href)) as { default?: unknown };
+      // Node caches a module by URL; a query with the content's hash reads an edited file again.
+      const url = pathToFileURL(absolute);
+      url.search = `v=${createHash('sha256').update(readFileSync(absolute)).digest('hex').slice(0, 16)}`;
+      module = (await import(url.href)) as { default?: unknown };
     } catch (error) {
       throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
     }

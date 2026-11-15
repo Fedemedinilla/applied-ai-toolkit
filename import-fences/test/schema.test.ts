@@ -3,7 +3,7 @@
  * .json config the way it loads a module, and the examples in the README are valid configs.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { CONFIG_SCHEMA_URL, configJsonSchema, loadConfig, parseConfig } from '../src/config.ts';
@@ -108,6 +108,17 @@ describe('a JSON config', () => {
     for (const name of ['list.json', 'typo.json', 'extra.json']) {
       expect(cli(root, ['--config', name]), name).toMatchObject({ code: 2, stdout: '', stderr: expect.stringMatching(/^invalid config:/) as unknown });
     }
+  });
+});
+
+describe('a module config', () => {
+  it('is read again when the file changes in the same process', async () => {
+    const write = (include: string) => `export default { groups: { a: { include: ['${include}'] } }, rules: [{ rule: 'dynamic-import', group: 'a' }] };\n`;
+    const root = tree({ 'fences.config.ts': write('a/**') });
+    const path = join(root, 'fences.config.ts');
+    expect((await loadConfig(path)).config.groups['a']?.include).toEqual(['a/**']);
+    writeFileSync(path, write('b/**'));
+    expect((await loadConfig(path)).config.groups['a']?.include).toEqual(['b/**']);
   });
 });
 
