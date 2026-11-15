@@ -24,6 +24,7 @@ from sitecheck.requestlog import RequestLog
 from sitecheck.scope import Purpose, ScopeGuard
 from fakeapis import FakeApis
 from fakesite import FakeSite, Route
+from fixhelp import run_e2e
 from sitefixtures import default_apis, school_scenario
 
 BASE = "https://colegio.test"
@@ -188,6 +189,44 @@ class CssUrlParsingTimeTest(unittest.TestCase):
         page = extract_page(f"<html><head><style>{css}</style></head><body></body></html>", f"{BASE}/")
         urls = [u for kind, _, u in page.subresources if kind == "style"]
         self.assertEqual(urls, [f"{BASE}/img/a.png", f"{BASE}/x.png", f"{BASE}/y.png"])
+
+
+class OgImageExclusionTest(unittest.TestCase):
+    """An excluded domain gets zero requests, also when another site declares its og:image there."""
+
+    OG = "https://www.colegio.test/wp-content/uploads/2024/03/portada.png"
+
+    def _scenario(self, og_url: str):  # type: ignore[no-untyped-def]
+        sc = school_scenario()
+        route = sc.routes["https://www.colegio.test/"]
+        self.assertIn(self.OG.encode(), route.body)
+        route.body = route.body.replace(self.OG.encode(), og_url.encode())
+        return sc
+
+    def test_og_image_on_an_excluded_host_is_not_requested(self) -> None:
+        sc = self._scenario("https://imagenes-excluidas.test/portada.png")
+        result = run_e2e(sc, default_apis(), exclude="imagenes-excluidas.test pidio no ser medido\n")
+        self.assertEqual(result.code, 0, result.err)
+        self.assertIn("https://www.colegio.test/", result.site_urls)
+        self.assertEqual([u for u in result.site_urls if "imagenes-excluidas.test" in u], [])
+
+    def test_og_image_redirect_to_an_excluded_host_is_not_followed(self) -> None:
+        sc = self._scenario("https://cdn-libre.test/portada.png")
+        sc.routes["https://cdn-libre.test/portada.png"] = Route(302, [("Location", "https://imagenes-excluidas.test/portada.png")], b"")
+        result = run_e2e(sc, default_apis(), exclude="imagenes-excluidas.test pidio no ser medido\n")
+        self.assertEqual(result.code, 0, result.err)
+        self.assertIn("https://cdn-libre.test/portada.png", result.site_urls)
+        self.assertEqual([u for u in result.site_urls if "imagenes-excluidas.test" in u], [])
+
+    def test_guard_refuses_an_excluded_og_image_host(self) -> None:
+        guard = ScopeGuard("colegio.test", f"{BASE}/", Endpoints.for_test("http://127.0.0.1:9"), test_loopback=True)
+        guard.set_exclusion(lambda host: host.endswith("excluido.test"))
+        self.assertFalse(guard.admit_og_image("https://img.excluido.test/a.png"))
+        self.assertTrue(guard.admit_og_image("https://cdn.test/a.png"))
+        self.assertEqual(
+            guard.redirect_verdict("https://cdn.test/a.png", "https://img.excluido.test/a.png", Purpose.OG_IMAGE, 1).value,
+            "leave",
+        )
 
 
 if __name__ == "__main__":

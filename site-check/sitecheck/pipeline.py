@@ -876,6 +876,11 @@ def _run(
             state.canonical_entry = entry
         return entry is not None
 
+    # The og:image may sit on any host; an excluded one gets no request either.
+    # getattr: a services_factory passed to run() may bring a guard of its own.
+    set_exclusion = getattr(services.guard, "set_exclusion", None)
+    if set_exclusion is not None:
+        set_exclusion(lambda host: lst.match(host) is not None)
     con.warn(f"Measuring {config.url} (this takes a few minutes)...")
     try:
         from .collect import collect

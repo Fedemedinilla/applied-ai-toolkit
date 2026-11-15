@@ -20,7 +20,8 @@ What is allowed on the target (registrable domain D):
 * the RSS/Atom feed only if the home links it with <link rel=alternate>;
 * pages the home links with <a href> on D (interna, --form-page,
   hreflang alternates, VIS-09 link checks): admitted with admit_linked;
-* og:image, on ANY host, for that single URL and its redirect hops;
+* og:image, on ANY host not on the exclusion list (set_exclusion), for that
+  single URL and its redirect hops;
 * one TLS handshake per site host (canonical host and the other apex/www host).
 
 Never, even when linked: DENY_PATTERNS (readme.html, /wp-json, ?author=,
@@ -57,7 +58,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -292,6 +293,7 @@ class ScopeGuard:
         self._feed: str | None = None
         self._og_image: str | None = None
         self._og_image_host: str | None = None
+        self._excluded: Callable[[str], bool] | None = None
         self._variant_keys = {domains.compare_key(v) for v in domains.site_variants(self.registrable)}
         self._input_key = domains.compare_key(self.input_url)
 
@@ -346,6 +348,17 @@ class ScopeGuard:
         return out
 
     # ------------------------------------------------------------------ admissions
+    def set_exclusion(self, excluded: Callable[[str], bool]) -> None:
+        """Hosts on the exclusion list: the og:image and its hops never go there.
+
+        The pipeline checks the input host, D and the canonical host itself;
+        the og:image is the one URL the page can aim at any host.
+        """
+        self._excluded = excluded
+
+    def _is_excluded(self, host: str) -> bool:
+        return self._excluded is not None and bool(self._excluded(host))
+
     def set_canonical(self, final_url: str) -> None:
         """Record H, the final URL of the input chain. Must be on D, else ScopeError."""
         t = _parse(final_url)
@@ -489,6 +502,9 @@ class ScopeGuard:
             return False
         if not self._port_ok(t):
             self._note(url, Purpose.OG_IMAGE, f"port {t.port}")
+            return False
+        if self._is_excluded(t.host):
+            self._note(url, Purpose.OG_IMAGE, "excluded")
             return False
         if self._on_site(t.host) and self._deny(t) is not None:
             self.refusals.append({"url": _audit_url(url), "purpose": str(Purpose.OG_IMAGE), "reason": "deny-pattern"})
@@ -661,6 +677,9 @@ class ScopeGuard:
         if purpose is Purpose.OG_IMAGE:
             if _is_ip_literal(t.host) or t.host == "localhost" or not self._port_ok(t):
                 self._note(to_url, purpose, "og:image hop to an IP address or a non-default port")
+                return RedirectVerdict.LEAVE
+            if self._is_excluded(t.host):
+                self._note(to_url, purpose, "og:image hop to an excluded host")
                 return RedirectVerdict.LEAVE
             if not self._isolation_ok(t):
                 raise self._refuse(to_url, purpose, "test isolation")
