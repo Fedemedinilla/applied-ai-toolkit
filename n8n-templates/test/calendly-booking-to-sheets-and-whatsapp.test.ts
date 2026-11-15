@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { DedupeHistory, applySet, dedupeKey, ifPasses, jsonBody } from '../harness/nodes.ts';
 import { loadTemplate, mainTargets, nodeNamed, reachableSideEffects } from '../harness/workflow.ts';
-import { BAD_EMAILS, webhookItem } from './helpers/webhook.ts';
+import { BAD_EMAILS, LONGEST_EMAIL, webhookItem } from './helpers/webhook.ts';
 
 const { workflow } = loadTemplate('calendly-booking-to-sheets-and-whatsapp.json');
 const WEBHOOK = 'Receive booking (Webhook)';
@@ -89,6 +89,11 @@ describe('Booking fields', () => {
       event: 'Intro call',
       invitee_uri: URI,
     });
+  });
+
+  it('stores the longest email the check accepts in full', () => {
+    expect(ifPasses(check, { json: booking({ email: LONGEST_EMAIL }) })).toBe(true);
+    expect(applySet(fields, { json: booking({ email: LONGEST_EMAIL }) }).email).toBe(LONGEST_EMAIL);
   });
 
   it('cuts long values and stores an empty phone when there is none', () => {

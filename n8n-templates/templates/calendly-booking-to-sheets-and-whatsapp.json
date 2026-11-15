@@ -45,7 +45,7 @@
             {
               "id": "8e45ed98-179c-4a17-8dfd-63eb800753b1",
               "name": "email",
-              "value": "={{ String($json.body.payload.email).trim().slice(0, 200) }}",
+              "value": "={{ String($json.body.payload.email).trim().slice(0, 254) }}",
               "type": "string"
             },
             {
