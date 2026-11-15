@@ -172,6 +172,8 @@ export async function runAttacks(
 ): Promise<AttackRecord[]> {
   const out: AttackRecord[] = [];
   let next = 0;
+  // NaN would leave no worker and an empty result that looks like a clean run.
+  if (Number.isNaN(opts.concurrency)) throw new Error(`concurrency must be a number, got ${opts.concurrency}`);
   const workers = Math.max(1, Math.min(opts.concurrency ?? 2, attacks.length));
   await Promise.all(
     Array.from({ length: workers }, async () => {

@@ -93,6 +93,13 @@ describe('runAttack, the turn loop', () => {
     expect(peak).toBe(2);
     expect(summarize(recs)).toEqual({ L1: { pass: 0, fail: 0, review: 4 }, L2: { pass: 0, fail: 0, review: 2 } });
   });
+
+  it('runAttacks refuses a concurrency that is not a number instead of running nothing', async () => {
+    const { handler, calls } = echoHandler();
+    await expect(runAttacks(handler, [attack({ id: 'a', turns: ['x'] })], { concurrency: NaN })).rejects.toThrow(/concurrency must be a number/);
+    expect(calls).toHaveLength(0);
+    expect(await runAttacks(handler, [attack({ id: 'a', turns: ['x'] })], { concurrency: Infinity })).toHaveLength(1);
+  });
 });
 
 describe('Attack schema', () => {

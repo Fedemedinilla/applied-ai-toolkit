@@ -84,6 +84,15 @@ describe('runEval', () => {
     expect(peak).toBe(3);
     expect(client.requests).toHaveLength(jobs.length);
   });
+
+  it('refuses a concurrency that is not a number instead of running nothing', async () => {
+    const client = recordingClient(() => reply('ok'));
+    const jobs = planJobs(PROBES.slice(0, 2), ['V0'], ['en'], 1);
+    await expect(runEval({ client, target, variants: VARIANTS, jobs, concurrency: NaN })).rejects.toThrow(/concurrency must be a number/);
+    expect(client.requests).toHaveLength(0);
+    const all = await runEval({ client, target, variants: VARIANTS, jobs, concurrency: Infinity });
+    expect(all.rows).toHaveLength(2);
+  });
 });
 
 describe('dumpPrompts', () => {

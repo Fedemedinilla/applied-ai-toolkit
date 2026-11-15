@@ -168,6 +168,9 @@ export async function runEval<C extends { id: string }, L extends string>(
   opts: RunOptions<C, L>,
 ): Promise<{ rows: EvalRow<L>[]; failures: EvalFailure[] }> {
   const { client, target, variants, jobs } = opts;
+  // NaN would make the worker pool empty, and the run would finish with no
+  // rows and no error, so it is refused rather than clamped.
+  if (Number.isNaN(opts.concurrency)) throw new Error(`concurrency must be a number, got ${opts.concurrency}`);
   const concurrency = Math.max(1, Math.floor(opts.concurrency ?? 3));
   const now = opts.now ?? new Date();
   preflight(target, variants, jobs, now);
