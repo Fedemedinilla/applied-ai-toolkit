@@ -12,7 +12,7 @@ Offline, no key, from the repository root:
 
 ```sh
 npm ci
-npx vitest run content-forge                 # 75 tests, fake Anthropic API, no key
+npx vitest run content-forge                 # 90 tests, fake Anthropic API, no key
 npm run check                                # tsc --noEmit, strict
 node content-forge/cli.ts validate           # the example catalogue in content-forge/catalog/
 node content-forge/cli.ts stats              # pass rate per entity type and prompt version
@@ -87,7 +87,7 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 
 **The catalogue must be valid before a run.** generate refuses to call the model when the catalogue has a single problem, and prints them all. That makes the references stage attributable. Any problem in "catalogue plus accepted candidates plus this one" is caused by this candidate, even when it is reported on another entity, such as a set pushed past its size.
 
-**Candidates are checked against the ones accepted before them.** Two candidates in one batch can be fine alone and conflict together, with the same id or name, or by filling one set between them. Each candidate is merged with the catalogue and the candidates accepted so far. In the fixture, `scout-call` summons `brine-scout`, accepted a moment earlier, and is rejected because `brine-scout` is not a token.
+**Candidates are checked against the ones accepted before them.** Two candidates in one batch can be fine alone and conflict together, with the same id or name, or by filling one set between them. Each candidate is merged with the catalogue, the candidates still pending in `_candidates/` from earlier runs, and the candidates accepted so far. A pending file that does not parse, or that reuses a catalogue id to wait for `--replace`, is left out of that merge. When the pending candidates no longer fit the catalogue, generate refuses before the call, since their problems would be blamed on the new ones. In the fixture, `scout-call` summons `brine-scout`, accepted a moment earlier, and is rejected because `brine-scout` is not a token.
 
 **Range rules only bind generated content.** The schemas say what any entry may be. The rules add limits for a generated one, at generate time and again at promote time. A card stays on the cost curve (budget 2 x cost + 1), is not legendary and has at most two keywords. A faction names no rival, since that would need an edit to another file. A new set is released after the last one, and no candidate says `handwritten: true`. A hand-written legendary such as The Drowned Queen is valid in the catalogue and would be rejected from the model; a test checks both.
 
@@ -95,7 +95,7 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 
 **The hand-written guard.** A target with `handwritten: true` is never replaced, with or without `--replace`. A target that cannot be read as JSON is treated as hand-written. Only `handwritten: true` protects a file. The field defaults to false, so a hand-written file without it counts as generated and `--replace` can overwrite it. A generated target is replaced only with `--replace`, and is checked again right before the write. A new file is written to a temporary name and hard-linked into place. The link fails with `EEXIST` if anything appeared there since the check, so a new file never lands on top of another. Temporary names start with a dot, which the loader skips, so a file left by a crash does not make the catalogue invalid.
 
-**A paid call always leaves a report.** generate refuses before the call when a pending file is not JSON, has no string id or is named after another id, since each would hide an id from the pending check. promote reports such a file instead of skipping it. If a candidate still cannot be written after the call (a file appeared at its path meanwhile), the report records it under `unwritten` with the error code, the command exits 1, and the cost stays counted.
+**A paid call always leaves a report.** generate refuses before the call when a pending file is not JSON, has no string id or is named after another id. Each would hide an id from the pending check. promote reports such a file instead of skipping it. If a candidate still cannot be written after the call (a file appeared at its path meanwhile), the report records it under `unwritten` with the error code, the command exits 1, and the cost stays counted.
 
 **Spending goes through the gateway.** [`src/model.ts`](src/model.ts) is the only file that imports the gateway, through its public entry. It sets `claude-sonnet-5-5` at medium effort, `max_tokens` 16,000 (the gateway's limit without streaming) and a US$1 cap per process. The gateway reserves each call's worst case first: for the card request in the tests (7,728 estimated input tokens) that is about US$0.18. The key is read only in [`cli.ts`](cli.ts) and passed in. Failures print the gateway's error code, never the model's text or the API's message.
 
@@ -112,7 +112,7 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 | `test/rules-report.test.ts` | The cost curve for each card type, token exemption, the hand-written legendary, set order, keyword count, rule texts in every prompt; the output schema's lenient elements; the Wilson interval; pooling by version; unusable runs and unknown costs; reports whose numbers do not add up; invalid report files listed and not counted |
 | `test/cli.test.ts` | The whole loop through `runCli` (validate, generate, stats, promote, validate), with the generate output compared to the sample above; exit codes 1, 2 and 3; error output with codes only, also for an unexpected error; `cli.ts` run as a child process |
 
-75 tests, all offline. The fixture responses in `test/fixtures/responses/` are written by hand in the shape of a structured-output response, with candidates that are wrong on purpose. None is a recorded model response.
+90 tests, all offline. The fixture responses in `test/fixtures/responses/` are written by hand in the shape of a structured-output response, with candidates that are wrong on purpose. None is a recorded model response.
 
 ## Layout
 
