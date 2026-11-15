@@ -230,7 +230,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
 
   const tableHead = (): void => {
     page.drawRectangle({ x: M - 6, y: y - 7, width: contentWidth + 12, height: 22, color: BAND });
-    text(L.product, col.nameLeft, y, bold, 9);
+    text(clip(bold, L.product, 9, col.nameWidth).text, col.nameLeft, y, bold, 9);
     text(clip(bold, L.detail, 9, col.detailWidth).text, col.detailLeft, y, bold, 9);
     right(clip(bold, L.quantity, 9, col.quantityWidth).text, col.quantityRight, y, bold, 9);
     right(clip(bold, L.unitPrice, 9, col.unitPriceWidth).text, col.unitPriceRight, y, bold, 9);
@@ -292,7 +292,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
   rule(y, 1);
   y -= 24;
 
-  text(L.customer, M, y, bold, 9, MUTED);
+  text(clip(bold, L.customer, 9, contentWidth).text, M, y, bold, 9, MUTED);
   y -= 17;
   text(fitted(r.customer.name, bold, 14, contentWidth, 'customer.name'), M, y, bold, 14);
   r.customer.lines.forEach((l, i) => {
@@ -301,7 +301,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
   });
   if (r.deliveryText !== null) {
     y -= 15;
-    text(`${L.delivery}: ${r.deliveryText}`, M, y, regular, 10, INK);
+    text(clip(regular, `${L.delivery}: ${r.deliveryText}`, 10, contentWidth).text, M, y, regular, 10, INK);
   }
   y -= 28;
 
@@ -380,7 +380,7 @@ function draw(doc: PDFDocument, r: PreparedReceipt, ctx: DrawContext): void {
       const chunk = lines.slice(next, next + room);
       const boxHeight = 30 + lh * chunk.length;
       page.drawRectangle({ x: M - 6, y: y - boxHeight + 12, width: contentWidth + 12, height: boxHeight, color: BAND });
-      text(first ? L.notes : `${L.notes} (${L.continued})`, M, y, bold, 9);
+      text(clip(bold, first ? L.notes : `${L.notes} (${L.continued})`, 9, contentWidth).text, M, y, bold, 9);
       chunk.forEach((l, k) => text(l, M, y - 16 - lh * k, regular, 10));
       y -= boxHeight + 8;
       next += chunk.length;
