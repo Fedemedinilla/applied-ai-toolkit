@@ -1,7 +1,7 @@
 // The pieces on their own: link stripping, the limiter and the Resend adapter.
 
 import { describe, expect, it } from 'vitest';
-import { createLimiter, EMAIL, greeting, htmlDocument, quote, resendTransport, stripLinks, TransportError } from '../src/index.ts';
+import { createLimiter, EMAIL, greeting, htmlDocument, paragraphs, quote, resendTransport, stripLinks, TransportError } from '../src/index.ts';
 import { FAKE_KEY, fakeResend } from './helpers/fake-resend.ts';
 
 describe('stripLinks', () => {
@@ -46,6 +46,14 @@ describe('quote and greeting', () => {
   it('greeting is one line and falls back when only links were there', () => {
     expect(greeting('Ana\nMaría', 32, 'there')).toBe('Ana María');
     expect(greeting('www.evil.example', 32, 'there')).toBe('there');
+  });
+});
+
+describe('paragraphs', () => {
+  it('CRLF and lone CR line endings, as native form posts send them, keep their paragraphs', () => {
+    const p = (x: string) => `<p style="margin:0 0 14px">${x}</p>`;
+    expect(paragraphs('a\r\n\r\nb\r\nc')).toBe(`${p('a')}${p('b<br>c')}`);
+    expect(paragraphs('a\r\rb')).toBe(`${p('a')}${p('b')}`);
   });
 });
 

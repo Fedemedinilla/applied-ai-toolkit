@@ -111,6 +111,17 @@ describe('a valid message', () => {
     expect(s.resend.sent[0]!.html).toContain('<p style="margin:0 0 14px">one<br>two</p><p style="margin:0 0 14px">&lt;b&gt;three&lt;/b&gt;</p>');
   });
 
+  it('a native form post with CRLF line endings keeps its paragraphs in both emails', async () => {
+    const s = setup();
+    await s.handler(asForm(good(s.now, { body: 'First paragraph.\r\n\r\nSecond one.' })), ctx());
+    expect(s.resend.sent).toHaveLength(2);
+    for (const mail of s.resend.sent) {
+      expect(mail.html).toContain('<p style="margin:0 0 14px">First paragraph.</p><p style="margin:0 0 14px">Second one.</p>');
+      expect(mail.html).not.toContain('\r');
+      expect(mail.text).not.toContain('\r');
+    }
+  });
+
   it('field names are configurable', async () => {
     const s = setup({ fields: { name: 'nombre', email: 'correo', message: 'mensaje' } });
     const res = await s.handler(asJson({ nombre: 'Ana', correo: 'ana@visitor.example', mensaje: 'Hola, una consulta.' }), ctx());

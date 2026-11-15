@@ -8,7 +8,7 @@
  * address under the site's name.
  */
 import { createLimiter, type RateLimit } from './rate-limit.ts';
-import { cut, escapeHtml, greeting, htmlDocument, oneLine, paragraphs, quote } from './sanitize.ts';
+import { cut, escapeHtml, greeting, htmlDocument, lf, oneLine, paragraphs, quote } from './sanitize.ts';
 import { fill, TEXTS, type Lang, type PageText, type Texts } from './texts.ts';
 import type { MailTransport } from './transport.ts';
 
@@ -274,7 +274,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
     const name = cut(oneLine(g('name')), 100);
     const email = g('email', 200);
     const phone = cut(oneLine(g('phone')), 40);
-    const message = g('message');
+    const message = lf(g('message'));
     const source = cut(oneLine(g('source')), 60);
     const subject = cut(oneLine(g('subject')), 90);
     if (!name || email.length > 160 || !EMAIL.test(email) || message.length < 2) {

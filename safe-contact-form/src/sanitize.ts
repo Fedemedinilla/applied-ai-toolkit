@@ -21,9 +21,12 @@ export function cut(s: string, max: number): string {
 /** A subject or a name is one line: a newline inside would split a header or leave text hanging. */
 export const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
+/** Line endings as `\n`. Browsers send a textarea's newlines as CRLF in a native form post. */
+export const lf = (s: string): string => s.replace(/\r\n?/g, '\n');
+
 /** Paragraphs and line breaks of a plain-text message, kept in the HTML part. */
 export function paragraphs(s: string): string {
-  return s
+  return lf(s)
     .split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 14px">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
     .join('');
