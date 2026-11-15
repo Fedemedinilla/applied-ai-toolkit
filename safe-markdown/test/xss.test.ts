@@ -112,6 +112,20 @@ describe('quotes and attributes', () => {
     inert('[x](mailto:a"onclick="alert(1)@shop.example)');
   });
 
+  // The payloads above end in "alert(1))", and a link URL cannot hold "(", so no link forms and
+  // the quotes stay literal text. These have no parentheses, so the anchor is built and the
+  // assertion is on the escaped href itself.
+  it.each([
+    ['[x](/a"onmouseover="x)', '<a href="/a&quot;onmouseover=&quot;x">x</a>'],
+    ["[x](/a'onmouseover='x)", '<a href="/a&#39;onmouseover=&#39;x">x</a>'],
+    ['[x](#a"onx="y)', '<a href="#a&quot;onx=&quot;y">x</a>'],
+    ['[x](mailto:a"onclick="x@shop.example)', '<a href="mailto:a&quot;onclick=&quot;x@shop.example">x</a>'],
+    ['[x](https://shop.example/"onmouseover="x)', '<a href="https://shop.example/%22onmouseover=%22x">x</a>'],
+  ])('a quote inside a link that forms is escaped in the href: %s', (s, anchor) => {
+    inert(s);
+    expect(md(s)).toBe(`<p>${anchor}</p>`);
+  });
+
   it('a mailto with headers or percent-encoding is not a link, so it cannot add a hidden recipient', () => {
     for (const url of [
       'mailto:a@b.example?cc=evil%40x.example&body=hi',
