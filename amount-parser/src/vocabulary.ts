@@ -120,6 +120,16 @@ export const EXPENSE_VERBS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Verbs whose object is the money itself: "gaste 3500", never "gaste 3 tortas". Not "compre",
+ * "vendi", "cargue" or "recibi", whose object is the goods.
+ */
+export const MONEY_VERBS: ReadonlySet<string> = new Set([
+  'gaste', 'gasto', 'pague', 'pago', 'abone', 'abono', 'salio', 'salieron', 'inverti', 'deposite',
+  'cobre', 'cobro', 'cobraron', 'facture', 'facturo', 'ingreso', 'ingresaron', 'entro', 'entraron',
+  'deposito', 'depositaron', 'transfirieron', 'pagaron', 'recaude',
+]);
+
+/**
  * Fixed expressions that talk about money without naming an amount. Matched as substrings of the
  * normalized sentence, so "doscientos dos pesos" also matches "dos pesos" (see the README's limits).
  */

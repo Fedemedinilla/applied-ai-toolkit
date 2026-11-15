@@ -164,6 +164,7 @@ Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container 
 - "x" is not read as multiplication: "pague 2 mil x 3" returns 2000.
 - "4 cuotas a 90 mil" returns 90000 (one instalment), while "4 pagos a 90 mil" asks `unit_or_total`. The instalments step needs "de" after the count, and the next step skips only the literal "cuota(s)". The source behaves the same way, and changing it needs corpus cases for both nouns.
 - "1e5" splits into 1 and 5 joined by "e", which is also a conjunction, and returns 6. Scientific notation is not something people type into an expense note, but the parser does not reject it.
+- A figure up to 10000 followed by an ordinary word reads as a count ("5 tortas"). When it is the only figure, it is the amount only right after a verb whose object is money and from 100 up: "gasté 3500 ayer" is 3500. "gasté ayer 3500 nafta" and "3500 nafta" still return no amount.
 - One amount per sentence. Two movements ("pague 5 mil de luz y 3 mil de gas") come back as their sum, and money in and out together is refused as `mixed_directions`, not split.
 - The vocabulary is Rioplatense Spanish only. Other Spanish varieties use other slang and, in some countries, the opposite separators.
 - Currencies with an ordinary homograph ("reales", "libras") are not detected, on purpose. A false alarm on "el precio real" would cost more than it saves.

@@ -52,6 +52,7 @@ import {
   INCOME_VERBS,
   INSTALMENT_NOUNS,
   JOINERS,
+  MONEY_VERBS,
   MONTHS,
   NEUTRAL_UNITS,
   NON_AMOUNT_IDIOMS,
@@ -337,6 +338,8 @@ interface Quantity {
   index: number;
   value: number;
   noun: string;
+  /** Counted only because an ordinary word followed it: "5 tortas", and also "3500 ayer". */
+  plainNoun: boolean;
 }
 
 interface Reading {
@@ -438,7 +441,8 @@ function classifyNumbers(s: Sentence): Reading | null {
         (countsBeforePrice && Number.isInteger(t.value)));
 
     if (countsSomething) {
-      quantities.push({ index: i, value: t.value, noun: countsBeforePrice ? '' : next });
+      const plainNoun = !COUNT_NOUNS.has(next) && !countsBeforePrice;
+      quantities.push({ index: i, value: t.value, noun: countsBeforePrice ? '' : next, plainNoun });
       continue;
     }
 
@@ -459,6 +463,17 @@ function classifyNumbers(s: Sentence): Reading | null {
 
   // A lone "un"/"una" is not an amount: "vendi una mesa" has no money in it.
   const pool = candidates.filter((c) => !(c.token.fromWords && c.token.value === 1 && !c.token.scaled));
+
+  // "gaste 3500 ayer", "pague 8000 efectivo": the word after the figure made it look like a count,
+  // and it was the only figure. Right after a verb whose object is money, it is the amount. Not
+  // after "compre" or "vendi", whose object is the goods ("compre 3 tortas" names no price), and not
+  // under 100, where "pague 3 entradas" is a count with its price left unsaid.
+  const lone = quantities.length === 1 ? quantities[0]! : undefined;
+  if (!pool.length && lone?.plainNoun && lone.value >= 100 && MONEY_VERBS.has(tokens[lone.index - 1]?.text ?? '')) {
+    const t = tokens[lone.index]!;
+    quantities.splice(0, 1);
+    pool.push({ index: lone.index, token: t, previousWord: tokens[lone.index - 1]!.text, perUnit: false, isTotalMarked: false, score: 0 });
+  }
   if (!pool.length) return null;
 
   pool.sort((a, b) => b.score - a.score || a.index - b.index);

@@ -2239,5 +2239,83 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "30000"
+ },
+ {
+  "phrase": "gaste 3500 ayer",
+  "family": "dates-and-tense",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 3500,
+  "ambiguous": false,
+  "note": "The only figure follows a verb whose object is money, so \"ayer\" is not what it counts: 3.500. It used to be read as 3.500 of something and the sentence came back with no amount.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "pague 8000 efectivo",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 8000,
+  "ambiguous": false,
+  "note": "Same shape with a payment method after the figure: 8.000. Without the verb rule the expense was never recorded or asked about.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "cobre 9000 transferencia",
+  "family": "income-verbs",
+  "kind": "income",
+  "quantity": null,
+  "unit_price": null,
+  "total": 9000,
+  "ambiguous": false,
+  "note": "Money in, same shape: 9.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "compre 3 tortas para el cumple",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": null,
+  "ambiguous": false,
+  "note": "CONTROL. \"compre\" takes the goods as object, so 3 counts tortas and the sentence names no price: no amount, not 3 pesos.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
+ },
+ {
+  "phrase": "gaste 3500 en nafta",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 3500,
+  "ambiguous": false,
+  "note": "CONTROL. With the connector the figure never looked like a count: 3.500.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "3500"
+ },
+ {
+  "phrase": "pague 3 entradas para el recital",
+  "family": "count-and-price",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": null,
+  "ambiguous": false,
+  "note": "CONTROL. A small figure after a money verb and before a noun is a count with its price left unsaid: no amount, not 3 pesos.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "null"
  }
 ]
