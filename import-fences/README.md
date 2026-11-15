@@ -66,7 +66,7 @@ export default defineConfig({
 });
 ```
 
-Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
+Globs use `**` across folders, `*` and `?` inside one name and `{a,b}` for alternatives. Paths are relative to `root`, which is relative to the config file, and are written without a leading `./` or `/` and with forward slashes; a glob written otherwise, or with unbalanced braces, stops the run with exit code 2, since it would match nothing. `node_modules`, `.git`, `dist` and `coverage` are ignored unless `ignore` says otherwise. Only `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files are read. Every rule takes an optional `why`, printed after the reason, so whoever breaks a fence reads why it exists.
 
 ### A JSON config, and a minimal example
 

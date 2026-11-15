@@ -10,6 +10,7 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { DEFAULT_IGNORE } from './files.ts';
+import { globToRegExp } from './glob.ts';
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
@@ -25,7 +26,28 @@ export const NODE_BUILTINS: readonly string[] = [
 ];
 
 const text = z.string().min(1);
-const globs = z.array(text);
+
+/**
+ * A repository glob is matched against posix paths relative to the root, such as `server/x.ts`.
+ * `./server/**`, `/server/**` and `server\**` would match none of them and turn the rule off
+ * silently, so they stop the run, and so does a glob that does not compile.
+ */
+const glob = text.superRefine((value, ctx) => {
+  if (value.startsWith('./') || value.startsWith('/')) {
+    ctx.addIssue({ code: 'custom', message: `glob ${JSON.stringify(value)} starts with "${value.startsWith('/') ? '/' : './'}"; paths are relative to the root without it, as in "server/**"` });
+  } else if (value.includes('\\')) {
+    ctx.addIssue({ code: 'custom', message: `glob ${JSON.stringify(value)} has a backslash; use forward slashes` });
+  } else {
+    try {
+      globToRegExp(value);
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: (error as Error).message });
+    }
+  }
+});
+const globs = z.array(glob);
+/** Module specifiers, not paths: `node:*`, `@vendor/sdk`. */
+const specifierList = z.array(text);
 const why = z.string().min(1).optional();
 
 const Group = z.strictObject({
@@ -41,7 +63,7 @@ const ForbiddenImport = z.strictObject({
   rule: z.literal('forbidden-import'),
   group: text,
   /** Package names (subpaths match) or prefixes ending in `*`, such as `node:*`. */
-  specifiers: globs.default([]),
+  specifiers: specifierList.default([]),
   /** Repository globs that the group may not reach through relative imports. */
   paths: globs.default([]),
   /**
@@ -54,7 +76,7 @@ const ForbiddenImport = z.strictObject({
   /** Follow relative imports into every file the group reaches, inside the repository. */
   transitive: z.boolean().default(true),
   /** Bare specifiers that resolve outside node_modules (virtual modules, aliases): not reported as unresolved. */
-  external: globs.default([]),
+  external: specifierList.default([]),
   why,
 });
 

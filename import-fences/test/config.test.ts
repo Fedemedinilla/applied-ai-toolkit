@@ -26,6 +26,23 @@ describe('parseConfig', () => {
     expect(() => parseConfig({ ...base, rules: [{ rule: 'dynamic-import', group: 'scr' }] })).toThrow(/rules\.0\.group: unknown group "scr"/);
     expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: ['x'], except: ['a.ts'] }] })).toThrow(/except narrows paths/);
   });
+
+  it('rejects a glob that cannot compile, naming its key', () => {
+    const config = { groups: { src: { include: ['src/{a,b.ts'] } }, rules: [{ rule: 'dynamic-import', group: 'src' }] };
+    expect(() => parseConfig(config)).toThrow(ConfigError);
+    expect(() => parseConfig(config)).toThrow(/groups\.src\.include\.0: unbalanced braces/);
+  });
+
+  it('rejects a glob written as ./x, /x or with backslashes, since it would match no repository path', () => {
+    for (const glob of ['./server/**', '/server/**', 'server\\**']) {
+      const config = { ...base, rules: [{ rule: 'forbidden-import', group: 'src', paths: [glob] }] };
+      expect(() => parseConfig(config), glob).toThrow(ConfigError);
+      expect(() => parseConfig(config), glob).toThrow(/rules\.0\.paths\.0: /);
+    }
+    expect(() => parseConfig({ groups: { src: { include: ['./src/**'] } }, rules: [{ rule: 'dynamic-import', group: 'src' }] })).toThrow(/groups\.src\.include\.0/);
+    expect(() => parseConfig({ ...base, ignore: ['./dist/**'], rules: [{ rule: 'dynamic-import', group: 'src' }] })).toThrow(/ignore\.0/);
+    expect(parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', paths: ['server/**', '**/x.ts', '{a,b}/*.ts'] }] }).rules).toHaveLength(1);
+  });
 });
 
 describe('specifier patterns', () => {
