@@ -150,15 +150,35 @@ const PERMISSIONS = /^\s*(['"]?)permissions\1\s*:(.*)$/;
 const KEY_VALUE = /^\s*(['"]?)([\w-]+)\1\s*:(.*)$/;
 
 /**
- * True when a ${{ }} expression on the line reads a secret or the job token. Each expression runs
- * to its closing braces, so a '}' inside it, as in format('{0}', secrets.X), hides nothing. The
+ * The bodies of the ${{ }} expressions on a line. Each runs to the "}}" that closes it outside a
+ * string literal ('...' with '' for a quote, as GitHub writes them), so neither a '}' in
+ * format('{0}', secrets.X) nor a '}}' in format('}}', secrets.X) ends it early.
+ */
+function expressionBodies(code: string): string[] {
+  const bodies: string[] = [];
+  let at = code.indexOf('${{');
+  while (at !== -1) {
+    let i = at + 3;
+    let quoted = false;
+    while (i < code.length && (quoted || !code.startsWith('}}', i))) {
+      if (code[i] === "'") quoted = !quoted;
+      i++;
+    }
+    bodies.push(code.slice(at + 3, i));
+    at = code.indexOf('${{', i + 2);
+  }
+  return bodies;
+}
+
+/**
+ * True when a ${{ }} expression on the line reads a secret or the job token. GitHub resolves
+ * context and property names in any letter case, so SECRETS.X and GitHub.Token count too. The
  * token is matched as github.token and as github['token'].
  */
 function readsSecret(code: string): boolean {
-  for (const [, body = ''] of code.matchAll(/\$\{\{(.*?)(?:\}\}|$)/g)) {
-    if (/\bsecrets\b/.test(body) || /\bgithub\s*(?:\.\s*token\b|\[\s*(['"])token\1\s*\])/.test(body)) return true;
-  }
-  return false;
+  return expressionBodies(code).some(
+    (body) => /\bsecrets\b/i.test(body) || /\bgithub\s*(?:\.\s*token\b|\[\s*(['"])token\1\s*\])/i.test(body),
+  );
 }
 
 export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_WORKFLOW_POLICY): Finding[] {

@@ -94,6 +94,15 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test', '      - run: echo "${{ github.sha }}" "${{ secrets.X }}"'))).toEqual(['17:secret-expression']);
   });
 
+  it('matches the contexts in any letter case and reads past "}}" inside a string literal', () => {
+    const step = (expr: string) => CLEAN.replace('      - run: npm test', `      - run: echo "\${{ ${expr} }}"`);
+    for (const expr of ['SECRETS.DEPLOY', 'Secrets.DEPLOY', 'GITHUB.TOKEN', 'GitHub.Token', "github['TOKEN']", "format('}}', secrets.DEPLOY)", "format('it''s }}', SECRETS.X)"]) {
+      expect(rules(step(expr)), expr).toEqual(['17:secret-expression']);
+    }
+    expect(rules(step("format('}}', github.sha)"))).toEqual([]);
+    expect(rules(step('GITHUB.SHA'))).toEqual([]);
+  });
+
   it('reports a real-looking value in a credential-shaped variable, and leaves other variables alone', () => {
     const found = workflowFindings(CLEAN.replace('ci-placeholder-app-0001', 'sk-live-0000'));
     expect(found).toEqual([{ line: 10, rule: 'credential-value', text: 'APP_API_KEY: sk-live-0000' }]);
