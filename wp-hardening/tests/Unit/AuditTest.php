@@ -274,6 +274,15 @@ final class AuditTest extends TestCase
         self::assertSame(['mu-plugins/new.php'], $finding->evidence);
     }
 
+    public function testRecentPhpCoversEveryPhpExtension(): void
+    {
+        foreach (['shell.phtml', 'x.php7', 'readme.txt'] as $name) {
+            file_put_contents($this->root . '/wp-content/mu-plugins/' . $name, '<?php');
+            touch($this->root . '/wp-content/mu-plugins/' . $name, $this->now - 86400);
+        }
+        self::assertSame(['mu-plugins/shell.phtml', 'mu-plugins/x.php7'], $this->audit()->recentPhp()->evidence);
+    }
+
     public function testSuspiciousHtaccessLines(): void
     {
         $text = implode("\n", [

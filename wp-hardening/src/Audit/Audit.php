@@ -426,7 +426,7 @@ final class Audit
         $since = $this->now() - $days * 86400;
         $recent = [];
         $walk = self::walk($this->paths()->content, function (\SplFileInfo $file) use (&$recent, $since): void {
-            if (preg_match('/\.php$/i', $file->getFilename()) === 1 && $file->getMTime() >= $since) {
+            if (preg_match(self::PHP_EXTENSION, $file->getFilename()) === 1 && $file->getMTime() >= $since) {
                 $recent[] = self::relative($file->getPathname(), $this->paths()->content);
             }
         });
