@@ -220,6 +220,13 @@ describe('request shape and limits', () => {
     expect(await res.json()).toEqual({ error: 'method' });
   });
 
+  it('the eighth user turn is answered; the ninth is the turn limit', async () => {
+    const s = setup([say('Dale.')]);
+    const eight: Msg[] = Array.from({ length: 8 }, () => ({ role: 'user', content: 'hola' }));
+    expect((await turn(s.handler, eight)).status).toBe(200);
+    expect((await turn(s.handler, [...eight, { role: 'user', content: 'hola' }])).body).toEqual({ error: 'turn_limit' });
+  });
+
   it('each turn reaches the model cut to maxChars and trimmed', async () => {
     const s = setup([say('ok')]);
     await turn(s.handler, [{ role: 'user', content: `  ${'a'.repeat(700)}` }]);
