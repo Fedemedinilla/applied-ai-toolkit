@@ -133,13 +133,13 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 ## What the tests cover
 
-78 tests, all offline.
+86 tests, all offline.
 
 `test/closed-signups.test.ts`
 - The list's normalization constraint and default role.
 - The hook, called as `supabase_auth_admin`, for listed, unlisted, mixed-case, empty and missing addresses; and refusing everyone once its policy is dropped.
 - The hook closed to `anon`, `authenticated` and `service_role`.
-- The trigger: accounts created with the listed role; unlisted and address-less users refused with no row left; the message names the id, not the address.
+- The trigger: accounts created with the listed role, also from an address with another case and surrounding spaces; unlisted and address-less users refused with no row left; the message names the id, not the address.
 - A user kept after its address leaves the list.
 - RLS on `accounts` for two users and for a token without `sub`; what `service_role` may change.
 - Any user getting in on a database without the trigger.
@@ -151,7 +151,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 `test/no-email-change.test.ts`
 - One listed row becoming two admin accounts on a database without the trigger.
-- Every kind of change refused: off the list, to another listed address, another spelling, null, by a privileged role.
+- Every kind of change refused: off the list, to another listed address, another spelling, null, by a privileged role. The refusal names the id and neither address.
 - Change requests in one row and in several; the soft delete.
 - Writes that do not change the address landing as written; a real delete taking the account with it.
 
@@ -159,14 +159,14 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 - 20 attempts `recorded`, then `exhausted` with nothing recorded; case and spacing; separate counts per address.
 - `no_code` for 30 made-up addresses, with no rows; a listed address with no user; a user whose address left the list, matched in lowercase.
 - The sha256 of the normalized address, its length check, and no column that could hold the address.
-- The 24-hour window, its cleanup and the exact edge; the advisory lock held until commit; 22004 for a missing address; privileges for every role.
+- The 24-hour window (rows one second past it free their slots), its cleanup and the exact edge; one advisory lock per address, held until commit; 22004 for a missing address; privileges for every role.
 
 `test/conventions.test.ts`
 - The exact tables, functions, enums and triggers the migrations create.
 - `audit.sql`: no rows on the migrated schema, all nine violations on objects created the default way, and MAINTAIN left to any one role.
 - Table and column privileges per role; EXECUTE per role and for `PUBLIC`; which functions are security definer; the RLS policies.
 
-`test/mutations.ts` is an opt-in mutation check, not part of `npm test`. It copies `sql/`, reintroduces one gap at a time, and runs the suite against the copy. The six gaps are matching `auth.users` without `lower()`, removing the hook's revoke, dropping the `email_change` clause from the trigger, firing the password trigger on insert only, `>` instead of `>=` for the cap, and a `using (true)` policy on `accounts`. An unchanged copy runs first as a control. Every mutation fails the suite. To repeat it (about two minutes):
+`test/mutations.ts` is an opt-in mutation check, not part of `npm test`. It copies `sql/`, reintroduces one gap at a time, and runs the suite against the copy. The five gaps in the triggers and policies are matching `auth.users` without `lower()`, removing the hook's revoke, dropping the `email_change` clause, firing the password trigger on insert only, and a `using (true)` policy on `accounts`. The five in the cap and the messages are `>` instead of `>=`, one lock key for every address, a 25-hour window, no `btrim` in the account trigger, and the address in the email-change refusal. An unchanged copy runs first as a control. Every mutation fails the suite. To repeat it (about three minutes):
 
 ```sh
 node supabase-auth-hardening/test/mutations.ts

@@ -4,8 +4,8 @@
  * copy (through HARDENING_SQL_DIR), and the mutation must make it fail. The script exits 1 if any
  * mutation survives, or if a mutation no longer matches the SQL it was written for.
  *
- * Not a *.test.ts file, so `npm test` does not pick it up: seven full runs (one control and
- * six mutations) take about two minutes.
+ * Not a *.test.ts file, so `npm test` does not pick it up: eleven full runs (one control and
+ * ten mutations) take about three minutes.
  */
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,6 +47,30 @@ const MUTATIONS: readonly Mutation[] = [
     file: '0005_otp_attempt_cap.sql',
     from: 'if v_used >= c_cap then',
     to: 'if v_used > c_cap then',
+  },
+  {
+    name: 'one lock key for every address',
+    file: '0005_otp_attempt_cap.sql',
+    from: "pg_catalog.hashtextextended(pg_catalog.encode(v_hash, 'hex'), 0)",
+    to: '42::bigint',
+  },
+  {
+    name: 'a 25-hour window',
+    file: '0005_otp_attempt_cap.sql',
+    from: "c_window constant interval := interval '24 hours';",
+    to: "c_window constant interval := interval '25 hours';",
+  },
+  {
+    name: 'no btrim in the account trigger',
+    file: '0002_closed_signups.sql',
+    from: "where a.email = pg_catalog.lower(pg_catalog.btrim(coalesce(new.email, '')));",
+    to: "where a.email = pg_catalog.lower(coalesce(new.email, ''));",
+  },
+  {
+    name: 'the address in the email-change refusal',
+    file: '0004_no_email_change.sql',
+    from: "'User % cannot change its email address.', new.id",
+    to: "'User % cannot change its email address.', new.email",
   },
   {
     name: 'a using (true) policy on accounts',
