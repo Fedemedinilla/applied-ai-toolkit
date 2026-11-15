@@ -98,6 +98,9 @@ export function protectedReason(rel: string, config: ProtectedConfig, readJson: 
   return null;
 }
 
+/** JSON.parse rejects a byte order mark, and editors on Windows often save JSON with one. */
+const readJsonFile = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+
 function parseConfig(raw: unknown): ProtectedConfig {
   if (typeof raw !== 'object' || raw === null) throw new Error('protected.json must be an object');
   const { paths, jsonFlag } = raw as { paths?: unknown; jsonFlag?: unknown };
@@ -149,7 +152,7 @@ export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): 
   if (!existsSync(configFile)) return { code: 0, message: '' };
   let config: ProtectedConfig;
   try {
-    config = parseConfig(JSON.parse(readFileSync(configFile, 'utf8')));
+    config = parseConfig(readJsonFile(configFile));
   } catch (error) {
     return { code: 2, message: `Blocked: .claude/protected.json cannot be read (${(error as Error).message}).` };
   }
@@ -157,7 +160,7 @@ export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): 
   if (candidates.length === 0) return { code: 0, message: '' };
   const readJson = (path: string): unknown => {
     try {
-      return JSON.parse(readFileSync(resolve(root, path), 'utf8'));
+      return readJsonFile(resolve(root, path));
     } catch {
       return null; // a new file or one that is not JSON carries no flag
     }

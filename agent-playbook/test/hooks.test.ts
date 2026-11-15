@@ -188,6 +188,14 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(hook(edit('src/a.ts'))).toEqual({ code: 0, stderr: '' });
   });
 
+  it('reads a hand-written JSON file and the config saved with a byte order mark', () => {
+    writeFileSync(join(root, 'content/bom.json'), '\uFEFF{ "handwritten": true }');
+    expect(hook(edit('content/bom.json')).code).toBe(2);
+    writeFileSync(join(root, '.claude/protected.json'), `\uFEFF${readFileSync(join(FOLDER, 'claude/protected.json'), 'utf8')}`);
+    expect(hook(edit('src/a.ts'))).toEqual({ code: 0, stderr: '' });
+    expect(hook(edit('test/golden/a.json')).code).toBe(2);
+  });
+
   it('reads the notebook path of NotebookEdit', () => {
     expect(hook({ tool_name: 'NotebookEdit', tool_input: { notebook_path: 'test/golden/n.ipynb' } }).code).toBe(2);
   });
