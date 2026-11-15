@@ -332,7 +332,12 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     const token = field(body, 'refresh_token');
     const stored = typeof token === 'string' ? refreshTokens.get(token) : undefined;
     if (stored === undefined) return authError(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
-    if (stored.revoked) return authError(400, 'refresh_token_already_used', 'Invalid Refresh Token: Already Used');
+    if (stored.revoked) {
+      // Reuse detection: a spent token coming back means it may have been stolen, so Auth revokes
+      // every token of that session (the token family), not just this one.
+      for (const other of refreshTokens.values()) if (other.sessionId === stored.sessionId) other.revoked = true;
+      return authError(400, 'refresh_token_already_used', 'Invalid Refresh Token: Already Used');
+    }
     const user = users.get(stored.userId);
     if (user === undefined) return authError(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
     // Rotation: the token just used is spent.

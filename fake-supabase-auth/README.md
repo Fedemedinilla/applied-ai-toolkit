@@ -72,7 +72,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 
 **Outage bodies that are not JSON.** `failWith` answers plain text, as a gateway in front of a dead Auth does. auth-js has a separate branch for an unparseable 5xx body, and a JSON body would skip it.
 
-**State where Auth keeps state.** Codes from `/otp` are single use. Refresh tokens rotate, and reusing a spent one gets 400 `refresh_token_already_used`. `/logout` honors `scope` (`global`, `local`, `others`), so a test can sign out one device and check another still refreshes. PKCE codes check the verifier against the S256 challenge. A stateless fake would accept a replayed code or a stolen refresh token, and the test of the code that should reject them would pass anyway.
+**State where Auth keeps state.** Codes from `/otp` are single use. Refresh tokens rotate, and reusing a spent one gets 400 `refresh_token_already_used` and revokes every refresh token of that session, as Auth's reuse detection does. `/logout` honors `scope` (`global`, `local`, `others`), so a test can sign out one device and check another still refreshes. PKCE codes check the verifier against the S256 challenge. A stateless fake would accept a replayed code or a stolen refresh token, and the test of the code that should reject them would pass anyway.
 
 **A gateway check on the key.** A request whose `apikey` header is not the publishable key gets the gateway's 401 before Auth or PostgREST sees it. A client built with the wrong key fails in the test instead of only in production.
 

@@ -271,6 +271,21 @@ describe('refresh', () => {
     expect(reused.error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
   });
 
+  it('reusing a spent refresh token revokes the rest of that session, and only that session', async () => {
+    const stolen = await signIn(fake, clientFor(fake));
+    const otherDevice = await signIn(fake, clientFor(fake));
+    const refreshWith = (refreshToken: string) => clientFor(fake).auth.refreshSession({ refresh_token: refreshToken });
+
+    const rotated = await refreshWith(stolen.refresh_token);
+    expect(rotated.error).toBeNull();
+    const child = rotated.data.session?.refresh_token;
+    if (child === undefined) throw new Error('no rotated refresh token');
+
+    expect((await refreshWith(stolen.refresh_token)).error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
+    expect((await refreshWith(child)).error).toMatchObject({ status: 400, code: 'refresh_token_already_used' });
+    expect((await refreshWith(otherDevice.refresh_token)).error).toBeNull();
+  });
+
   it('a 5xx on refresh is retried with backoff for about 30 seconds, then returned, and the session stays', async () => {
     fake.knobs.expiresIn = -60;
     const storage = memoryStorage();
