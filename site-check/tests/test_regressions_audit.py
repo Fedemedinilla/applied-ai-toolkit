@@ -13,7 +13,7 @@ from support import TEST_KEY, SleepRecorder
 from sitecheck.challenge import ChallengeDetector
 from sitecheck.credentials import Redactor
 from sitecheck.endpoints import Endpoints
-from sitecheck.httpclient import ClientConfig, HttpClient, LoopbackRoute, public_address
+from sitecheck.httpclient import ClientConfig, HttpClient, LoopbackRoute, _declared_length, public_address
 from sitecheck.requestlog import RequestLog
 from sitecheck.scope import Purpose, ScopeGuard
 from fakeapis import FakeApis
@@ -52,6 +52,25 @@ class Nat64AddressTest(unittest.TestCase):
         self.assertTrue(public_address("64:ff9b::101:101"))  # 1.1.1.1
         self.assertTrue(public_address("2606:4700:4700::1111"))
         self.assertFalse(public_address("::ffff:10.0.0.1"))
+
+
+class NonAsciiDigitHeaderTest(unittest.TestCase):
+    """str.isdigit() accepts the latin-1 superscripts that http.client can decode."""
+
+    def test_content_length_superscript_is_not_a_length(self) -> None:
+        self.assertIsNone(_declared_length([("Content-Length", "²")]))
+        self.assertEqual(_declared_length([("Content-Length", "12")]), 12)
+
+    def test_retry_after_superscript_still_cuts_the_host(self) -> None:
+        busy = Route(429, [("Content-Type", "text/html"), ("Retry-After", "²")], b"<html><body>Too many</body></html>")
+        sc = school_scenario()
+        sc.routes.update({f"{BASE}/a/": busy, f"{BASE}/b/": busy})
+        with FakeSite(sc) as site, FakeApis(default_apis()) as apis:
+            rig = _Rig(site, apis)
+            rig.guard.admit_linked([f"{BASE}/a/", f"{BASE}/b/"], purpose=Purpose.LINK_CHECK, source="t")
+            rig.client.fetch(f"{BASE}/a/", purpose=Purpose.LINK_CHECK, headers_only=True)
+            self.assertTrue(rig.client.blocked)
+            self.assertEqual(rig.client.fetch(f"{BASE}/b/", purpose=Purpose.LINK_CHECK, headers_only=True).skipped, "blocked")
 
 
 if __name__ == "__main__":

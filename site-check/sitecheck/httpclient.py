@@ -544,7 +544,9 @@ def _declared_length(headers: list[tuple[str, str]]) -> int | None:
     if len(values) != 1:
         return None
     value = values.pop()
-    return int(value) if value.isdigit() else None
+    # isascii first: str.isdigit() is also True for the latin-1 superscripts
+    # that http.client decodes from a header byte, and int() rejects them.
+    return int(value) if value.isascii() and value.isdigit() else None
 
 
 def _safe_host(url: str) -> str:
@@ -956,7 +958,7 @@ class HttpClient:
         value = (resp.header("Retry-After") or "").strip()
         if not value:
             return None
-        if value.isdigit():
+        if value.isascii() and value.isdigit():
             return float(int(value))
         try:
             moment = email.utils.parsedate_to_datetime(value)
