@@ -163,7 +163,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 `test/conventions.test.ts`
 - The exact tables, functions, enums and triggers the migrations create.
-- `audit.sql`: no rows on the migrated schema, all nine violations on objects created the default way, and MAINTAIN left to any one role.
+- `audit.sql`: no rows on the migrated schema, all nine violations on objects created the default way, MAINTAIN left to any one role, a trigger function open to `service_role`, `supabase_auth_admin` or `PUBLIC`, a view or materialized view that reads past RLS for `authenticated`, and no search_path row for an aggregate.
 - Table and column privileges per role; EXECUTE per role and for `PUBLIC`; which functions are security definer; the RLS policies.
 
 `test/mutations.ts` is an opt-in mutation check, not part of `npm test`. It copies `sql/`, reintroduces one gap at a time, and runs the suite against the copy. The five gaps in the triggers and policies are matching `auth.users` without `lower()`, removing the hook's revoke, dropping the `email_change` clause, firing the password trigger on insert only, and a `using (true)` policy on `accounts`. The five in the cap and the messages are `>` instead of `>=`, one lock key for every address, a 25-hour window, no `btrim` in the account trigger, and the address in the email-change refusal. An unchanged copy runs first as a control. Every mutation fails the suite. To repeat it (about three minutes):
