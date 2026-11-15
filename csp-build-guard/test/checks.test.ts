@@ -198,6 +198,20 @@ describe('inline hashes', () => {
     ]);
   });
 
+  it("reports only 'unsafe-inline' when it is the reason inline content runs, not a block the browser does not make", () => {
+    const page = '<script>run()</script><p onclick="x()">';
+    const loose = guard({ 'index.html': page }, literal("script-src 'self' 'unsafe-inline'"));
+    expect(messages(loose, 'inline-hashes')).toEqual([
+      "index.html: script-src has 'unsafe-inline', which lets any injected inline script run. Allow inline content by hash instead.",
+    ]);
+    // Next to a hash, CSP3 browsers ignore 'unsafe-inline', so content without its hash is blocked.
+    const mixed = guard({ 'index.html': '<script>run()</script><script>other()</script>' }, literal(`script-src 'self' 'unsafe-inline' ${sha256('run()')}`));
+    expect(messages(mixed, 'inline-hashes')).toEqual([
+      "index.html: script-src has 'unsafe-inline', which lets any injected inline script run. Allow inline content by hash instead.",
+      expect.stringContaining(`does not list ${sha256('other()')}`),
+    ]);
+  });
+
   it('reports a hash left in script-src when script-src-elem and script-src-attr shadow it', () => {
     const text = 'run()';
     const policy = `script-src 'self' ${sha256(text)}; script-src-elem 'self' ${sha256(text)}; script-src-attr 'none'`;

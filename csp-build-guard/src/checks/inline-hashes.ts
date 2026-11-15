@@ -19,6 +19,12 @@ const fallbacks = (kind: InlineKind): string[] => {
 function allowedBy(policy: Policy, item: InlineItem): boolean | 'unrestricted' {
   const directive = effectiveDirective(policy, item.kind);
   if (directive === undefined) return 'unrestricted';
+  // CSP3 "allow all inline behavior": 'unsafe-inline' lets every inline item run unless a hash or a
+  // nonce (or 'strict-dynamic', for scripts) sits next to it. The 'unsafe-inline' failure covers it.
+  const lowered = directive.sources.map((s) => s.toLowerCase());
+  const overridden = lowered.some((s) => normalizeHash(s) !== undefined || s.startsWith("'nonce-") || (item.kind.startsWith('script') && s === "'strict-dynamic'"));
+  // Matched as written, like the 'unsafe-inline' failure below, so the two never disagree.
+  if (directive.sources.includes("'unsafe-inline'") && !overridden) return true;
   const listedHashes = new Set(directive.sources.map(normalizeHash));
   const listed = allHashes(item).some((h) => listedHashes.has(h));
   // Hashes only cover attributes (event handlers, style="") when the directive also has 'unsafe-hashes'.
