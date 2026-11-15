@@ -13,3 +13,5 @@ dist/
 reports/
 # The diff-scoped audit's scope, written by npm run -s audit:scope -- --json > scope.json.
 /scope.json
+# The audit-diff fixers' worktrees (.claude/workflows/audit-diff.js), kept out of git status.
+/.claude/worktrees/
