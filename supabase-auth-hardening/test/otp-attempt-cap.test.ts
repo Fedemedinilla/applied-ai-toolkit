@@ -133,6 +133,27 @@ describe('reserve_otp_attempt', () => {
     expect(await advisoryLocks()).toBe(0);
   });
 
+  it('refuses to run under REPEATABLE READ, where the snapshot predates the lock and the count misses a concurrent attempt', async () => {
+    const email = await user('isolation');
+    // set local role: the error aborts the transaction, so asRole could not reset the role inside it.
+    await db.exec('begin isolation level repeatable read; set local role service_role');
+    try {
+      expect(await sqlState(() => db.query('select public.reserve_otp_attempt($1)', [email]))).toBe('25000');
+    } finally {
+      await db.exec('rollback');
+    }
+    expect(await rowsFor(email)).toBe(0);
+    // SERIALIZABLE is safe: the second of two racing reservations fails with a serialization error.
+    for (const level of ['read committed', 'serializable']) {
+      await db.exec(`begin isolation level ${level}`);
+      try {
+        expect([level, await reserve(email)]).toEqual([level, 'recorded']);
+      } finally {
+        await db.exec('commit');
+      }
+    }
+  });
+
   it.each([null, '', '   '])('refuses a missing address (%j) with 22004', async (email) => {
     expect(await sqlState(() => reserve(email))).toBe('22004');
   });

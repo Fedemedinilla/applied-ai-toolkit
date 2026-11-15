@@ -88,7 +88,7 @@ switch (data) {
 
 **Every attempt counts, including the one that succeeds.** The reservation happens before Auth is asked, so it cannot depend on the result. Counting only failures would need a second call after `verifyOtp`, and two verifications at once could both pass the cap before either was marked. The cost: a legitimate user who signs in by code more than 20 times in 24 hours is locked out until the oldest attempt ages out. With sessions that last weeks this does not happen in practice. Change `c_cap` in a new migration if your sessions are short.
 
-**One advisory lock per address, held until the transaction ends.** Two concurrent reservations for the same address would otherwise both count 19 and both insert. The lock key is a 64-bit hash of the address hash; a collision only makes two unrelated addresses wait on each other.
+**One advisory lock per address, held until the transaction ends.** Two concurrent reservations for the same address would otherwise both count 19 and both insert. The count has to see what the other session committed while this one waited. Under REPEATABLE READ the snapshot predates the lock, so the function refuses to run at that level (SQLSTATE 25000). READ COMMITTED, the default, and SERIALIZABLE are safe. The lock key is a 64-bit hash of the address hash; a collision only makes two unrelated addresses wait on each other.
 
 **The table holds a sha256 of the address, and only for addresses that can hold a code.** The address comes from the client and can be any text. Recording every input would let anonymous requests with made-up addresses grow the table without bound, 20 rows per address. Recording only listed addresses and existing users bounds it, and a test checks that 30 made-up addresses leave no row. Listed addresses with no user yet are counted, so the first code is not an uncounted window.
 
@@ -133,7 +133,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 ## What the tests cover
 
-86 tests, all offline.
+87 tests, all offline.
 
 `test/closed-signups.test.ts`
 - The list's normalization constraint and default role.
@@ -159,7 +159,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 - 20 attempts `recorded`, then `exhausted` with nothing recorded; case and spacing; separate counts per address.
 - `no_code` for 30 made-up addresses, with no rows; a listed address with no user; a user whose address left the list, matched in lowercase.
 - The sha256 of the normalized address, its length check, and no column that could hold the address.
-- The 24-hour window (rows one second past it free their slots), its cleanup and the exact edge; one advisory lock per address, held until commit; 22004 for a missing address; privileges for every role.
+- The 24-hour window (rows one second past it free their slots), its cleanup and the exact edge; one advisory lock per address, held until commit; the refusal under REPEATABLE READ; 22004 for a missing address; privileges for every role.
 
 `test/conventions.test.ts`
 - The exact tables, functions, enums and triggers the migrations create.
