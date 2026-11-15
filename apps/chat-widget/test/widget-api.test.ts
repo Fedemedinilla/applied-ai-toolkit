@@ -43,6 +43,20 @@ describe('GET /widget/config', () => {
     expect(logged.map((l) => l.event)).toContain('invalid_row');
   });
 
+  it('refuses a valid row that belongs to another tenant', async () => {
+    const { app, api, store, logged } = setup({ replies: [streamed('Ok.')] });
+    const other = await store.getConfig(WORKSHOP.tenantId);
+    expect(TenantConfig.safeParse(other).success).toBe(true);
+    breakStore(store, 'getConfig', { value: other });
+    for (const response of [await app(config(BAKERY.tenantId)), await app(chat())]) {
+      expect(response.status).toBe(503);
+      expect(await json(response)).toEqual({ error: 'unavailable' });
+    }
+    expect(api.requests).toHaveLength(0);
+    expect(store.turns.size).toBe(0);
+    expect(logged.filter((l) => l.event === 'invalid_row')).toHaveLength(2);
+  });
+
   it('answers 503 when the store throws or does not answer in time', async () => {
     const broken = setup({ limits: { storeTimeoutMs: 20 } });
     breakStore(broken.store, 'getConfig', 'throw');
