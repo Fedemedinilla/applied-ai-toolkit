@@ -243,6 +243,30 @@ describe('session and content', () => {
     expect(s.store.tenants.get('vivero-nuevo')?.config['context']).toBe('');
   });
 
+  it('refuses every write route from another origin, and with no Origin except the operator route', async () => {
+    const s = setup();
+    const cookie = await owner(s);
+    const token = await invite(s);
+    const routes: Array<[string, string, unknown]> = [
+      ['login', 'POST', { email: 'owner@vivero-nuevo.example', password: 'una clave larga de prueba' }],
+      ['logout', 'POST', {}],
+      ['invite/check', 'POST', { token }],
+      ['invite/accept', 'POST', { token, password: 'una clave larga de prueba' }],
+      ['admin/invite', 'POST', { tenantId: 'vivero-otro', email: 'owner@vivero-otro.example', allowedDomains: ['vivero-otro.example'] }],
+      ['content', 'PUT', { context: 'x' }],
+    ];
+    for (const [path, method, body] of routes) {
+      const headers = { cookie, 'content-type': 'application/json', ...basic(ADMIN) };
+      const foreign = await s.app(new Request(`${BASE}/panel/api/${path}`, { method, headers: { ...headers, origin: 'https://evil.example' }, body: JSON.stringify(body) }));
+      expect([path, foreign.status, await foreign.json()]).toEqual([path, 403, { error: 'cross_origin' }]);
+      if (path === 'admin/invite') continue;
+      const none = await s.app(new Request(`${BASE}/panel/api/${path}`, { method, headers, body: JSON.stringify(body) }));
+      expect([path, none.status, await none.json()]).toEqual([path, 403, { error: 'cross_origin' }]);
+    }
+    expect(s.store.tenants.has('vivero-otro')).toBe(false);
+    expect((await s.app(call('invite/check', 'POST', { token }))).status).toBe(200);
+  });
+
   it('answers 503 when the store fails, without leaking the error', async () => {
     const s = setup();
     const cookie = await owner(s);
