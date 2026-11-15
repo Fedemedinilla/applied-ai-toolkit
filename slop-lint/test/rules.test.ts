@@ -1,11 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { GENRES, resolveRules } from '../src/genres.ts';
 import { lint, rawMatches } from '../src/lint.ts';
-import { PATTERN_RULES, RULES, STRUCTURAL_RULES, TUTEO, VOSEO } from '../src/rules.ts';
+import { GENRE_RULES, PATTERN_RULES as CATALOG_PATTERN_RULES, RULES as CATALOG, STRUCTURAL_RULES as CATALOG_STRUCTURAL_RULES, TUTEO, VOSEO } from '../src/rules.ts';
 import { STRUCTURAL_CHECK_IDS } from '../src/structural.ts';
-import type { Lang } from '../src/types.ts';
+import type { Genre, Lang, PatternRule, Rule, StructuralRule } from '../src/types.ts';
 
 const langsOf = (lang: 'en' | 'es' | 'both'): Lang[] => (lang === 'both' ? ['en', 'es'] : [lang]);
+
+// The catalog and the rules only a genre runs (MAIL-01 and the rest) follow the same conventions.
+const RULES: readonly Rule[] = [...CATALOG, ...GENRE_RULES];
+const PATTERN_RULES: readonly PatternRule[] = [...CATALOG_PATTERN_RULES, ...GENRE_RULES.filter((r): r is PatternRule => r.kind === 'pattern')];
+const STRUCTURAL_RULES: readonly StructuralRule[] = [...CATALOG_STRUCTURAL_RULES, ...GENRE_RULES.filter((r): r is StructuralRule => r.kind === 'structural')];
+/** The genre a rule runs in: a cover letter for every catalog rule, the first genre that adds it otherwise. */
+const genreOf = (rule: Rule): Genre => GENRES.find((g) => resolveRules(CATALOG, g).some((r) => r.id === rule.id)) ?? 'cover-letter';
 
 describe('catalog', () => {
   it('has unique ids', () => {
@@ -64,6 +72,14 @@ describe('catalog', () => {
   it('has exactly one structural check per structural rule', () => {
     expect([...STRUCTURAL_CHECK_IDS].sort()).toEqual(STRUCTURAL_RULES.map((r) => r.id).sort());
   });
+
+  it('keeps the rules a genre adds out of the catalog, and runs each in a genre that adds it', () => {
+    const catalogIds = new Set(CATALOG.map((r) => r.id));
+    for (const rule of GENRE_RULES) {
+      expect(catalogIds.has(rule.id), rule.id).toBe(false);
+      expect(genreOf(rule), rule.id).not.toBe('cover-letter');
+    }
+  });
 });
 
 describe('pattern rules fire on their example and not on the near-miss', () => {
@@ -81,7 +97,10 @@ describe('structural rules fire on their example and not on the near-miss', () =
   for (const rule of STRUCTURAL_RULES) {
     for (const ex of rule.examples) {
       it(`${rule.id} (${ex.lang})`, () => {
-        const ids = (text: string) => lint(text, { lang: ex.lang }).findings.map((f) => f.ruleId);
+        const genre = genreOf(rule);
+        // A catalog rule gets the options it always got: no genre and no earlier message.
+        const options = { lang: ex.lang, ...(genre === 'cover-letter' ? {} : { genre }), ...(ex.previous === undefined ? {} : { previous: ex.previous }) };
+        const ids = (text: string) => lint(text, options).findings.map((f) => f.ruleId);
         expect(ids(ex.fire)).toContain(rule.id);
         expect(ids(ex.pass)).not.toContain(rule.id);
       });

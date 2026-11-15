@@ -21,6 +21,8 @@ export interface GenreProfile {
    * also sets (SPLIT_PART_IDS).
    */
   splits?: Readonly<Partial<Record<string, readonly Rule[]>>>;
+  /** Rules of GENRE_RULES this genre runs, after the catalog's. A config setting for their id applies. */
+  adds?: readonly Rule[];
   /** The shared Tier 2 budget per text. */
   tier2Budget: number;
   thresholds: StructuralThresholds;
@@ -58,6 +60,9 @@ const NOT_A_LETTER: Readonly<Record<string, GenreSetting>> = {
 };
 
 const FMT_01 = ruleById('FMT-01');
+
+/** The rules of GENRE_RULES that email and follow-up run. */
+const MAIL_RULES: readonly Rule[] = ['MAIL-01'].map(ruleById);
 const MARKUP = String.raw`\*\*[^*\n]+\*\*|__[^_\n]+__|^#{1,6}[ \t]`;
 const LIST_ITEM = String.raw`^[ \t]*(?:[-*•]|\d+[.)])[ \t]+`;
 
@@ -89,6 +94,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
   email: {
     rules: { ...NOT_A_LETTER, 'EST-09': { severity: 'low' } },
     splits: { 'FMT-01': FMT_01_IN_A_MAIL },
+    adds: MAIL_RULES,
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: COVER_LETTER.thresholds,
     experimental: true,
@@ -97,6 +103,7 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
     // Quoting the earlier message is what a follow-up is for, so process narration is off.
     rules: { ...NOT_A_LETTER, 'EST-09': 'off', 'EST-11': 'off' },
     splits: { 'FMT-01': FMT_01_IN_A_MAIL },
+    adds: MAIL_RULES,
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: COVER_LETTER.thresholds,
     experimental: true,
@@ -157,15 +164,22 @@ export function splitRule(rule: Rule, genre: Genre = DEFAULT_GENRE): readonly Ru
   return GENRE_PROFILES[genre].splits?.[rule.id] ?? [rule];
 }
 
+/** The rules a genre runs on top of the catalog, from GENRE_RULES. None for a cover letter. */
+export function addedRules(genre: Genre = DEFAULT_GENRE): readonly Rule[] {
+  return GENRE_PROFILES[genre].adds ?? [];
+}
+
 /**
  * The rules with a genre's profile applied: the ones set to "off" dropped, the others cloned with
- * the profile's level, severity, budget and message. Structural budgets are not set here; they
- * travel in the profile's thresholds. A rule the profile does not name is returned as it is, so
+ * the profile's level, severity, budget and message, and the genre's own rules (addedRules) after
+ * them unless the list already holds their id. Structural budgets are not set here; they travel in
+ * the profile's thresholds. A rule the profile does not name is returned as it is, so
  * 'cover-letter' returns the same rule objects.
  */
 export function resolveRules(rules: readonly Rule[], genre: Genre = DEFAULT_GENRE): Rule[] {
   const profile = GENRE_PROFILES[genre];
-  return rules.flatMap((rule) =>
+  const ids = new Set(rules.map((r) => r.id));
+  return [...rules, ...addedRules(genre).filter((r) => !ids.has(r.id))].flatMap((rule) =>
     splitRule(rule, genre).flatMap((part) => {
       const applied = applySetting(part, profile.rules[part.id] ?? profile.rules[rule.id]);
       if (applied === undefined) return [];
