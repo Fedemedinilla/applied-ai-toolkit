@@ -111,4 +111,9 @@ describe('length', () => {
   it('cuts at maxLength with an ellipsis', () => {
     expect(renderMarkdown('abcdef', { ...opts, maxLength: 3 })).toBe('<p>abc…</p>');
   });
+
+  it('a cut inside an emoji drops the whole character instead of leaving half a surrogate pair', () => {
+    expect(renderMarkdown('a\u{1F600}b', { ...opts, maxLength: 2 })).toBe('<p>a…</p>');
+    expect(renderMarkdown('\u{1F600}\u{1F600}', { ...opts, maxLength: 3 })).toBe('<p>\u{1F600}…</p>');
+  });
 });

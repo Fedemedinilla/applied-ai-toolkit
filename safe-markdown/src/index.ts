@@ -191,7 +191,11 @@ function escapeRegex(s: string): string {
 
 function prepare(src: string, r: Resolved): string {
   const c = clean(src);
-  return c.length > r.max ? `${c.slice(0, r.max)}…` : c;
+  if (c.length <= r.max) return c;
+  // A cut between the two halves of a surrogate pair would leave a lone high surrogate.
+  const hi = c.charCodeAt(r.max - 1);
+  const end = hi >= 0xd800 && hi <= 0xdbff ? r.max - 1 : r.max;
+  return `${c.slice(0, end)}…`;
 }
 
 /** One line of inline Markdown (code, links, bare URLs, emphasis) as HTML. */
