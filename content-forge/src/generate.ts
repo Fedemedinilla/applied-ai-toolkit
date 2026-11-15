@@ -48,6 +48,23 @@ export async function validCatalog(dir: string): Promise<{ raw: RawCatalog; inde
 
 const runId = (now: Date, entity: EntityName): string => `${now.toISOString().replace(/[:.]/g, '-')}-${entity}`;
 
+/**
+ * Writes the report under its run id. The id has millisecond resolution, so a second run in the
+ * same millisecond finds the name taken; it has paid for its call too, so it takes the run id with
+ * the start of its job id instead of losing the report.
+ */
+async function writeReport(dir: string, report: RunReport): Promise<RunReport> {
+  try {
+    await writeJsonNew(join(reportsDir(dir), `${report.run}.json`), report);
+    return report;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+    const renamed = RunReport.parse({ ...report, run: `${report.run}-${report.jobId.slice(0, 8)}` });
+    await writeJsonNew(join(reportsDir(dir), `${renamed.run}.json`), renamed);
+    return renamed;
+  }
+}
+
 /** Candidates are numbered from 1 in messages; the report's `index` is the 0-based array position. */
 const label = (i: number, value: unknown): string => {
   const id = idOf(value);
@@ -162,8 +179,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
       passRate: 0,
       rejections: [],
     });
-    await writeJsonNew(join(reportsDir(dir), `${id}.json`), report);
-    return report;
+    return writeReport(dir, report);
   }
 
   const considered = candidates.slice(0, count);
@@ -201,6 +217,5 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
     passRate: accepted.length / count,
     rejections,
   });
-  await writeJsonNew(join(reportsDir(dir), `${id}.json`), report);
-  return report;
+  return writeReport(dir, report);
 }

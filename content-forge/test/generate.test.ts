@@ -203,6 +203,18 @@ describe('writes after the paid call', () => {
   });
 });
 
+describe('two runs in the same millisecond', () => {
+  it('leaves a report for each paid call', async () => {
+    const { api, model } = setup([messageText(await response('card-batch')), messageText('{"candidates": [', undefined, 'max_tokens')]);
+    const first = await run(model, 'card', 1);
+    const second = await run(model, 'card', 1);
+    expect(api.requests).toHaveLength(2);
+    expect(second.run).not.toBe(first.run);
+    expect((await readdir(reportsDir(dir))).sort()).toEqual([`${first.run}.json`, `${second.run}.json`].sort());
+    expect(RunReport.parse(await readJson(join(reportsDir(dir), `${second.run}.json`)))).toEqual(second);
+  });
+});
+
 describe('other entity types', () => {
   it('judges decks against card limits, factions and tokens', async () => {
     const { model } = setup([messageText(await response('deck-batch'))]);
