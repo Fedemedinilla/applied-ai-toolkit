@@ -1,7 +1,7 @@
 // Build for apps/caja: `npm run build:caja` from the repository root writes dist/apps/caja.
 //
 // base './' makes every URL relative, so the same output works at a domain root or under any
-// subpath (GitHub Pages serves it at /<repo>/apps/caja/). The plugin below does three things the
+// subpath (GitHub Pages serves it at /<repo>/caja/). The plugin below does three things the
 // app needs and Vite does not do on its own:
 //   1. Serves and emits corpus.json, the parser's spec, read from ../../amount-parser/corpus/.
 //      One file in the repository, no copy to keep in sync.

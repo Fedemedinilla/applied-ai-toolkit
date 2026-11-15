@@ -16,7 +16,7 @@ ASSISTANT_HISTORY_SECRET=$(openssl rand -hex 32) node apps/salon-assistant/serve
 
 Without `ANTHROPIC_API_KEY` the server starts, `/api/health` and `/api/assistant` answer 503 with no model call, and the page says the assistant is not available. With the key, each turn is one real call. Without a history secret of at least 32 bytes the server refuses to start.
 
-The build writes 8.00 kB of JavaScript (3.72 kB gzipped) and 2.42 kB of CSS. csp-build-guard measures 3.7 kB gzipped and 3.3 kB brotli for `index.html`, against a 10 kB budget. It also finds no regex lookbehind and no inline script or style, so the build needs nothing beyond the `'self'`-only policy in `csp-guard.config.json`. `server/serve.ts` sends that same policy as a `Content-Security-Policy` header on every static file.
+The build writes 8.00 kB of JavaScript (3.72 kB gzipped) and 2.42 kB of CSS. csp-build-guard measures 3.7 kB gzipped and 3.3 kB brotli for `index.html`, against a 10 kB budget. It also finds no regex lookbehind and no inline script or style, so the build needs nothing beyond the `'self'`-only policy in `csp-guard.config.json`. `server/static.ts` sends that same policy (`server/csp.ts`) as a `Content-Security-Policy` header on every static file.
 
 ## Design decisions
 
@@ -46,6 +46,7 @@ The build writes 8.00 kB of JavaScript (3.72 kB gzipped) and 2.42 kB of CSS. csp
 | `test/serve.test.ts` | The local server on a free loopback port: the CSP header and that it equals `csp-guard.config.json`, no file outside the root, 405 for `TRACE`, 413 above 32 KiB, 500 when the app rejects, 400 for a target such as `http://[`, and that it keeps serving after each |
 | `test/main.dom.test.ts` | The page in jsdom: what the live region reads for a reply with a list and a card |
 | `test/build.test.ts` | The production build: relative URLs, one script and one stylesheet, the renderer included, and no server code, secret name or prompt in the bundle |
+| `test/csp-config.test.ts` | The policy in `csp-guard.config.json` equals the `CSP` that `server/static.ts` sends (from `server/csp.ts`), so the guard and the header cannot drift apart |
 
 ## Limits
 

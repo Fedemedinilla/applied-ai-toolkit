@@ -4,12 +4,14 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, normalize, resolve, sep } from 'node:path';
+import { CSP } from './csp.ts';
+
+/** The same policy csp-build-guard checks the build against (csp-guard.config.json); a test compares them. */
+export { CSP };
 
 /** The largest request body handed to the app; a bigger one gets 413. */
 export const BODY_LIMIT = 32 * 1024;
 const TYPES: Readonly<Record<string, string>> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
-/** The same policy csp-build-guard checks the build against (csp-guard.config.json); a test compares them. */
-export const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
 // Node accepts TRACE, CONNECT and others that `new Request` throws on; they never reach the app.
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 
