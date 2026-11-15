@@ -60,7 +60,7 @@ import { BUILT_IN_REGISTRY, FALLBACK_DEFAULT_BETA, type Effort, type ModelRegist
 import type { CallObserver, CallOperation, CallSpan } from './observe.ts';
 import type { Clock, ConfigStore, EventLog, PriceStore, UsageRow, UsageStore } from './ports.ts';
 import { structuredFormat, type StructuredFormat } from './schema.ts';
-import { requirePositiveInt, requireTimeZone } from './setup.ts';
+import { MAX_TIMEOUT_MS, requireTimeoutMs, requireTimeZone } from './setup.ts';
 
 type BetaMessage = Anthropic.Beta.BetaMessage;
 export type ContentBlock = Anthropic.Beta.BetaContentBlock;
@@ -110,8 +110,9 @@ export interface GatewayDeps<M extends string = SupportedModel> {
   readonly failures: EventLog<FailureEvent>;
   /**
    * Receives one span per call after it ends (observe.ts). Optional: without it nothing is
-   * measured for tracing. With it, each call reads the prices once more, after the result, to
-   * value its reservation.
+   * measured for tracing. With it, each call reads the prices once more when it ends, to value
+   * its reservation, and the result is returned after that read. The read is not counted in the
+   * span's duration.
    */
   readonly observer?: CallObserver;
   /** IANA zone of the cap's day and month. */
@@ -119,7 +120,7 @@ export interface GatewayDeps<M extends string = SupportedModel> {
   /**
    * Deadline for a whole call when the request does not bring its own: store reads, waiting for
    * headers, the body and the stream. The SDK timeout only covers the headers. The reservation is
-   * inside the deadline; the closing row is outside it.
+   * inside the deadline; the closing row is outside it. At most 2147483647 (the setTimeout limit).
    */
   readonly timeoutMs: number;
 }
@@ -166,7 +167,7 @@ export interface GatewayRequest<M extends string = SupportedModel> {
   /** Use the task's hardCaseEffort if it has one. Not combinable with `config`. */
   readonly hardCase?: boolean;
   readonly signal?: AbortSignal;
-  /** Deadline for this call instead of the default. */
+  /** Deadline for this call instead of the default. At most 2147483647, the setTimeout limit. */
   readonly timeoutMs?: number;
 }
 
@@ -346,7 +347,9 @@ function validateRequest(request: GatewayRequest<string>, streaming: boolean, sc
   if (!streaming && request.maxTokens > MAX_TOKENS_WITHOUT_STREAMING) {
     fail(`maxTokens ${request.maxTokens} without streaming (up to ${MAX_TOKENS_WITHOUT_STREAMING}): use structuredStream`);
   }
-  if (request.timeoutMs !== undefined && (!Number.isInteger(request.timeoutMs) || request.timeoutMs <= 0)) fail(`timeoutMs ${request.timeoutMs}`);
+  if (request.timeoutMs !== undefined && (!Number.isInteger(request.timeoutMs) || request.timeoutMs <= 0 || request.timeoutMs > MAX_TIMEOUT_MS)) {
+    fail(`timeoutMs ${request.timeoutMs} (a whole number of ms from 1 to ${MAX_TIMEOUT_MS})`);
+  }
   if (request.system.some((block) => block.trim() === '')) fail('an empty system block');
   // Attachment tokens do not follow from request size. They go through streaming, where
   // message_start measures them, with a bound for a cut before message_start.
@@ -393,7 +396,7 @@ function errorName(error: unknown): string {
 
 export function createGateway<M extends string = SupportedModel>(deps: GatewayDeps<M>): Gateway<M> {
   requireTimeZone(deps.timeZone);
-  requirePositiveInt(deps.timeoutMs, 'timeoutMs of the gateway');
+  requireTimeoutMs(deps.timeoutMs, 'timeoutMs of the gateway');
   // Without deps.models, M is its default, SupportedModel, which is what the built-in registry holds.
   const models = (deps.models ?? BUILT_IN_REGISTRY) as ModelRegistry<M>;
   const schemas = configSchemasFor(models.ids);
@@ -524,6 +527,8 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
       errorCode = error instanceof GatewayError ? error.code : 'unknown';
       throw error;
     } finally {
+      // The end of the call, read before the span's own price read so that read is not counted.
+      const durationMs = Math.round(deps.clock.monotonicMs() - trace.startMono);
       const row = trace.closing;
       const span: CallSpan = {
         operation,
@@ -535,6 +540,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         maxTokens: request.maxTokens,
         streaming: operation !== 'structured',
         tokens: row && { input: row.inputTokens, output: row.outputTokens, cacheRead: row.cacheReadTokens, cacheWrite5m: row.cacheWrite5mTokens, cacheWrite1h: row.cacheWrite1hTokens },
+        ...(row?.incomplete === true ? { incomplete: true as const } : {}),
         reservedUsd: await reservedUsd(trace, request.maxTokens),
         settledUsd: row?.costUsd ?? null,
         outcome: errorCode === null ? 'ok' : 'error',
@@ -545,7 +551,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         reservationId: trace.reservationId,
         usageId: row?.id ?? null,
         startTime: trace.startTime,
-        durationMs: Math.round(deps.clock.monotonicMs() - trace.startMono),
+        durationMs,
       };
       try {
         observer.onCall(span);
@@ -557,8 +563,10 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
 
   /**
    * The reservation's worst case for the span: the estimated input and maxTokens of output at the
-   * highest price in force among the registry's models, the way the stores value an open
-   * reservation. Null when nothing was reserved or the prices cannot be read. Never throws.
+   * highest price in force among the registry's models. The stores value an open reservation at
+   * the highest price of every model in their price table, so a priced model outside the registry
+   * with higher rates makes this lower than what the caps hold. Null when nothing was reserved or
+   * the prices cannot be read. Never throws.
    */
   async function reservedUsd(trace: Trace, maxTokens: number): Promise<number | null> {
     if (trace.estimatedInput === null) return null;
@@ -588,7 +596,8 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
    * Shared by the three entry points: deadline, preparation, reservation, call and record. A cut
    * before the request leaves (an already aborted signal, or the deadline or signal during the
    * reads) throws ApiError with no row and no notice: nothing was spent. A cut while the
-   * reservation was being written closes it with a zero-usage row.
+   * reservation was being written does not wait for the store: it throws ApiError with the
+   * reservation's id at once, and closes the reservation with a zero-usage row if it lands later.
    */
   async function call(request: GatewayRequest<string>, format: StructuredFormat<unknown> | null, mode: Mode, trace: Trace | null): Promise<Call<M>> {
     const fixed = validateRequest(request, mode.kind === 'stream', schemas);
@@ -619,7 +628,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         trace.model = prepared.model;
         trace.effort = prepared.effort;
       }
-      reservation = await reserve(prepared, trace);
+      reservation = await reserveWithinDeadline(prepared, trace, deadline, cutCode);
       if (trace) {
         trace.reservationId = reservation.id;
         trace.estimatedInput = reservation.estimatedInput;
@@ -645,9 +654,38 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
     return { response: executed.response, meta: await recordResponse(prepared, reservation, executed) };
   }
 
-  /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
-  async function reserve(prepared: Prepared<M>, trace: Trace | null): Promise<Reservation> {
+  /**
+   * The reservation, raced against the deadline and the caller's signal: a store that does not
+   * answer cannot hold the call past either. On a cut the write may still land, so the error names
+   * its id, and a reservation that lands afterwards is closed with a zero-usage row (a failure to
+   * close it is logged as record_failed and it stays open at its worst case).
+   */
+  async function reserveWithinDeadline(prepared: Prepared<M>, trace: Trace | null, deadline: Deadline, cutCode: () => 'timeout' | 'cancelled'): Promise<Reservation> {
     const id = crypto.randomUUID();
+    const writing = reserve(prepared, trace, id);
+    const signal = deadline.signal;
+    let onAbort = () => {};
+    const cut = new Promise<never>((_, reject) => {
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      return await Promise.race([writing, cut]);
+    } catch (error) {
+      if (!signal.aborted || error instanceof ReservationError) throw error;
+      const code = cutCode();
+      writing.then(
+        (late) => recordUnbilled(prepared, late, { code, requestId: null, durationMs: 0 }).catch(() => {}),
+        () => {},
+      );
+      throw cutBeforeSending(code, error, id);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  /** The row before calling: incomplete with nothing measured, valued by the caps at its worst case until closed. */
+  async function reserve(prepared: Prepared<M>, trace: Trace | null, id: string): Promise<Reservation> {
     const estimatedInput = estimateInputTokens(prepared.params) + prepared.attachmentBound;
     const row: UsageRow = {
       ...prepared.row,

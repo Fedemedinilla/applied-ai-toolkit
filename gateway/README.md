@@ -33,12 +33,16 @@ npm test -- gateway   # offline, no API key
 npm run check         # tsc --noEmit (strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess)
 ```
 
-Two opt-in checks, neither part of the test suite:
+Three opt-in checks, none part of the test suite:
 
 ```sh
 # Applies sql/schema.sql inside a transaction, runs the assertions, rolls back.
 # Checked on PostgreSQL 16.
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f gateway/sql/test.sql
+
+# Fires 20 reserve_usage calls at once from separate connections, three rounds, in a scratch
+# database it creates and drops. Needs a role that can create databases. Checked on PostgreSQL 16.
+PGHOST=localhost PGUSER=postgres bash gateway/sql/race.sh
 
 # One real structured call. Without the variable it prints usage and exits.
 ANTHROPIC_API_KEY=sk-ant-... node gateway/examples/live-call.ts
@@ -51,7 +55,7 @@ Node 24 runs the TypeScript sources directly (type stripping). There is no build
 1. Validates the request: no assistant prefill, at most 4 cache breakpoints, ids are UUIDs, attachments carry a token bound.
 2. Reads the task's model and effort, the caps and the usage totals, and validates each with zod. The model has to be in the registry, with an effort level and a `max_tokens` its entry allows.
 3. Checks the caps. A reached cap throws `CapError` and nothing else happens.
-4. Writes a reservation row to the ledger at the call's worst case. If that insert fails twice, the API is not called.
+4. Writes a reservation row to the ledger at the call's worst case. If that insert fails twice, the API is not called and `ReservationError` names the id. When the first attempt reached the store and only its response was lost, that row stays in the ledger, open at its worst case.
 5. Checks the caps again, with everything else in flight and without its own reservation. A reached cap closes the reservation with a zero-usage row and throws `CapError`. A store with an atomic `reserve` does steps 4 and 5 in one statement.
 6. Calls `client.beta.messages`, with server-side fallbacks when the model's entry has them. Only the gateway builds the request body.
 7. Writes a second row that closes the reservation: the measured response, an incomplete row for a cut call, or a zero-usage row for a request that was not billed.
@@ -169,7 +173,7 @@ Each call becomes one span of kind `CLIENT` named `chat <model>`. The attributes
 | `gen_ai.response.finish_reasons` | The `stop_reason`, as a one-element list |
 | `error.type` | The gateway's error code, on a failed call |
 
-The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `prompt_version`, `effort`, `streaming`, `outcome`, `fell_back`, `cost.reserved_usd`, `cost.settled_usd`, `request_id`, `reservation_id` and `usage_id`. A failed call also gets status `ERROR` with the code as its message. An attribute whose value is unknown is left out. A cut call has no `cost.settled_usd`, because its cost is unknown and a zero would read as free.
+The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `prompt_version`, `effort`, `streaming`, `outcome`, `fell_back`, `cost.reserved_usd`, `cost.settled_usd`, `request_id`, `reservation_id` and `usage_id`. A failed call also gets status `ERROR` with the code as its message. An attribute whose value is unknown is left out. A cut call has no `cost.settled_usd`, because its cost is unknown and a zero would read as free. For the same reason it has no `gen_ai.usage.output_tokens`, and when it was cut before `message_start` it has no token attributes at all. The span marks it with `incomplete: true`.
 
 ## Design decisions
 
@@ -189,7 +193,7 @@ The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `pro
 
 **Nulls fail closed.** The usage totals return null for windows that were not requested, and the bound is null when there are unpriced rows and no price in force at all. The gateway throws `invalid_usage_totals` on a null where it asked for a sum instead of reading it as zero. A user with no account caps row gets `unknown_account`. An account can lower a global cap and never raise it.
 
-**Windows in a configured time zone.** The day and month start at local midnight in an IANA zone passed to the gateway, never the process zone, which is UTC on most hosts. Local midnight is computed in two passes so a daylight saving change on that day does not shift it.
+**Windows in a configured time zone.** The day and month start at local midnight in an IANA zone passed to the gateway, never the process zone, which is UTC on most hosts. Local midnight is computed in two passes so a daylight saving change on that day does not shift it. Where the clocks skip midnight, as in Santiago and Havana, the day starts at the first local instant of that date, 01:00, and a test sweeps every day of 2026 in eight zones.
 
 ### The ledger
 
@@ -211,7 +215,7 @@ The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `pro
 
 **Integers, and null instead of a guess.** Prices have four decimals, so the sum runs in integer units of 1e-10 US$ and rounds once to the ledger's six decimals. A model without a price makes the cost null with a notice naming it. Usage that reports a tariff the price table does not hold (a pinned region, priority, fast, batch) also makes it null, because the standard price would be wrong.
 
-**The registry carries a list price, and the price table still decides.** A registry entry must state its price, since a model with no price would enter the caps only at a bound. Those prices are data for loading a price store (`priceRows()`), and the cost of a call is still computed from the store's rows in force at the time of the call. A price change stays a new row with a later `validFrom`, and no code changes. The built-in prices are the input, output and cache read prices in Anthropic's API reference on 2026-11-03. Cache writes are listed there for `claude-fable-5-2`; for the other three they are the published 1.25x and 2x of the input price. Registry prices must be above zero and have at most four decimals. A zero would price calls at nothing, and a fifth decimal would break the integer sum.
+**The registry carries a list price, and the price table still decides.** A registry entry must state its price, since a model with no price would enter the caps only at a bound. Those prices are data for loading a price store (`priceRows()`), and the cost of a call is still computed from the store's rows in force at the time of the call. A price change stays a new row with a later `validFrom`, and no code changes. The built-in prices are the input, output and cache read prices in Anthropic's API reference on 2026-11-03. Cache writes are listed there for `claude-fable-5-2`; for the other three they are the published 1.25x and 2x of the input price. Registry prices must be above zero and have at most four decimals. A zero would price calls at nothing, and a fifth decimal would break the integer sum. The price table holds the same rule. `model_prices` has `> 0` checks, and a zero row read from any store fails `PriceRow`, so the call is recorded without cost and counted at its bound. The grants suggested in `sql/schema.sql` give the application role only `SELECT` on `model_prices`; run `loadPrices` with the migration or admin role, so a bug or a compromised app server cannot insert a cheaper price. A `validFrom` must be an ISO 8601 date-time with `Z` or a numeric offset. Without one, the memory store reads it in the process zone and Postgres in the session zone, so the two would disagree on when the price starts.
 
 ### Talking to the API
 
@@ -219,7 +223,7 @@ The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `pro
 
 **One client, configured explicitly.** `createClaudeClient` takes the API key and base URL as arguments, so the SDK never reads `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_BASE_URL` from the host. It also pins `logLevel` (at debug the SDK logs request bodies) and the OpenTelemetry content mode (an environment variable can otherwise put prompts in traces). A test sets `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `ANTHROPIC_LOG` and checks that none of them takes effect.
 
-**The gateway owns timeouts and retries.** The SDK's `timeout` only covers the wait for response headers. The gateway runs its own deadline over the whole call (store reads, headers, body, stream) through an `AbortSignal` combined with the caller's. `maxRetries` is 0, because retries belong to the caller, which can honor `retry-after` and lower concurrency, and SDK retries could make one call outlive the deadline. The closing row is written outside the deadline, so a cut call is still recorded.
+**The gateway owns timeouts and retries.** The SDK's `timeout` only covers the wait for response headers. The gateway runs its own deadline over the whole call (store reads, headers, body, stream) through an `AbortSignal` combined with the caller's. `maxRetries` is 0, because retries belong to the caller, which can honor `retry-after` and lower concurrency, and SDK retries could make one call outlive the deadline. The reservation write is raced against the deadline and the caller's signal, so a store that does not answer cannot hold a call past either. Such a cut throws `ApiError` with the reservation's id, because the row may still land; if it does, a zero-usage row closes it. The closing row is written outside the deadline, so a cut call is still recorded. A timeout must be at most 2,147,483,647 ms, the `setTimeout` limit. Node fires a longer delay after 1 ms, so a larger value fails at startup or as a malformed request.
 
 **Knowing whether a failed call was billed.** Each failure is classified by what it implies about spend:
 
@@ -236,7 +240,7 @@ The second case needed a fetch wrapper. The SDK treats any fetch error whose tex
 
 ### Structured output
 
-**zod in, zod out.** The schema sent is `z.toJSONSchema(schema)` reduced to what structured outputs accept, and the response text is parsed with the same zod schema. The reducer is written here because the SDK 1.1.0 helper moves `enum` and `const` into the description, so the model could return a value outside the enum; a test shows the difference. Constraints the API does not accept (ranges, lengths, patterns) move into the description and zod enforces them on return. Recursive schemas, `z.record`, tuples and schemas over the API limits (24 optional properties, 16 unions) are rejected before calling, since the API would answer with a 400 only after the reservation.
+**zod in, zod out.** The schema sent is `z.toJSONSchema(schema)` reduced to what structured outputs accept, and the response text is parsed with the same zod schema. The reducer is written here because the SDK 1.1.0 helper moves `enum` and `const` into the description, so the model could return a value outside the enum; a test shows the difference. Constraints the API does not accept (ranges, lengths, patterns) move into the description and zod enforces them on return. An accepted format keeps zod's pattern in the description too, unless the two say the same thing (`date`). zod's pattern is often narrower. `z.iso.datetime()` accepts only `Z` while the `date-time` format allows any offset, so without the hint a valid answer could fail zod after it was billed. Recursive schemas, `z.record`, tuples and schemas over the API limits (24 optional properties, 16 unions) are rejected before calling, since the API would answer with a 400 only after the reservation.
 
 **`stop_reason` before content.** `parse()` and formats that carry a parser validate as soon as the message ends and throw on a refusal or a `max_tokens` stop, losing the response and its usage. The gateway reads `stop_reason` first. Refusal, truncation and context overflow get their own codes, and only `end_turn` reaches validation.
 
@@ -246,7 +250,7 @@ The second case needed a fetch wrapper. The SDK treats any fetch error whose tex
 
 **Nothing from the conversation in errors or logs.** Error messages and log events carry ids, codes, counts and costs. They never include prompt text, model output or the API's error message, which can echo the request. Validation problems report the zod path and issue code, not the value. Notices (an unpriced model, a retried insert) and failures (a reservation or closing row that could not be written) go to separate channels so the second can be routed at error level.
 
-**Tracing through an interface, with no dependency.** The gateway emits one plain object per call to an observer. `otelObserver` is a function over a tracer typed by its shape, so the package does not depend on `@opentelemetry/api`, and a project without OpenTelemetry pays nothing. A `Tracer` from `@opentelemetry/api` 1.10.0 was checked to fit that shape with `tsc`. The span is built when the call ends, with the call's own start and end times, because the reserved and settled costs are only known then. The reserved cost is the estimated input and `maxTokens` of output at the highest price in force among the registry's models, which is how the stores value an open reservation. It costs one more price read per call, made once the call has ended and only when an observer is set. A span has no field for prompt, system or response text, and none for the user or job id. A test puts marker strings in all three texts and checks that none reaches a span or its attributes. An observer that throws does not change the call's result; the gateway logs `observer_failed`.
+**Tracing through an interface, with no dependency.** The gateway emits one plain object per call to an observer. `otelObserver` is a function over a tracer typed by its shape, so the package does not depend on `@opentelemetry/api`, and a project without OpenTelemetry pays nothing. A `Tracer` from `@opentelemetry/api` 1.10.0 was checked to fit that shape with `tsc`. The span is built when the call ends, with the call's own start and end times, because the reserved and settled costs are only known then. The reserved cost is the estimated input and `maxTokens` of output at the highest price in force among the registry's models. The stores value an open reservation at the highest price of every model in their price table. A priced model outside the registry with higher rates therefore makes the span's figure lower than what the caps hold. It costs one more price read per call, made once the call has ended and only when an observer is set. The call returns after that read, and the span's duration ends before it. A span has no field for prompt, system or response text, and none for the user or job id. A test puts marker strings in all three texts and checks that none reaches a span or its attributes. An observer that throws does not change the call's result; the gateway logs `observer_failed`.
 
 **Stores return `unknown`.** A database row is an external boundary, and generated types cannot say which models the gateway supports or that a sum can be null. Every read is validated with zod before use.
 
@@ -266,7 +270,7 @@ The second case needed a fetch wrapper. The SDK treats any fetch error whose tex
 | `test/caps.test.ts` | Window boundaries in a time zone and across DST, cap precedence, null handling, float-safe sums |
 | `test/client.test.ts` | Environment isolation, `maxRetries` 0, API version header, connect failures against real local TCP servers |
 
-The two Postgres suites run on PGlite, which has one connection. They exercise the SQL as written and the interleaving of the gateway's steps between statements. They do not make two connections wait on the advisory lock; that part rests on the reasoning under Design decisions.
+The two Postgres suites run on PGlite, which has one connection. They exercise the SQL as written and the interleaving of the gateway's steps between statements. They do not make two connections wait on the advisory lock. `sql/race.sh` does, on a real server. With the lock every call returns a different total, and with the lock line removed the totals repeat in every run.
 
 `test/helpers/fake-claude.ts` is the fake API. It answers the real client with JSON or server-sent events in the API's format. It can cut a stream after any event, send an error event, hang until aborted or fail the connection. No test touches the network or needs a key.
 
@@ -340,6 +344,7 @@ src/
 sql/
   schema.sql       tables, constraints, indexes, usage_for_caps(), reserve_usage()
   test.sql         assertions, run in a rolled-back transaction
+  race.sh          parallel reserve_usage calls over separate connections, opt-in
 examples/
   live-call.ts     one real call, opt-in
 test/              Vitest suites and the fake API
@@ -359,7 +364,7 @@ test/              Vitest suites and the fake API
 ## Limits
 
 - The in-memory stores are only correct within one process.
-- The Postgres adapter was tested on PGlite, with one connection. The advisory lock was not exercised across connections, and `sql/test.sql` does not cover `reserve_usage`.
+- The Postgres adapter was tested on PGlite, with one connection. The advisory lock is exercised across connections only by `sql/race.sh`, an opt-in script that CI does not run, and `sql/test.sql` does not cover `reserve_usage`.
 - Concurrent calls can overrun a cap by one worst-case reservation. With a store that has no atomic `reserve`, a burst of calls near a cap can all be refused, as described above.
 - The bound for unpriced rows uses standard prices. A complete row left without a cost because its usage reported another tariff (priority tier, fast speed, a pinned region) is billed at a premium the bound does not include.
 - The built-in entries, the fallback header and the request rules are pinned to SDK 1.1.0 and API version 2026-10-21. Two points are still open in the source app. One is whether `fallbacks: "default"` together with `output_config.format` is valid for every fallback target. The other is the prices of fallback models, which are not loaded, so those calls are counted at the upper bound.

@@ -62,11 +62,29 @@ function offsetMs(instantMs: number, format: Intl.DateTimeFormat): number {
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - whole;
 }
 
-/** The UTC instant of local midnight on that date. Two passes: the offset can change that day (DST). */
+function sameDate(p: DateParts, year: number, month: number, day: number): boolean {
+  return p.year === year && p.month === month && p.day === day;
+}
+
+/**
+ * The UTC instant of local midnight on that date. Two passes: the offset can change that day (DST).
+ * Where the clocks skip midnight (Santiago, Havana), the two passes land in the hour before it, on
+ * the previous date; the day then starts where the gap ends, found by bisection to the second.
+ */
 function localMidnight(year: number, month: number, day: number, format: Intl.DateTimeFormat): Date {
   const asUtc = Date.UTC(year, month - 1, day);
   const approx = asUtc - offsetMs(asUtc, format);
-  return new Date(asUtc - offsetMs(approx, format));
+  const twoPass = asUtc - offsetMs(approx, format);
+  if (sameDate(partsAt(twoPass, format), year, month, day)) return new Date(twoPass);
+  // Midnight at the offset in force before the change is at or after the end of the gap.
+  let before = twoPass;
+  let after = asUtc - offsetMs(twoPass, format);
+  while (after - before > 1000) {
+    const mid = before + Math.floor((after - before) / 2000) * 1000;
+    if (sameDate(partsAt(mid, format), year, month, day)) after = mid;
+    else before = mid;
+  }
+  return new Date(after);
 }
 
 /** Cap windows for `now`. Never uses the process time zone, which is UTC on most hosts. */

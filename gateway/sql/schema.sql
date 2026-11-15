@@ -30,12 +30,13 @@ create table public.model_prices (
   model text not null
     constraint model_prices_model_format check (model ~ '^claude-[a-z0-9.-]+$'),
   valid_from timestamptz not null,
-  -- US$ per million tokens. Four decimals, so the gateway can sum in integers.
-  input numeric(10, 4) not null constraint model_prices_input_nonnegative check (input >= 0),
-  output numeric(10, 4) not null constraint model_prices_output_nonnegative check (output >= 0),
-  cache_read numeric(10, 4) not null constraint model_prices_cache_read_nonnegative check (cache_read >= 0),
-  cache_write_5m numeric(10, 4) not null constraint model_prices_cache_write_5m_nonnegative check (cache_write_5m >= 0),
-  cache_write_1h numeric(10, 4) not null constraint model_prices_cache_write_1h_nonnegative check (cache_write_1h >= 0),
+  -- US$ per million tokens. Four decimals, so the gateway can sum in integers. Above zero: a
+  -- zero row in force would price every call of the model at nothing and the caps would count none.
+  input numeric(10, 4) not null constraint model_prices_input_positive check (input > 0),
+  output numeric(10, 4) not null constraint model_prices_output_positive check (output > 0),
+  cache_read numeric(10, 4) not null constraint model_prices_cache_read_positive check (cache_read > 0),
+  cache_write_5m numeric(10, 4) not null constraint model_prices_cache_write_5m_positive check (cache_write_5m > 0),
+  cache_write_1h numeric(10, 4) not null constraint model_prices_cache_write_1h_positive check (cache_write_1h > 0),
   source text not null constraint model_prices_source_not_blank check (btrim(source) <> ''),
   created_at timestamptz not null default now(),
   primary key (model, valid_from)
@@ -420,8 +421,11 @@ revoke all on table public.model_prices, public.llm_global_caps, public.llm_task
 revoke execute on function public.require_current_price() from public;
 revoke execute on function public.usage_for_caps(timestamptz, timestamptz, uuid, uuid, uuid) from public;
 revoke execute on function public.reserve_usage(uuid, uuid, text, uuid, public.llm_effort, text, text, integer, integer, timestamptz, timestamptz) from public;
--- For the application role (replace app_server with yours):
---   grant select, insert on public.model_prices, public.llm_usage to app_server;
+-- For the application role (replace app_server with yours). It only reads prices: run loadPrices
+-- with the migration or admin role, so the role that makes calls cannot lower the price that
+-- values them.
+--   grant select, insert on public.llm_usage to app_server;
+--   grant select on public.model_prices to app_server;
 --   grant select on public.llm_global_caps, public.llm_task_config, public.llm_account_caps to app_server;
 --   grant execute on function public.usage_for_caps(timestamptz, timestamptz, uuid, uuid, uuid) to app_server;
 --   grant execute on function public.reserve_usage(uuid, uuid, text, uuid, public.llm_effort, text, text, integer, integer, timestamptz, timestamptz) to app_server;

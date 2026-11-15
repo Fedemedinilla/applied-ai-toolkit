@@ -47,8 +47,12 @@ const usdPerMillion = z
  * model billed on several rate cards has to be registered at its highest card (see the README).
  */
 export const ModelPrice = z.strictObject({
-  /** The price applies to calls from this instant on. */
-  validFrom: z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'invalid date'),
+  /**
+   * The price applies to calls from this instant on. An ISO 8601 date-time with `Z` or a numeric
+   * offset: without one, the memory store would read it in the process zone and Postgres in the
+   * session zone, and the two would disagree on when the price comes into force.
+   */
+  validFrom: z.iso.datetime({ offset: true }),
   input: usdPerMillion,
   output: usdPerMillion,
   cacheRead: usdPerMillion,

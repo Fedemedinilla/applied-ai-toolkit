@@ -320,6 +320,15 @@ describe('structured', () => {
     expect(harness.notices).toEqual([{ event: 'prices_unavailable', data: { usageId: meta.usageId, error: 'connection_failure' } }]);
   });
 
+  it('a zero price row in the price table is not read as a price: the call is recorded without cost, at the bound', async () => {
+    const { gateway, harness } = setup([() => jsonResponse(triageResponse())]);
+    // A later row at zero would otherwise be in force and price every call at nothing.
+    harness.stores.prices.rows.push({ model: 'claude-sonnet-5-5', validFrom: '2026-10-02T00:00:00Z', input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
+    const { meta } = await gateway.structured(Triage, REQUEST);
+    expect(meta.costUsd).toBeNull();
+    expect(harness.notices).toEqual([{ event: 'prices_unavailable', data: { usageId: meta.usageId, error: 'schema' } }]);
+  });
+
   it('a call without a user reads no account caps and only the monthly cap applies', async () => {
     const { gateway, harness } = setup([() => jsonResponse(triageResponse())]);
     harness.stores.config.accounts.clear();
@@ -613,6 +622,8 @@ describe('invalid config or request: no API call', () => {
       { ...REQUEST, system: ['a', 'b', 'c', 'd', 'e'] },
       { ...REQUEST, system: [''] },
       { ...REQUEST, timeoutMs: -1 },
+      // Above the setTimeout limit, Node would fire the deadline after 1 ms.
+      { ...REQUEST, timeoutMs: 2_147_483_648 },
       // 2 in the system and 3 in the messages: the API allows 4 per request.
       { ...REQUEST, messages: [{ role: 'user', content: [WITH_BREAKPOINT, WITH_BREAKPOINT, WITH_BREAKPOINT] }] },
       { ...REQUEST, config: { model: 'claude-sonnet-5-5', effort: 'medium' }, hardCase: true },
@@ -826,6 +837,64 @@ describe('the ledger', () => {
     expect(requests).toHaveLength(0);
     expect(harness.ledger).toEqual([]);
     expect(harness.failures).toEqual([{ event: 'reservation_failed', data: { usageId: harness.recordAttempts[0]?.id, task: 'triage', error: 'connection_failure' } }]);
+  });
+
+  it('if the first reservation insert lands but its response is lost and the retry fails, the error says the row may be open', async () => {
+    const { gateway, harness, requests } = setup([]);
+    harness.recordBehavior = ['store_then_fail', 'fail'];
+    const error = await failure(gateway.structured(Triage, REQUEST));
+    const [reservation] = harness.ledger;
+    expect(error).toBeInstanceOf(ReservationError);
+    expect(error).toMatchObject({ code: 'reservation_failed', usageId: reservation?.id });
+    expect(error.message).toBe(`Could not confirm reservation ${reservation?.id}: Claude was not called, and the row may be in the ledger, open at its worst case`);
+    expect(requests).toHaveLength(0);
+    expect(harness.openReservations).toEqual([reservation]);
+  });
+
+  describe('a reservation write that does not answer', () => {
+    /** Holds every reservation insert until released; closing rows go through. */
+    function holdReservations(harness: ReturnType<typeof setup>['harness'], deps: ReturnType<typeof setup>['deps']) {
+      const held: Array<{ readonly id: string; readonly release: () => void }> = [];
+      const record = deps.usage.record.bind(deps.usage);
+      const gateway = createGateway({
+        ...deps,
+        usage: {
+          ...deps.usage,
+          record: async (row) => {
+            if (row.reservation) await new Promise<void>((release) => held.push({ id: row.id, release }));
+            return record(row);
+          },
+        },
+      });
+      return { gateway, held, harness };
+    }
+
+    it('the deadline cuts the call with timeout and names the reservation, which may land later', async () => {
+      const { deps, harness, requests } = setup([], { timeoutMs: 30 });
+      const { gateway, held } = holdReservations(harness, deps);
+      const error = await failure(gateway.structured(Triage, REQUEST));
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ code: 'timeout', usageId: held[0]?.id });
+      expect(requests).toHaveLength(0);
+      // The insert lands after the cut: it is closed with a zero-usage row, not left at its worst case.
+      for (const { release } of held) release();
+      await vi.waitFor(() => expect(harness.ledger).toHaveLength(2));
+      expect(harness.openReservations).toEqual([]);
+      expect(harness.ledger[1]).toMatchObject({ replaces: held[0]?.id, costUsd: 0, errorCode: 'timeout' });
+    });
+
+    it("the caller's signal cuts the call with cancelled", async () => {
+      const { deps, harness, requests } = setup([]);
+      const { gateway, held } = holdReservations(harness, deps);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 20);
+      const error = await failure(gateway.structured(Triage, { ...REQUEST, signal: controller.signal }));
+      expect(error).toMatchObject({ code: 'cancelled', usageId: held[0]?.id });
+      expect(requests).toHaveLength(0);
+      for (const { release } of held) release();
+      await vi.waitFor(() => expect(harness.ledger).toHaveLength(2));
+      expect(harness.openReservations).toEqual([]);
+    });
   });
 
   it('when closing rows always fail, each call leaves its worst-case reservation and the caps end up cutting', async () => {
@@ -1074,5 +1143,13 @@ describe('setup', () => {
     const { deps } = fakeDeps(client);
     expect(() => createGateway({ ...deps, timeZone: 'Mars/Olympus_Mons' })).toThrow(SetupError);
     expect(() => createGateway({ ...deps, timeoutMs: 0 })).toThrow(SetupError);
+  });
+
+  it('a timeout above what setTimeout holds (2^31 - 1 ms) fails at startup, since Node would fire it after 1 ms', () => {
+    const { client } = fakeApi([]);
+    const { deps } = fakeDeps(client);
+    expect(() => createGateway({ ...deps, timeoutMs: 2_147_483_647 })).not.toThrow();
+    expect(() => createGateway({ ...deps, timeoutMs: 2_147_483_648 })).toThrow(SetupError);
+    expect(() => createGateway({ ...deps, timeoutMs: 2_592_000_000 })).toThrow(/at most 2147483647/);
   });
 });

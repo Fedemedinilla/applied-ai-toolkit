@@ -131,6 +131,9 @@ describe('a custom entry states everything', () => {
     { name: 'a negative price', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, output: -5 } }, issue: 'price.output: too_small' },
     { name: 'a price with five decimals', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, input: 0.12345 } }, issue: 'price.input: custom' },
     { name: 'a price as text', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, input: '1' } }, issue: 'price.input: invalid_type' },
+    { name: 'a validFrom that Postgres cannot read', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, validFrom: '1' } }, issue: 'price.validFrom: invalid_format' },
+    { name: 'a validFrom without an offset', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, validFrom: '2026-11-03T00:00:00' } }, issue: 'price.validFrom: invalid_format' },
+    { name: 'a validFrom as a free-form date', entry: { ...EXAMPLE, price: { ...EXAMPLE.price, validFrom: 'Nov 3 2026' } }, issue: 'price.validFrom: invalid_format' },
     { name: 'no effort level', entry: { ...EXAMPLE, surface: { ...EXAMPLE.surface, efforts: [] } }, issue: 'surface.efforts: too_small' },
     { name: 'an unknown effort level', entry: { ...EXAMPLE, surface: { ...EXAMPLE.surface, efforts: ['turbo'] } }, issue: 'surface.efforts.0: invalid_value' },
     { name: 'an unknown key', entry: { ...EXAMPLE, surface: { ...EXAMPLE.surface, tools: true } }, issue: 'surface: unrecognized_keys' },
@@ -139,6 +142,10 @@ describe('a custom entry states everything', () => {
   ])('$name throws', ({ entry, issue }) => {
     const error = setupError(() => createModelRegistry([entry]));
     expect(error.message).toBe(`Model entry 0 fails its schema (${issue})`);
+  });
+
+  it.each(['2026-11-03T00:00:00Z', '2026-11-03T00:00:00+00:00', '2026-11-02T21:00:00.000-03:00'])('a validFrom with an offset (%s) registers', (validFrom) => {
+    expect(() => createModelRegistry([{ ...EXAMPLE, price: { ...EXAMPLE.price, validFrom } }])).not.toThrow();
   });
 
   it('the error names fields and codes, never the values of the entry', () => {

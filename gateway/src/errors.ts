@@ -41,7 +41,7 @@ export const ERROR_CODES = {
   api_error: 'An API error without a more specific class.',
   sdk_error: 'The SDK failed on its own, outside the network.',
   // The ledger
-  reservation_failed: 'The reservation row could not be written, even after one retry. The API was not called.',
+  reservation_failed: 'The reservation row could not be confirmed, even after one retry. The API was not called. The row may be in the ledger, open at its worst case, if an attempt reached the store.',
   record_failed: 'The row that closes the reservation could not be written. The result is withheld and the reservation keeps counting at its worst case.',
 } as const;
 
@@ -395,14 +395,21 @@ export function classifyApiError(error: unknown, signals: CutSignals, nowMs: num
 // The ledger
 // ---------------------------------------------------------------------------
 
-/** The reservation could not be written, even after one retry. The API was not called. */
+/**
+ * The reservation could not be confirmed, even after one retry. The API was not called. If an
+ * attempt reached the store and only its response was lost, the row is in the ledger, open at
+ * its worst case, and nothing closes it: look for `usageId` before treating the call as unwritten.
+ */
 export class ReservationError extends GatewayError {
   declare readonly code: 'reservation_failed';
-  /** The id the reservation was attempted with. It is not in the ledger. */
+  /**
+   * The id the reservation was attempted with. Usually it is not in the ledger, but it may be
+   * there as an open reservation if an attempt reached the store before failing.
+   */
   readonly usageId: string;
 
   constructor(usageId: string, options?: ErrorOptions) {
-    super('reservation_failed', `Could not write reservation ${usageId}: Claude was not called`, options);
+    super('reservation_failed', `Could not confirm reservation ${usageId}: Claude was not called, and the row may be in the ledger, open at its worst case`, options);
     this.usageId = usageId;
   }
 }

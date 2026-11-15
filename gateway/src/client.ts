@@ -1,6 +1,6 @@
 import Anthropic, { type ClientOptions } from '@anthropic-ai/sdk';
 import { ConnectionNotOpenedError, isConnectFailure } from './errors.ts';
-import { requirePositiveInt, requireSecret } from './setup.ts';
+import { requireSecret, requireTimeoutMs } from './setup.ts';
 
 /** Explicit on purpose: without baseURL the SDK reads ANTHROPIC_BASE_URL from the environment. */
 export const CLAUDE_API_URL = 'https://api.anthropic.com';
@@ -58,7 +58,7 @@ export function createClaudeClient(options: ClaudeClientOptions): Anthropic {
     apiKey: requireSecret(options.apiKey, 'the Anthropic API key'),
     baseURL: options.baseURL ?? CLAUDE_API_URL,
     maxRetries: 0,
-    timeout: requirePositiveInt(options.timeoutMs, 'timeoutMs of the Claude client'),
+    timeout: requireTimeoutMs(options.timeoutMs, 'timeoutMs of the Claude client'),
     logLevel: 'warn',
     openTelemetry: { traces: { contentMode: 'metadata_only' } },
     fetch: withConnectFailureMarked(options.fetch ?? globalThis.fetch),

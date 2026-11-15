@@ -18,15 +18,19 @@ export interface Price {
   readonly cacheWrite1h: number;
 }
 
-/** A row of the price table. A price change is a new row with a later validFrom; rows are never edited. */
+/**
+ * A row of the price table. A price change is a new row with a later validFrom; rows are never
+ * edited. Prices are above zero: a zero row in force would price the model's calls at nothing, so
+ * a store that returns one fails validation and the call is recorded without cost, at its bound.
+ */
 export const PriceRow = z.object({
   model: z.string().min(1),
   validFrom: z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'invalid date'),
-  input: z.number().nonnegative(),
-  output: z.number().nonnegative(),
-  cacheRead: z.number().nonnegative(),
-  cacheWrite5m: z.number().nonnegative(),
-  cacheWrite1h: z.number().nonnegative(),
+  input: z.number().positive(),
+  output: z.number().positive(),
+  cacheRead: z.number().positive(),
+  cacheWrite5m: z.number().positive(),
+  cacheWrite1h: z.number().positive(),
 });
 export type PriceRow = z.infer<typeof PriceRow>;
 
