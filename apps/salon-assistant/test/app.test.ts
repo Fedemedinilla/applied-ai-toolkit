@@ -189,5 +189,7 @@ describe('the per-minute limiter', () => {
     limited('new-2');
     // Still counted: two turns already, so the third is over the limit.
     expect(limited('active')).toBe(true);
+    // Dropped: idle-0 had one turn, so if it were still kept its second call would be over the limit.
+    expect([limited('idle-0'), limited('idle-0')]).toEqual([false, false]);
   });
 });
