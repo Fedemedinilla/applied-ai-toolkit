@@ -13,7 +13,7 @@ git add .changeset/*.md    # commit it with the change
 
 A change that needs no release (a test, a README typo) needs no changeset.
 
-No package has been published yet. The first release of each is 0.1.0, the version in its `package.json`, and it carries everything the folder does today, so no changeset describes a change against it. Changesets start with the first change after 0.1.0 is on npm.
+No package has been published yet. The first release of each is the version in its `package.json`, and it carries everything the folder does today, so no changeset describes a change against it. For `gateway/`, `import-fences/` and `csp-build-guard/` that is 0.1.0. For `slop-lint/` it is 0.2.0, which also carries genres; [`slop-lint/CHANGELOG.md`](../slop-lint/CHANGELOG.md) describes it. Changesets start with the first change after each first release is on npm.
 
 ## What happens on main
 
@@ -34,7 +34,7 @@ The workflow does nothing until the repository variable `NPM_RELEASE` is set to 
 2. **For each package,** open its Settings page, find "Trusted Publisher", choose GitHub Actions and fill in owner `Fedemedinilla`, repository `applied-ai-toolkit`, workflow filename `release.yml` and no environment. Allow `npm publish`. npm does not check these fields when they are saved; a mismatch shows up as a failed publish. The configuration has to see its first publish within two days or it expires.
 3. **In the repository,** under Settings > Actions > General, enable "Allow GitHub Actions to create and approve pull requests", which the version step needs. Then add the variable under Settings > Secrets and variables > Actions > Variables: `NPM_RELEASE` with the value `enabled`.
 
-npm's documentation describes the trusted publisher form on the Settings page of a package that already exists, and it does not say whether a name that was never published can have one. If it cannot, the first version (0.1.0 of each package) has to be published once by hand with an npm login, and trusted publishing is configured after it. From a clean checkout, run `npm ci` and then `npm run release`, which runs the pack check and `changeset publish`; that publishes each version npm does not have yet, through each package's prepack script. Provenance can only be generated inside CI, so if npm refuses that publish over the `provenance` setting in `publishConfig`, remove the setting for that one publish and leave it uncommitted.
+npm's documentation describes the trusted publisher form on the Settings page of a package that already exists, and it does not say whether a name that was never published can have one. If it cannot, the first version of each package has to be published once by hand with an npm login, and trusted publishing is configured after it. From a clean checkout, run `npm ci` and then `npm run release`, which runs the pack check and `changeset publish`; that publishes each version npm does not have yet, through each package's prepack script. Provenance can only be generated inside CI, so if npm refuses that publish over the `provenance` setting in `publishConfig`, remove the setting for that one publish and leave it uncommitted.
 
 ## Known limits
 

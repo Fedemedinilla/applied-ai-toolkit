@@ -1,6 +1,6 @@
 {
   "name": "@fedemedinilla/slop-lint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flags the patterns that make a cover letter, an email, a follow-up, a WhatsApp message or a README read as generated, in English and Spanish. A pure function and a CLI with no runtime dependencies.",
   "license": "MIT",
   "author": "Federico Medinilla",
