@@ -144,8 +144,11 @@ const FENCE = /^\s*(`{3,}|~{3,})/;
 /** A closing fence carries no info string: a line such as ```md inside a block is code. */
 const FENCE_CLOSE = /^\s*(`{3,}|~{3,})\s*$/;
 const SCHEME = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
-/** The target of an inline link or image, after its label: `](target)` or `](target "title")`. */
-const INLINE_TARGET = /\]\(([^()\s]+)(\s+"[^"]*")?\)/g;
+/**
+ * The target of an inline link or image, after its label: `](target)`, `](<target>)` or either
+ * with a title in "...", '...' or (...). A bare target may hold one level of balanced parentheses.
+ */
+const INLINE_TARGET = /\]\((<[^<>\n]*>|(?:[^()\s<]|\([^()\s]*\))(?:[^()\s]|\([^()\s]*\))*)(\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\)/g;
 /** A reference definition: `[label]: target`. A footnote, `[^label]: text`, is not one. */
 const DEFINITION = /^(\s{0,3}\[(?!\^)[^\]]+\]:\s+)(\S+)/;
 
@@ -185,6 +188,7 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
     if (next === null) broken.push(target);
     return next ?? target;
   };
+  const fixInline = (target: string): string => (target.startsWith('<') ? `<${fix(target.slice(1, -1))}>` : fix(target));
   let fence: string | undefined;
   const lines = markdown.split('\n').map((line) => {
     if (fence !== undefined) {
@@ -202,7 +206,7 @@ export function rewriteLinks(markdown: string, from: string, ctx: LinkContext): 
       return `${definition[1]}${fix(definition[2])}${line.slice(definition[0].length)}`;
     }
     return segments(line)
-      .map((s) => (s.code ? s.text : s.text.replace(INLINE_TARGET, (_all, target: string, title?: string) => `](${fix(target)}${title ?? ''})`)))
+      .map((s) => (s.code ? s.text : s.text.replace(INLINE_TARGET, (_all, target: string, title?: string) => `](${fixInline(target)}${title ?? ''})`)))
       .join('');
   });
   return { text: lines.join('\n'), broken };

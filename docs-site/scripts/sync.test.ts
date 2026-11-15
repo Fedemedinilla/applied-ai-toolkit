@@ -125,6 +125,12 @@ describe('rewriteLinks', () => {
     expect(rewrite(markdown)).toEqual({ text: markdown.replace('../evals/', `${BASE}/evals/`), broken: [] });
   });
 
+  it('reads angle-bracket targets, single-quoted and parenthesized titles, and parentheses in a path', () => {
+    const { text, broken } = rewrite("[a](<../evals/README.md>) [s](<a file.txt>) [b](../evals/README.md 'T') [p](src/caps.ts (T)) [c](missing(1).md)");
+    expect(text).toBe(`[a](<${BASE}/evals/>) [s](<${blob('gateway/a%20file.txt')}>) [b](${BASE}/evals/ 'T') [p](${blob('gateway/src/caps.ts')} (T)) [c](missing(1).md)`);
+    expect(broken).toEqual(['missing(1).md']);
+  });
+
   it('reports each link whose file does not exist, and keeps it as written', () => {
     const { text, broken } = rewrite('[a](src/missing.ts) and [b](../nowhere/README.md#x) and [c](src/caps.ts)');
     expect(broken).toEqual(['src/missing.ts', '../nowhere/README.md#x']);
