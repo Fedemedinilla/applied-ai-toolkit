@@ -15,8 +15,8 @@
 -- PostgreSQL 17, and Supabase's default grant all includes it there. It is checked only on 17 and later, so the query also runs on 16.
 --
 -- The checks cover every object in public, not only the ones in this folder: a table added later
--- without RLS, or a function left executable by anon, shows up here even if nobody wrote a test
--- for it.
+-- without RLS, a function left executable by anon, or a view that reads past RLS for authenticated
+-- (rule 1 applied to what the view exposes) shows up here even if nobody wrote a test for it.
 
 with
 relations as (
@@ -97,6 +97,23 @@ select 'function without an empty search_path', f.name
 from functions as f
 where f.prokind in ('f', 'p')
   and not coalesce(f.proconfig @> array['search_path=""'], false)
+
+union all
+-- A view runs as its owner unless it sets security_invoker, and a materialized view has no RLS at
+-- all, so either one readable by authenticated can show every row of a table whose RLS would hide
+-- them. anon is already reported above. Postgres keeps the option as written, so every spelling of
+-- true counts.
+select 'view readable by authenticated that bypasses RLS', r.name
+from relations as r
+join pg_catalog.pg_class as c on c.oid = r.oid
+where r.relkind in ('v', 'm')
+  and pg_catalog.has_any_column_privilege('authenticated', r.oid, 'SELECT')
+  and (r.relkind = 'm'
+       or not exists (
+         select 1 from pg_catalog.pg_options_to_table(c.reloptions) as o
+         where o.option_name = 'security_invoker'
+           and pg_catalog.lower(o.option_value) in ('t', 'tr', 'tru', 'true', 'y', 'ye', 'yes', 'on', '1')
+       ))
 
 union all
 select 'table without a comment', r.name

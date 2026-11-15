@@ -120,6 +120,24 @@ describe('sql/audit.sql', () => {
     }
   }, FRESH_DB_TIMEOUT);
 
+  it.each([
+    ['a view without security_invoker', 'create view public.account_list as select user_id, role from public.accounts', true],
+    ['a view with security_invoker = on', 'create view public.account_list with (security_invoker = on) as select user_id, role from public.accounts', false],
+    ['a materialized view', 'create materialized view public.account_list as select user_id, role from public.accounts', true],
+  ] as const)('checks %s readable by authenticated, which reads past RLS on accounts unless it runs as the caller', async (_, create, reported) => {
+    const scratch = await openDb();
+    try {
+      await scratch.exec(`
+        ${create};
+        revoke all on public.account_list from public, anon, authenticated, service_role;
+        grant select on public.account_list to authenticated;
+      `);
+      expect(await audit(scratch)).toEqual(reported ? [{ violation: 'view readable by authenticated that bypasses RLS', object: 'account_list' }] : []);
+    } finally {
+      await scratch.close();
+    }
+  }, FRESH_DB_TIMEOUT);
+
   it.each(['service_role', 'supabase_auth_admin', 'public'] as const)('reports a trigger function executable by %s', async (grantee) => {
     // Rule 4: a trigger function is never granted to anyone. A grant to public reaches every role.
     const scratch = await openDb();
