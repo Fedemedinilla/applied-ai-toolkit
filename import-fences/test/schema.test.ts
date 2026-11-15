@@ -89,6 +89,13 @@ describe('a JSON config', () => {
     expect(cli(root, ['--config', 'config/fences.json'])).toMatchObject({ code: 0, stdout: 'import-fences: 0 violations in 3 files, 3 rules\n' });
   });
 
+  it('loads a file saved with a UTF-8 byte order mark, as Windows editors write it', async () => {
+    const root = tree({ ...CLEAN_FILES, 'import-fences.config.json': `\uFEFF${JSON.stringify(JSON_CONFIG)}` });
+    const { $schema: _schema, ...plain } = JSON_CONFIG;
+    expect((await loadConfig(join(root, 'import-fences.config.json'))).config).toEqual(parseConfig(plain));
+    expect(cli(root)).toMatchObject({ code: 0, stdout: 'import-fences: 0 violations in 3 files, 3 rules\n' });
+  });
+
   it('exits 2 with nothing on stdout when it is not JSON, not an object, or not a valid config', () => {
     const root = tree({
       ...CLEAN_FILES,

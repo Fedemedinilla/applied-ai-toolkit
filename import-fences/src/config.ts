@@ -182,9 +182,12 @@ export function configJsonSchema(): Record<string, unknown> {
   };
 }
 
-/** A JSON config: the object a module would export, with an optional `$schema` key for editors. */
+/**
+ * A JSON config: the object a module would export, with an optional `$schema` key for editors.
+ * A leading byte order mark, which Windows editors often write, is dropped: JSON.parse rejects it.
+ */
 function readJsonConfig(absolute: string): unknown {
-  const value: unknown = JSON.parse(readFileSync(absolute, 'utf8'));
+  const value: unknown = JSON.parse(readFileSync(absolute, 'utf8').replace(/^\uFEFF/, ''));
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
   const { $schema: _schema, ...config } = value as Record<string, unknown>;
   return config;
