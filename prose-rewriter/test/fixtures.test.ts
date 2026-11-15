@@ -37,18 +37,21 @@ describe('the fixtures carry no real data', () => {
   // Witnesses: if the checks stopped seeing real data, the tests above would pass for the wrong reason.
   it('reports a real address, a real phone, a real host, the owner and a missing marker', () => {
     const owner = 'Medi' + 'nilla';
-    const text = `Write to someone@gmail.com or call +54 9 11 4567-8901. See https://portfolio.dev. Signed ${owner}.`;
+    const text = `Write to someone@gmail.com or call +54 9 11 4567-8901. See https://portfolio.dev, linkedin.com/in/x and www.portfolio.dev. WhatsApp 3515551234. Signed ${owner}.`;
     expect(checkFictional('bad.md', text, { needsMarker: true }).map((f) => `${f.kind} ${f.match}`)).toEqual([
       'email someone@gmail.com',
       'host https://portfolio.dev',
+      'host linkedin.com',
+      'host www.portfolio.dev',
       'phone +54 9 11 4567-8901',
+      'phone 3515551234',
       `owner ${owner}`,
       'marker Write to someone@gmail.com or call +54 9',
     ]);
   });
 
   it('accepts reserved hosts, zero-filled phones and year ranges', () => {
-    const text = '<!-- Fictional -->\nana@school.test, ana@example.org, https://ana.example, +54 9 351 0000-0000, 2019-2023.';
+    const text = '<!-- Fictional -->\nana@school.test, ana@example.org, https://ana.example, ana.example/cv, +54 9 351 0000-0000, 35100000000, 2019-2023, Node.js, cv.md, e.g. this.';
     expect(checkFictional('ok.md', text, { needsMarker: true })).toEqual([]);
   });
 });
