@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildReceiptPdf, type ReceiptWarning } from '../../../pdf-receipt/src/index.ts';
+import { buildReceipt, buildReceiptPdf, ReceiptInputError, type ReceiptWarning } from '../../../pdf-receipt/src/index.ts';
 import { fileNameFor } from '../src/app.ts';
 import { FIELD, toReceipt } from '../src/draft.ts';
-import { locate, warningText } from '../src/messages.ts';
+import { inputErrorText, locate, warningText } from '../src/messages.ts';
 import { hostileOrder, longOrder, simpleOrder } from '../src/samples.ts';
 
 const TODAY = '2026-11-04';
@@ -49,6 +49,14 @@ describe('toReceipt', () => {
     expect(r.errors.map((e) => e.field)).toEqual([FIELD.itemQuantity(4), FIELD.itemUnitPrice(4), FIELD.shipping, FIELD.balance]);
   });
 
+  it('puts a line total over the maximum on that row\'s price, in Spanish', () => {
+    const d = simpleOrder(TODAY);
+    const r = toReceipt({ ...d, items: [{ name: 'Maceta', detail: '', quantity: '1000000', unitPrice: '99.999.999.999,99' }] }, [3]);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors).toEqual([{ field: FIELD.itemUnitPrice(3), message: 'El subtotal (cantidad por precio) es demasiado grande.' }]);
+  });
+
   it('builds every sample', async () => {
     for (const sample of [simpleOrder(TODAY), hostileOrder(TODAY), longOrder(TODAY)]) {
       const r = toReceipt(sample, sample.items.map((_, i) => i));
@@ -63,6 +71,39 @@ describe('messages', () => {
     expect(locate('items[1].name', [{ id: 3, position: 1 }, { id: 5, position: 4 }])).toEqual({ name: 'Producto 4, nombre', id: FIELD.itemName(5) });
     expect(locate('customer.lines[2]', [])).toEqual({ name: 'Datos del cliente, renglón 3', id: FIELD.customerLines });
     expect(locate('notes', [])).toEqual({ name: 'Aclaraciones', id: FIELD.notes });
+  });
+
+  it('names a line total by its row and points at the price, not the name', () => {
+    expect(locate('items[0]', [{ id: 2, position: 3 }])).toEqual({ name: 'Producto 3, subtotal', id: FIELD.itemUnitPrice(2) });
+  });
+
+  it('words every input error in Spanish, with no internal path', async () => {
+    const rows = [{ id: 0, position: 1 }];
+    const errors = [
+      new ReceiptInputError('invalid_date', 'issuedOn', 'x'),
+      new ReceiptInputError('invalid_date', 'deliveryOn', 'x'),
+      new ReceiptInputError('amount_too_large', 'items', 'x'),
+      new ReceiptInputError('amount_too_large', 'shippingCents', 'x'),
+      new ReceiptInputError('amount_too_large', 'previousBalanceCents', 'x'),
+      new ReceiptInputError('amount_too_large', 'items[0]', 'x'),
+    ];
+    const texts = errors.map((e) => inputErrorText(e, rows));
+    expect(texts).toEqual([
+      { field: FIELD.issuedOn, text: 'Fecha: la fecha no es válida.' },
+      { field: FIELD.deliveryOn, text: 'Entrega: la fecha no es válida.' },
+      { field: null, text: 'La suma de los productos es demasiado grande.' },
+      { field: FIELD.shipping, text: 'El total del remito es demasiado grande.' },
+      { field: FIELD.balance, text: 'Saldo anterior: el importe es demasiado grande.' },
+      { field: FIELD.itemUnitPrice(0), text: 'Producto 1, subtotal: el importe es demasiado grande.' },
+    ]);
+    // A date with the right shape that is not on the calendar gets past toReceipt.
+    const r = toReceipt({ ...simpleOrder(TODAY), issuedOn: '2026-02-30' }, [0, 1, 2]);
+    if (!r.ok) throw new Error('expected the shape check to pass');
+    const thrown = await buildReceipt(r.data).catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(ReceiptInputError);
+    const located = inputErrorText(thrown as ReceiptInputError, r.rows);
+    expect(located.text).not.toMatch(/[a-z][A-Z]/u);
+    expect(located).toEqual({ field: FIELD.issuedOn, text: 'Fecha: la fecha no es válida.' });
   });
 
   it('words every warning in Spanish', () => {
