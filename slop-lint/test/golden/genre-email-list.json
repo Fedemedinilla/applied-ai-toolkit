@@ -1,0 +1,59 @@
+{
+  "lang": "en",
+  "findings": [
+    {
+      "ruleId": "FMT-01-LIST",
+      "level": 2,
+      "severity": "medium",
+      "start": 143,
+      "end": 145,
+      "line": 7,
+      "column": 1,
+      "match": "- ",
+      "message": "List in a plain-text mail. A short one reads fine; a long one reads as a report.",
+      "suggestion": "Keep it to a few items, or write them as a sentence."
+    },
+    {
+      "ruleId": "FMT-01-LIST",
+      "level": 2,
+      "severity": "medium",
+      "start": 179,
+      "end": 181,
+      "line": 8,
+      "column": 1,
+      "match": "- ",
+      "message": "List in a plain-text mail. A short one reads fine; a long one reads as a report.",
+      "suggestion": "Keep it to a few items, or write them as a sentence."
+    },
+    {
+      "ruleId": "FMT-01-LIST",
+      "level": 2,
+      "severity": "medium",
+      "start": 221,
+      "end": 223,
+      "line": 9,
+      "column": 1,
+      "match": "- ",
+      "message": "List in a plain-text mail. A short one reads fine; a long one reads as a report.",
+      "suggestion": "Keep it to a few items, or write them as a sentence."
+    }
+  ],
+  "passesTier1": true,
+  "disqualified": false,
+  "score": {
+    "points": 10.5,
+    "max": 15
+  },
+  "stats": {
+    "words": 55,
+    "sentences": 10,
+    "proseSentences": 2,
+    "meanSentenceLength": 10,
+    "sentenceLengthCV": 0.1,
+    "emDashes": 0,
+    "anchors": 2,
+    "tier2Used": 0,
+    "tier2Budget": 2
+  },
+  "genre": "email"
+}

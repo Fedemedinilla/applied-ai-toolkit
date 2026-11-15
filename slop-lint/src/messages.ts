@@ -21,6 +21,7 @@ export const MESSAGE_VARIANTS: Readonly<Record<string, MessageVariant>> = {
     deviation: 'The report checks only the first sentence; here every sentence start is checked, because the phrases are no better in the middle of a text.',
   },
   'RET-01': { message: 'Praise for the company with nothing the writer knows about it.' },
+  'FMT-01': { message: 'Markdown in a plain-text message. The reader’s app shows the asterisks and hashes as typed.' },
   'FMT-02': { message: 'Emoji in a professional message.' },
   'FMT-04': { message: 'Template placeholder or chat residue. It cannot be sent as it is.' },
   'ORT-04': { message: 'A raya that opens an aside must close it, and a short text tolerates one aside between rayas.' },

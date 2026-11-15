@@ -7,7 +7,7 @@
  * schema/config.schema.json describes the same shape for editors, and test/config-schema.test.ts
  * runs both over one fixture set so they cannot drift apart.
  */
-import { applySetting, GENRE_PROFILES, GENRES } from './genres.ts';
+import { applySetting, GENRE_PROFILES, GENRES, splitRule } from './genres.ts';
 import { globProblem, matchesAny } from './glob.ts';
 import { messageFor } from './messages.ts';
 import { RULES } from './rules.ts';
@@ -427,13 +427,18 @@ export function settingsFor(config: Config, path: string | undefined, origin: st
   const off: string[] = [];
   for (const rule of all) {
     // The config's setting for a rule replaces the genre's as a whole: the config wins over the genre.
-    const applied = applySetting(rule, settings[rule.id] ?? profile[rule.id]);
-    if (applied === undefined) {
+    // A rule the genre splits takes that setting on every part.
+    const setting = settings[rule.id] ?? profile[rule.id];
+    if (setting === 'off') {
       off.push(rule.id);
       continue;
     }
-    const message = messageFor(applied, resolvedGenre);
-    rules.push(message === applied.message ? applied : { ...applied, message });
+    for (const part of splitRule(rule, resolvedGenre)) {
+      const applied = applySetting(part, setting);
+      if (applied === undefined) continue;
+      const message = messageFor(applied, resolvedGenre);
+      rules.push(message === applied.message ? applied : { ...applied, message });
+    }
   }
   return { lang, format, genre: resolvedGenre, variety: resolvedVariety, anchors, rules, off, suppressions: { ...DEFAULT_SUPPRESSIONS, ...config.suppressions } };
 }

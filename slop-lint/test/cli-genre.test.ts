@@ -1,6 +1,7 @@
 // --genre, --variety and --previous. The goldens pin the JSON output of each new genre over its
 // fixture; regenerate them on purpose, from slop-lint/:
 //   node cli.ts test/fixtures/genres/email-es.txt --lang es --genre email --json > test/golden/genre-email.json
+//   node cli.ts test/fixtures/genres/email-list-en.txt --lang en --genre email --json > test/golden/genre-email-list.json
 //   node cli.ts test/fixtures/genres/follow-up-en.txt --lang en --genre follow-up --json > test/golden/genre-follow-up.json
 //   node cli.ts test/fixtures/genres/whatsapp-es.txt --lang es --genre whatsapp --variety rioplatense --json > test/golden/genre-whatsapp.json
 import { spawnSync } from 'node:child_process';
@@ -17,12 +18,14 @@ const golden = (name: string) => readFileSync(new URL(`golden/${name}`, import.m
 const run = (args: string[], options: { input?: string; cwd?: string } = {}) =>
   spawnSync(process.execPath, [join(dir, 'cli.ts'), ...args], { cwd: options.cwd ?? dir, encoding: 'utf8', ...(options.input === undefined ? {} : { input: options.input }) });
 const EMAIL = 'test/fixtures/genres/email-es.txt';
+const EMAIL_LIST = 'test/fixtures/genres/email-list-en.txt';
 const FOLLOW_UP = 'test/fixtures/genres/follow-up-en.txt';
 const WHATSAPP = 'test/fixtures/genres/whatsapp-es.txt';
 
 describe('--genre', () => {
   it('prints the same JSON as the golden of each new genre', () => {
     expect(run([EMAIL, '--lang', 'es', '--genre', 'email', '--json']).stdout).toBe(golden('genre-email.json'));
+    expect(run([EMAIL_LIST, '--lang', 'en', '--genre', 'email', '--json']).stdout).toBe(golden('genre-email-list.json'));
     expect(run([FOLLOW_UP, '--lang', 'en', '--genre', 'follow-up', '--json']).stdout).toBe(golden('genre-follow-up.json'));
     expect(run([WHATSAPP, '--lang', 'es', '--genre', 'whatsapp', '--variety', 'rioplatense', '--json']).stdout).toBe(golden('genre-whatsapp.json'));
   });
