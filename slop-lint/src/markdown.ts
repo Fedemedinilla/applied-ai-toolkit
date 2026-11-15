@@ -153,7 +153,20 @@ export function maskMarkdown(source: string, options: MaskOptions = {}): Markdow
   const regions: Array<[number, number]> = [];
   const directives: Directive[] = [];
   const directiveIssues: DirectiveIssue[] = [];
-  for (const m of current().matchAll(HTML_COMMENT)) {
+  // A comment written inside inline code is code: it is neither a directive nor a comment. The
+  // spans are found here without masking; the inline pass below masks them.
+  // A comment that opens inside a span is skipped, and the search goes on after that span.
+  const codeSpans = maskInlineCode(current(), () => undefined);
+  const commentSource = current();
+  const comments: RegExpExecArray[] = [];
+  const commentRe = new RegExp(HTML_COMMENT.source, HTML_COMMENT.flags);
+  for (let m = commentRe.exec(commentSource); m !== null; m = commentRe.exec(commentSource)) {
+    const at = m.index;
+    const span = codeSpans.find(([a, b]) => a < at && at < b);
+    if (span) commentRe.lastIndex = span[1];
+    else comments.push(m);
+  }
+  for (const m of comments) {
     const end = m.index + m[0].length;
     const body = m[0].replace(/^<!--|-->$/gu, '').trim();
     regions.push([m.index, end]);

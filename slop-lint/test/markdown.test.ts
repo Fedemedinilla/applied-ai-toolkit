@@ -194,6 +194,15 @@ describe('disable directives', () => {
     expect(ids('```\n<!-- slop-lint-disable -->\n```\nI am passionate about data.')).toEqual(['LEX-03']);
   });
 
+  it('is not a directive inside inline code', () => {
+    expect(ids('Write `<!-- slop-lint-disable -->` to mask a span.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Write ``<!-- slop-lint-disable-next-line -->``\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Use `<!-- slop-lint-disable LEX-03 -->` here.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    // An unclosed comment opener in code would otherwise run to the end of the file; a real directive after it still works.
+    expect(ids('Type `<!--` to open a comment.\n\nI am passionate about data.')).toEqual(['LEX-03']);
+    expect(ids('Type `<!--` first.\n<!-- slop-lint-disable-next-line -->\nI am passionate about data.')).toEqual([]);
+  });
+
   it('is only read in Markdown mode', () => {
     const source = '<!-- slop-lint-disable-next-line -->\nI am passionate about data.';
     expect(lint(source, { lang: 'en' }).findings.map((f) => f.ruleId)).toEqual(['LEX-03']);
