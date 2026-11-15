@@ -2,7 +2,7 @@
 
 A deterministic parser that reads one money amount from a sentence written or dictated in Rioplatense Spanish. It has three answers: a number, no amount, or `ambiguous: true` with a reason so the app asks instead of guessing. "vendí 3 docenas a 12 mil la docena" is 36000. "vendí 5 tortas a 8000" is a question: 8000 each and 8000 for the lot are both common readings, and a native speaker cannot tell either.
 
-No model and no runtime dependencies, and `src/` is browser-safe. Extracted from production work with its 165-phrase corpus, which is the spec.
+No model and no runtime dependencies, and `src/` is browser-safe. Extracted from production work with its corpus, which is the spec: 165 phrases from that work and 29 from an audit of this copy.
 
 ## Run it
 
@@ -46,31 +46,31 @@ Where a model is involved, it picks the fragment of a message that talks about m
 
 ## The families
 
-The corpus has 165 phrases in 15 families. The first 126 came from sweeping seven phrasing families. An adversarial review followed, in which every phrase had to be something a person would say and a second reader recomputed every expected value. Sixteen were dropped for sounding synthetic. The other 39 came from a red-team read of the parser, in eight new families. Eight of those cases are controls, sentences that already worked and had to keep working, marked CONTROL in their notes.
+The corpus has 194 phrases in 15 families. The first 126 came from sweeping seven phrasing families. An adversarial review followed, in which every phrase had to be something a person would say and a second reader recomputed every expected value. Sixteen were dropped for sounding synthetic. The other 39 came from a red-team read of the parser, in eight new families. Eight of those cases are controls, sentences that already worked and had to keep working, marked CONTROL in their notes. The last 29 came from an audit of this copy on 2026-11-15, each a sentence the parser misread, with 7 controls.
 
 | Family | Cases | Example | Result |
 |---|---|---|---|
-| `quantity-unit-price` | 17 | compre 3 docenas de facturas a 12 mil la docena | 36000 |
-| `slang-and-fuzzy-amounts` | 18 | le pague 30 lucas y pico al gasista | 30000, approximate |
-| `voice-transcription` | 19 | eh gaste veinte no pera treinta mil en nafta | 30000 |
-| `income-verbs` | 17 | me pagaron 3 fletes a 25 lucas | ask: `unit_or_total` |
+| `quantity-unit-price` | 20 | compre 3 docenas de facturas a 12 mil la docena | 36000 |
+| `slang-and-fuzzy-amounts` | 25 | le pague 30 lucas y pico al gasista | 30000, approximate |
+| `voice-transcription` | 24 | eh gaste veinte no pera treinta mil en nafta | 30000 |
+| `income-verbs` | 19 | me pagaron 3 fletes a 25 lucas | ask: `unit_or_total` |
 | `noisy-numbers` | 18 | emiti la factura 1234 por 89 mil | 89000 |
-| `dates-and-tense` | 20 | el jueves 12 gaste 12 lucas en insumos | 12000 |
-| `multi-and-edge` | 17 | compre 3 bolsas de cemento a 9500 cada una mas 4 mil de flete | 32500 |
+| `dates-and-tense` | 21 | el jueves 12 gaste 12 lucas en insumos | 12000 |
+| `multi-and-edge` | 25 | compre 3 bolsas de cemento a 9500 cada una mas 4 mil de flete | 32500 |
 | `loose-scale-words` | 8 | el arreglo me salio un par de palos | 2000000 |
 | `instalments-and-financing` | 8 | compre el horno en 18 cuotas fijas de 40 mil | 720000 |
 | `tax-and-discounts` | 7 | el proveedor me cobro 200 mil mas el 21 de iva | ask: `tax_unclear` |
 | `foreign-currency` | 5 | vendi la camioneta en 20 mil dolares | ask: `foreign_currency` |
 | `comma-enumeration` | 3 | pague la luz 45 mil, el gas 12 mil | 57000 |
-| `ranges` | 3 | el gasista me pidio de 80 mil a 100 mil | ask: `range` |
-| `count-and-price` | 3 | me devolvieron 3 remeras de 12 mil | ask: `unit_or_total` |
+| `ranges` | 5 | el gasista me pidio de 80 mil a 100 mil | ask: `range` |
+| `count-and-price` | 4 | me devolvieron 3 remeras de 12 mil | ask: `unit_or_total` |
 | `reference-amounts` | 2 | de los 80 mil me devolvieron 20 mil | 20000 |
 
 The ten reasons for asking are `unit_or_total`, `open_remainder` ("un palo y pico"), `range`, `discount_unclear`, `tax_unclear`, `mixed_directions` (money in and out in one sentence), `net_or_gross`, `instalments` ("6 cuotas sin interés de 25 lucas"), `several_quantities` and `foreign_currency`. The last is the one case where the reading is clear. The caller stores one fixed currency, so a figure said in dollars would be filed as that many pesos.
 
 ## The corpus is the spec
 
-[`corpus/corpus.json`](corpus/corpus.json) holds each phrase with its family, the expected `total`, `quantity` and `unit_price`, whether it is `ambiguous`, and a note saying why that is the right answer. The 39 red-team cases also record what the earlier version of the parser returned (`earlier_parser`). Each fix can be read next to the defect it closed. For "se me fueron 30 y pico de lucas" the field says 1000, and for "18 cuotas fijas de 40 mil" it says 40000.
+[`corpus/corpus.json`](corpus/corpus.json) holds each phrase with its family, the expected `total`, `quantity` and `unit_price`, whether it is `ambiguous`, and a note saying why that is the right answer. The 39 red-team cases and the 29 audit cases (`source: "audit"`) also record what the earlier version of the parser returned (`earlier_parser`). Each fix can be read next to the defect it closed. For "se me fueron 30 y pico de lucas" the field says 1000, and for "18 cuotas fijas de 40 mil" it says 40000.
 
 A change to the parser is done when every corpus phrase passes. A new rule starts as a phrase in the corpus, with its control.
 
@@ -99,15 +99,15 @@ The two source versions of the corpus did not disagree. The earlier 126 phrases 
 | File | Covers |
 |---|---|
 | `test/corpus.test.ts` | Every corpus phrase, grouped by family, with the source's acceptance rule, plus quantity and unit price whenever the parser multiplies; the known conflict; a per-family score |
-| `test/regressions.test.ts` | The 39 hand-written cases from the source's test table (identical in both versions), grouped by the audit that found them, each checked as a number, a question or no amount; and the 14 red-team phrases with what the earlier copy returned |
+| `test/regressions.test.ts` | The 39 hand-written cases from the source's test table (identical in both versions), grouped by the audit that found them, each checked as a number, a question or no amount; the 14 red-team phrases with what the earlier copy returned; words that name an `Object.prototype` key; the caller's `slang` |
 | `test/reference.test.ts` | Output identical to the source parser on 212 phrases, field for field |
-| `test/properties.test.ts` | fast-check: an integer formatted the Argentine way (`1.234.567`, `1.234,56`) parses back to itself; integers up to 999999 spelled out in words parse back; "mil" after a figure multiplies it by a thousand; "y pico" never returns an exact value; `normalize` is idempotent; arbitrary Unicode never throws; capitals and extra spaces do not change the result |
+| `test/properties.test.ts` | fast-check: an integer formatted the Argentine way (`1.234.567`, `1.234,56`) parses back to itself; integers up to 999999 spelled out in words parse back, and so do millions up to 999.999.999 except the colloquial "un millon doscientos" shape the corpus pins; "mil" after a figure multiplies it by a thousand; "y pico" never returns an exact value; `normalize` is idempotent; arbitrary Unicode never throws; capitals and extra spaces do not change the result |
 | `test/numbers.test.ts` | `parseNumber` on separators, including the dot as a decimal point ("1.5", "250000.00") |
 | `test/spans.test.ts` | Roles and offsets for each kind of result, and that every span is a slice of the input |
 | `test/limits.test.ts` | The known limits below, pinned as they behave today |
 | `test/package.test.ts` | The CLI on stdin and arguments, with one set of keys for every answer; `src/` imports only its own files (static, side-effect and dynamic imports), uses no Node API and no regex lookbehind, for Safari before 16.4 |
 
-484 tests, all offline.
+525 tests, all offline.
 
 ## Mutation testing
 
@@ -130,7 +130,7 @@ A timeout counts as detected: the mutant made a loop run forever. That run took 
 
 The run showed four untested separator rules in `parseNumber`, each now a test: a comma at the start, a dot at the start before a comma, more than one dot, and three digits after a dot that is not the last group.
 
-The survivors are not claimed as equivalent. The corpus pins the reading of 165 sentences end to end, and a sentence checks the branches it goes through together, not one at a time. What that leaves open, by area:
+The survivors are not claimed as equivalent. The corpus pins the reading of 194 sentences end to end (165 when this was measured), and a sentence checks the branches it goes through together, not one at a time. What that leaves open, by area:
 
 - **`money.ts`.** About 220 of its survivors are a single condition, comparison or `&&` inside the rules that pick among several figures in a sentence. A mutant there changes the reading of a sentence shape the corpus does not have. About 45 are strings: the `literal` of a result and the role of a span, which few tests compare.
 - **`numbers.ts`.** `readWordNumber` after a million ("un millón doscientos"): the conditions that treat the next group as thousands survive, so that reading rests on few corpus sentences.
@@ -168,4 +168,4 @@ Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container 
 - One amount per sentence. Two movements ("pague 5 mil de luz y 3 mil de gas") come back as their sum, and money in and out together is refused as `mixed_directions`, not split.
 - The vocabulary is Rioplatense Spanish only. Other Spanish varieties use other slang and, in some countries, the opposite separators.
 - Currencies with an ordinary homograph ("reales", "libras") are not detected, on purpose. A false alarm on "el precio real" would cost more than it saves.
-- The corpus is 165 phrases. It covers the shapes that came up in use and the ones found by reading the parser for weak spots. A phrasing outside them can still switch a rule off.
+- The corpus is 194 phrases. It covers the shapes that came up in use and the ones found by reading the parser for weak spots. A phrasing outside them can still switch a rule off.
