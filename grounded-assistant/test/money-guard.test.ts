@@ -125,6 +125,21 @@ describe('decomposed accents (NFD)', () => {
   });
 });
 
+describe('price phrases over long gaps', () => {
+  // Three whitespace quantifiers side by side once backtracked cubically: 4,000 spaces took 9 s.
+  const gaps = [' '.repeat(5000), '\n'.repeat(5000), '\u00A0'.repeat(5000), ' ,'.repeat(2500), ' :'.repeat(2500)];
+  it.each(gaps.map((g, i) => [i, g] as const))('gap %i between a name and a figure is judged quickly', (_i, gap) => {
+    const started = performance.now();
+    moneyVerdict(`Balayage${gap}x $78.000`, null);
+    moneyVerdict(`$78.000 x${gap}el balayage`, null);
+    moneyVerdict(`Balayage${gap}y${gap}x $78.000`, null);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+  it('a padded price phrase is still a price phrase', () => {
+    expect(misstatedRows(`Balayage${' '.repeat(5000)}sale $65.000.`).map((r) => r.id)).toEqual(['balayage']);
+  });
+});
+
 describe('reachable', () => {
   it('prunes above the cap and stays small with every row', () => {
     const all = SALON_SERVICES.map((s) => s.price);

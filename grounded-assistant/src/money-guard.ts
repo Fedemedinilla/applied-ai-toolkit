@@ -164,6 +164,11 @@ const STRONG_AFTER = /^\s*(?:\([^)]*\))?[\s,(]*(?::|sale|cuesta|vale|es|esta|es 
 const WEAK_AFTER = /^\s*(?:\([^)]*\))?[\s,(]*(?:son|salen|cuestan|valen|queda en|quedan en|queda|da|dan|suma|suman|en total|total|todo junto|are|come to|comes to|add up to|adds up to|in total|would come to)[\s:]*$/;
 const STRONG_BEFORE = /^\s*(?:el|la|los|las|del|de la|por el|por la|cada|for|for the|for a|for his|for her|for your|for my|per)?\s*$/;
 const JOINER = /^\s*(?:,|y|e|con|mas|\+|and|with|plus|&)\s*(?:el|la|los|las|un|una|the|a|an)?\s*$/;
+/* The patterns above put several whitespace quantifiers side by side, and a long run of spaces
+   before a character that does not fit made V8 try every split: 4,000 spaces took 9 s, cubically,
+   on every request of the process. A gap is tested with each run collapsed to one space, so no
+   quantifier has a run to split; the patterns treat every whitespace alike, so the verdict holds. */
+const phrase = (gap: string) => gap.replace(/\s+/g, ' ');
 
 /**
  * The rows whose price the reply states wrong: "<row> is $N" or "$N for <row>" where $N is not that
@@ -182,7 +187,7 @@ export function misstatedRows(text: string, lang: Lang = 'es'): Service[] {
   const mentions = servicesNamedIn(reply);
   const found = figures.map((f) => f.n);
   const qty = quantityMentioned(reply, lang);
-  const joined = (a: Mention, b: Mention) => JOINER.test(folded.slice(a.end, b.start));
+  const joined = (a: Mention, b: Mention) => JOINER.test(phrase(folded.slice(a.end, b.start)));
   const out: Service[] = [];
   for (const [i, m] of mentions.entries()) {
     const p = m.service.price;
@@ -200,13 +205,13 @@ export function misstatedRows(text: string, lang: Lang = 'es'): Service[] {
     const prev = [...figures].reverse().find((f) => f.at + f.raw.length <= m.start);
     let wrong = false;
     if (next && !mentions.some((o) => o.start >= m.end && o.start < next.at)) {
-      const between = folded.slice(m.end, next.at);
+      const between = phrase(folded.slice(m.end, next.at));
       if (STRONG_AFTER.test(between)) wrong = inGroup ? !total(next.n) : !multiple(next.n);
       else if (WEAK_AFTER.test(between)) wrong = !total(next.n);
     }
     if (!wrong && prev && !mentions.some((o) => o.start >= prev.at && o.end <= m.start)) {
       const between = folded.slice(prev.at + prev.raw.length, m.start);
-      if (!between.includes('\n') && STRONG_BEFORE.test(between)) wrong = inGroup ? !total(prev.n) : !multiple(prev.n);
+      if (!between.includes('\n') && STRONG_BEFORE.test(phrase(between))) wrong = inGroup ? !total(prev.n) : !multiple(prev.n);
     }
     if (wrong && !out.includes(m.service)) out.push(m.service);
   }
