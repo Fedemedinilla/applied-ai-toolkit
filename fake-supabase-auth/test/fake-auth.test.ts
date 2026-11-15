@@ -298,6 +298,26 @@ describe('refresh', () => {
   });
 });
 
+describe('/user and /logout with an expired token', () => {
+  it('getUser with an expired jwt passed explicitly gets 403 bad_jwt, and so does /logout', async () => {
+    fake.knobs.expiresIn = -60;
+    const session = await signIn(fake, clientFor(fake));
+
+    const { data, error } = await clientFor(fake).auth.getUser(session.access_token);
+    expect(data.user).toBeNull();
+    expect(error).toMatchObject({ status: 403, code: 'bad_jwt' });
+    expect(error?.message).toMatch(/token is expired/);
+    expect(fake.calls).toEqual(['GET /auth/v1/user']);
+
+    const logout = await fake.fetch(`${fake.url}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { apikey: fake.publishableKey, authorization: `Bearer ${session.access_token}` },
+    });
+    expect(logout.status).toBe(403);
+    expect(await logout.json()).toMatchObject({ error_code: 'bad_jwt' });
+  });
+});
+
 describe('refresh failure cooldown', () => {
   it('after a failed refresh, the same refresh token gets the cached error for 60 seconds with no /token call', async () => {
     fake.knobs.expiresIn = -60;
