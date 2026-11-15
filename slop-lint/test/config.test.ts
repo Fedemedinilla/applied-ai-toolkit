@@ -68,6 +68,8 @@ describe('globs', () => {
     expect(globProblem('docs\\es')).toMatch(/backslash/u);
     expect(globProblem('docs/../x')).toMatch(/\.\. segment/u);
     expect(globProblem('!docs/a.md')).toMatch(/negation/u);
+    expect(globProblem('./docs/**')).toMatch(/without \.\//u);
+    expect(globProblem('docs/')).toMatch(/add \*\*/u);
   });
 });
 
