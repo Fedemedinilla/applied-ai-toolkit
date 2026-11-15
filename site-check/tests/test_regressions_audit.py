@@ -313,5 +313,37 @@ class IdnaDeviationTest(unittest.TestCase):
             self.assertIn("xn--", err)
 
 
+class SarifOverrideTest(unittest.TestCase):
+    """SARIF results are the rules that did not pass, whatever colour an override gave them."""
+
+    def _log(self, recolour: dict[str, str]) -> dict[str, Any]:
+        from sitecheck import i18n, sarif
+
+        run = json.loads((EXAMPLES / "run.json").read_text(encoding="utf-8"))
+        for check in run["checks"]:
+            if check["id"] in recolour:
+                check["colour"] = recolour[check["id"]]
+        return sarif.to_sarif(run, i18n.catalog("es"))["runs"][0]
+
+    def _state(self, rule_id: str) -> str:
+        run = json.loads((EXAMPLES / "run.json").read_text(encoding="utf-8"))
+        return next(c["state"] for c in run["checks"] if c["id"] == rule_id)
+
+    def test_a_passing_rule_recoloured_yellow_is_not_a_result(self) -> None:
+        self.assertEqual(self._state("EXT-20"), "pass")
+        run = self._log({"EXT-20": "yellow"})
+        self.assertNotIn("EXT-20", [r["ruleId"] for r in run["results"]])
+        self.assertTrue(all(r["properties"]["state"] in ("fail", "pass_with_note") for r in run["results"]))
+
+    def test_a_failing_rule_recoloured_green_is_counted(self) -> None:
+        self.assertEqual(self._state("EXT-05"), "fail")
+        baseline = self._log({})
+        self.assertEqual(baseline["properties"]["notPassedWithoutResult"], 0)
+        run = self._log({"EXT-05": "green"})
+        self.assertNotIn("EXT-05", [r["ruleId"] for r in run["results"]])
+        self.assertEqual(len(run["results"]), len(baseline["results"]) - 1)
+        self.assertEqual(run["properties"]["notPassedWithoutResult"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

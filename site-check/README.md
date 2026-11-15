@@ -192,7 +192,7 @@ A run records its language in `meta.report_language`, and `--rerender` keeps it 
 | `blue` | Optional improvement | `note` |
 | `green`, `grey`, `hidden` | fine, could not be seen, not applicable | no result |
 
-A grey rule could not be checked, which says nothing about the site, so it gives no result; the run's `properties` carry the count. The location of every result is the page that was checked: `artifactLocation.uri` is the canonical URL of the run, or the input URL when the home never answered. A web page has no lines, so there is no region, and GitHub code scanning lists such a result without attaching it to a file. The message is the text the report of that language prints for the rule: the stored sentence with `--lang es`, the fixed description with `--lang en`. `partialFingerprints` hashes the rule id and the URL.
+A grey rule could not be checked, which says nothing about the site, so it gives no result; the run's `properties` carry the count. The SARIF log lists a rule by its state and takes only the level from its colour, so an override cannot turn a passed rule into a warning. A failed rule that an override coloured green is left out too, and `properties.notPassedWithoutResult` counts it. The location of every result is the page that was checked: `artifactLocation.uri` is the canonical URL of the run, or the input URL when the home never answered. A web page has no lines, so there is no region, and GitHub code scanning lists such a result without attaching it to a file. The message is the text the report of that language prints for the rule: the stored sentence with `--lang es`, the fixed description with `--lang en`. `partialFingerprints` hashes the rule id and the URL.
 
 ## Runs of earlier versions
 

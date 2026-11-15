@@ -13,7 +13,10 @@ state, the module and the priority of the rule, colours.py):
     green, grey (not verified) and hidden (not applicable) -> no result
 
 A result is a rule that did not pass on that site: state ``fail`` or
-``pass_with_note``, both printed under "What is worth fixing". A grey rule
+``pass_with_note``, both printed under "What is worth fixing", with a red,
+yellow or blue colour. A rule in another state is never a result, even when
+--overrides recolours it. One that did not pass but was recoloured green is
+counted in ``properties.notPassedWithoutResult``. A grey rule
 could not be checked, which is not a finding about the site; the count of
 grey rules is in the run's ``properties``.
 
@@ -40,6 +43,7 @@ SARIF_VERSION = "2.1.0"
 INFORMATION_URI = "https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/site-check"
 # The partialFingerprints key. The version changes if the hash input ever does.
 FINGERPRINT_KEY = "siteCheck/v1"
+NOT_PASSED_STATES: frozenset[str] = frozenset({"fail", "pass_with_note"})
 LEVEL_OF_COLOUR: dict[str, str] = {"red": "error", "yellow": "warning", "blue": "note"}
 # The internal colour name of each public one, for the catalog keys.
 _CATALOG_COLOUR = {"red": "rojo", "yellow": "amarillo", "blue": "azul"}
@@ -78,7 +82,10 @@ def to_sarif(run: dict[str, Any], cat: Catalog) -> dict[str, Any]:
     meta = run.get("meta") or {}
     uri = str(meta.get("canonical_url") or meta.get("input_url") or "")
     checks = [c for c in run.get("checks") or [] if isinstance(c, dict) and c.get("id")]
-    failed = [c for c in checks if c.get("colour") in LEVEL_OF_COLOUR]
+    not_passed = [c for c in checks if c.get("state") in NOT_PASSED_STATES]
+    # The state decides what is a result, the colour only its level: an
+    # override can recolour a rule, never turn a pass into a finding.
+    failed = [c for c in not_passed if c.get("colour") in LEVEL_OF_COLOUR]
     rules: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     for index, check in enumerate(failed):
@@ -133,6 +140,8 @@ def to_sarif(run: dict[str, Any], cat: Catalog) -> dict[str, Any]:
                     "checks": len(checks),
                     "notVerified": sum(1 for c in checks if c.get("colour") == "grey"),
                     "notApplicable": sum(1 for c in checks if c.get("state") == "not_applicable"),
+                    # A rule that did not pass but an override coloured green (or grey).
+                    "notPassedWithoutResult": len(not_passed) - len(failed),
                 },
             }
         ],
