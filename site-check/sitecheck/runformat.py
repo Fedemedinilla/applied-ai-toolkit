@@ -575,13 +575,25 @@ def to_public(document: dict[str, Any]) -> dict[str, Any]:
     return public
 
 
+def _version(document: dict[str, Any]) -> int | None:
+    """The schema_version of a stored run, or None when it is not a JSON integer.
+
+    The check is by type because Python compares True == 1 and 2.0 == 2, and
+    the README promises that any other schema_version is refused.
+    """
+    version = document.get("schema_version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        return None
+    return version
+
+
 def to_internal(document: dict[str, Any]) -> dict[str, Any]:
     """The internal dict of a stored run, whatever its version.
 
     schema_version 2 is translated back; schema_version 1 (``datos.json``) is
     the internal layout already. Any other version raises RunFormatError.
     """
-    version = document.get("schema_version")
+    version = _version(document)
     if version == SCHEMA_VERSION:
         return _apply(document, _RUN_BACK, _RUN_BACK, _MEASURED_BACK)
     if version == LEGACY_SCHEMA_VERSION:
@@ -592,7 +604,7 @@ def to_internal(document: dict[str, Any]) -> dict[str, Any]:
             internal["meta"] = {"idioma_informe": "es", **meta}
         return internal
     raise RunFormatError(
-        f"schema_version {version!r}; this tool reads {SCHEMA_VERSION} and migrates {LEGACY_SCHEMA_VERSION}"
+        f"schema_version {document.get('schema_version')!r}; this tool reads {SCHEMA_VERSION} and migrates {LEGACY_SCHEMA_VERSION}"
     )
 
 
@@ -602,12 +614,12 @@ def comparison_to_internal(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def is_legacy(document: dict[str, Any]) -> bool:
-    return document.get("schema_version") == LEGACY_SCHEMA_VERSION
+    return _version(document) == LEGACY_SCHEMA_VERSION
 
 
 def migrate(document: dict[str, Any]) -> dict[str, Any]:
     """A schema_version 1 document (``datos.json``) as schema_version 2. A version 2 document is returned as it is."""
-    if document.get("schema_version") == SCHEMA_VERSION:
+    if _version(document) == SCHEMA_VERSION:
         return document
     return to_public(to_internal(document))
 

@@ -5,10 +5,16 @@ Each test reproduces one confirmed finding and failed before its fix.
 
 from __future__ import annotations
 
+import json
+import shutil
 import unittest
+from pathlib import Path
+from typing import Any
 
 import support  # noqa: F401
-from support import TEST_KEY, SleepRecorder
+from support import TEST_KEY, SleepRecorder, run_cli, temp_dir
+
+from sitecheck import runformat
 
 from sitecheck.challenge import ChallengeDetector
 from sitecheck.credentials import Redactor
@@ -21,6 +27,7 @@ from fakesite import FakeSite, Route
 from sitefixtures import default_apis, school_scenario
 
 BASE = "https://colegio.test"
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 
 class _Rig:
@@ -71,6 +78,37 @@ class NonAsciiDigitHeaderTest(unittest.TestCase):
             rig.client.fetch(f"{BASE}/a/", purpose=Purpose.LINK_CHECK, headers_only=True)
             self.assertTrue(rig.client.blocked)
             self.assertEqual(rig.client.fetch(f"{BASE}/b/", purpose=Purpose.LINK_CHECK, headers_only=True).skipped, "blocked")
+
+
+def _stored_run(root: Path, name: str, edit: Any) -> Path:
+    """A copy of examples/<name> in its own folder, changed by ``edit(document)``."""
+    folder = root / "run"
+    folder.mkdir()
+    document = json.loads((EXAMPLES / name).read_text(encoding="utf-8"))
+    edit(document)
+    path = folder / name
+    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+class SchemaVersionTypeTest(unittest.TestCase):
+    """schema_version is an integer: JSON true is not 1 and 2.0 is not 2."""
+
+    def test_bool_and_float_versions_are_refused(self) -> None:
+        for version in (True, 2.0, 1.0, False):
+            with self.subTest(version=version):
+                with self.assertRaises(runformat.RunFormatError):
+                    runformat.to_internal({"schema_version": version, "meta": {}})
+                self.assertFalse(runformat.is_legacy({"schema_version": version}))
+
+    def test_rerender_refuses_a_boolean_version_with_exit_2(self) -> None:
+        for name, version in (("datos.json", True), ("run.json", 2.0)):
+            with self.subTest(name=name), temp_dir() as root:
+                path = _stored_run(root, name, lambda d, v=version: d.__setitem__("schema_version", v))
+                code, _, err = run_cli(["--rerender", str(path)])
+                self.assertEqual(code, 2, err)
+                self.assertIn("schema_version", err)
+                self.assertFalse((path.parent / "report.md").exists())
 
 
 if __name__ == "__main__":
