@@ -1,7 +1,7 @@
 import { TUTEO, VOSEO } from './rules.ts';
 import { compile } from './regex.ts';
 import { isProse, words, type Span } from './text.ts';
-import type { Lang } from './types.ts';
+import type { Lang, Variety } from './types.ts';
 
 /** A raw hit from a structural check, before lint() attaches the rule's metadata. */
 export interface StructuralHit {
@@ -18,6 +18,39 @@ export interface StructuralContext {
   anchorsIn: (sentence: Span) => number;
   /** The sentences EST-10 measures: all of them in plain text, paragraph sentences in Markdown. */
   longSentenceScope: readonly Span[];
+  /** The genre's thresholds and budgets; DEFAULT_THRESHOLDS for a cover letter. */
+  thresholds: StructuralThresholds;
+  /** The Spanish variety, when the caller gave one. REG-01 reads it. */
+  variety?: Variety;
+}
+
+/** Every number a structural check applies, so a genre profile can set them. */
+export interface StructuralThresholds {
+  /** EST-10: words over which a sentence is long, per language. */
+  longSentence: Readonly<Record<Lang, number>>;
+  /** EST-11: prose sentences needed before the rhythm is measured. */
+  minSentencesForRhythm: number;
+  /** EST-11: coefficient of variation under which the rhythm is flat. */
+  minRhythmCV: number;
+  /** ESP-02: words of prose allowed per anchor. */
+  wordsPerAnchor: number;
+  /** OFI-01: words allowed per nominalization. */
+  wordsPerNominalization: number;
+  /** OFI-01: words a text needs before nominalizations are counted. */
+  minWordsForNominalization: number;
+  /** FMT-05: colons before a lowercase word tolerated per text. */
+  colonBudget: number;
+  /** ORT-04: closed asides between rayas tolerated per text. */
+  asideBudget: number;
+  /** ORT-05: em dashes tolerated per text. */
+  emDashBudget: number;
+  /** MED-01: -mente adverbs tolerated per text. */
+  menteBudget: number;
+  /**
+   * ORT-01: true checks an opening mark only when the text uses it somewhere, so a text written
+   * without ¿ or ¡ (a chat message, as its author types) is left alone.
+   */
+  openingMarksFollowText: boolean;
 }
 
 type Check = (ctx: StructuralContext) => StructuralHit[];
@@ -28,6 +61,21 @@ const MIN_RHYTHM_CV = 0.25;
 const WORDS_PER_ANCHOR = 35;
 const WORDS_PER_NOMINALIZATION = 12;
 const MIN_WORDS_FOR_NOMINALIZATION = 24;
+
+/** Today's values, which the cover-letter profile in genres.ts repeats and test/genres.test.ts compares. */
+export const DEFAULT_THRESHOLDS: StructuralThresholds = {
+  longSentence: LONG_SENTENCE,
+  minSentencesForRhythm: MIN_SENTENCES_FOR_RHYTHM,
+  minRhythmCV: MIN_RHYTHM_CV,
+  wordsPerAnchor: WORDS_PER_ANCHOR,
+  wordsPerNominalization: WORDS_PER_NOMINALIZATION,
+  minWordsForNominalization: MIN_WORDS_FOR_NOMINALIZATION,
+  colonBudget: 2,
+  asideBudget: 1,
+  emDashBudget: 1,
+  menteBudget: 2,
+  openingMarksFollowText: false,
+};
 
 const NOMINALIZATION: Record<Lang, RegExp> = {
   es: /^\p{L}{2,}(?:ción|ciones|sión|siones|miento|mientos|dad|dades)$/iu,
@@ -62,7 +110,8 @@ const checks: Record<string, Check> = {
     const ps = prose(ctx);
     const total = ps.reduce((n, s) => n + words(s.text).length, 0);
     const anchors = ps.reduce((n, s) => n + ctx.anchorsIn(s), 0);
-    if (total < WORDS_PER_ANCHOR || anchors * WORDS_PER_ANCHOR >= total) return [];
+    const per = ctx.thresholds.wordsPerAnchor;
+    if (total < per || anchors * per >= total) return [];
     return [{ ruleId: 'ESP-02', ...wholeRange(ps), detail: `${anchors} anchors in ${total} words of prose` }];
   },
 
@@ -77,30 +126,33 @@ const checks: Record<string, Check> = {
   'EST-10': (ctx) =>
     ctx.longSentenceScope.flatMap((s) => {
       const n = words(s.text).length;
-      return n > LONG_SENTENCE[ctx.lang] ? [{ ruleId: 'EST-10', start: s.start, end: s.end, detail: `${n} words` }] : [];
+      return n > ctx.thresholds.longSentence[ctx.lang] ? [{ ruleId: 'EST-10', start: s.start, end: s.end, detail: `${n} words` }] : [];
     }),
 
   'EST-11': (ctx) => {
     const ps = prose(ctx);
-    if (ps.length < MIN_SENTENCES_FOR_RHYTHM) return [];
+    if (ps.length < ctx.thresholds.minSentencesForRhythm) return [];
     const cv = coefficientOfVariation(ps.map((s) => words(s.text).length));
-    if (cv === null || cv >= MIN_RHYTHM_CV) return [];
+    if (cv === null || cv >= ctx.thresholds.minRhythmCV) return [];
     return [{ ruleId: 'EST-11', ...wholeRange(ps), detail: `CV ${cv.toFixed(2)} over ${ps.length} sentences` }];
   },
 
-  'FMT-05': (ctx) =>
-    [...ctx.text.matchAll(/(?<=[\p{L}\p{N})\]])[ \t]*:[ \t]+(?=\p{Ll})/gu)]
-      .slice(2)
+  'FMT-05': (ctx) => {
+    const budget = ctx.thresholds.colonBudget;
+    return [...ctx.text.matchAll(/(?<=[\p{L}\p{N})\]])[ \t]*:[ \t]+(?=\p{Ll})/gu)]
+      .slice(budget)
       .map((m) => {
         const at = m.index + m[0].indexOf(':');
-        return { ruleId: 'FMT-05', start: at, end: at + 1, detail: 'budget 2 per text' };
-      }),
+        return { ruleId: 'FMT-05', start: at, end: at + 1, detail: `budget ${budget} per text` };
+      });
+  },
 
   'ORT-01': (ctx) => {
     if (ctx.lang !== 'es') return [];
+    const marks = ([['¿', '?'], ['¡', '!']] as const).filter(([open]) => !ctx.thresholds.openingMarksFollowText || ctx.text.includes(open));
     return ctx.sentences.flatMap((s) => {
       const hits: StructuralHit[] = [];
-      for (const [open, close] of [['¿', '?'], ['¡', '!']] as const) {
+      for (const [open, close] of marks) {
         const closes = positions(s.text, close);
         const last = closes[closes.length - 1];
         if (last !== undefined && closes.length > positions(s.text, open).length) {
@@ -115,12 +167,14 @@ const checks: Record<string, Check> = {
     if (ctx.lang !== 'es') return [];
     const hits: StructuralHit[] = [];
     let asides = 0;
+    const budget = ctx.thresholds.asideBudget;
+    const tooMany = budget === 1 ? 'more than one aside between rayas' : `more than ${budget} asides between rayas`;
     for (const s of ctx.sentences) {
       const dashes = positions(s.text, '—').filter((p) => !(/\p{L}/u.test(s.text[p - 1] ?? '') && /\p{L}/u.test(s.text[p + 1] ?? '')));
       for (let i = 0; i + 1 < dashes.length; i += 2) {
         asides++;
         const p = dashes[i] ?? 0;
-        if (asides > 1) hits.push({ ruleId: 'ORT-04', start: s.start + p, end: s.start + p + 1, detail: 'more than one aside between rayas' });
+        if (asides > budget) hits.push({ ruleId: 'ORT-04', start: s.start + p, end: s.start + p + 1, detail: tooMany });
       }
       const last = dashes[dashes.length - 1];
       if (dashes.length % 2 === 1 && last !== undefined) {
@@ -132,15 +186,22 @@ const checks: Record<string, Check> = {
 
   'ORT-05': (ctx) => {
     if (ctx.lang !== 'en') return [];
+    const budget = ctx.thresholds.emDashBudget;
     return positions(ctx.text, '—')
-      .slice(1)
-      .map((p) => ({ ruleId: 'ORT-05', start: p, end: p + 1, detail: 'budget 1 per text' }));
+      .slice(budget)
+      .map((p) => ({ ruleId: 'ORT-05', start: p, end: p + 1, detail: `budget ${budget} per text` }));
   },
 
   'REG-01': (ctx) => {
     if (ctx.lang !== 'es') return [];
     const vos = [...ctx.text.matchAll(compile(VOSEO, 'giu'))];
     const tu = [...ctx.text.matchAll(compile(TUTEO, 'giu'))];
+    // With a variety, every form of the other register is wrong, even when it is the only one used.
+    if (ctx.variety !== undefined) {
+      const wrong = ctx.variety === 'rioplatense' ? tu : vos;
+      const expected = ctx.variety === 'rioplatense' ? 'voseo' : 'tuteo';
+      return wrong.map((m) => ({ ruleId: 'REG-01', start: m.index, end: m.index + m[0].length, detail: `the variety is ${ctx.variety}, which uses ${expected}` }));
+    }
     if (vos.length === 0 || tu.length === 0) return [];
     // Flag the minority register; on a tie, the one that shows up later.
     const firstVos = vos[0]?.index ?? 0;
@@ -152,18 +213,19 @@ const checks: Record<string, Check> = {
 
   'OFI-01': (ctx) => {
     const ws = words(ctx.text);
-    if (ws.length < MIN_WORDS_FOR_NOMINALIZATION) return [];
+    if (ws.length < ctx.thresholds.minWordsForNominalization) return [];
     const count = ws.filter((w) => NOMINALIZATION[ctx.lang].test(w.text)).length;
-    if (count * WORDS_PER_NOMINALIZATION <= ws.length) return [];
+    if (count * ctx.thresholds.wordsPerNominalization <= ws.length) return [];
     return [{ ruleId: 'OFI-01', start: ws[0]?.start ?? 0, end: ws[ws.length - 1]?.end ?? 0, detail: `${count} in ${ws.length} words` }];
   },
 
   'MED-01': (ctx) => {
     if (ctx.lang !== 'es') return [];
+    const budget = ctx.thresholds.menteBudget;
     return words(ctx.text)
       .filter((w) => /^\p{L}{3,}mente$/iu.test(w.text))
-      .slice(2)
-      .map((w) => ({ ruleId: 'MED-01', start: w.start, end: w.end, detail: 'budget 2 per text' }));
+      .slice(budget)
+      .map((w) => ({ ruleId: 'MED-01', start: w.start, end: w.end, detail: `budget ${budget} per text` }));
   },
 };
 
