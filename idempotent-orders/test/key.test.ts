@@ -66,6 +66,28 @@ describe('ActionKey', () => {
     expect(action.current()).toBe(k);
   });
 
+  it('starts a new action in a second tab once the first tab cleared the shared key', () => {
+    const tabA = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const tabB = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const k = tabA.current();
+    expect(tabB.current()).toBe(k);
+    tabA.clear();
+    const fresh = tabB.current();
+    expect(fresh).not.toBe(k);
+    // The two tabs agree on the new action too.
+    expect(tabA.current()).toBe(fresh);
+  });
+
+  it('takes the key another tab started after a clear', () => {
+    const tabA = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const tabB = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const k = tabB.current();
+    tabA.clear();
+    const next = tabA.current();
+    expect(next).not.toBe(k);
+    expect(tabB.current()).toBe(next);
+  });
+
   it('keeps the key in memory when storage reads but cannot write', () => {
     const full: KeyStorage = {
       getItem: () => null,

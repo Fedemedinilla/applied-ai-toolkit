@@ -45,8 +45,10 @@ interface Stored {
  * to send the cart as a separate order. A failure or an "unknown" answer keeps the key, so the
  * next tap is a resend, not a second order.
  *
- * The key is kept in memory and mirrored to storage. Memory wins, so a retry from the same page
- * keeps its key when storage is blocked; storage is what survives a reload.
+ * The key is kept in memory and mirrored to storage, which survives a reload and is shared by the
+ * tabs of the page. Once the mirror is written, storage decides: when another tab cleared the slot
+ * or started a new action there, this tab follows it. Memory wins only while storage cannot be
+ * read or written, so a retry from the same page keeps its key when storage is blocked or full.
  */
 export class ActionKey {
   readonly #slot: string;
@@ -55,6 +57,8 @@ export class ActionKey {
   readonly #now: () => number;
   readonly #makeKey: () => string;
   #current: Stored | null = null;
+  /** Whether the last write of #current reached storage, so the slot can be read as the truth. */
+  #mirrored = false;
 
   constructor(options: ActionKeyOptions) {
     this.#slot = options.slot;
@@ -72,10 +76,16 @@ export class ActionKey {
     const now = this.#now();
     // A clock moved back makes the age negative. That only makes a stored value suspect; the key
     // this page minted is still the same action, so its next send stays a resend.
-    if (this.#current && now - this.#current.createdAt < this.#lifetimeMs) return this.#current.key;
     const stored = this.#read();
-    this.#current = stored && this.#fresh(stored, now) ? stored : { key: this.#makeKey(), createdAt: now };
-    this.#write(this.#current);
+    const mine = this.#current;
+    if (mine && now - mine.createdAt < this.#lifetimeMs) {
+      // Another tab may have cleared the shared slot after a success, or started a new action in it.
+      const slotAgrees = stored === 'blocked' || !this.#mirrored || stored?.key === mine.key;
+      if (slotAgrees) return mine.key;
+    }
+    const adopt = stored !== 'blocked' && stored !== null && this.#fresh(stored, now) ? stored : null;
+    this.#current = adopt ?? { key: this.#makeKey(), createdAt: now };
+    this.#mirrored = this.#write(this.#current);
     return this.#current.key;
   }
 
@@ -94,9 +104,16 @@ export class ActionKey {
     return age >= 0 && age < this.#lifetimeMs;
   }
 
-  #read(): Stored | null {
+  /** The stored value, null when the slot is empty or holds something else, 'blocked' when it cannot be read. */
+  #read(): Stored | null | 'blocked' {
+    if (!this.#storage) return 'blocked';
+    let raw: string | null;
     try {
-      const raw = this.#storage?.getItem(this.#slot);
+      raw = this.#storage.getItem(this.#slot);
+    } catch {
+      return 'blocked';
+    }
+    try {
       if (!raw) return null;
       const value: unknown = JSON.parse(raw);
       if (typeof value !== 'object' || value === null) return null;
@@ -110,11 +127,14 @@ export class ActionKey {
     }
   }
 
-  #write(stored: Stored): void {
+  #write(stored: Stored): boolean {
+    if (!this.#storage) return false;
     try {
-      this.#storage?.setItem(this.#slot, JSON.stringify(stored));
+      this.#storage.setItem(this.#slot, JSON.stringify(stored));
+      return true;
     } catch {
       // Blocked or full storage: the key still holds for this page.
+      return false;
     }
   }
 }
