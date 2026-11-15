@@ -234,6 +234,36 @@ describe('run file', () => {
     expect(cleared).toEqual(['']);
   });
 
+  it('a slow read that finishes after a newer import or a new run changes nothing', async () => {
+    const { app } = mount();
+    const record = (seed: string): string => JSON.stringify({ format: 'dsim-run/1', rulesetVersion: 'dice-1', seed, inputs: [{ kind: 'roll', dice: 3 }] });
+    const slow = (name: string, content: string): ((value: string) => void) => {
+      let resolve: (value: string) => void = () => undefined;
+      const file = new File([content], name, { type: 'application/json' });
+      vi.spyOn(file, 'text').mockReturnValue(new Promise<string>((r) => (resolve = r)));
+      const input = $<HTMLInputElement>('#import-file');
+      Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+      input.dispatchEvent(new Event('change'));
+      return resolve;
+    };
+    const finishA = slow('a.json', record('alpha'));
+    chooseFile('b.json', record('beta'));
+    await vi.waitFor(() => expect(app.session()?.state.seed).toBe('beta'));
+    finishA(record('alpha'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.session()?.state.seed).toBe('beta');
+    expect(text('#import-result')).toContain('b.json: seed "beta"');
+    expect($<HTMLInputElement>('#seed').value).toBe('beta');
+
+    const finishC = slow('c.json', record('gamma'));
+    startSeed('delta');
+    finishC(record('gamma'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.session()?.state.seed).toBe('delta');
+    expect($<HTMLInputElement>('#seed').value).toBe('delta');
+    expect(text('#import-result')).toBe('c.json was not loaded: a run changed while it was read.');
+  });
+
   it('refuses a file over 64 KB without reading it', () => {
     mount();
     const input = $<HTMLInputElement>('#import-file');

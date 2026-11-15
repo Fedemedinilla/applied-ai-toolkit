@@ -90,6 +90,8 @@ function formula(entry: LogEntry): string {
 export function mountApp(doc: Document, deps: Deps): App {
   let session: Session | null = null;
   let downloadUrl: string | null = null;
+  // Bumped by every file choice, so a slow read that a newer one replaced is dropped.
+  let importCount = 0;
   // The running batch: a token that its messages must still match, and its cancel function.
   let activeBatch: object | null = null;
   let cancelBatch: (() => void) | null = null;
@@ -263,6 +265,7 @@ export function mountApp(doc: Document, deps: Deps): App {
   importInput.addEventListener('change', () => {
     const file = importInput.files?.[0];
     if (!file) return;
+    const thisImport = ++importCount;
     // Refused before the file is read, so a huge file never reaches memory. importRun checks again
     // for direct callers.
     if (file.size > MAX_FILE_BYTES) {
@@ -274,8 +277,15 @@ export function mountApp(doc: Document, deps: Deps): App {
     // file is chosen again, so a failed read could not be retried otherwise.
     importInput.value = '';
     importResult.replaceChildren(h(doc, 'p', {}, `Replaying ${file.name}...`));
+    // The session when the read started: a run started or played meanwhile is not replaced.
+    const sessionAtStart = session;
     file.text().then(
       (text) => {
+        if (thisImport !== importCount) return;
+        if (session !== sessionAtStart) {
+          importResult.replaceChildren(h(doc, 'p', {}, `${file.name} was not loaded: a run changed while it was read.`));
+          return;
+        }
         const v = importRun(text, file.size);
         if (!v.ok) {
           importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be replayed: ${v.error}.`));
@@ -298,6 +308,7 @@ export function mountApp(doc: Document, deps: Deps): App {
         render(fromReplay(v.record, v.state));
       },
       () => {
+        if (thisImport !== importCount) return;
         importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be read.`));
       },
     );
