@@ -49,12 +49,16 @@ async function listJson(folder: string): Promise<string[] | null> {
 
 export interface Loaded {
   readonly raw: RawCatalog;
-  /** File-level problems: unreadable JSON, a name that is not the id, a file that is not JSON. */
+  /** File-level problems: unreadable JSON, a name that is not the id, a file that is not JSON, a candidate with no id. */
   readonly problems: readonly Problem[];
 }
 
-/** Reads one folder per entity type under `root` (the catalogue, or its `_candidates/`). */
-async function loadTree(root: string, prefix: string, only?: EntityName): Promise<Loaded> {
+/**
+ * Reads one folder per entity type under `root` (the catalogue, or its `_candidates/`). For
+ * candidates, a file with no string id is a file-level problem: its name would be missing from the
+ * pending ids, and promote could not find it. In the catalogue the schema reports it.
+ */
+async function loadTree(root: string, prefix: string, only?: EntityName, requireId = false): Promise<Loaded> {
   const raw = emptyRaw();
   const problems: Problem[] = [];
   for (const entity of only ? [only] : ENTITY_NAMES) {
@@ -74,6 +78,7 @@ async function loadTree(root: string, prefix: string, only?: EntityName): Promis
       }
       const id = idOf(value);
       if (id !== null && `${id}.json` !== file) problems.push({ where, path: 'id', message: `the file name must be "${id}.json"` });
+      if (id === null && requireId) problems.push({ where, path: 'id', message: 'has no string id' });
       raw[entity].push({ source: where, value });
     }
   }
@@ -82,7 +87,7 @@ async function loadTree(root: string, prefix: string, only?: EntityName): Promis
 
 export const loadCatalog = (dir: string): Promise<Loaded> => loadTree(dir, '');
 
-export const loadCandidates = (dir: string, entity?: EntityName): Promise<Loaded> => loadTree(join(dir, CANDIDATES), `${CANDIDATES}/`, entity);
+export const loadCandidates = (dir: string, entity?: EntityName): Promise<Loaded> => loadTree(join(dir, CANDIDATES), `${CANDIDATES}/`, entity, true);
 
 /**
  * A temporary name next to `path`, on the same file system so rename and link work. It starts with

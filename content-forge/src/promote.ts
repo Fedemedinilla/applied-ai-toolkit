@@ -47,7 +47,11 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
     return id === null ? [] : [[id, e] as const];
   }));
   const wanted = options.ids === 'all' ? [...byId.keys()].sort() : [...new Set(options.ids)];
-  if (wanted.length === 0) throw new ForgeError('bad_request', `No ${entity} candidates to promote`);
+  if (wanted.length === 0) {
+    // A pending file that could not be read as a candidate is reported, not taken for an empty folder.
+    if (pending.problems.length > 0) throw new ForgeError('refused', 'Nothing was promoted', problems);
+    throw new ForgeError('bad_request', `No ${entity} candidates to promote`);
+  }
 
   const selected: { id: string; value: unknown }[] = [];
   const replaced: string[] = [];
@@ -55,7 +59,8 @@ export async function promote(options: PromoteOptions): Promise<PromoteResult> {
     const entry = byId.get(id);
     const where = `${ENTITIES[entity].folder}/${id}.json`;
     if (!entry) {
-      problems.push({ where: `_candidates/${where}`, path: '', message: 'no such candidate' });
+      // A file there that the loader already reported is not "no such candidate".
+      if (!pending.problems.some((p) => p.where === `_candidates/${where}`)) problems.push({ where: `_candidates/${where}`, path: '', message: 'no such candidate' });
       continue;
     }
     if (typeof entry.value === 'object' && entry.value !== null && 'handwritten' in entry.value && entry.value.handwritten === true) {

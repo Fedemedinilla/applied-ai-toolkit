@@ -138,6 +138,14 @@ describe('promote', () => {
     expect(await readJson(entityPath(dir, 'set', 'tidepool'))).toMatchObject({ note: 'edited by hand' });
   });
 
+  it('reports a pending file with no string id instead of skipping it', async () => {
+    await writeJson(candidatePath(dir, 'card', 'moss-crawler'), { name: 'Moss Crawler' });
+    const problem = '_candidates/cards/moss-crawler.json: id: has no string id';
+    expect(await refusal(promote({ dir, entity: 'card', ids: 'all' }))).toEqual([problem]);
+    expect(await refusal(promote({ dir, entity: 'card', ids: ['moss-crawler'] }))).toEqual([problem]);
+    expect(await readdir(join(dir, '_candidates', 'cards'))).toEqual(['moss-crawler.json']);
+  });
+
   it('says when there is nothing to promote', async () => {
     await expect(promote({ dir, entity: 'deck', ids: 'all' })).rejects.toMatchObject({ code: 'bad_request' });
   });

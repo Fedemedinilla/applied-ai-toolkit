@@ -110,7 +110,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
   if (brief !== null && brief.length > MAX_BRIEF) throw new ForgeError('bad_request', `--brief is limited to ${MAX_BRIEF} characters`);
 
   const { raw, index } = await validCatalog(dir);
-  // A pending file whose name is not its id, or that is not JSON, would hide an id from the
+  // A pending file whose name is not its id, that has no string id or is not JSON, would hide an id from the
   // pending check and make a write fail after the paid call. Refused before the call instead.
   const pendingFiles = await loadCandidates(dir, entity);
   if (pendingFiles.problems.length > 0) throw new ForgeError('refused', 'The pending candidates have problems; fix or remove them first', pendingFiles.problems);

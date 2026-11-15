@@ -183,6 +183,14 @@ describe('writes after the paid call', () => {
     expect(api.requests).toHaveLength(0);
   });
 
+  it.each([[{ name: 'Brine Scout' }], [{ id: 42 }]])('refuses before the call when a pending file has no string id: %j', async (value) => {
+    await writeJson(candidatePath(dir, 'card', 'brine-scout'), value);
+    const { api, model } = setup([messageText(await response('card-batch'))]);
+    const error = await run(model, 'card', 8).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'refused', problems: [{ where: '_candidates/cards/brine-scout.json', path: 'id', message: 'has no string id' }] });
+    expect(api.requests).toHaveLength(0);
+  });
+
   it('records a candidate it could not write and still writes the report with the cost', async () => {
     // A file appears at brine-scout's path while the call is out, too late for the pending check.
     const { model } = setup([messageText(await response('card-batch'))], undefined, () => writeJson(candidatePath(dir, 'card', 'brine-scout'), { id: 'brine-scout', by: 'someone else' }));
