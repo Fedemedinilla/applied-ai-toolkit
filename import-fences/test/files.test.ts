@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { check } from '../src/check.ts';
+import { parseConfig } from '../src/config.ts';
 import { diskSource, memorySource } from '../src/files.ts';
 
 const TREE: Readonly<Record<string, string>> = {
@@ -49,6 +51,30 @@ describe('diskSource and memorySource', () => {
       const listed = diskSource(root, ignore).list();
       expect(listed, JSON.stringify(ignore)).not.toContain('vendor/x.ts');
       expect(listed, JSON.stringify(ignore)).not.toContain('pkg/vendor/y.ts');
+    }
+  });
+});
+
+describe('packages installed above the root', () => {
+  it('count as installed, as Node resolves them in a workspace with hoisted node_modules', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'import-fences-hoisted-'));
+    try {
+      const files: Record<string, string> = {
+        'node_modules/hoisted-pkg/package.json': '{"name":"hoisted-pkg"}',
+        'pkg/src/client/a.ts': "import { x } from 'hoisted-pkg';\nimport { y } from 'missing-pkg';",
+      };
+      for (const [path, content] of Object.entries(files)) {
+        mkdirSync(dirname(join(workspace, path)), { recursive: true });
+        writeFileSync(join(workspace, path), content);
+      }
+      const config = parseConfig({
+        groups: { client: { include: ['src/client/**'] } },
+        rules: [{ rule: 'forbidden-import', group: 'client', specifiers: ['node:*'], paths: ['src/server/**'] }],
+      });
+      const found = check(config, diskSource(join(workspace, 'pkg'))).violations.map((v) => `${v.file}:${v.line} ${v.rule}`);
+      expect(found).toEqual(['src/client/a.ts:2 unresolved-import']);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
     }
   });
 });

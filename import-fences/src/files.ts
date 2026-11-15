@@ -1,6 +1,6 @@
 /** Where the checker reads files from: a folder on disk, or an in-memory tree for tests. */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { isCodeFile } from './extract.ts';
 import { globMatcher } from './glob.ts';
 
@@ -10,6 +10,12 @@ export interface FileSource {
   /** The content of a file, or null if it is not a file. */
   read(path: string): string | null;
   isFile(path: string): boolean;
+  /**
+   * Whether `node_modules/<name>/package.json` exists in the folder of `from` or any folder above
+   * it, up to the filesystem root, as Node looks. Optional: without it the checker looks only
+   * inside the root through isFile.
+   */
+  packageInstalled?(from: string, name: string): boolean;
 }
 
 export const DEFAULT_IGNORE: readonly string[] = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/coverage/**'];
@@ -76,6 +82,17 @@ export function diskSource(root: string, ignore: readonly string[] = DEFAULT_IGN
         return statSync(join(root, path)).isFile();
       } catch {
         return false;
+      }
+    },
+    packageInstalled(from, name) {
+      // Above the root too: a workspace hoists its packages' dependencies to the repository root.
+      for (let dir = dirname(join(root, from)); ; dir = dirname(dir)) {
+        try {
+          if (statSync(join(dir, 'node_modules', name, 'package.json')).isFile()) return true;
+        } catch {
+          // Not here; keep looking further up.
+        }
+        if (dirname(dir) === dir) return false;
       }
     },
   };

@@ -210,6 +210,7 @@ function forbiddenImport(
   };
   const external = (s: string) => rule.external.some((p) => matchesSpecifier(s, p));
   const installed = (from: string, name: string) => {
+    if (files.packageInstalled !== undefined) return files.packageInstalled(from, name);
     for (let dir = posix.dirname(from); ; dir = posix.dirname(dir)) {
       if (files.isFile(posix.join(dir === '.' ? '' : dir, 'node_modules', name, 'package.json'))) return true;
       if (dir === '.' || dir === '') return false;
