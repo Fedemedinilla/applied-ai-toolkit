@@ -149,4 +149,7 @@ export const NUMBER_WORDS: Readonly<Record<string, number>> = wordTable({
   ochenta: 80, noventa: 90, cien: 100, ciento: 100, doscientos: 200,
   trescientos: 300, cuatrocientos: 400, quinientos: 500, seiscientos: 600,
   setecientos: 700, ochocientos: 800, novecientos: 900,
+  // Feminine forms, said before a feminine noun: "quinientas lucas", "veintiuna lucas".
+  veintiuna: 21, doscientas: 200, trescientas: 300, cuatrocientas: 400, quinientas: 500,
+  seiscientas: 600, setecientas: 700, ochocientas: 800, novecientas: 900,
 });

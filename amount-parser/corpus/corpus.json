@@ -2317,5 +2317,44 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "null"
+ },
+ {
+  "phrase": "gaste quinientas lucas en la heladera",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 500000,
+  "ambiguous": false,
+  "note": "\"luca\" is feminine, so the hundreds agree with it: quinientas lucas = 500 x 1.000 = 500.000. The feminine form was skipped and the bare \"lucas\" read as 1.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1000"
+ },
+ {
+  "phrase": "le pague doscientas cincuenta lucas al pintor",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 250000,
+  "ambiguous": false,
+  "note": "A feminine hundred followed by a ten: 250 x 1.000 = 250.000. Only the \"cincuenta lucas\" used to be read.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "50000"
+ },
+ {
+  "phrase": "me salio veintiuna lucas el service",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 21000,
+  "ambiguous": false,
+  "note": "\"veintiuna\" is the feminine of veintiuno: 21 x 1.000 = 21.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1000"
  }
 ]
