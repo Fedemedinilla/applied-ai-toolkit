@@ -84,6 +84,24 @@ final class AuditTest extends TestCase
         self::assertStringContainsString('web root', $log->detail);
     }
 
+    /** wp_debug_mode() turns display off for any falsy value but null, and leaves php.ini alone for null. */
+    public function testDebugDisplayFollowsWordPress(): void
+    {
+        foreach ([0, '0', ''] as $off) {
+            self::assertSame(Verdict::Warn, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => $off])->debug()->verdict);
+        }
+        self::assertSame(Verdict::Fail, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => 1])->debug()->verdict);
+        $before = ini_get('display_errors');
+        try {
+            ini_set('display_errors', '0');
+            self::assertSame(Verdict::Warn, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => null])->debug()->verdict);
+            ini_set('display_errors', '1');
+            self::assertSame(Verdict::Fail, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => null])->debug()->verdict);
+        } finally {
+            ini_set('display_errors', (string) $before);
+        }
+    }
+
     public function testADebugLogInASiblingFolderIsNotInTheWebRoot(): void
     {
         mkdir($this->root . '-logs');

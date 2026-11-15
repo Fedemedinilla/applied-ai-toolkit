@@ -136,8 +136,7 @@ final class Audit
         if ($this->constants->value('WP_DEBUG') !== true) {
             return new Finding('INT-11', $title, Verdict::Pass, 'WP_DEBUG is off.');
         }
-        $display = $this->constants->defined('WP_DEBUG_DISPLAY') ? $this->constants->value('WP_DEBUG_DISPLAY') : true;
-        if ($display !== false) {
+        if ($this->displaysErrors()) {
             return new Finding('INT-11', $title, Verdict::Fail, 'WP_DEBUG is on and errors are printed into pages, with file paths in them.', ['WP_DEBUG=true', 'WP_DEBUG_DISPLAY not false']);
         }
         $log = $this->constants->value('WP_DEBUG_LOG');
@@ -146,6 +145,23 @@ final class Audit
             return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on and the log is inside the web root. Check from outside that it is not served.', [self::relative($file, $this->paths()->root)]);
         }
         return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on, with display off. Turn it off once the problem it was on for is fixed.', ['WP_DEBUG=true']);
+    }
+
+    /**
+     * Whether wp_debug_mode() leaves errors printed into pages. WordPress defines WP_DEBUG_DISPLAY
+     * as true when wp-config.php does not, turns display off for any other falsy value, and leaves
+     * php.ini in charge when it is null.
+     */
+    private function displaysErrors(): bool
+    {
+        if (!$this->constants->defined('WP_DEBUG_DISPLAY')) {
+            return true;
+        }
+        $display = $this->constants->value('WP_DEBUG_DISPLAY');
+        if ($display === null) {
+            return \in_array(strtolower(trim((string) ini_get('display_errors'))), ['1', 'on', 'true', 'yes', 'stdout'], true);
+        }
+        return (bool) $display;
     }
 
     public function salts(): Finding
