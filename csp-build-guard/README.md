@@ -84,7 +84,7 @@ A policy that allows inline scripts by hash breaks the moment the script changes
 - an event handler (`onclick="..."`) or a `style="..."` attribute is present without `'unsafe-hashes'` and its hash, since a hash-only policy blocks it;
 - a page has no policy at all, or one whose value is empty (`""`, `;`, an empty `<meta>` content), so there is nothing to compare against.
 
-JSON-LD and other data blocks are skipped, since CSP does not apply to them. Import maps are hashed, since it does. An empty `<script></script>` is skipped, since the browser runs no CSP check on it; a whitespace-only one is hashed. sha256, sha384 and sha512 hashes are all recognized. As in the browser, the algorithm can be in any case and the digest in base64 or base64url.
+JSON-LD and other data blocks are skipped, since CSP does not apply to them. Import maps are hashed, since it does. An empty `<script></script>` is skipped, since the browser runs no CSP check on it; a whitespace-only one is hashed. sha256, sha384 and sha512 hashes are all recognized. As in the browser, the algorithm can be in any case and the digest in base64 or base64url. The digest keeps its `=` padding in both: CSP3 maps `-` to `+` and `_` to `/`, then compares the digest as text with the padded base64 of the content, so an unpadded digest (what Node's `digest('base64url')` returns) matches nothing.
 
 ### 2. Exact policy (`policy`)
 

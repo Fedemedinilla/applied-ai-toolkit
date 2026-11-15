@@ -186,6 +186,18 @@ describe('inline hashes', () => {
     expect(header.ok).toBe(false);
   });
 
+  it('runs the guard with a base64url digest: padded it matches, unpadded it does not, as CSP3 compares text', () => {
+    const text = 'run()';
+    const url = createHash('sha256').update(text).digest('base64url');
+    const padded = guard({ 'index.html': `<script>${text}</script>` }, literal(`script-src 'self' 'sha256-${url}='`));
+    expect(check(padded, 'inline-hashes')?.status).toBe('pass');
+    const unpadded = guard({ 'index.html': `<script>${text}</script>` }, literal(`script-src 'self' 'sha256-${url}'`));
+    expect(messages(unpadded, 'inline-hashes')).toEqual([
+      expect.stringContaining(`does not list ${sha256(text)}`),
+      expect.stringContaining(`lists 'sha256-${url}', which matches no inline content`),
+    ]);
+  });
+
   it('reports a hash left in script-src when script-src-elem and script-src-attr shadow it', () => {
     const text = 'run()';
     const policy = `script-src 'self' ${sha256(text)}; script-src-elem 'self' ${sha256(text)}; script-src-attr 'none'`;
