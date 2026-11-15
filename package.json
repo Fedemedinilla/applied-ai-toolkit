@@ -64,5 +64,10 @@
     "pdf-lib": "1.17.1",
     "web-push": "3.6.7",
     "zod": "4.6.7"
+  },
+  "overrides": {
+    "typed-rest-client": {
+      "qs": "6.17.1"
+    }
   }
 }
