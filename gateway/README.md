@@ -173,7 +173,7 @@ Each call becomes one span of kind `CLIENT` named `chat <model>`. The attributes
 | `gen_ai.response.finish_reasons` | The `stop_reason`, as a one-element list |
 | `error.type` | The gateway's error code, on a failed call |
 
-The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `prompt_version`, `effort`, `streaming`, `outcome`, `fell_back`, `cost.reserved_usd`, `cost.settled_usd`, `request_id`, `reservation_id` and `usage_id`. A failed call also gets status `ERROR` with the code as its message. An attribute whose value is unknown is left out. A cut call has no `cost.settled_usd`, because its cost is unknown and a zero would read as free.
+The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `prompt_version`, `effort`, `streaming`, `outcome`, `fell_back`, `cost.reserved_usd`, `cost.settled_usd`, `request_id`, `reservation_id` and `usage_id`. A failed call also gets status `ERROR` with the code as its message. An attribute whose value is unknown is left out. A cut call has no `cost.settled_usd`, because its cost is unknown and a zero would read as free. For the same reason it has no `gen_ai.usage.output_tokens`, and when it was cut before `message_start` it has no token attributes at all. The span marks it with `incomplete: true`.
 
 ## Design decisions
 

@@ -260,12 +260,29 @@ describe('the OpenTelemetry adapter', () => {
 
     const attributes = recorded[0]?.options?.attributes ?? {};
     expect(recorded[0]?.status).toEqual({ code: 2, message: 'connection' });
-    expect(attributes).toMatchObject({ 'error.type': 'connection', 'claude_gateway.outcome': 'error', 'gen_ai.usage.input_tokens': 0 });
-    // Cut before message_start: no model answered and the cost is unknown, so neither is set.
+    expect(attributes).toMatchObject({ 'error.type': 'connection', 'claude_gateway.outcome': 'error' });
+    // Cut before message_start: no model answered, and the tokens and the cost are unknown, so none is set.
+    for (const key of ['gen_ai.usage.input_tokens', 'gen_ai.usage.output_tokens', 'gen_ai.usage.cache_read.input_tokens', 'gen_ai.usage.cache_creation.input_tokens']) {
+      expect(attributes).not.toHaveProperty(key);
+    }
     expect(attributes).not.toHaveProperty('gen_ai.response.model');
     expect(attributes).not.toHaveProperty('claude_gateway.cost.settled_usd');
     expect(attributes).not.toHaveProperty('gen_ai.response.finish_reasons');
     expect(recorded[0]?.ended).toBe(1);
+  });
+
+  it('a call cut after message_start reports the measured input and leaves the partial output out', async () => {
+    const { tracer, recorded } = fakeTracer();
+    const api = fakeApi([() => sseResponse(answer(), { cutAfter: 1 })]);
+    const { deps } = fakeDeps(api.client);
+    const spans: CallSpan[] = [];
+    const observer = otelObserver(tracer);
+    await failure(createGateway({ ...deps, observer: { onCall: (span) => (spans.push(span), observer.onCall(span)) } }).text(REQUEST));
+
+    expect(spans[0]).toMatchObject({ incomplete: true, tokens: { input: 1200, cacheRead: 5000, cacheWrite5m: 400 } });
+    const attributes = recorded[0]?.options?.attributes ?? {};
+    expect(attributes).toMatchObject({ 'gen_ai.usage.input_tokens': 6600, 'gen_ai.usage.cache_read.input_tokens': 5000, 'gen_ai.usage.cache_creation.input_tokens': 400 });
+    expect(attributes).not.toHaveProperty('gen_ai.usage.output_tokens');
   });
 
   it('a call that failed before its config was read is named after the operation alone', () => {

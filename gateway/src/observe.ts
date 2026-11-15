@@ -31,6 +31,12 @@ export interface CallSpan {
    */
   readonly tokens: TokenTotals | null;
   /**
+   * Present and true when the closing row is incomplete: a call cut before the API reported all
+   * its usage. Its output tokens are then partial, and with no model in `modelResponded` nothing
+   * was measured, so the OpenTelemetry adapter leaves those token attributes out.
+   */
+  readonly incomplete?: true;
+  /**
    * The reservation's worst case in US$: the estimated input and maxTokens of output at the
    * highest price in force among the registry's models. Null when nothing was reserved, or when
    * the prices could not be read: never a zero that was not computed.
@@ -109,11 +115,14 @@ export function otelAttributes(span: CallSpan): Record<string, OtelAttribute> {
   set('gen_ai.request.model', span.model);
   set('gen_ai.response.model', span.modelResponded);
   set('gen_ai.response.finish_reasons', span.stopReason === null ? null : [span.stopReason]);
-  if (span.tokens !== null) {
+  // A cut call (incomplete) measured its input only if message_start arrived, which is when a model
+  // is named, and never its whole output: an unmeasured count is left out, not reported as zero.
+  const inputMeasured = span.tokens !== null && (span.incomplete !== true || span.modelResponded !== null);
+  if (span.tokens !== null && inputMeasured) {
     const cacheWrites = span.tokens.cacheWrite5m + span.tokens.cacheWrite1h;
     // The convention's input_tokens includes cached tokens; the API's input_tokens does not.
     attributes['gen_ai.usage.input_tokens'] = span.tokens.input + span.tokens.cacheRead + cacheWrites;
-    attributes['gen_ai.usage.output_tokens'] = span.tokens.output;
+    if (span.incomplete !== true) attributes['gen_ai.usage.output_tokens'] = span.tokens.output;
     attributes['gen_ai.usage.cache_read.input_tokens'] = span.tokens.cacheRead;
     attributes['gen_ai.usage.cache_creation.input_tokens'] = cacheWrites;
   }

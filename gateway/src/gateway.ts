@@ -540,6 +540,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         maxTokens: request.maxTokens,
         streaming: operation !== 'structured',
         tokens: row && { input: row.inputTokens, output: row.outputTokens, cacheRead: row.cacheReadTokens, cacheWrite5m: row.cacheWrite5mTokens, cacheWrite1h: row.cacheWrite1hTokens },
+        ...(row?.incomplete === true ? { incomplete: true as const } : {}),
         reservedUsd: await reservedUsd(trace, request.maxTokens),
         settledUsd: row?.costUsd ?? null,
         outcome: errorCode === null ? 'ok' : 'error',
