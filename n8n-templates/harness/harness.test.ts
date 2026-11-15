@@ -158,6 +158,11 @@ describe('evaluate', () => {
     expect(evaluate('={{ $json.id.nope() }}', scope)).toBeUndefined();
   });
 
+  it('fails on a name n8n defines but the harness does not, instead of yielding an empty value', () => {
+    expect(() => evaluate("=Sent {{ DateTime.now().toFormat('yyyy') }}", scope)).toThrow(/DateTime is not emulated/);
+    expect(() => evaluate("={{ /'/.test($json.id) ? $vars.x : 'no' }}", { json: { id: "'" } })).toThrow(ExpressionHarnessError);
+  });
+
   it('fails on a syntax error and on a node without data', () => {
     expect(() => evaluate('={{ $json. }}', scope)).toThrow(ExpressionHarnessError);
     expect(() => evaluate("={{ $('Missing').item.json.x }}", scope)).toThrow(/references node "Missing"/);
@@ -210,6 +215,13 @@ describe('expressionGlobals', () => {
     const text = "=Total $5 {{ $json.a + $('N').item.json.b + $now.toFormat('yyyy') + '$vars' + /^[0-9]+$/.test($json.c) }}";
     expect(expressionGlobals(text)).toEqual(['$', '$json', '$now']);
     expect(expressionGlobals('$json outside an expression')).toEqual([]);
+  });
+
+  it("lists n8n's globals without a $, and $ names after a regex literal with a quote", () => {
+    expect(expressionGlobals("=Sent {{ DateTime.now().toFormat('yyyy') }}")).toEqual(['DateTime']);
+    expect(expressionGlobals('={{ Duration.fromObject({ days: 1 }) && max(1, 2) }}')).toEqual(['Duration', 'max']);
+    expect(expressionGlobals('={{ Math.max($json.a, 1) + { min: 1 }.min }}')).toEqual(['$json']);
+    expect(expressionGlobals("={{ /'/.test($json.a) ? $vars.x : '' }}")).toEqual(['$json', '$vars']);
   });
 
   it('every expression in the templates uses only globals the harness emulates', () => {

@@ -15,6 +15,8 @@
 // - An error thrown inside a block (reading a field of undefined, calling a
 //   missing method) is swallowed and the block yields undefined. Only a
 //   syntax error or a reference to a node without data fails the node.
+//   Here a name the harness does not define (DateTime, $vars) also fails,
+//   with ExpressionHarnessError, because n8n would give it a value.
 //
 // Emulated globals, each block in a node:vm context frozen to exactly these:
 //   $json                      json of the current item
@@ -29,6 +31,7 @@
 // checks that the templates use nothing outside the emulated list.
 
 import vm from 'node:vm';
+import { codeOnly } from './js-scan.ts';
 
 export interface Scope {
   /** json of the current item, `$json`. */
@@ -76,15 +79,33 @@ export function splitExpression(body: string): Chunk[] {
   return chunks;
 }
 
-/** `$name` identifiers used inside the code blocks of a parameter. */
+/**
+ * Globals n8n 2.15 adds to an expression without a `$`: Luxon's classes and
+ * the extended functions (n8n-workflow expression.js and extended-functions.js).
+ */
+export const N8N_BARE_GLOBALS: readonly string[] = [
+  'DateTime',
+  'Interval',
+  'Duration',
+  'min',
+  'max',
+  'not',
+  'average',
+  'numberList',
+  'zip',
+];
+
+const BARE_GLOBAL = new RegExp(`(?<![\\w$.])(?:${N8N_BARE_GLOBALS.join('|')})\\b(?!\\s*:)`, 'g');
+
+/** `$name` identifiers and n8n's bare globals (N8N_BARE_GLOBALS) used inside the code blocks of a parameter. */
 export function expressionGlobals(parameter: string): string[] {
   if (!parameter.startsWith('=')) return [];
   const code = splitExpression(parameter.slice(1))
     .filter((c) => c.type === 'code')
-    .map((c) => c.text.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, "''"))
+    .map((c) => codeOnly(c.text))
     .join('\n');
-  // "$/" and "$'" end a regex literal such as /^[0-9]+$/, they are not identifiers.
-  return [...new Set([...code.matchAll(/\$[A-Za-z_]+|\$(?=\()/g)].map((m) => m[0]))].sort();
+  const names = [...code.matchAll(/\$[A-Za-z_]+|\$(?=\()/g), ...code.matchAll(BARE_GLOBAL)].map((m) => m[0]);
+  return [...new Set(names)].sort();
 }
 
 function clone(value: unknown): unknown {
@@ -125,6 +146,13 @@ function runBlock(code: string, scope: Scope): unknown {
     value = script.runInContext(vm.createContext(context), { timeout: 1000 });
   } catch (error) {
     if (error instanceof ExpressionHarnessError) throw error;
+    // n8n defines every name a template can use, so a ReferenceError here is a gap in the
+    // emulation (DateTime, $vars), not the empty value n8n would swallow an error into.
+    // The error comes from the context's realm, so it is checked by name.
+    if ((error as { name?: unknown } | null)?.name === 'ReferenceError') {
+      const name = /^(\S+) is not defined/.exec(String((error as { message?: unknown }).message))?.[1] ?? 'a name';
+      throw new ExpressionHarnessError(`${name} is not emulated, in {{${code}}}`);
+    }
     return undefined;
   }
   // Objects built inside the context belong to another realm: hand back plain JSON.
