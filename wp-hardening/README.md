@@ -48,7 +48,7 @@ The same toggles are under Settings > Hardening, and each control and each fast 
 
 | Id | Check | Where it runs |
 |---|---|---|
-| INT-11 | Open registration (fails when new accounts get a role above subscriber); `WP_DEBUG` on, and whether errors reach the page or the log sits in the web root | Site Health and CLI |
+| INT-11 | Open registration (fails when new accounts get the administrator, editor, author or shop_manager role, warns for any other; on multisite, warns when the network allows signup); `WP_DEBUG` on, and whether errors reach the page or the log sits in the web root | Site Health and CLI |
 | INT-16 | All eight keys and salts set, at least 32 characters, distinct, not the placeholder | Site Health and CLI |
 | INT-05, INT-13 | Administrator count, shared or default logins, application passwords on administrator accounts that were never used | Site Health and CLI |
 | INT-10, INT-18 | Inactive plugins, more than three themes, child theme in use | Site Health and CLI |
