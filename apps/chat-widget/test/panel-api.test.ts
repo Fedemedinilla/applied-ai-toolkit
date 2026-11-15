@@ -83,6 +83,18 @@ describe('invites', () => {
     expect((await s.app(call('invite/check', 'POST', { token: sessionToken }))).status).toBe(410);
   });
 
+  it('refuses a session token that carries the live invite nonce', async () => {
+    const s = setup();
+    await invite(s);
+    const nonce = s.store.tenants.get('vivero-nuevo')?.owner.inviteNonce ?? '';
+    expect(nonce).not.toBe('');
+    // Only the purpose tells this token apart from the invite: same key, tenant and nonce.
+    const { createAuth, INVITE_MAX_AGE_S } = await import('../server/auth.ts');
+    const forged = createAuth(SECRET, () => s.clock.now).sign('session', 'vivero-nuevo', nonce, INVITE_MAX_AGE_S);
+    expect((await s.app(call('invite/check', 'POST', { token: forged }))).status).toBe(410);
+    expect((await s.app(call('invite/accept', 'POST', { token: forged, password: 'una clave larga de prueba' }))).status).toBe(410);
+  });
+
   it('limits failed operator logins per IP, and keeps refusing the right password until the window passes', async () => {
     const s = setup({ limits: { loginAttempts: 3 } });
     const body = { tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains: ['vivero-nuevo.example'] };
