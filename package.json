@@ -42,6 +42,7 @@
     "audit:scope": "node test/audit-scope/cli.ts",
     "evals:gate": "node evals/scripts/gate.ts",
     "evals:report": "node evals/scripts/report.ts",
+    "genre:eval": "node slop-lint/scripts/genre-eval.ts slop-lint/fixtures",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "release": "npm run pack:check && changeset publish"
