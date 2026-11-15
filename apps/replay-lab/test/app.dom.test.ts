@@ -313,6 +313,19 @@ describe('batch', () => {
     expect(text('#batch-status')).toBe('The batch failed: the worker stopped.');
     expect($<HTMLButtonElement>('#run-batch').disabled).toBe(false);
   });
+
+  it('a runner that throws on start is reported and the form is usable again', () => {
+    mount({
+      start() {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    });
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(text('#batch-status')).toBe('The batch failed: blocked.');
+    expect($<HTMLButtonElement>('#run-batch').disabled).toBe(false);
+    expect($('#cancel-batch').hidden).toBe(true);
+    expect($('#batch-progress').hidden).toBe(true);
+  });
 });
 
 describe('tabs', () => {

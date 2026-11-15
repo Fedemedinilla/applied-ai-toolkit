@@ -43,6 +43,12 @@ export interface App {
 }
 
 const short = (hash: string): string => hash.slice(0, 16);
+
+/** The message of a thrown value (an Error or a DOMException), or the fallback. */
+function errorText(error: unknown, fallback: string): string {
+  const message: unknown = typeof error === 'object' && error !== null ? (error as { message?: unknown }).message : undefined;
+  return typeof message === 'string' && message.length > 0 ? message : fallback;
+}
 const permille = (p: number): string => `x${(p / 1000).toFixed(p % 100 === 0 ? 1 : 2)}`;
 const mean = (d: Distribution): string => (d.mean100 / 100).toFixed(2);
 
@@ -362,7 +368,16 @@ export function mountApp(doc: Document, deps: Deps): App {
     // and the cancel function is kept only while that batch is still the running one.
     const token = {};
     activeBatch = token;
-    const stop = deps.batch.start(request, (message) => {
+    try {
+      const stop = deps.batch.start(request, onBatchMessage);
+      if (activeBatch === token) cancelBatch = stop;
+    } catch (error) {
+      // new Worker() can throw at once (a SecurityError, no module workers): reset the form.
+      finishBatch();
+      batchStatus.textContent = `The batch failed: ${errorText(error, 'the worker could not start')}.`;
+    }
+
+    function onBatchMessage(message: BatchMessage): void {
       if (activeBatch !== token) return;
       if (message.type === 'progress') {
         progress.value = message.done;
@@ -382,8 +397,7 @@ export function mountApp(doc: Document, deps: Deps): App {
       const ms = deps.now() - started;
       renderReport(message.report, message.hash, ms);
       batchStatus.textContent = `Done: ${message.report.runs.toLocaleString('en-US')} runs, mean score ${mean(message.report.score)}, median ${message.report.score.p50}.`;
-    });
-    if (activeBatch === token) cancelBatch = stop;
+    }
   });
 
   cancelButton.addEventListener('click', () => {
