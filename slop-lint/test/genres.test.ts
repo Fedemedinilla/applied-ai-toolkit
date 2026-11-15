@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { applySetting, DEFAULT_GENRE, GENRE_PROFILES, GENRES, guessGenre, resolveRules } from '../src/genres.ts';
+import { applySetting, DEFAULT_GENRE, GENRE_PROFILES, GENRES, GUESS_CUTS, guessGenre, guessGenreWith, resolveRules } from '../src/genres.ts';
 import { settingsFor, validateConfig } from '../src/config.ts';
 import { appliesTo, lint } from '../src/lint.ts';
 import { MESSAGE_VARIANTS, messageFor } from '../src/messages.ts';
@@ -365,6 +365,16 @@ describe('guessGenre', () => {
     ['a chat with emoji and open lines', 'Te paso el tablero 📊\nLo vemos el jueves', 'whatsapp', 'high'],
   ] as const)('gives %s the right genre and confidence', (_name, text, genre, confidence) => {
     expect(guessGenre(text)).toMatchObject({ genre, confidence });
+  });
+
+  it('cuts at 60 and 150 words unless other cuts are given', () => {
+    expect(GUESS_CUTS).toEqual({ shortWords: 60, mailWords: 150 });
+    const chat = 'Te paso el tablero 📊\nLo vemos el jueves';
+    expect(guessGenreWith(chat, GUESS_CUTS)).toEqual(guessGenre(chat));
+    // With a 5-word cut the chat is no longer short, so it falls back to the default genre.
+    expect(guessGenreWith(chat, { ...GUESS_CUTS, shortWords: 5 }).genre).toBe(DEFAULT_GENRE);
+    const mail = 'Hi Dana,\n\nThe file is in the shared folder.\n\nThanks,\nSam';
+    expect(guessGenreWith(mail, { ...GUESS_CUTS, mailWords: 5 }).genre).toBe(DEFAULT_GENRE);
   });
 
   it('is not called by lint(): without a genre a mail is read as a cover letter', () => {
