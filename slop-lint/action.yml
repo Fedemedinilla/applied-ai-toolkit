@@ -100,7 +100,13 @@ runs:
         node "$cli" "${files[@]}" "${args[@]}" || code=$?
         written=''
         if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
-          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")" || fail "cannot create the folder of $SLOP_SARIF_FILE"
+          # The CLI has run, so a folder that cannot be created still reports exit-code 2.
+          if ! mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")"; then
+            printf 'slop-lint: cannot create the folder of %s\n' "$SLOP_SARIF_FILE" >&2
+            code=2
+          fi
+        fi
+        if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
           sarif_code=0
           node "$cli" "${files[@]}" "${args[@]}" --sarif > "$SLOP_SARIF_FILE" || sarif_code=$?
           # A failed redirect also exits 1, so the file itself has to be there and not empty.

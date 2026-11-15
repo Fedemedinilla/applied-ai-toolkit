@@ -233,6 +233,16 @@ describe('the action script', () => {
     expect(r.stderr).toMatch(/could not write SARIF to out/u);
   });
 
+  it('reports exit-code 2 when the folder of sarif-file cannot be created, after the CLI ran', () => {
+    // a.md is a regular file, so mkdir -p a.md/sub fails once the text report has printed.
+    const ws = workspace({ 'a.md': CLEAN, 'letter.txt': BANNED });
+    const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'a.md/sub/x.sarif', SLOP_FAIL: 'false' });
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^letter\.txt:1:/mu);
+    expect(r.stderr).toMatch(/cannot create the folder of a\.md\/sub\/x\.sarif/u);
+    expect(r.outputs).toEqual({ 'exit-code': '2', 'sarif-file': '' });
+  });
+
   it('refuses a sarif-file with a line break, which could forge another output', () => {
     const ws = workspace({ 'letter.txt': BANNED });
     const r = runAction(ws, { SLOP_FILES: 'letter.txt', SLOP_SARIF_FILE: 'a.sarif\nexit-code=0', SLOP_FAIL: 'false' });
