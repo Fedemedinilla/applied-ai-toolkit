@@ -376,7 +376,7 @@ describe('rules only a genre runs', () => {
   const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
 
   it('run in the genres the design gives them and never in a cover letter', () => {
-    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'], 'SEG-03': ['follow-up'] };
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'], 'SEG-03': ['follow-up'], 'WA-03': ['whatsapp'] };
     for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
     expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
   });
@@ -479,5 +479,31 @@ describe('SEG-03, a follow-up that copies the earlier message', () => {
     const anterior = 'Hola, Laura:\n\nTe mandé el tablero de ventas de la sucursal Rosario con los datos de marzo.\n\nSaludos,\nAna';
     const seguimiento = 'Hola, Laura:\n\nTe escribo porque te mandé el tablero de ventas de la sucursal Rosario con los datos. ¿Lo pudiste ver?\n\nSaludos,\nAna';
     expect(ids(seguimiento, { lang: 'es', genre: 'follow-up', previous: anterior })).toContain('SEG-03');
+  });
+});
+
+describe('WA-03, emoji used as bullets', () => {
+  const list = 'Te paso lo que falta\n✅ el tablero de ventas\n✅ la carga de marzo\n📅 lo vemos el jueves';
+
+  it('reports each emoji that opens a line of a list, in whatsapp only', () => {
+    const wa = lint(list, { lang: 'es', genre: 'whatsapp' }).findings.filter((f) => f.ruleId === 'WA-03');
+    expect(wa.map((f) => [f.match, f.line, f.level, f.severity])).toEqual([
+      ['✅', 2, 2, 'medium'],
+      ['✅', 3, 2, 'medium'],
+      ['📅', 4, 2, 'medium'],
+    ]);
+    expect(ids(list, { lang: 'es', genre: 'email' })).not.toContain('WA-03');
+    expect(ids(list, { lang: 'es' })).not.toContain('WA-03');
+  });
+
+  it('counts keycap numbers and skips blank lines between items', () => {
+    const numbered = 'Pasos\n1️⃣ bajá el archivo\n\n2️⃣ abrilo en Excel';
+    expect(lint(numbered, { lang: 'es', genre: 'whatsapp' }).findings.filter((f) => f.ruleId === 'WA-03').map((f) => f.match)).toEqual(['1️⃣', '2️⃣']);
+  });
+
+  it('leaves one emoji line, an emoji at the end of a line and a dash list alone', () => {
+    for (const text of ['✅ Listo el tablero\nLo vemos el jueves', 'Listo el tablero ✅\nLo vemos el jueves 📅', '- el tablero\n- la carga']) {
+      expect(ids(text, { lang: 'es', genre: 'whatsapp' }), text).not.toContain('WA-03');
+    }
   });
 });

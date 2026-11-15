@@ -1355,7 +1355,28 @@ const followUp: Rule[] = [
   },
 ];
 
-export const GENRE_RULES: readonly Rule[] = [...mail, ...followUp];
+const whatsapp: Rule[] = [
+  {
+    kind: 'structural',
+    id: 'WA-03',
+    threshold: '0; a list is 2 lines in a row that open with an emoji',
+    name: 'Emoji used as bullets',
+    lang: 'both',
+    level: 2,
+    severity: 'medium',
+    message: 'Emoji used as bullets. It turns a chat message into a slide.',
+    suggestion: 'Write the items in a sentence, or use a plain "-" list, which WhatsApp formats.',
+    source: { evidence: ['REPORTADO'], ref: 'Section 4.4 (emoji as bullets among the format signs)', section: '4.4' },
+    deviation:
+      'The report names emoji as bullets and gives no test. Here a bullet is an emoji, or a keycap number such as 1️⃣, that opens a line ' +
+      'and is followed by a space and text, on two non-blank lines in a row or more; one such line alone is not a list. FMT-02 reports ' +
+      'every emoji in the other genres, so this rule runs in whatsapp, where FMT-02 is off.',
+    falsePositives: 'A status list a team agreed on, such as one check mark per finished task.',
+    examples: [{ lang: 'es', fire: 'Te paso lo que falta\n✅ el tablero\n✅ la carga de marzo', pass: 'Te paso lo que falta\n- el tablero\n- la carga de marzo' }],
+  },
+];
+
+export const GENRE_RULES: readonly Rule[] = [...mail, ...followUp, ...whatsapp];
 
 export const TIER2_BUDGET = 2;
 
