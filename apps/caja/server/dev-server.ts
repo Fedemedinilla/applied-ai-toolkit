@@ -4,14 +4,16 @@
 //   npx vite apps/caja        # Vite's dev and preview servers proxy /api here (vite.config.ts)
 //
 // Without the key it still starts, and /api/health answers 503, so the toggle stays hidden.
-// It listens on 127.0.0.1 only.
+// It listens on 127.0.0.1 only, and answers only requests whose Host names 127.0.0.1 or localhost
+// on its port (dev-host.ts), so a page rebound to 127.0.0.1 cannot spend the cap.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { DEV_PORT, withLocalHost } from './dev-host.ts';
 import { MAX_BODY_BYTES } from './handler.ts';
 import { createHandlerFromEnv } from './index.ts';
 
-export const DEV_PORT = 8787;
-const handler = createHandlerFromEnv();
+export { DEV_PORT };
+const handler = withLocalHost(createHandlerFromEnv());
 
 /**
  * Keeps at most one byte past the handler's limit and drops the rest as it arrives, so a large
