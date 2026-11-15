@@ -111,6 +111,17 @@ describe('js-budget inputs', () => {
   });
 });
 
+describe('js-budget globs', () => {
+  it('fails a budget whose glob matches no page, which would otherwise measure nothing', () => {
+    const files = { 'index.html': '<script src="/a.js"></script>', 'a.js': 'run()' };
+    const typo = guard(files, { budgets: [{ pages: 'index.htm', gzipKb: 1 }] });
+    expect(check(typo, 'js-budget')?.status).toBe('fail');
+    expect(messages(typo, 'js-budget')).toEqual(['the budget for "index.htm" matches no page, so it measures nothing']);
+    const partly = guard(files, { budgets: [{ pages: 'index.html', gzipKb: 1 }, { pages: 'blog/**', gzipKb: 1 }] });
+    expect(messages(partly, 'js-budget')).toEqual(['the budget for "blog/**" matches no page, so it measures nothing']);
+  });
+});
+
 describe('lookbehind targets', () => {
   const files = { 'index.html': '<p></p>', 'a.js': 'const r=/(?<=\\$)\\d+/;' };
 

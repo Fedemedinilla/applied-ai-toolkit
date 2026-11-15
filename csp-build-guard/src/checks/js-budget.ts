@@ -123,6 +123,10 @@ export function checkJsBudget(ctx: Context): CheckResult {
       else unmeasurable.set(key, [page.display]);
     }
   }
+  // A budget whose glob matches no page measured nothing (a typo such as "index.htm"), so it fails.
+  for (const b of budgets) {
+    if (!ctx.pages.some((page) => matchesAny(page.path, [b.pages]))) failures.push({ message: `the budget for "${b.pages}" matches no page, so it measures nothing` });
+  }
   // One line per URL that could not be measured, with the pages that load it.
   for (const [what, pages] of unmeasurable) failures.push({ message: `cannot measure ${what}, loaded by ${pagesLabel(pages)}`, ...(pages[0] === undefined ? {} : { file: pages[0] }) });
   const note = unbudgeted ? `; ${plural(unbudgeted, 'page')} match${unbudgeted === 1 ? 'es' : ''} no budget` : '';
