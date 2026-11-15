@@ -10,7 +10,7 @@ import { candidatePath, loadCatalog, reportsDir } from '../src/files.ts';
 import { generate } from '../src/generate.ts';
 import { createForgeModel, MAX_TOKENS, MODEL, TASK, type ForgeModel } from '../src/model.ts';
 import { PROMPT_VERSIONS } from '../src/prompt.ts';
-import { RunReport } from '../src/report.ts';
+import { formatRun, RunReport } from '../src/report.ts';
 import { RULES } from '../src/rules.ts';
 import { Card } from '../src/schemas.ts';
 import { copyCatalog, readJson, response, writeJson } from './helpers/catalog-dir.ts';
@@ -200,6 +200,23 @@ describe('writes after the paid call', () => {
     expect(report.costUsd).toBeCloseTo(0.031, 6);
     expect(await readJson(candidatePath(dir, 'card', 'brine-scout'))).toEqual({ id: 'brine-scout', by: 'someone else' });
     expect(RunReport.parse(await readJson(join(reportsDir(dir), `${report.run}.json`)))).toEqual(report);
+  });
+});
+
+describe('ids from the model', () => {
+  it('never puts an id that breaks the id pattern into a label or the report, so control characters stay out of the terminal', async () => {
+    const hostile = 'x\u001b]0;pwned\u0007\u001b[2J';
+    const { model } = setup([message({ candidates: [{ id: hostile, name: 'X' }] })]);
+    const report = await run(model, 'card', 1);
+    expect(report.rejections).toHaveLength(1);
+    expect(report.rejections[0]?.id).toBeNull();
+    expect(report.rejections[0]?.problems.every((p) => p.where === 'candidate 1')).toBe(true);
+    expect(formatRun(report).join('\n')).not.toContain('\u001b');
+    // Any other text a report quotes is printed with its control characters escaped.
+    const quoted = { ...report, rejections: report.rejections.map((r) => ({ ...r, problems: r.problems.map((p) => ({ ...p, message: `${p.message} ${hostile}` })) })) };
+    const lines = formatRun(quoted);
+    for (const line of lines) expect(line).not.toMatch(/[\u0000-\u001f]/);
+    expect(lines.join('\n')).toContain('x\\u001b]0;pwned\\u0007\\u001b[2J');
   });
 });
 

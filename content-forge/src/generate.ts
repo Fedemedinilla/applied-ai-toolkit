@@ -21,7 +21,7 @@ import { EFFORT, MAX_TOKENS, ResponseError, TASK, type Gateway } from './model.t
 import { batchSchema, catalogueBlock, instructions, MAX_BRIEF, MAX_COUNT, PROMPT_VERSIONS, userMessage } from './prompt.ts';
 import { RunReport, type Rejection, type Stage } from './report.ts';
 import { checkRules } from './rules.ts';
-import { ENTITY_NAMES, SCHEMAS, type EntityName, type EntityTypes } from './schemas.ts';
+import { ENTITY_NAMES, Id, SCHEMAS, type EntityName, type EntityTypes } from './schemas.ts';
 
 export interface GenerateOptions {
   readonly dir: string;
@@ -65,9 +65,18 @@ async function writeReport(dir: string, report: RunReport): Promise<RunReport> {
   }
 }
 
+/**
+ * The id of a model candidate when it is a valid id, otherwise null. The raw value can be any
+ * string, control characters included, and it is printed to the terminal and kept in the report.
+ */
+const candidateId = (value: unknown): string | null => {
+  const id = idOf(value);
+  return id !== null && Id.safeParse(id).success ? id : null;
+};
+
 /** Candidates are numbered from 1 in messages; the report's `index` is the 0-based array position. */
 const label = (i: number, value: unknown): string => {
-  const id = idOf(value);
+  const id = candidateId(value);
   return id === null ? `candidate ${i + 1}` : `candidate ${i + 1} (${id})`;
 };
 
@@ -189,7 +198,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
     const where = label(i, value);
     const verdict = judge(entity, value, where, { raw, index, pending }, accepted);
     if (verdict.accepted) accepted.push(verdict.accepted);
-    else rejections.push({ index: i, id: idOf(value), problems: [...verdict.problems] });
+    else rejections.push({ index: i, id: candidateId(value), problems: [...verdict.problems] });
   });
 
   // The call is paid for by now, so a failed write is recorded in the report instead of thrown:

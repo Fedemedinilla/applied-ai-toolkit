@@ -99,7 +99,7 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 
 **Spending goes through the gateway.** [`src/model.ts`](src/model.ts) is the only file that imports the gateway, through its public entry. It sets `claude-sonnet-5-5` at medium effort, `max_tokens` 16,000 (the gateway's limit without streaming) and a US$1 cap per process. The gateway reserves each call's worst case first: for the card request in the tests (7,728 estimated input tokens) that is about US$0.18. The key is read only in [`cli.ts`](cli.ts) and passed in. Failures print the gateway's error code, never the model's text or the API's message.
 
-**The brief is data.** `--brief` is limited to 400 characters, goes inside `<brief>` tags with angle brackets removed, and the prompt says an instruction inside it is ignored. Whatever it says, the output can only be candidates, and candidates reach the catalogue only through the checks and a person running promote.
+**The brief is data.** `--brief` is limited to 400 characters, goes inside `<brief>` tags with angle brackets removed, and the prompt says an instruction inside it is ignored. Whatever it says, the output can only be candidates, and candidates reach the catalogue only through the checks and a person running promote. A rejected candidate's id is printed and stored only when it is a valid id, so a label never carries what the model put there, and the run output shows control characters escaped.
 
 ## What the tests cover
 

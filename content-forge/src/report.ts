@@ -163,7 +163,15 @@ export async function loadReports(dir: string): Promise<LoadedReports> {
 
 const pct = (x: number): string => `${(x * 100).toFixed(0)}%`;
 
+/** C0 and C1 control characters, shown escaped: a report's text can quote what the model wrote. */
+const printable = (line: string): string =>
+  line.replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
 export function formatRun(r: RunReport): string[] {
+  return runLines(r).map(printable);
+}
+
+function runLines(r: RunReport): string[] {
   const lines = [
     `${r.entity} ${r.promptVersion}: ${r.accepted.length} of ${r.requested} accepted (${pct(r.passRate)}), ${r.returned} returned${r.ignored > 0 ? `, ${r.ignored} past the count ignored` : ''}`,
   ];
