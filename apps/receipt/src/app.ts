@@ -83,6 +83,8 @@ export function mountApp(doc: Document, deps: AppDeps): App {
   let running: Promise<void> = Promise.resolve();
   let sampleLogo: Promise<Uint8Array | null> | null = null;
   let uploadedLogo: Uint8Array | null = null;
+  /** Bumped on each pick of a logo file, so a slower read of an earlier file is dropped. */
+  let logoRead = 0;
   let destroyed = false;
   /** What the live region last said, as a state key: 'ready:<pages>' or the error text. */
   let announced: string | null = null;
@@ -399,8 +401,10 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     const file = logoFile.files?.[0];
     if (!file) return;
     clearLinks();
+    const read = ++logoRead;
     deps.readFile(file).then(
       (bytes) => {
+        if (destroyed || read !== logoRead) return;
         uploadedLogo = bytes;
         schedule();
       },

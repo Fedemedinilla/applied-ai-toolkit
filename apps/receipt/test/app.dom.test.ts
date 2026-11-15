@@ -338,6 +338,29 @@ describe('when the sample logo cannot be fetched', () => {
 });
 
 describe('uploaded logo files', () => {
+  it('keeps the file picked last when an earlier read finishes after it', async () => {
+    const reads = new Map<string, ReturnType<typeof deferred<Uint8Array>>>();
+    const h = mount({
+      readFile: (file) => {
+        const d = deferred<Uint8Array>();
+        reads.set(file.name, d);
+        return d.promise;
+      },
+    });
+    await h.app.settled();
+    choose('file');
+    await h.app.settled();
+    pick(new File(['not an image'], 'old.txt'));
+    pick(new File([logo], 'new.png', { type: 'image/png' }));
+    reads.get('new.png')?.resolve(logo);
+    await tick();
+    await h.app.settled();
+    reads.get('old.txt')?.resolve(new TextEncoder().encode('not an image'));
+    await tick();
+    await h.app.settled();
+    expect($('#notices').hidden).toBe(true);
+    expect(await hasImage(h)).toBe(true);
+  });
 
 });
 
