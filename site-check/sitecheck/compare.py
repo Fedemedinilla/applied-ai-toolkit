@@ -232,12 +232,20 @@ def comparability_problems(before: StoredRun, after: StoredRun) -> list[str]:
 
     for key, what in IDENTITY_KEYS:
         differs_meta(key, what)
+    def differs_present(key: str, what: str, value: Callable[[dict[str, Any]], Any]) -> None:
+        # The key may hold null, but a run that lacks the key does not record it.
+        missing = [label for label, run in runs if key not in run.meta]
+        for label in missing:
+            problems.append(f"the {label} run does not record {what}")
+        if not missing:
+            differs_values(what, value(before.meta), value(after.meta))
+
     for key, what in OPTIONAL_KEYS:
-        differs_values(what, before.meta.get(key), after.meta.get(key))
-    differs_values(
+        differs_present(key, what, lambda meta, k=key: meta.get(k))
+    differs_present(
+        "alcance",
         "MDN Observatory asked (--observatory)",
-        bool((before.meta.get("alcance") or {}).get("observatory")),
-        bool((after.meta.get("alcance") or {}).get("observatory")),
+        lambda meta: bool((meta.get("alcance") or {}).get("observatory")),
     )
 
     psi_on = [run.meta.get("sin_pagespeed") is False for _, run in runs]

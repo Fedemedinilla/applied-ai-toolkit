@@ -243,6 +243,35 @@ class RefusalTest(unittest.TestCase):
                 self.assertIn(expected, err)
             self.assertFalse((runs.after_dir / compare.REPORT).exists())
 
+    def test_missing_inner_url_and_scope_are_refused_not_matched(self) -> None:
+        # Audit: url_interna and alcance were read with .get(), so two runs
+        # without them compared as equal. A null inner_url stays valid.
+        def edit(b: dict[str, Any], a: dict[str, Any]) -> None:
+            for datos in (b, a):
+                datos["meta"].pop("url_interna")
+                datos["meta"].pop("alcance")
+
+        with temp_dir() as root:
+            runs = _Runs(root)
+            edit(runs.before, runs.after)
+            code, _, err = runs.run()
+            self.assertEqual(code, int(ExitCode.NOT_COMPARABLE), err)
+            for expected in (
+                "the BEFORE run does not record the inner page read (meta.inner_url)",
+                "the AFTER run does not record the inner page read (meta.inner_url)",
+                "the BEFORE run does not record MDN Observatory asked (--observatory)",
+                "the AFTER run does not record MDN Observatory asked (--observatory)",
+            ):
+                self.assertIn(expected, err)
+
+    def test_null_inner_url_on_both_sides_still_compares(self) -> None:
+        with temp_dir() as root:
+            runs = _Runs(root)
+            for datos in (runs.before, runs.after):
+                datos["meta"]["url_interna"] = None
+            code, _, err = runs.run()
+            self.assertNotIn("inner page read", err)
+
     def test_missing_psi_counts_are_refused(self) -> None:
         self._refused(lambda b, a: a["meta"].pop("corridas_psi"), "the AFTER run does not record valid in meta.psi_runs")
 
