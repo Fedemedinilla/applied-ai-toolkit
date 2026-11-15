@@ -215,6 +215,22 @@ describe('placeOrder', () => {
     expect(fake.count('place_order')).toBe(1);
   });
 
+  it.each<[string, (r: PlaceRequest) => PlaceRequest, string]>([
+    ['another cart', (r) => ({ ...r, lines: [{ productId: widgetA, quantity: 5 }] }), 'key_reused'],
+    ['another customer', (r) => ({ ...r, customerId: 'shop-2' }), 'key_taken'],
+  ])('does not join a call with the same key and %s', async (_, change, firstReason) => {
+    const c = client({ timeoutMs: 20 });
+    const r = request();
+    // The first call hangs, so the second one runs while it is in flight.
+    fake.fail('place_order', 'hang');
+    const [a, b] = await Promise.all([c.placeOrder(r), c.placeOrder(change(r))]);
+    expect(b).not.toBe(a);
+    expect(b).toMatchObject({ kind: 'placed' });
+    expect(a).toMatchObject({ kind: 'rejected', reason: firstReason });
+    expect(fake.count('place_order')).toBeGreaterThanOrEqual(3);
+    expect(await count(db, 'orders')).toBe(1);
+  });
+
   it('does not join a call that brings its own signal, so one abort does not end the other tap', async () => {
     const c = client();
     const r = request();
