@@ -403,14 +403,25 @@ def body_sha256(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
 
 
+_NAT64_WELL_KNOWN = ipaddress.IPv6Network("64:ff9b::/96")
+
+
 def public_address(ip: str) -> bool:
     """True for a global unicast address: never loopback, private, CGNAT, link-local, ULA or reserved."""
     try:
         addr = ipaddress.ip_address(ip.split("%", 1)[0])
     except ValueError:
         return False
-    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
-        addr = addr.ipv4_mapped
+    if isinstance(addr, ipaddress.IPv6Address):
+        # An IPv6 address that carries an IPv4 one reaches that IPv4 address:
+        # ::ffff:a.b.c.d directly, 64:ff9b::/96 through a DNS64/NAT64 gateway
+        # (RFC 6052), and 2002::/16 through a 6to4 relay.
+        if addr.ipv4_mapped is not None:
+            addr = addr.ipv4_mapped
+        elif addr in _NAT64_WELL_KNOWN:
+            addr = ipaddress.IPv4Address(int(addr) & 0xFFFFFFFF)
+        elif addr.sixtofour is not None and not public_address(str(addr.sixtofour)):
+            return False
     return addr.is_global and not addr.is_multicast
 
 
