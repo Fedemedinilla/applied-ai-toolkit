@@ -205,7 +205,7 @@ Graph walks check that no side-effect node in the MercadoPago, Tiendanube and Ca
 - A payment whose API response has no payer data is invoiced with empty customer fields, because n8n turns a missing field into an empty value. Your invoicing provider decides whether to accept it.
 - The Tiendanube flow does not check the phone before the WhatsApp call. An order without a usable phone is saved to the sheet and then fails at the send.
 - While `YOUR_VERIFY_TOKEN` is not replaced, the WhatsApp verification answers anyone who sends the placeholder.
-- The welcome and review greetings keep Latin letters only. A name in another script gets "Hi there".
+- The welcome and review greetings keep Latin letters only. A name in another script gets "Hi there". The 40 letters and spaces that remain are still caller text, so someone who has the webhook URL can put a short sentence in an email sent from your Gmail.
 - The signature Code node needs `crypto`. On a self-hosted instance that does not allow it, the node fails and no payment is processed until you set `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
 - Sheets appends keep automatic retries, so a timeout after Google accepted the write can add a duplicate row.
 - The HubSpot flow creates a contact per new message. Updating an existing contact needs a search by phone first.
