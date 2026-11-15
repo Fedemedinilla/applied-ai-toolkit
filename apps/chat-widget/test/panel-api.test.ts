@@ -168,6 +168,15 @@ describe('login', () => {
     expect(await wrong.json()).toEqual(await unknown.json());
   });
 
+  it('refuses the dummy hash password for an owner who has not accepted an invite, and for an unknown email', async () => {
+    const s = setup();
+    await invite(s);
+    for (const email of ['owner@vivero-nuevo.example', 'nobody@vivero-nuevo.example']) {
+      const response = await s.app(call('login', 'POST', { email, password: 'not a password' }));
+      expect([email, response.status, await response.json()]).toEqual([email, 401, { error: 'bad_credentials' }]);
+    }
+  });
+
   it('limits attempts per IP', async () => {
     const s = setup({ limits: { loginAttempts: 3 } });
     const attempt = (): Promise<Response> => s.app(call('login', 'POST', { email: 'a@b.example', password: 'x' }));
