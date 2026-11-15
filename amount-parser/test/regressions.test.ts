@@ -144,3 +144,17 @@ describe('red-team phrases', () => {
     }
   });
 });
+
+describe('words that name a key of Object.prototype', () => {
+  // The word tables are plain objects, so "constructor" used to look up Object and the parser
+  // multiplied a figure by a function: value NaN with ambiguous:false. Such a word must read like
+  // any other unknown noun.
+  const SENTENCES = ['pague 3 constructor', 'pague 80 mil al albanil y 5 constructor', 'dos constructor', 'pague constructor 20 mil'];
+
+  it.each(SENTENCES)('%j reads like the same sentence with an ordinary noun', (phrase) => {
+    const withoutSpans = (r: ReturnType<typeof parseAmount>) => (r === null ? null : { ...r, spans: [] });
+    const r = parseAmount(phrase);
+    if (r?.value !== null && r?.value !== undefined) expect(Number.isFinite(r.value)).toBe(true);
+    expect(withoutSpans(r)).toStrictEqual(withoutSpans(parseAmount(phrase.replace('constructor', 'carpintero'))));
+  });
+});

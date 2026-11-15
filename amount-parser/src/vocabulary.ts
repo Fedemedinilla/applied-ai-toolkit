@@ -1,6 +1,14 @@
 // The words the parser knows. This is data, not logic: identifiers are English, the words people
 // say stay in Rioplatense Spanish, written the way `normalize` leaves them (lower case, no accents).
 
+/**
+ * A word table with no prototype. A plain object answers `table['constructor']` with Object, which
+ * is not undefined, and a figure followed by that word was multiplied by a function (NaN).
+ */
+export function wordTable(...entries: ReadonlyArray<Readonly<Record<string, number>>>): Readonly<Record<string, number>> {
+  return Object.assign(Object.create(null) as Record<string, number>, ...entries);
+}
+
 /** Words that multiply the number in front of them. Callers can add their own through `parseAmount`. */
 export const BASE_SCALES: Readonly<Record<string, number>> = {
   mil: 1_000,
@@ -33,9 +41,9 @@ export const COUNT_NOUNS: ReadonlySet<string> = new Set([
 ]);
 
 /** How many single items a pack holds, for when the price is quoted per unit. */
-export const PACK_SIZES: Readonly<Record<string, number>> = {
+export const PACK_SIZES: Readonly<Record<string, number>> = wordTable({
   docena: 12, docenas: 12, decena: 10, decenas: 10, par: 2, pares: 2,
-};
+});
 
 /** Function words. A number followed by one of these stands on its own. */
 export const CONNECTORS: ReadonlySet<string> = new Set([
@@ -119,7 +127,7 @@ export const NON_AMOUNT_IDIOMS: readonly string[] = [
   'dos mangos', 'cuatro mangos', 'dos pesos',
 ];
 
-export const NUMBER_WORDS: Readonly<Record<string, number>> = {
+export const NUMBER_WORDS: Readonly<Record<string, number>> = wordTable({
   cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
   seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12,
   trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
@@ -130,4 +138,4 @@ export const NUMBER_WORDS: Readonly<Record<string, number>> = {
   ochenta: 80, noventa: 90, cien: 100, ciento: 100, doscientos: 200,
   trescientos: 300, cuatrocientos: 400, quinientos: 500, seiscientos: 600,
   setecientos: 700, ochocientos: 800, novecientos: 900,
-};
+});

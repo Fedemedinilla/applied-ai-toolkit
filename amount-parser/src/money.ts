@@ -58,6 +58,7 @@ import {
   PART_OF_THE_WHOLE,
   PRICE_MARKERS,
   REFERENCE_MARKERS,
+  wordTable,
 } from './vocabulary.ts';
 
 // ── Public shape ─────────────────────────────────────────────────────────────────────────────
@@ -721,7 +722,7 @@ const READING_STEPS = [openRemainder, quantityTimesUnitPrice, instalments, count
  * `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key.
  */
 export function parseAmount(text: string, slang: Readonly<Record<string, number>> = {}): ParsedAmount | null {
-  const scales: Record<string, number> = { ...BASE_SCALES, ...slang };
+  const scales = wordTable(BASE_SCALES, slang);
   const clean = normalize(text);
   if (!clean) return null;
 
