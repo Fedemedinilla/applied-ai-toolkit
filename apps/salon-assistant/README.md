@@ -16,7 +16,7 @@ ASSISTANT_HISTORY_SECRET=$(openssl rand -hex 32) node apps/salon-assistant/serve
 
 Without `ANTHROPIC_API_KEY` the server starts, `/api/health` and `/api/assistant` answer 503 with no model call, and the page says the assistant is not available. With the key, each turn is one real call. Without a history secret of at least 32 bytes the server refuses to start.
 
-The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp-build-guard measures 3.4 kB gzipped and 3.1 kB brotli for `index.html`, against a 10 kB budget. It also finds no regex lookbehind and no inline script or style, so the build needs nothing beyond the `'self'`-only policy in `csp-guard.config.json`. `server/serve.ts` sends that same policy as a `Content-Security-Policy` header on every static file.
+The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp-build-guard measures 3.4 kB gzipped and 3.1 kB brotli for `index.html`, against a 10 kB budget. It also finds no regex lookbehind and no inline script or style, so the build needs nothing beyond the `'self'`-only policy in `csp-guard.config.json`. `server/serve.ts` sends that same policy (`server/csp.ts`) as a `Content-Security-Policy` header on every static file.
 
 ## Design decisions
 
@@ -44,6 +44,7 @@ The build writes 7.47 kB of JavaScript (3.44 kB gzipped) and 2.42 kB of CSS. csp
 |---|---|
 | `test/app.test.ts` | A turn over the real gateway and SDK client against a fake Messages API: the request body (model, `max_tokens`, no `temperature`, two system blocks with the clock line, a JSON schema with `booking` before `reply`), the card from `decide()`; a signed second turn; a forged turn that never reaches the API; the cap refusing the second call; 529, 400, schema failure and `max_tokens` mapped to their answers; no key; the env readers; the per-minute limiter, including that past 10,000 addresses it drops an idle one and keeps an active one |
 | `test/build.test.ts` | The production build: relative URLs, one script and one stylesheet, the renderer included, and no server code, secret name or prompt in the bundle |
+| `test/csp-config.test.ts` | The policy in `csp-guard.config.json` equals the `CSP` that `server/serve.ts` sends (from `server/csp.ts`), so the guard and the header cannot drift apart |
 
 ## Limits
 
