@@ -142,7 +142,7 @@ final class Audit
         }
         $log = $this->constants->value('WP_DEBUG_LOG');
         $file = \is_string($log) && $log !== '' && !\in_array(strtolower($log), ['1', 'true'], true) ? $log : $this->paths()->content . '/debug.log';
-        if ($log !== false && $log !== null && is_file($file) && str_starts_with($file, $this->paths()->root)) {
+        if ($log !== false && $log !== null && is_file($file) && str_starts_with($file, rtrim($this->paths()->root, '/') . '/')) {
             return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on and the log is inside the web root. Check from outside that it is not served.', [self::relative($file, $this->paths()->root)]);
         }
         return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on, with display off. Turn it off once the problem it was on for is fixed.', ['WP_DEBUG=true']);

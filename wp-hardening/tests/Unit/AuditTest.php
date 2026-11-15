@@ -84,6 +84,16 @@ final class AuditTest extends TestCase
         self::assertStringContainsString('web root', $log->detail);
     }
 
+    public function testADebugLogInASiblingFolderIsNotInTheWebRoot(): void
+    {
+        mkdir($this->root . '-logs');
+        $file = $this->root . '-logs/debug.log';
+        file_put_contents($file, 'x');
+        $log = $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => false, 'WP_DEBUG_LOG' => $file])->debug();
+        self::assertStringNotContainsString('web root', $log->detail);
+        self::assertSame(['WP_DEBUG=true'], $log->evidence);
+    }
+
     public function testSaltsReportNamesNeverValues(): void
     {
         self::assertSame(Verdict::Pass, $this->audit($this->salts())->salts()->verdict);
