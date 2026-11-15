@@ -1,5 +1,7 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { evaluate, formatRatio, guessGrid, locate, toMarkdown, validateSet, type LabeledSet } from '../scripts/genre-eval.ts';
+import { evaluate, formatRatio, guessGrid, LABELED_GENRES, LANGS, loadSets, locate, toMarkdown, validateSet, type LabeledSet } from '../scripts/genre-eval.ts';
+import { GUESS_CUTS } from '../src/genres.ts';
 
 // Fictional: the names, the branch and the file are invented for this test.
 const TINY: LabeledSet = {
@@ -141,5 +143,35 @@ describe('toMarkdown', () => {
     for (const heading of ['## The set', '## Level 1 on human texts', '## Per level', '## Per rule', '## False positives, one by one', '## guessGenre']) expect(md).toContain(heading);
     expect(md).toContain('| email | LEX-04 | 2 | sentence | 0 | 0 | 1 | n/a | 0.00 (0/1) | 0.00 (0/9) |');
     expect(md).toContain('| **60** | **150** |');
+  });
+});
+
+describe('the labelled set', () => {
+  const dir = fileURLToPath(new URL('../fixtures/', import.meta.url));
+  const sets = loadSets(dir);
+  const words = (text: string) => text.split(/\s+/u).filter(Boolean).length;
+  const hasSubject = (text: string) => /^(?:asunto|subject)\s*:/iu.test(text);
+  const of = (genre: string) => sets.filter((s) => s.genre === genre).flatMap((s) => s.items);
+
+  it('has one valid file per genre and language, each with human and slop texts', () => {
+    expect(sets.map((s) => `${s.genre}/${s.lang}`)).toEqual(LABELED_GENRES.flatMap((g) => LANGS.map((l) => `${g}/${l}`)));
+    for (const set of sets) {
+      expect(set.items.length, `${set.genre}/${set.lang}`).toBeGreaterThanOrEqual(10);
+      expect(new Set(set.items.map((i) => i.kind)), `${set.genre}/${set.lang}`).toEqual(new Set(['human', 'slop']));
+    }
+  });
+
+  it("holds texts on both sides of guessGenre's cuts", () => {
+    const mails = of('email');
+    expect(mails.some((i) => words(i.text) >= GUESS_CUTS.mailWords)).toBe(true);
+    expect(mails.some((i) => words(i.text) >= GUESS_CUTS.mailWords * 0.85 && words(i.text) < GUESS_CUTS.mailWords && !hasSubject(i.text))).toBe(true);
+    const followUps = of('follow-up');
+    // A long follow-up is sure only with a subject line, so the set has long ones with and without it.
+    for (const subject of [true, false]) expect(followUps.some((i) => words(i.text) >= GUESS_CUTS.mailWords && hasSubject(i.text) === subject)).toBe(true);
+    expect(followUps.filter((i) => i.previous !== undefined && i.sentences.some((s) => s.rules.includes('SEG-03'))).length).toBeGreaterThanOrEqual(2);
+    expect(followUps.filter((i) => i.previous !== undefined && i.kind === 'human').length).toBeGreaterThanOrEqual(2);
+    const chats = of('whatsapp');
+    expect(chats.some((i) => words(i.text) >= GUESS_CUTS.shortWords)).toBe(true);
+    expect(chats.some((i) => words(i.text) < GUESS_CUTS.shortWords)).toBe(true);
   });
 });

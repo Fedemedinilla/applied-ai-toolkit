@@ -1,0 +1,468 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "follow-up",
+  "lang": "en",
+  "items": [
+    {
+      "id": "follow-up-en-01",
+      "kind": "human",
+      "text": "Subject: Re: Slow load on the Velmora store\n\nHi Ines,\n\nI wrote to you on 2 October about the store’s load time. I measured it again yesterday and it is still at 6 seconds, so the note still applies.\nShall I send it, or would 15 minutes on Thursday suit you better?\n\nBest,\nTom",
+      "previous": "Hi Ines,\n\nOn 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product. If it helps, I can send the two-page note with what I found.\n\nBest,\nTom",
+      "sentences": [
+        {
+          "text": "Subject: Re: Slow load on the Velmora store",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I wrote to you on 2 October about the store’s load time.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I measured it again yesterday and it is still at 6 seconds, so the note still applies.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Shall I send it, or would 15 minutes on Thursday suit you better?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-02",
+      "kind": "human",
+      "text": "Hi Mark,\n\nDid you get a chance to look at Tuesday’s quote? If 480 dollars is too much this month, I can start with the home page alone and add the rest in November.\n\nBest,\nJulia",
+      "previous": "Hi Mark,\n\nHere is the quote to rebuild the Copo North site: five pages and a form for 480 dollars, with a month of changes at no cost.\n\nBest,\nJulia",
+      "sentences": [
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Did you get a chance to look at Tuesday’s quote?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If 480 dollars is too much this month, I can start with the home page alone and add the rest in November.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-03",
+      "kind": "human",
+      "text": "Hi Ines,\n\nI wrote to you on 2 October about the Velmora store’s load time, and I do not want to push, so this is the last time I write about it.\nTwo things have changed since then. Yesterday the home page took 6.4 seconds, a little more than before, because a 3 MB clearance banner was added.\nGoogle also now shows the store with a warning that it is slow on phones, which it did not do before.\nI measured from a mid-range phone on mobile data at 11 in the morning, the same as the first time, so the two numbers can be compared.\nThe two-page note is still there. If it is useful, I can send it today at no cost, and you can use it with whoever builds the site, me or someone else.\nIf someone else looks after this, tell me who and I will write to them. If now is not the time, that helps me too.\n\nBest,\nTom",
+      "previous": "Hi Ines,\n\nOn 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product. If it helps, I can send the two-page note with what I found.\n\nBest,\nTom",
+      "sentences": [
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I wrote to you on 2 October about the Velmora store’s load time, and I do not want to push, so this is the last time I write about it.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Two things have changed since then.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Yesterday the home page took 6.4 seconds, a little more than before, because a 3 MB clearance banner was added.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Google also now shows the store with a warning that it is slow on phones, which it did not do before.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I measured from a mid-range phone on mobile data at 11 in the morning, the same as the first time, so the two numbers can be compared.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "The two-page note is still there.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If it is useful, I can send it today at no cost, and you can use it with whoever builds the site, me or someone else.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If someone else looks after this, tell me who and I will write to them.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If now is not the time, that helps me too.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-04",
+      "kind": "human",
+      "text": "Subject: Re: Quote for the Copo North site\n\nHi Mark,\n\nFollowing up on our call, I kept thinking about what you said about the season.\nIf the site has to be ready before 15 November, the safest plan is to split it in two.\nFirst the home page, the product page and the order form, which is what your wholesale buyers use. I can have that in two weeks from the day you send the photos.\nAnyone at the shop can take the photos with a phone; good light is enough. If you prefer, I can pass on the details of a photographer who charges by the day.\nThen, in December, the company page and the blog, which are not urgent.\nThe total price stays the same, but you can pay it in two parts, one per delivery. If that works, I will send the plan with dates on Friday.\n\nBest,\nJulia",
+      "previous": "Hi Mark,\n\nHere is the quote to rebuild the Copo North site: five pages and a form for 480 dollars, with a month of changes at no cost.\n\nBest,\nJulia",
+      "sentences": [
+        {
+          "text": "Subject: Re: Quote for the Copo North site",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Following up on our call, I kept thinking about what you said about the season.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If the site has to be ready before 15 November, the safest plan is to split it in two.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "First the home page, the product page and the order form, which is what your wholesale buyers use.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I can have that in two weeks from the day you send the photos.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Anyone at the shop can take the photos with a phone; good light is enough.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If you prefer, I can pass on the details of a photographer who charges by the day.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Then, in December, the company page and the blog, which are not urgent.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "The total price stays the same, but you can pay it in two parts, one per delivery.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If that works, I will send the plan with dates on Friday.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-05",
+      "kind": "slop",
+      "text": "Subject: Re: Slow load on the Velmora store\n\nHi Ines,\n\nAs I said, on 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds. If it helps, I can send the two-page note with what I found.\n\nBest,\nTom",
+      "previous": "Hi Ines,\n\nOn 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product. If it helps, I can send the two-page note with what I found.\n\nBest,\nTom",
+      "sentences": [
+        {
+          "text": "Subject: Re: Slow load on the Velmora store",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "As I said, on 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "If it helps, I can send the two-page note with what I found.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-06",
+      "kind": "slop",
+      "text": "Hi Mark,\n\nJust following up on my previous email. I know you are busy, so I wanted to bump this to the top of your inbox.\nPlease don’t hesitate to reach out if you have any questions.\n\nThank you for your time and consideration.\n\nBest regards,\nJulia",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Just following up on my previous email.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "I know you are busy, so I wanted to bump this to the top of your inbox.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Please don’t hesitate to reach out if you have any questions.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Thank you for your time and consideration.",
+          "slop": true,
+          "rules": [
+            "MAIL-01"
+          ]
+        },
+        {
+          "text": "Best regards,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-07",
+      "kind": "human",
+      "text": "Hi Ines,\n\nIn my note of 2 October I asked whether the report would help. I have it ready in case: it is two pages and you do not need to reply to read it.\n\nBest,\nTom",
+      "previous": "Hi Ines,\n\nOn 2 October I measured the Velmora store with PageSpeed from a phone, and the home page took 6.1 seconds to show the first product. If it helps, I can send the two-page note with what I found.\n\nBest,\nTom",
+      "sentences": [
+        {
+          "text": "Hi Ines,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "In my note of 2 October I asked whether the report would help.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I have it ready in case: it is two pages and you do not need to reply to read it.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tom",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-08",
+      "kind": "slop",
+      "text": "Subject: Following up\n\nDear Hiring Manager,\n\nI am circling back to reiterate my keen interest in the role. It is important to note that I would welcome the opportunity to further discuss how my skills align with your needs.\n\nThank you for your time and consideration.\n\nSincerely,\nRodrigo",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Subject: Following up",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Dear Hiring Manager,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I am circling back to reiterate my keen interest in the role.",
+          "slop": true,
+          "rules": [
+            "LEX-03"
+          ]
+        },
+        {
+          "text": "It is important to note that I would welcome the opportunity to further discuss how my skills align with your needs.",
+          "slop": true,
+          "rules": [
+            "EST-04",
+            "LEX-04"
+          ]
+        },
+        {
+          "text": "Thank you for your time and consideration.",
+          "slop": true,
+          "rules": [
+            "MAIL-01"
+          ]
+        },
+        {
+          "text": "Sincerely,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Rodrigo",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-09",
+      "kind": "human",
+      "text": "Dear Mr Ibarra,\n\nI wrote to you on Monday the 6th with the quote for the Copo North site. If it is easier, I can come by the office on Friday and we can go over it in person.\n\nKind regards,\nJulia Montes",
+      "previous": "Hi Mark,\n\nHere is the quote to rebuild the Copo North site: five pages and a form for 480 dollars, with a month of changes at no cost.\n\nBest,\nJulia",
+      "sentences": [
+        {
+          "text": "Dear Mr Ibarra,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I wrote to you on Monday the 6th with the quote for the Copo North site.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "If it is easier, I can come by the office on Friday and we can go over it in person.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Kind regards,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia Montes",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-en-10",
+      "kind": "slop",
+      "text": "Hi Mark,\n\nI am writing to remind you of the quote to rebuild the Copo North site: five pages and a form for 480 dollars. I truly believe this is a game-changer that will unlock real value for your business.\n\nBest,\nJulia",
+      "previous": "Hi Mark,\n\nHere is the quote to rebuild the Copo North site: five pages and a form for 480 dollars, with a month of changes at no cost.\n\nBest,\nJulia",
+      "sentences": [
+        {
+          "text": "Hi Mark,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "I am writing to remind you of the quote to rebuild the Copo North site: five pages and a form for 480 dollars.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "I truly believe this is a game-changer that will unlock real value for your business.",
+          "slop": true,
+          "rules": [
+            "LEX-03"
+          ]
+        },
+        {
+          "text": "Best,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}

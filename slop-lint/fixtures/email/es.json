@@ -1,0 +1,604 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "email",
+  "lang": "es",
+  "items": [
+    {
+      "id": "email-es-01",
+      "kind": "human",
+      "text": "Asunto: Tablero de stock de marzo · reunión del jueves\n\nHola, Laura:\n\nTe paso el tablero de stock de marzo con las 14 sucursales. La carga de Villa Brumal quedó para el lunes porque faltan dos planillas.\n¿Lo vemos el jueves a las 10?\n\nSaludos,\nTomás",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Asunto: Tablero de stock de marzo · reunión del jueves",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hola, Laura:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Te paso el tablero de stock de marzo con las 14 sucursales.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "La carga de Villa Brumal quedó para el lunes porque faltan dos planillas.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "¿Lo vemos el jueves a las 10?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-02",
+      "kind": "human",
+      "text": "Hola, Martín:\n\nTe adjunto la factura 0003 de octubre por el mantenimiento del sitio. Si la necesitás a nombre de otra razón social, avisame y la rehago hoy.\n\nGracias,\nJulia",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Te adjunto la factura 0003 de octubre por el mantenimiento del sitio.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si la necesitás a nombre de otra razón social, avisame y la rehago hoy.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Gracias,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-03",
+      "kind": "human",
+      "text": "Asunto: Carga lenta de la tienda de Velmora · medición del 2 de octubre\n\nHola, Inés:\n\nSoy Tomás Ferrán y armo sitios en WordPress para comercios de la zona. El 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto.\nLa mayor parte del peso son tres fotos de portada de 2 MB cada una y un plugin de chat que carga aunque nadie lo abra. Con las fotos comprimidas y el chat cargado al tocar el botón, en otras tiendas parecidas bajé ese tiempo a menos de la mitad, aunque eso hay que medirlo en la de ustedes.\nNo toqué nada del sitio: solo miré lo que ve cualquier visitante. Si te interesa, te mando el informe de dos páginas con lo que encontré y lo que haría primero.\nSi no es un tema para vos, decime quién lo ve y no te escribo más.\n\nSaludos,\nTomás Ferrán",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Asunto: Carga lenta de la tienda de Velmora · medición del 2 de octubre",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Soy Tomás Ferrán y armo sitios en WordPress para comercios de la zona.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "La mayor parte del peso son tres fotos de portada de 2 MB cada una y un plugin de chat que carga aunque nadie lo abra.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Con las fotos comprimidas y el chat cargado al tocar el botón, en otras tiendas parecidas bajé ese tiempo a menos de la mitad, aunque eso hay que medirlo en la de ustedes.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "No toqué nada del sitio: solo miré lo que ve cualquier visitante.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si te interesa, te mando el informe de dos páginas con lo que encontré y lo que haría primero.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si no es un tema para vos, decime quién lo ve y no te escribo más.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás Ferrán",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-04",
+      "kind": "human",
+      "text": "Hola, Carla:\n\nGracias por mandarme las planillas de ventas de abril a septiembre. Las crucé con el sistema de caja y encontré dos cosas que conviene revisar antes de la reunión del martes.\nLa primera: en junio hay 312 tickets que figuran en la caja y no en la planilla, casi todos del local de calle Quillén. Parece un día que no se exportó, el 14, pero lo tiene que confirmar Hernán, que hace el cierre.\nLa segunda: los descuentos de jubilados se cargan a veces como porcentaje y a veces como monto fijo. Por eso el margen de julio da 3 puntos más bajo de lo que es.\nArmé una hoja aparte con los dos casos marcados en amarillo, así no tocamos la original. Si el martes llegamos con eso aclarado, el tablero ya puede salir con datos de todo el semestre.\n\nAbrazo,\nNicolás",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola, Carla:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Gracias por mandarme las planillas de ventas de abril a septiembre.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Las crucé con el sistema de caja y encontré dos cosas que conviene revisar antes de la reunión del martes.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "La primera: en junio hay 312 tickets que figuran en la caja y no en la planilla, casi todos del local de calle Quillén.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Parece un día que no se exportó, el 14, pero lo tiene que confirmar Hernán, que hace el cierre.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "La segunda: los descuentos de jubilados se cargan a veces como porcentaje y a veces como monto fijo.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Por eso el margen de julio da 3 puntos más bajo de lo que es.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Armé una hoja aparte con los dos casos marcados en amarillo, así no tocamos la original.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si el martes llegamos con eso aclarado, el tablero ya puede salir con datos de todo el semestre.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Abrazo,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Nicolás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-05",
+      "kind": "human",
+      "text": "Asunto: Presupuesto para el sitio de Copo Norte\n\nEstimada señora Paredes:\n\nLe escribo por el presupuesto que pidió el 3 de octubre para el sitio de Copo Norte. Le adjunto dos opciones: una con cinco páginas y formulario, por 480 dólares, y otra que suma la tienda, por 950.\nLas dos incluyen un mes de cambios sin costo.\n\nAtentamente,\nRodrigo Funes",
+      "variety": "neutral",
+      "sentences": [
+        {
+          "text": "Asunto: Presupuesto para el sitio de Copo Norte",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Estimada señora Paredes:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Le escribo por el presupuesto que pidió el 3 de octubre para el sitio de Copo Norte.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Le adjunto dos opciones: una con cinco páginas y formulario, por 480 dólares, y otra que suma la tienda, por 950.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Las dos incluyen un mes de cambios sin costo.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Atentamente,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Rodrigo Funes",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-06",
+      "kind": "human",
+      "text": "Hola, Inés:\n\nPara publicar el viernes me faltan tres cosas:\n- el logo en SVG\n- los textos de la página de precios\n- el acceso al hosting\nCon eso lo dejo online el lunes temprano.\n\nAbrazo,\nNico",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Para publicar el viernes me faltan tres cosas:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- el logo en SVG",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- los textos de la página de precios",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "- el acceso al hosting",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Con eso lo dejo online el lunes temprano.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Abrazo,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Nico",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-07",
+      "kind": "slop",
+      "text": "Asunto: Oportunidad emocionante\n\nEstimado/a equipo:\n\nMe dirijo a ustedes para expresar mi profundo interés en colaborar con su prestigiosa empresa. En el dinámico mundo digital actual, contar con un sitio sólido es fundamental.\nNo se trata solo de diseño, se trata de resultados. Estoy convencido que puedo aportar un gran valor a su organización.\nQuedo a su entera disposición.\n\nSaludos cordiales,\nTomás",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Asunto: Oportunidad emocionante",
+          "slop": true,
+          "rules": [
+            "MAIL-03"
+          ]
+        },
+        {
+          "text": "Estimado/a equipo:",
+          "slop": true,
+          "rules": [
+            "MAIL-02"
+          ]
+        },
+        {
+          "text": "Me dirijo a ustedes para expresar mi profundo interés en colaborar con su prestigiosa empresa.",
+          "slop": true,
+          "rules": [
+            "LEX-01",
+            "RET-01"
+          ]
+        },
+        {
+          "text": "En el dinámico mundo digital actual, contar con un sitio sólido es fundamental.",
+          "slop": true,
+          "rules": [
+            "LEX-01",
+            "LEX-02"
+          ]
+        },
+        {
+          "text": "No se trata solo de diseño, se trata de resultados.",
+          "slop": true,
+          "rules": [
+            "EST-01"
+          ]
+        },
+        {
+          "text": "Estoy convencido que puedo aportar un gran valor a su organización.",
+          "slop": true,
+          "rules": [
+            "SIN-02",
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Quedo a su entera disposición.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Saludos cordiales,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-08",
+      "kind": "slop",
+      "text": "Hola, Laura:\n\nEspero que este mail te encuentre muy bien. Te escribo para contarte que me apasiona el análisis de datos.\nTras revisar tu sitio, noté que la página de inicio tarda en cargar. La medí con PageSpeed el 2 de octubre y tardó 6,1 segundos en celular.\n¿Te sirve que te mande el informe completo?\n\nSaludos,\nAna",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola, Laura:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Espero que este mail te encuentre muy bien.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Te escribo para contarte que me apasiona el análisis de datos.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Tras revisar tu sitio, noté que la página de inicio tarda en cargar.",
+          "slop": true,
+          "rules": [
+            "EST-09"
+          ]
+        },
+        {
+          "text": "La medí con PageSpeed el 2 de octubre y tardó 6,1 segundos en celular.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "¿Te sirve que te mande el informe completo?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Ana",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-09",
+      "kind": "slop",
+      "text": "Hola, equipo de Ondara:\n\nMe gustaría aplicar a la posición de analista de datos. Soy una persona proactiva, orientada a resultados y apasionada por la tecnología.\nCreo de que mi perfil hace sentido para el rol. En resumen, sería un honor sumarme.\n\nSaludos,\nLucía",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Hola, equipo de Ondara:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Me gustaría aplicar a la posición de analista de datos.",
+          "slop": true,
+          "rules": [
+            "REG-02"
+          ]
+        },
+        {
+          "text": "Soy una persona proactiva, orientada a resultados y apasionada por la tecnología.",
+          "slop": true,
+          "rules": [
+            "ESP-04",
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Creo de que mi perfil hace sentido para el rol.",
+          "slop": true,
+          "rules": [
+            "SIN-01",
+            "REG-02"
+          ]
+        },
+        {
+          "text": "En resumen, sería un honor sumarme.",
+          "slop": true,
+          "rules": [
+            "EST-05",
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Lucía",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-10",
+      "kind": "slop",
+      "text": "Hola, Martín:\n\nQuería contarte que trabajo ayudando a empresas a crecer en el mundo digital. Mi enfoque combina estrategia, creatividad y compromiso con cada proyecto que encaro. Creo firmemente que cada negocio merece una presencia online que refleje su esencia.\nPor eso me encantaría conocer más sobre sus objetivos y ver de qué manera podemos trabajar juntos. Estoy convencido de que juntos podemos lograr grandes cosas.\n\nSaludos,\nJulián",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Quería contarte que trabajo ayudando a empresas a crecer en el mundo digital.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Mi enfoque combina estrategia, creatividad y compromiso con cada proyecto que encaro.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Creo firmemente que cada negocio merece una presencia online que refleje su esencia.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Por eso me encantaría conocer más sobre sus objetivos y ver de qué manera podemos trabajar juntos.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Estoy convencido de que juntos podemos lograr grandes cosas.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julián",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-11",
+      "kind": "slop",
+      "text": "Hola, [Nombre]:\n\nTe escribo desde [Empresa] porque vi que están buscando mejorar su sitio. Hago sitios en WordPress y Astro desde 2021.\n¿Te puedo mandar dos ejemplos?\n\nSaludos,\nPablo",
+      "sentences": [
+        {
+          "text": "Hola, [Nombre]:",
+          "slop": true,
+          "rules": [
+            "FMT-04"
+          ]
+        },
+        {
+          "text": "Te escribo desde [Empresa] porque vi que están buscando mejorar su sitio.",
+          "slop": true,
+          "rules": [
+            "FMT-04"
+          ]
+        },
+        {
+          "text": "Hago sitios en WordPress y Astro desde 2021.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "¿Te puedo mandar dos ejemplos?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Pablo",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "email-es-12",
+      "kind": "human",
+      "text": "Hola, Pablo:\n\nSí, mandame los dos ejemplos. El miércoles a la tarde los miro con Carla.\n\nGracias,\nInés",
+      "variety": "rioplatense",
+      "sentences": [
+        {
+          "text": "Hola, Pablo:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Sí, mandame los dos ejemplos.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El miércoles a la tarde los miro con Carla.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Gracias,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Inés",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}

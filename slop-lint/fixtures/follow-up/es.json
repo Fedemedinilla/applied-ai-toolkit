@@ -1,0 +1,477 @@
+{
+  "fictional": "Fictional texts written for this labelled set: every person, company, place, date and figure is invented. Each sentence is labelled by hand; see slop-lint/scripts/genre-eval.ts for the schema.",
+  "genre": "follow-up",
+  "lang": "es",
+  "items": [
+    {
+      "id": "follow-up-es-01",
+      "kind": "human",
+      "text": "Asunto: Re: Carga lenta de la tienda de Velmora\n\nHola, Inés:\n\nTe escribí el 2 de octubre por la carga de la tienda. Ayer la volví a medir y sigue en 6 segundos, así que el informe vale igual.\n¿Te lo mando o preferís que lo hablemos 15 minutos el jueves?\n\nSaludos,\nTomás",
+      "variety": "rioplatense",
+      "previous": "Hola, Inés:\n\nEl 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto. Si te interesa, te mando el informe de dos páginas con lo que encontré.\n\nSaludos,\nTomás",
+      "sentences": [
+        {
+          "text": "Asunto: Re: Carga lenta de la tienda de Velmora",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Te escribí el 2 de octubre por la carga de la tienda.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Ayer la volví a medir y sigue en 6 segundos, así que el informe vale igual.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "¿Te lo mando o preferís que lo hablemos 15 minutos el jueves?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-02",
+      "kind": "human",
+      "text": "Hola, Martín:\n\n¿Pudiste ver el presupuesto del martes? Si los 480 dólares no entran este mes, puedo arrancar con la página de inicio sola y sumar el resto en noviembre.\n\nSaludos,\nJulia",
+      "variety": "rioplatense",
+      "previous": "Hola, Martín:\n\nTe paso el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares, con un mes de cambios sin costo.\n\nSaludos,\nJulia",
+      "sentences": [
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "¿Pudiste ver el presupuesto del martes?",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si los 480 dólares no entran este mes, puedo arrancar con la página de inicio sola y sumar el resto en noviembre.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-03",
+      "kind": "human",
+      "text": "Hola, Inés:\n\nTe escribí el 2 de octubre por la carga de la tienda de Velmora y no quiero insistir de más, así que este es el último mail que te mando sobre el tema.\nDesde entonces pasaron dos cosas. Ayer volví a medir y la página de inicio tardó 6,4 segundos, un poco más que la vez anterior, porque sumaron un banner de liquidación de 3 MB.\nAdemás, Google ahora muestra la tienda con la advertencia de que tarda en celulares, cosa que antes no pasaba.\nLa medición la hice desde un celular de gama media, con datos móviles, a las 11 de la mañana, igual que la primera vez, para que se puedan comparar.\nEl informe de dos páginas sigue disponible. Si te sirve, te lo mando hoy, sin costo, y lo podés usar con quien te arme el sitio, sea yo o no.\nSi el tema lo ve otra persona, decime quién y le escribo directamente. Si no es momento, también me sirve saberlo.\n\nSaludos,\nTomás",
+      "variety": "rioplatense",
+      "previous": "Hola, Inés:\n\nEl 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto. Si te interesa, te mando el informe de dos páginas con lo que encontré.\n\nSaludos,\nTomás",
+      "sentences": [
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Te escribí el 2 de octubre por la carga de la tienda de Velmora y no quiero insistir de más, así que este es el último mail que te mando sobre el tema.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Desde entonces pasaron dos cosas.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Ayer volví a medir y la página de inicio tardó 6,4 segundos, un poco más que la vez anterior, porque sumaron un banner de liquidación de 3 MB.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Además, Google ahora muestra la tienda con la advertencia de que tarda en celulares, cosa que antes no pasaba.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "La medición la hice desde un celular de gama media, con datos móviles, a las 11 de la mañana, igual que la primera vez, para que se puedan comparar.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El informe de dos páginas sigue disponible.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si te sirve, te lo mando hoy, sin costo, y lo podés usar con quien te arme el sitio, sea yo o no.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si el tema lo ve otra persona, decime quién y le escribo directamente.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si no es momento, también me sirve saberlo.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-04",
+      "kind": "human",
+      "text": "Asunto: Re: Presupuesto del sitio de Copo Norte\n\nHola, Martín:\n\nRetomo el mail del presupuesto porque me quedé pensando en lo que me dijiste por teléfono sobre la temporada.\nSi el sitio tiene que estar antes del 15 de noviembre, lo más seguro es dividirlo en dos partes.\nPrimero la página de inicio, la de productos y el formulario de pedidos, que es lo que usan tus clientes mayoristas. Eso lo puedo tener en dos semanas desde que me mandes las fotos.\nLas fotos las puede sacar alguien del local con el celular: con buena luz alcanza. Si preferís, te paso el contacto de una fotógrafa que cobra por jornada.\nDespués, en diciembre, la página de la empresa y el blog, que no corren apuro.\nEl precio total no cambia, pero lo podés pagar en dos partes, una por cada entrega. Si te cierra, te mando el detalle con fechas el viernes.\n\nSaludos,\nJulia",
+      "variety": "rioplatense",
+      "previous": "Hola, Martín:\n\nTe paso el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares, con un mes de cambios sin costo.\n\nSaludos,\nJulia",
+      "sentences": [
+        {
+          "text": "Asunto: Re: Presupuesto del sitio de Copo Norte",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Retomo el mail del presupuesto porque me quedé pensando en lo que me dijiste por teléfono sobre la temporada.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si el sitio tiene que estar antes del 15 de noviembre, lo más seguro es dividirlo en dos partes.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Primero la página de inicio, la de productos y el formulario de pedidos, que es lo que usan tus clientes mayoristas.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Eso lo puedo tener en dos semanas desde que me mandes las fotos.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Las fotos las puede sacar alguien del local con el celular: con buena luz alcanza.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si preferís, te paso el contacto de una fotógrafa que cobra por jornada.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Después, en diciembre, la página de la empresa y el blog, que no corren apuro.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "El precio total no cambia, pero lo podés pagar en dos partes, una por cada entrega.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si te cierra, te mando el detalle con fechas el viernes.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-05",
+      "kind": "slop",
+      "text": "Asunto: Re: Carga lenta de la tienda de Velmora\n\nHola, Inés:\n\nComo te comenté, el 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos. Si te interesa, te mando el informe de dos páginas con lo que encontré.\n\nSaludos,\nTomás",
+      "variety": "rioplatense",
+      "previous": "Hola, Inés:\n\nEl 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto. Si te interesa, te mando el informe de dos páginas con lo que encontré.\n\nSaludos,\nTomás",
+      "sentences": [
+        {
+          "text": "Asunto: Re: Carga lenta de la tienda de Velmora",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Como te comenté, el 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "Si te interesa, te mando el informe de dos páginas con lo que encontré.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-06",
+      "kind": "slop",
+      "text": "Hola, Martín:\n\nSolo quería hacer un seguimiento de mi mensaje anterior. Perdón por molestar, sé que estás con mil cosas.\nNo dudes en escribirme si tenés alguna consulta.\nQuedo a tu entera disposición.\n\nSaludos cordiales,\nJulia",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Solo quería hacer un seguimiento de mi mensaje anterior.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Perdón por molestar, sé que estás con mil cosas.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "No dudes en escribirme si tenés alguna consulta.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Quedo a tu entera disposición.",
+          "slop": true,
+          "rules": [
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Saludos cordiales,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-07",
+      "kind": "human",
+      "text": "Hola, Inés:\n\nEn mi mail del 2 de octubre te pregunté si te interesaba el informe. Lo dejé listo por si acaso: son dos páginas y no hace falta que me contestes para leerlo.\n\nSaludos,\nTomás",
+      "variety": "rioplatense",
+      "previous": "Hola, Inés:\n\nEl 2 de octubre medí la tienda de Velmora con PageSpeed desde un celular y la página de inicio tardó 6,1 segundos en mostrar el primer producto. Si te interesa, te mando el informe de dos páginas con lo que encontré.\n\nSaludos,\nTomás",
+      "sentences": [
+        {
+          "text": "Hola, Inés:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "En mi mail del 2 de octubre te pregunté si te interesaba el informe.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Lo dejé listo por si acaso: son dos páginas y no hace falta que me contestes para leerlo.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Tomás",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-08",
+      "kind": "slop",
+      "text": "Asunto: Seguimiento\n\nEstimado/a:\n\nRetomo mi mensaje anterior para reiterar mi interés. Es importante destacar que me encantaría tener la oportunidad de colaborar con ustedes.\nAgradezco de antemano su tiempo y consideración.\n\nAtentamente,\nRodrigo",
+      "variety": "neutral",
+      "textRules": [
+        "ESP-02"
+      ],
+      "sentences": [
+        {
+          "text": "Asunto: Seguimiento",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Estimado/a:",
+          "slop": true,
+          "rules": [
+            "MAIL-02"
+          ]
+        },
+        {
+          "text": "Retomo mi mensaje anterior para reiterar mi interés.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Es importante destacar que me encantaría tener la oportunidad de colaborar con ustedes.",
+          "slop": true,
+          "rules": [
+            "EST-04"
+          ]
+        },
+        {
+          "text": "Agradezco de antemano su tiempo y consideración.",
+          "slop": true,
+          "rules": []
+        },
+        {
+          "text": "Atentamente,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Rodrigo",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-09",
+      "kind": "human",
+      "text": "Estimado señor Ibarra:\n\nLe escribí el lunes 6 con el presupuesto del sitio de Copo Norte. Si le resulta más cómodo, puedo pasar el viernes por la oficina y lo vemos en persona.\n\nAtentamente,\nJulia Montes",
+      "variety": "neutral",
+      "previous": "Hola, Martín:\n\nTe paso el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares, con un mes de cambios sin costo.\n\nSaludos,\nJulia",
+      "sentences": [
+        {
+          "text": "Estimado señor Ibarra:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Le escribí el lunes 6 con el presupuesto del sitio de Copo Norte.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Si le resulta más cómodo, puedo pasar el viernes por la oficina y lo vemos en persona.",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Atentamente,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia Montes",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    },
+    {
+      "id": "follow-up-es-10",
+      "kind": "slop",
+      "text": "Hola, Martín:\n\nTe escribo para recordarte el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares. Creo de que es una propuesta que puede aportar valor a tu negocio.\n\nSaludos,\nJulia",
+      "variety": "rioplatense",
+      "previous": "Hola, Martín:\n\nTe paso el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares, con un mes de cambios sin costo.\n\nSaludos,\nJulia",
+      "sentences": [
+        {
+          "text": "Hola, Martín:",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Te escribo para recordarte el presupuesto para rehacer el sitio de Copo Norte: cinco páginas y formulario por 480 dólares.",
+          "slop": true,
+          "rules": [
+            "SEG-03"
+          ]
+        },
+        {
+          "text": "Creo de que es una propuesta que puede aportar valor a tu negocio.",
+          "slop": true,
+          "rules": [
+            "SIN-01",
+            "LEX-01"
+          ]
+        },
+        {
+          "text": "Saludos,",
+          "slop": false,
+          "rules": []
+        },
+        {
+          "text": "Julia",
+          "slop": false,
+          "rules": []
+        }
+      ]
+    }
+  ]
+}
