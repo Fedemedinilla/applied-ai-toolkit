@@ -70,7 +70,9 @@ export class ActionKey {
   /** The key for the next send of this action: the current one if still fresh, else a new one. */
   current(): string {
     const now = this.#now();
-    if (this.#current && this.#fresh(this.#current, now)) return this.#current.key;
+    // A clock moved back makes the age negative. That only makes a stored value suspect; the key
+    // this page minted is still the same action, so its next send stays a resend.
+    if (this.#current && now - this.#current.createdAt < this.#lifetimeMs) return this.#current.key;
     const stored = this.#read();
     this.#current = stored && this.#fresh(stored, now) ? stored : { key: this.#makeKey(), createdAt: now };
     this.#write(this.#current);

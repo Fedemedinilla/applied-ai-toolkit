@@ -49,6 +49,36 @@ describe('ActionKey', () => {
     expect(action.current()).not.toBe(k);
   });
 
+  it('keeps the key on this page when the clock moves back', () => {
+    let now = 1_000_000;
+    const action = new ActionKey({ slot: 'checkout', storage: localStorage, now: () => now });
+    const k = action.current();
+    // An NTP or manual correction after an unknown result, before the user taps again.
+    now -= 1000;
+    expect(action.current()).toBe(k);
+  });
+
+  it('keeps the key on this page when the clock moves back and storage is blocked', () => {
+    let now = 1_000_000;
+    const action = new ActionKey({ slot: 'checkout', now: () => now });
+    const k = action.current();
+    now -= 60_000;
+    expect(action.current()).toBe(k);
+  });
+
+  it('keeps the key in memory when storage reads but cannot write', () => {
+    const full: KeyStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: () => undefined,
+    };
+    const action = new ActionKey({ slot: 'checkout', storage: full });
+    const k = action.current();
+    expect(action.current()).toBe(k);
+  });
+
   it('keeps the key in memory when storage throws', () => {
     const blocked: KeyStorage = {
       getItem: () => {
