@@ -211,6 +211,21 @@ const EMOJI = /(?![©®™])\p{Extended_Pictographic}/u;
  * this is for `--genre auto` and for tools that show the guess and ask.
  */
 export function guessGenre(text: string): GenreGuess {
+  return guessGenreWith(text, GUESS_CUTS);
+}
+
+/** The word counts guessGenre cuts at. Not calibrated: scripts/genre-eval.ts measures them on the labelled set. */
+export interface GuessCuts {
+  /** Under this many words a text can be a chat message. */
+  shortWords: number;
+  /** Under this many words a text with a greeting and a sign-off reads as a mail, not a letter. */
+  mailWords: number;
+}
+
+export const GUESS_CUTS: Readonly<GuessCuts> = { shortWords: 60, mailWords: 150 };
+
+/** guessGenre with other cuts, so scripts/genre-eval.ts can compare them. Not part of the package entry. */
+export function guessGenreWith(text: string, cuts: Readonly<GuessCuts>): GenreGuess {
   const signals: string[] = [];
   const wordCount = text.split(/\s+/u).filter(Boolean).length;
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -227,14 +242,14 @@ export function guessGenre(text: string): GenreGuess {
   const unpunctuated = lines.filter((l) => !/[.!?:…]$/u.test(l)).length;
   const chatLines = lines.length > 0 && unpunctuated * 2 > lines.length;
   if (chatLines) signals.push('lines without a closing period');
-  const short = wordCount < 60;
+  const short = wordCount < cuts.shortWords;
   if (short) signals.push(`${wordCount} words`);
 
   // A letter can mention an earlier application too, so a long text needs a subject line to be sure.
-  if (previous) return { genre: 'follow-up', confidence: subject || ((greeting || signOff) && wordCount < 150) ? 'high' : 'low', signals };
+  if (previous) return { genre: 'follow-up', confidence: subject || ((greeting || signOff) && wordCount < cuts.mailWords) ? 'high' : 'low', signals };
   if (subject) return { genre: 'email', confidence: 'high', signals };
   if (short && (emoji || chatLines) && !signOff) return { genre: 'whatsapp', confidence: emoji && chatLines ? 'high' : 'low', signals };
   // A cover letter has a greeting and a sign-off too; it is longer than most mails.
-  if (greeting && signOff && wordCount < 150) return { genre: 'email', confidence: 'low', signals };
-  return { genre: DEFAULT_GENRE, confidence: wordCount >= 150 && !emoji ? 'high' : 'low', signals };
+  if (greeting && signOff && wordCount < cuts.mailWords) return { genre: 'email', confidence: 'low', signals };
+  return { genre: DEFAULT_GENRE, confidence: wordCount >= cuts.mailWords && !emoji ? 'high' : 'low', signals };
 }
