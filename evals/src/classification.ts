@@ -35,8 +35,17 @@ export type ClassificationOptions = {
    * whole output must then be one label.
    */
   multi?: boolean;
-  /** Applied to the output's labels before the comparison. Default: trim only, case kept. */
+  /**
+   * Applied to the output's labels before the comparison. Default: trim only,
+   * case kept. It changes the scoring, so it changes the version: "custom",
+   * or `normalizeId` when given.
+   */
   normalize?: (label: string) => string;
+  /**
+   * A name for `normalize`, kept in the version. Change it whenever the
+   * function changes, so the gate refuses runs scored under the old one.
+   */
+  normalizeId?: string;
 };
 
 const OUT_OF_SET = '(out of set)';
@@ -59,7 +68,7 @@ function outputLabels(output: string, multi: boolean): string[] {
 /**
  * The rubric for one label set. The label set is part of the version, so the
  * gate refuses to compare a run scored against four labels with one scored
- * against five.
+ * against five. A custom `normalize` is part of it too.
  */
 export function classification(options: ClassificationOptions): CodeRubric<ClassificationVerdict, string | string[]> {
   const labels = uniqueSorted(options.labels);
@@ -68,13 +77,16 @@ export function classification(options: ClassificationOptions): CodeRubric<Class
   const known = new Set(labels);
   const multi = options.multi ?? false;
   const normalize = options.normalize ?? ((s: string) => s.trim());
+  if (options.normalizeId !== undefined && !options.normalize) throw new RubricError('normalizeId needs normalize');
+  if (options.normalizeId === '') throw new RubricError('normalizeId must not be empty');
+  const normalizeTag = options.normalize ? ` normalize:${options.normalizeId ?? 'custom'}` : '';
   const label = z.string().refine((l) => known.has(l), { message: `expected label is not one of ${labels.join(', ')}` });
   const expected = multi ? z.array(label) : z.union([label, z.array(label).length(1)]);
 
   return {
     kind: 'code',
     name: 'classification',
-    version: `1 ${multi ? 'set' : 'single'} [${labels.join(', ')}]`,
+    version: `1 ${multi ? 'set' : 'single'} [${labels.join(', ')}]${normalizeTag}`,
     verdict: ClassificationVerdict,
     expected,
     score(output, want) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classification, classificationReport } from '../src/classification.ts';
+import { gate } from '../src/gate.ts';
 import { parseRun, RUN_FORMAT, scoreItems, summarize } from '../src/run.ts';
 
 const LABELS = ['price', 'hours', 'repair', 'other'];
@@ -65,6 +66,17 @@ describe('the classification rubric', () => {
     expect(classification({ labels: [...LABELS].reverse() }).version).toBe(rubric.version);
     expect(classification({ labels: [...LABELS, 'refund'] }).version).not.toBe(rubric.version);
     expect(classification({ labels: LABELS, multi: true }).version).toBe('1 set [hours, other, price, repair]');
+  });
+
+  it('puts a custom normalize in the version, so the gate refuses runs scored under different rules', () => {
+    const lower = (s: string) => s.trim().toLowerCase().replace(/\.$/, '');
+    expect(classification({ labels: LABELS, normalize: lower }).version).toBe('1 single [hours, other, price, repair] normalize:custom');
+    expect(classification({ labels: LABELS, normalize: lower, normalizeId: 'lower-dot' }).version).toBe('1 single [hours, other, price, repair] normalize:lower-dot');
+    expect(() => classification({ labels: LABELS, normalizeId: 'lower-dot' })).toThrow(/normalizeId needs normalize/);
+    const items = [{ case: 'a', output: 'Price.', expected: 'price' }, { case: 'b', output: 'hours', expected: 'hours' }];
+    const strict = scoreItems(rubric, 'main', items);
+    const loose = scoreItems(classification({ labels: LABELS, normalize: lower }), 'pr', items);
+    expect(() => gate(strict, loose)).toThrow(/different versions of classification/);
   });
 
   it('refuses a label set of one, and a reserved label', () => {
