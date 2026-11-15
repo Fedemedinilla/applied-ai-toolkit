@@ -1240,7 +1240,7 @@ def _local_moment(meta: dict[str, Any], key: str, fallback: dt.datetime) -> dt.d
 
 
 def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
-    from . import evaluate
+    from . import evaluate, kinds
     from .config import DEFAULT_KIND, DEFAULT_PARA
     from .model import Finding
     from .render_report import ReportContext, render_annex, render_report
@@ -1288,6 +1288,14 @@ def _rerender(config: "RunConfig", con: _Console) -> RunOutcome:
     institution = config.institution or meta.get("institucion") or domain
     para = config.para or meta.get("para") or DEFAULT_PARA
     kind = config.kind if config.kind_explicit else (meta.get("tipo") or DEFAULT_KIND)
+    stored_kind = str(meta.get("tipo") or DEFAULT_KIND)
+    if config.kind_explicit and kinds.of(str(kind)).educational != kinds.of(stored_kind).educational:
+        # VIS-17 (admissions) applies only to the educational kinds, and the
+        # stored run holds no data to evaluate it again for the other side.
+        return _usage(
+            con,
+            f"--rerender: --kind {kind} changes which checks apply (the run was measured as {stored_kind}); measure again with --kind",
+        )
     # The language the run was written in, unless --lang asks for another; a run stored before --lang is Spanish.
     lang = normalize_lang(config.lang or meta.get("idioma_informe"))
     velocity, mail_auth = _tables_from_datos(old.get("tablas"))

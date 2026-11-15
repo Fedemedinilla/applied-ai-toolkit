@@ -127,7 +127,7 @@ Once the package is installed, `site-check` and `python3 -m sitecheck` take the 
 |---|---|
 | `URL` | the home page of the site, http or https, without a path |
 | `--name NAME` | the organisation's name, for the title check and the report header |
-| `--kind KIND` | `school`, `institute`, `kindergarten`, `company` or `organisation` (default). It chooses the noun the Spanish report uses and whether the admissions check applies. The Spanish nouns are accepted too: `colegio`, `escuela`, `instituto`, `jardín`, `empresa`, `institución` |
+| `--kind KIND` | `school`, `institute`, `kindergarten`, `company` or `organisation` (default). It chooses the noun the Spanish report uses and whether the admissions check applies. With `--rerender` it may change the noun only: a kind that would change whether the admissions check applies is exit 2, because the stored run has no data to evaluate that check again. The Spanish nouns are accepted too: `colegio`, `escuela`, `instituto`, `jardín`, `empresa`, `institución` |
 | `--to TEXT` | who the report is addressed to (default "Dirección", or "Management" with `--lang en`) |
 | `--lang LANG` | report language, `es` (default) or `en`; see Report language |
 | `--inner-page URL`, `--form-page URL` | an inner page and a page with a form; each is read only if the home links it |

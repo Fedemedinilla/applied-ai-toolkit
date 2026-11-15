@@ -138,5 +138,31 @@ class SchemaVersionTypeTest(unittest.TestCase):
                 self.assertFalse((path.parent / "report.md").exists())
 
 
+class RerenderKindTest(unittest.TestCase):
+    """--kind on --rerender cannot change whether VIS-17 (admissions) applies: the run holds no data for that."""
+
+    def test_school_run_rerendered_as_a_company_is_refused(self) -> None:
+        with temp_dir() as root:
+            path = _stored_run(root, "run.json", lambda d: None)
+            code, _, err = run_cli(["--rerender", str(path), "--kind", "company"])
+            self.assertEqual(code, 2, err)
+            self.assertIn("--kind", err)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["meta"]["kind"], "colegio")
+            self.assertFalse((path.parent / "report.md").exists())
+
+    def test_company_run_rerendered_as_a_school_is_refused(self) -> None:
+        with temp_dir() as root:
+            path = _stored_run(root, "run.json", lambda d: d["meta"].__setitem__("kind", "empresa"))
+            code, _, err = run_cli(["--rerender", str(path), "--kind", "school"])
+            self.assertEqual(code, 2, err)
+
+    def test_a_kind_with_the_same_checks_is_still_accepted(self) -> None:
+        with temp_dir() as root:
+            path = _stored_run(root, "run.json", lambda d: None)
+            code, _, err = run_cli(["--rerender", str(path), "--kind", "kindergarten"])
+            self.assertEqual(code, 0, err)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["meta"]["kind"], "jardín")
+
+
 if __name__ == "__main__":
     unittest.main()
