@@ -17,7 +17,8 @@ export interface GenreProfile {
   rules: Readonly<Partial<Record<string, GenreSetting>>>;
   /**
    * Catalog rules this genre runs as several rules, by the catalog id. The first part keeps the
-   * id; a config setting for that id applies to every part.
+   * id; a config setting for that id applies to every part, except a part whose own id the config
+   * also sets (SPLIT_PART_IDS).
    */
   splits?: Readonly<Partial<Record<string, readonly Rule[]>>>;
   /** The shared Tier 2 budget per text. */
@@ -130,6 +131,14 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
   },
 };
 
+/**
+ * The ids of the parts a genre adds when it splits a catalog rule, such as FMT-01-LIST. A config
+ * may name them under ruleSettings; in a genre that does not split the rule they change nothing.
+ */
+export const SPLIT_PART_IDS: readonly string[] = [
+  ...new Set(Object.values(GENRE_PROFILES).flatMap((p) => Object.entries(p.splits ?? {}).flatMap(([id, parts]) => (parts ?? []).map((r) => r.id).filter((partId) => partId !== id)))),
+];
+
 export function isGenre(value: unknown): value is Genre {
   return typeof value === 'string' && (GENRES as readonly string[]).includes(value);
 }
@@ -158,7 +167,7 @@ export function resolveRules(rules: readonly Rule[], genre: Genre = DEFAULT_GENR
   const profile = GENRE_PROFILES[genre];
   return rules.flatMap((rule) =>
     splitRule(rule, genre).flatMap((part) => {
-      const applied = applySetting(part, profile.rules[rule.id]);
+      const applied = applySetting(part, profile.rules[part.id] ?? profile.rules[rule.id]);
       if (applied === undefined) return [];
       const message = messageFor(applied, genre);
       return [message === applied.message ? applied : { ...applied, message }];

@@ -7,7 +7,7 @@
  * schema/config.schema.json describes the same shape for editors, and test/config-schema.test.ts
  * runs both over one fixture set so they cannot drift apart.
  */
-import { applySetting, GENRE_PROFILES, GENRES, splitRule } from './genres.ts';
+import { applySetting, GENRE_PROFILES, GENRES, SPLIT_PART_IDS, splitRule } from './genres.ts';
 import { globProblem, matchesAny } from './glob.ts';
 import { messageFor } from './messages.ts';
 import { RULES } from './rules.ts';
@@ -331,6 +331,8 @@ export function validateMeaning(config: Config): void {
       throw new ConfigError(`${path}.pattern`, 'matches the empty string, so it would match everywhere or report nothing; make at least one character required');
     }
   });
+  // A split part such as FMT-01-LIST can be set on its own; custom ids start with X-, so they cannot collide.
+  for (const id of SPLIT_PART_IDS) ids.add(id);
   const check = (settings: Record<string, RuleSetting> | undefined, path: string): void => {
     for (const id of Object.keys(settings ?? {})) {
       if (!ids.has(id)) throw new ConfigError(join(path, id), 'is not the id of a built-in rule or of a rule under rules; --list-rules prints every id');
@@ -427,15 +429,14 @@ export function settingsFor(config: Config, path: string | undefined, origin: st
   const off: string[] = [];
   for (const rule of all) {
     // The config's setting for a rule replaces the genre's as a whole: the config wins over the genre.
-    // A rule the genre splits takes that setting on every part.
-    const setting = settings[rule.id] ?? profile[rule.id];
-    if (setting === 'off') {
-      off.push(rule.id);
-      continue;
-    }
+    // A rule the genre splits takes that setting on every part, except a part whose own id is set.
     for (const part of splitRule(rule, resolvedGenre)) {
+      const setting = settings[part.id] ?? settings[rule.id] ?? profile[part.id] ?? profile[rule.id];
       const applied = applySetting(part, setting);
-      if (applied === undefined) continue;
+      if (applied === undefined) {
+        off.push(part.id);
+        continue;
+      }
       const message = messageFor(applied, resolvedGenre);
       rules.push(message === applied.message ? applied : { ...applied, message });
     }
