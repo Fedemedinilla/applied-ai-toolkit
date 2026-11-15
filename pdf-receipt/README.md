@@ -76,7 +76,7 @@ const bytes = await buildReceiptPdf(
 
 ### The document
 
-**The logo travels as bytes.** A serverless function has no `public/` folder to read a file from, so the caller passes PNG or JPEG bytes, typically a base64 constant in the bundle. The format is detected from the file signature, not from a name or a type the caller could get wrong. A logo that is not an image, or a PNG that fails to decode, prints the shop name instead with a `logo_unreadable` warning, because a broken brand asset must not take an order's document down.
+**The logo travels as bytes.** A serverless function has no `public/` folder to read a file from, so the caller passes PNG or JPEG bytes, typically a base64 constant in the bundle. The format is detected from the file signature, not from a name or a type the caller could get wrong. A logo that is not an image, a PNG that fails to decode, or a JPEG whose header gives a width or height of 0 is not drawn. The shop name is printed instead with a `logo_unreadable` warning, because a broken brand asset must not take an order's document down.
 
 **Dates come from the data, not the clock.** `issuedOn` and `deliveryOn` are calendar dates (`YYYY-MM-DD`) formatted in UTC from their parts. The source formatted timestamps with the server's UTC day. An order confirmed at 22:00 local time was then dated the next day. pdf-lib also stamps the creation and modification dates with the clock. Here they are set from `issuedOn`, so a test builds the same order twice, a second apart, and gets the same bytes. A stored PDF can then be rebuilt and checked against its data.
 

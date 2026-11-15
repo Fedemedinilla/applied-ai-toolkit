@@ -130,13 +130,17 @@ async function embedLogo(doc: PDFDocument, logo: Uint8Array | ArrayBuffer, warn:
     warn({ code: 'logo_unreadable', reason: 'unknown_format' });
     return null;
   }
+  let image: PDFImage | null = null;
   try {
-    return format === 'png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    image = format === 'png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
   } catch {
     // A broken logo must not take the document down with it: the shop name is printed instead.
-    warn({ code: 'logo_unreadable', reason: 'embed_failed' });
-    return null;
   }
+  // pdf-lib takes a JPEG's size from its header unchecked; a 0 there would scale the logo to NaN.
+  const usable = (n: number): boolean => Number.isFinite(n) && n > 0;
+  if (image && usable(image.width) && usable(image.height)) return image;
+  warn({ code: 'logo_unreadable', reason: 'embed_failed' });
+  return null;
 }
 
 /**

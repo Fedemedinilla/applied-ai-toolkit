@@ -7,6 +7,7 @@ import { PDFDocument, PDFPage } from 'pdf-lib';
 import { buildReceipt, buildReceiptPdf, LABELS_EN, MAX_CENTS, type ReceiptData, type ReceiptOptions, type ReceiptWarning } from '../src/index.ts';
 import { columns, LAYOUT } from '../src/receipt.ts';
 import { items, order } from './helpers/fixtures.ts';
+import { jpegHeaderOnly } from './helpers/jpeg.ts';
 import { solidPng } from './helpers/png.ts';
 import { amounts, pageCount, record, texts, type Drawn } from './helpers/record.ts';
 
@@ -232,6 +233,14 @@ describe('logo', () => {
       const drawn = await drawnOf(order(), { logo, onWarning: (w) => warnings.push(w) });
       expect(warnings).toEqual([{ code: 'logo_unreadable', reason }]);
       expect(drawn.filter((d) => d.text === 'Vivero Ejemplo').map((d) => d.size)).toContain(20);
+    }
+  });
+
+  it('falls back to the shop name for a JPEG whose header gives no size', async () => {
+    for (const logo of [jpegHeaderOnly(0, 0), jpegHeaderOnly(10, 0), jpegHeaderOnly(0, 10)]) {
+      const result = await buildReceipt(order({ items: items(60) }), { logo });
+      expect(result.warnings).toEqual([{ code: 'logo_unreadable', reason: 'embed_failed' }]);
+      expect(result.pageCount).toBeGreaterThan(1);
     }
   });
 });
