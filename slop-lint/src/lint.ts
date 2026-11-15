@@ -14,6 +14,9 @@ interface Hit {
   start: number;
   end: number;
   detail?: string;
+  /** A structural hit's own wording, which replaces the rule's message and suggestion. */
+  message?: string;
+  suggestion?: string;
 }
 
 /** Whether the rule runs on a text of this language and genre. A rule the genre's profile turns off does not. */
@@ -221,6 +224,8 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
     for (const s of runStructural(rule.id, ctx)) {
       const hit: Hit = { rule, order: patternRules.length + i, start: s.start, end: s.end };
       if (s.detail !== undefined) hit.detail = s.detail;
+      if (s.message !== undefined) hit.message = s.message;
+      if (s.suggestion !== undefined) hit.suggestion = s.suggestion;
       reported.push(hit);
     }
   });
@@ -239,8 +244,8 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
         line,
         column,
         match: source.slice(h.start, h.end),
-        message: messageFor(h.rule, genre),
-        suggestion: h.rule.suggestion,
+        message: h.message ?? messageFor(h.rule, genre),
+        suggestion: h.suggestion ?? h.rule.suggestion,
       };
       if (h.detail !== undefined) f.detail = h.detail;
       return f;
