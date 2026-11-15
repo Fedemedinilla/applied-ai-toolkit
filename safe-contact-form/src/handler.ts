@@ -107,7 +107,7 @@ export type ContactHandler = (request: Request, context?: RequestContext) => Pro
  */
 export const EMAIL = /^[^@\s,;<>"'()\\]+@(?:[^@\s,;<>"'()\\.]+\.)+[^@\s,;<>"'()\\.]+$/;
 
-type ErrorCode = 'origin' | 'invalid' | 'limited' | 'not_configured' | 'send_failed' | 'too_large' | 'media_type' | 'method';
+type ErrorCode = 'origin' | 'invalid' | 'limited' | 'not_configured' | 'send_failed' | 'too_large' | 'media_type';
 
 class BodyTooLarge extends Error {}
 
@@ -200,7 +200,6 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
     send_failed: 'unavailable',
     too_large: 'tooLarge',
     media_type: 'invalid',
-    method: 'invalid',
   };
 
   return async (request, context = {}) => {
