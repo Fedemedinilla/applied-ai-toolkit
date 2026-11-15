@@ -9,7 +9,7 @@ import { RULES } from './rules.ts';
 import { DOCUMENT_SCOPE_IDS } from './structural.ts';
 import { lineColumn, lineStarts } from './text.ts';
 import { DIRECTIVE_RULES, type DirectiveRule } from './suppress.ts';
-import type { Finding, Level, LintResult, Rule, Severity } from './types.ts';
+import type { Finding, Genre, Level, LintResult, Rule, Severity } from './types.ts';
 
 export const SARIF_SCHEMA = 'https://json.schemastore.org/sarif-2.1.0.json';
 export const INFORMATION_URI = 'https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/slop-lint';
@@ -54,6 +54,8 @@ export interface SarifLog {
       tool: { driver: { name: 'slop-lint'; informationUri: string; rules: SarifRule[] } };
       columnKind: 'unicodeCodePoints';
       results: SarifResult[];
+      /** Present only when an input was linted as a genre other than 'cover-letter': that genre per uri. */
+      properties?: { genres: Record<string, Genre> };
     },
   ];
 }
@@ -236,9 +238,17 @@ export function toSarif(all: readonly SarifInput[]): SarifLog {
       });
     }
   }
+  const genres = Object.fromEntries(inputs.flatMap(({ uri, result }) => (result.genre === undefined ? [] : [[uri, result.genre]])));
   return {
     $schema: SARIF_SCHEMA,
     version: '2.1.0',
-    runs: [{ tool: { driver: { name: 'slop-lint', informationUri: INFORMATION_URI, rules: descriptors } }, columnKind: 'unicodeCodePoints', results }],
+    runs: [
+      {
+        tool: { driver: { name: 'slop-lint', informationUri: INFORMATION_URI, rules: descriptors } },
+        columnKind: 'unicodeCodePoints',
+        results,
+        ...(Object.keys(genres).length === 0 ? {} : { properties: { genres } }),
+      },
+    ],
   };
 }

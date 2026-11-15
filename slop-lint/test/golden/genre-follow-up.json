@@ -1,0 +1,22 @@
+{
+  "lang": "en",
+  "findings": [],
+  "passesTier1": true,
+  "disqualified": false,
+  "score": {
+    "points": 15,
+    "max": 15
+  },
+  "stats": {
+    "words": 64,
+    "sentences": 8,
+    "proseSentences": 4,
+    "meanSentenceLength": 12.5,
+    "sentenceLengthCV": 0.24331050121192876,
+    "emDashes": 0,
+    "anchors": 9,
+    "tier2Used": 0,
+    "tier2Budget": 2
+  },
+  "genre": "follow-up"
+}

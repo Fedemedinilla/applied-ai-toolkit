@@ -1,0 +1,35 @@
+{
+  "lang": "es",
+  "findings": [
+    {
+      "ruleId": "EST-09",
+      "level": 2,
+      "severity": "low",
+      "start": 200,
+      "end": 212,
+      "line": 5,
+      "column": 113,
+      "match": "Tras revisar",
+      "message": "Narrates the writing process. The fact does not need an escort.",
+      "suggestion": "Delete the clause and keep the fact."
+    }
+  ],
+  "passesTier1": true,
+  "disqualified": false,
+  "score": {
+    "points": 14.5,
+    "max": 15
+  },
+  "stats": {
+    "words": 86,
+    "sentences": 9,
+    "proseSentences": 5,
+    "meanSentenceLength": 13.8,
+    "sentenceLengthCV": 0.4429190373894529,
+    "emDashes": 0,
+    "anchors": 6,
+    "tier2Used": 0,
+    "tier2Budget": 2
+  },
+  "genre": "email"
+}

@@ -1,0 +1,23 @@
+{
+  "lang": "es",
+  "findings": [],
+  "passesTier1": true,
+  "disqualified": false,
+  "score": {
+    "points": 15,
+    "max": 15
+  },
+  "stats": {
+    "words": 28,
+    "sentences": 4,
+    "proseSentences": 0,
+    "meanSentenceLength": null,
+    "sentenceLengthCV": null,
+    "emDashes": 0,
+    "anchors": 0,
+    "tier2Used": 0,
+    "tier2Budget": 2
+  },
+  "genre": "whatsapp",
+  "variety": "rioplatense"
+}
