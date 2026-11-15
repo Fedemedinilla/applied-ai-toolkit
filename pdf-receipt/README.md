@@ -102,7 +102,7 @@ const bytes = await buildReceiptPdf(
 | `test/pagination.test.ts` | The row count at which the totals move to page 2 alone, with no table head there; the row count at which a row moves under a repeated head; room reserved only for drawn extras; equal rows on full continuation pages; wrapped names as taller rows; notes over several pages in order; every text above the footer zone and inside the margins, the footer and page count on every page; the tallest allowed rows |
 | `test/browser.dom.test.ts` | A build under jsdom, wrapped in a `Blob` |
 
-89 tests, all offline. The assertions on what reached the paper intercept `PDFPage.prototype.drawText`, the way the source's regression script did ([`test/helpers/record.ts`](test/helpers/record.ts)). Each call records the text, position, size, font and measured width, and pages are numbered in the order they first receive text. The expected strings are written out in full.
+108 tests, all offline. The assertions on what reached the paper intercept `PDFPage.prototype.drawText`, the way the source's regression script did ([`test/helpers/record.ts`](test/helpers/record.ts)). Each call records the text, position, size, font and measured width, and pages are numbered in the order they first receive text. The expected strings are written out in full.
 
 The timings below are the median of five runs on Node 24 in this environment, after a warm-up. A 3-line order builds in about 5 ms (1,915 bytes). A 500-line order takes about 142 ms (20 pages, 70,481 bytes).
 
