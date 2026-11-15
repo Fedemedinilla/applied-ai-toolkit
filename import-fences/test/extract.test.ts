@@ -133,6 +133,26 @@ describe('reexports', () => {
     expect(leaks("import * as sdk from 'sdk';\nclass X extends sdk.C {}\nexport { X };")).toEqual(['X']);
   });
 
+  it('follows a value wrapped in an object or array literal', () => {
+    expect(leaks("const { Client } = require('sdk');\nmodule.exports = { Client };")).toEqual(['module.exports = { Client };']);
+    expect(leaks("import { Client } from 'sdk';\nexport default { Client };")).toEqual(['export default { Client };']);
+    expect(leaks("import { Client } from 'sdk';\nexport const api = { Client };")).toEqual(['api = { Client }']);
+    expect(leaks("import * as sdk from 'sdk';\nexport const api = { make: sdk.Client, n: 1 };")).toEqual(['api = { make: sdk.Client, n: 1 }']);
+    expect(leaks("import * as sdk from 'sdk';\nexport const api = { ...sdk };")).toEqual(['api = { ...sdk }']);
+    expect(leaks("import { Client } from 'sdk';\nexport const all = [Client];")).toEqual(['all = [Client]']);
+    expect(leaks("import { Client } from 'sdk';\nconst api = { nested: { Client } };\nexport { api };")).toEqual(['api']);
+    expect(leaks("module.exports = { Client: require('sdk').Client };")).toEqual(["module.exports = { Client: require('sdk').Client };"]);
+    expect(leaks("import { Client } from 'sdk';\nexport const api = { n: 1, f() { return 2; } };")).toEqual([]);
+  });
+
+  it('follows export import = require() and export import of a member', () => {
+    expect(leaks("export import sdk = require('sdk');")).toEqual(["export import sdk = require('sdk');"]);
+    expect(leaks("import sdk = require('sdk');\nexport import C = sdk.Client;")).toEqual(['export import C = sdk.Client;']);
+    expect(leaks("import * as sdk from 'sdk';\nimport C = sdk.Client;\nexport { C };")).toEqual(['C']);
+    expect(leaks("export import type T = require('sdk');")).toEqual([]);
+    expect(leaks("export import other = require('other');")).toEqual([]);
+  });
+
   it('lets types and unrelated modules leave', () => {
     expect(leaks("export type { Message } from 'sdk';")).toEqual([]);
     expect(leaks("import type Client from 'sdk';\nexport type C = Client;")).toEqual([]);

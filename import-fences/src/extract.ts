@@ -218,9 +218,10 @@ function isCommonJsExport(node: ts.Expression): boolean {
  * Where the file hands values of a target module to its own importers. Re-export statements:
  * `export * from`, `export * as ns from`, `export { x } from`. A value bound from the target
  * (by `import`, `import x = require()` or `const x = require()` at the top level), or a top-level
- * alias of one (`const k = x`, `class K extends x {}`, followed to any depth), that leaves through
- * `export { }`, `export default`, `export =`, an exported `const`, an exported class that extends
- * it, or `module.exports` / `exports.y`. Member access (`x.Client`) counts too. Types may leave:
+ * alias of one (`const k = x`, `import k = x.Client`, `class K extends x {}`, followed to any depth),
+ * that leaves through `export { }`, `export default`, `export =`, `export import`, an exported
+ * `const`, an exported class that extends it, or `module.exports` / `exports.y`. Member access
+ * (`x.Client`) and an object or array literal that holds the value (`{ Client }`) count too. Types may leave:
  * they create nothing at runtime. A function that returns the value is not followed.
  */
 export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => boolean): Located[] {
@@ -243,11 +244,29 @@ export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => 
     }
   }
   const leaks = (expression: ts.Expression | undefined): boolean => {
+    if (expression !== undefined && ts.isParenthesizedExpression(expression)) return leaks(expression.expression);
+    // `{ Client }`, `{ make: sdk.Client }`, `{ ...sdk }`, `[Client]`: the literal carries the value out.
+    if (expression !== undefined && ts.isObjectLiteralExpression(expression)) {
+      return expression.properties.some((p) =>
+        ts.isShorthandPropertyAssignment(p) ? bound.has(p.name.text) : ts.isPropertyAssignment(p) ? leaks(p.initializer) : ts.isSpreadAssignment(p) && leaks(p.expression),
+      );
+    }
+    if (expression !== undefined && ts.isArrayLiteralExpression(expression)) {
+      return expression.elements.some((e) => leaks(ts.isSpreadElement(e) ? e.expression : e));
+    }
     const required = requiredSpecifier(expression);
     if (required !== null) return isTarget(required);
     const root = rootIdentifier(expression);
     return root !== undefined && bound.has(root);
   };
+  /** `import C = sdk.Client`: the leftmost name of the entity, `sdk`. */
+  const entityRoot = (name: ts.EntityName): string => (ts.isIdentifier(name) ? name.text : entityRoot(name.left));
+  /** `import x = require('target')`, or `import C = sdk.Client` with `sdk` bound. */
+  const importEqualsLeaks = (node: ts.ImportEqualsDeclaration): boolean =>
+    !node.isTypeOnly &&
+    (ts.isExternalModuleReference(node.moduleReference)
+      ? isTarget(literalText(node.moduleReference.expression) ?? '')
+      : bound.has(entityRoot(node.moduleReference)));
   // Local aliases, until nothing new is bound: `const k = Client`, `class K extends Client {}`.
   for (let grew = true; grew; ) {
     grew = false;
@@ -265,6 +284,8 @@ export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => 
           else for (const element of d.name.elements) if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) bind(element.name.text);
         }
       } else if (ts.isClassDeclaration(node) && node.name !== undefined && leaks(superclass(node))) {
+        bind(node.name.text);
+      } else if (ts.isImportEqualsDeclaration(node) && importEqualsLeaks(node)) {
         bind(node.name.text);
       }
     }
@@ -285,6 +306,8 @@ export function reexports(file: ts.SourceFile, isTarget: (specifier: string) => 
     } else if (ts.isVariableStatement(node) && isExported(node)) {
       for (const declaration of node.declarationList.declarations) if (leaks(declaration.initializer)) found.push(at(declaration));
     } else if (ts.isClassDeclaration(node) && isExported(node) && leaks(superclass(node))) {
+      found.push(at(node));
+    } else if (ts.isImportEqualsDeclaration(node) && isExported(node) && importEqualsLeaks(node)) {
       found.push(at(node));
     } else if (
       ts.isExpressionStatement(node) &&
