@@ -45,10 +45,13 @@ final class SourceRulesTest extends TestCase
     }
 
     /**
-     * Calls that write to disk, the options table or the database. `$wpdb->` has its own branch
-     * because a word boundary never comes before `$`: `\b\$wpdb` would not match `  $wpdb->query(`.
+     * Calls that write to disk, the options table or the database: file functions, options and
+     * transients (site and network ones too), metadata, the wp_insert/update/delete_* APIs, uploads
+     * and SplFileObject. A method call on any object but `$this` with a write name counts too, which
+     * covers `$wpdb` under another name and WP_Filesystem. That branch starts at `$` because a word
+     * boundary never comes before `$`: `\b\$wpdb` would not match `  $wpdb->query(`.
      */
-    private const WRITES = '/(?:\b(file_put_contents|fwrite|fputs|fopen|unlink|rename|copy|mkdir|rmdir|chmod|touch|insert_with_markers|save_mod_rewrite_rules|update_option|add_option|delete_option|set_transient|delete_transient|set_site_transient|delete_site_transient)|(\$wpdb\s*->\s*(?:query|insert|update|delete|replace)))\s*\(/';
+    private const WRITES = '/(?:\b(file_put_contents|fwrite|fputs|fopen|unlink|rename|copy|mkdir|rmdir|chmod|chown|chgrp|touch|symlink|link|tempnam|move_uploaded_file|insert_with_markers|save_mod_rewrite_rules|update_option|add_option|delete_option|set_transient|delete_transient|set_site_transient|delete_site_transient|(?:add|update|delete)_(?:site_option|network_option|user_option|metadata|\w+_meta)|wp_(?:insert|update|delete)_\w+|wp_delete_file|wp_mkdir_p|wp_handle_upload|wp_handle_sideload)|(\$(?!this\b)\w+\s*->\s*(?:query|insert|update|delete|replace|put_contents|move|copy|mkdir|rmdir|chmod|touch))|(new\s+\\\\?SplFileObject))\s*\(/';
 
     /** @return list<string> The write calls found in $text, by name. */
     private static function writes(string $text): array
@@ -56,7 +59,8 @@ final class SourceRulesTest extends TestCase
         preg_match_all(self::WRITES, $text, $m, PREG_SET_ORDER);
         $found = [];
         foreach ($m as $match) {
-            $found[] = ($match[1] ?? '') !== '' ? $match[1] : (string) preg_replace('/\s+/', '', $match[2] ?? '');
+            $name = ($match[1] ?? '') !== '' ? $match[1] : (($match[2] ?? '') !== '' ? $match[2] : ($match[3] ?? ''));
+            $found[] = (string) preg_replace('/\s+|\\\\/', '', $name);
         }
         return array_values(array_unique($found));
     }
@@ -68,7 +72,24 @@ final class SourceRulesTest extends TestCase
         self::assertSame(['file_put_contents'], self::writes('\\file_put_contents($f, $x);'));
         self::assertSame(['update_option'], self::writes('if (1) { update_option(1); }'));
         self::assertSame(['set_transient'], self::writes('set_transient($k, $v, 60);'));
-        self::assertSame([], self::writes('$wpdb->get_results("SELECT 1"); get_option("x"); $this->update_options;'));
+        $samples = [
+            'update_site_option("x", 1);' => 'update_site_option',
+            'update_network_option(null, "x", 1);' => 'update_network_option',
+            'update_user_meta(1, "k", 1);' => 'update_user_meta',
+            'update_post_meta(1, "k", 1);' => 'update_post_meta',
+            'add_metadata("user", 1, "k", 1);' => 'add_metadata',
+            'wp_insert_post([]);' => 'wp_insert_post',
+            'wp_delete_file($f);' => 'wp_delete_file',
+            'move_uploaded_file($a, $b);' => 'move_uploaded_file',
+            'symlink($a, $b);' => 'symlink',
+            '$wp_filesystem->put_contents($f, $x);' => '$wp_filesystem->put_contents',
+            '$db->query("DELETE");' => '$db->query',
+            'new \\SplFileObject($f, "w");' => 'newSplFileObject',
+        ];
+        foreach ($samples as $line => $name) {
+            self::assertSame([$name], self::writes($line), $line);
+        }
+        self::assertSame([], self::writes('$wpdb->get_results("SELECT 1"); get_option("x"); $this->update_options; $this->delete($x); get_user_meta(1, "k");'));
     }
 
     public function testNothingWritesSilently(): void
