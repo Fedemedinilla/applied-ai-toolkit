@@ -270,11 +270,13 @@ export function mountApp(doc: Document, deps: Deps): App {
       importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be replayed: ${tooLarge(file.size)}.`));
       return;
     }
+    // Cleared before reading, whatever the outcome: the browser fires no change event when the same
+    // file is chosen again, so a failed read could not be retried otherwise.
+    importInput.value = '';
     importResult.replaceChildren(h(doc, 'p', {}, `Replaying ${file.name}...`));
     file.text().then(
       (text) => {
         const v = importRun(text, file.size);
-        importInput.value = '';
         if (!v.ok) {
           importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be replayed: ${v.error}.`));
           return;

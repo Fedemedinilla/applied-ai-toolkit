@@ -221,6 +221,19 @@ describe('run file', () => {
     expect(text('#import-result')).toBe('bad.json could not be replayed: rolling 5 dice costs 5 chips; there are 0.');
   });
 
+  it('a file that cannot be read is reported and the input is cleared, so the same file can be chosen again', async () => {
+    mount();
+    const input = $<HTMLInputElement>('#import-file');
+    const cleared: string[] = [];
+    Object.defineProperty(input, 'value', { configurable: true, get: () => '', set: (v: string) => cleared.push(v) });
+    const file = new File(['{}'], 'c.json', { type: 'application/json' });
+    vi.spyOn(file, 'text').mockRejectedValue(new DOMException('gone', 'NotReadableError'));
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(text('#import-result')).toBe('c.json could not be read.'));
+    expect(cleared).toEqual(['']);
+  });
+
   it('refuses a file over 64 KB without reading it', () => {
     mount();
     const input = $<HTMLInputElement>('#import-file');
