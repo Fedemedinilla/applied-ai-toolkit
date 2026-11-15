@@ -125,6 +125,19 @@ describe('promote', () => {
     expect(await promote({ dir, entity: 'set', ids: ['driftwood'], replace: true })).toEqual({ moved: ['driftwood'], replaced: ['driftwood'] });
   });
 
+  it('applies the release order rule against the rest of the catalogue when the replaced set does not validate', async () => {
+    await writeJson(entityPath(dir, 'set', 'reefline'), { id: 'reefline', name: 'Reefline', code: 'RFL', releaseOrder: 5, size: 10, handwritten: true });
+    const tidepool = { id: 'tidepool', name: 'Tidepool', code: 'TDP', releaseOrder: 3, size: 10, handwritten: false };
+    // A generated set edited by hand into an invalid state. The candidate that replaces it comes
+    // before reefline (release order 5), so it breaks "next-release" whatever the old file holds.
+    await writeJson(entityPath(dir, 'set', 'tidepool'), { ...tidepool, note: 'edited by hand' });
+    await writeJson(candidatePath(dir, 'set', 'tidepool'), tidepool);
+    expect(await refusal(promote({ dir, entity: 'set', ids: ['tidepool'], replace: true }))).toEqual([
+      '_candidates/sets/tidepool.json: breaks the rule for generated content "next-release": release order 3 is not after the last set (5)',
+    ]);
+    expect(await readJson(entityPath(dir, 'set', 'tidepool'))).toMatchObject({ note: 'edited by hand' });
+  });
+
   it('says when there is nothing to promote', async () => {
     await expect(promote({ dir, entity: 'deck', ids: 'all' })).rejects.toMatchObject({ code: 'bad_request' });
   });
