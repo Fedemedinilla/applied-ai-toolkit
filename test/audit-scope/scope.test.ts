@@ -155,3 +155,46 @@ describe('gitScope and the CLI on a temporary repository', () => {
     expect(unknown.stderr).toContain('--nope');
   });
 });
+
+describe('gitScope with renames', () => {
+  let repo = '';
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    });
+
+  beforeAll(() => {
+    repo = mkdtempSync(join(tmpdir(), 'audit-scope-rename-'));
+    git('init', '-q', '-b', 'main');
+    for (const [path, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      writeFileSync(join(repo, path), content);
+    }
+    git('add', '-A');
+    git('commit', '-q', '-m', 'base');
+    git('branch', 'base');
+    git('switch', '-q', '-c', 'work');
+  });
+  afterAll(() => rmSync(repo, { recursive: true, force: true }));
+
+  it('counts a committed rename of an imported file as a change to the old path, so its importers become dependents', () => {
+    git('mv', 'gateway/src/index.ts', 'gateway/src/main.ts');
+    git('commit', '-q', '-m', 'rename entry');
+    const scope = gitScope({ cwd: repo, base: 'base' });
+    expect(scope.files).toEqual(['gateway/src/index.ts', 'gateway/src/main.ts']);
+    expect(scope.dependents.map((d) => d.unit)).toEqual(['content-forge', 'apps-caja', 'apps-writer']);
+    git('reset', '-q', '--hard', 'base');
+  });
+
+  it('marks both units of a rename across units as changed, committed or not', () => {
+    git('mv', 'pdf-receipt/src/index.ts', 'slop-lint/src/moved.ts');
+    git('commit', '-q', '-m', 'move across units');
+    expect(gitScope({ cwd: repo, base: 'base' }).units.filter((u) => u.reason === 'changed').map((u) => u.id).sort()).toEqual(['pdf-receipt', 'slop-lint']);
+    git('reset', '-q', '--hard', 'base');
+    git('mv', 'README.md', 'R.md');
+    expect(gitScope({ cwd: repo, base: 'base' }).files).toEqual(['R.md', 'README.md']);
+    git('reset', '-q', '--hard', 'base');
+  });
+});

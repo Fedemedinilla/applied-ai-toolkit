@@ -16,7 +16,7 @@ Exit code 0 on success, 2 when an option is wrong or git cannot answer, for exam
 
 ## What counts as changed
 
-The files of `git diff --name-only <base>...HEAD`, which are the changes since the merge base and not the base's own later commits, plus uncommitted changes to tracked files and untracked files that git does not ignore. Uncommitted work sets `dirty: true` in the JSON.
+The files of `git diff --name-only --no-renames <base>...HEAD`, which are the changes since the merge base and not the base's own later commits, plus uncommitted changes to tracked files and untracked files that git does not ignore. Uncommitted work sets `dirty: true` in the JSON. Rename detection is off (`--no-renames`), so a renamed file counts as a deletion of the old path plus an addition of the new one. The unit of the old path stays changed, and the units that import the old path become dependents.
 
 ## Units
 

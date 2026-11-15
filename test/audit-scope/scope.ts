@@ -179,8 +179,10 @@ export function gitScope({ cwd, base }: { readonly cwd: string; readonly base: s
   const root = git(cwd, ['rev-parse', '--show-toplevel']).trim();
   const head = git(root, ['rev-parse', 'HEAD']).trim();
   const mergeBase = git(root, ['merge-base', base, 'HEAD']).trim();
-  const committed = list(git(root, ['diff', '-z', '--name-only', `${base}...HEAD`]));
-  const uncommitted = [...list(git(root, ['diff', '-z', '--name-only', 'HEAD'])), ...list(git(root, ['ls-files', '-z', '--others', '--exclude-standard']))];
+  // --no-renames: a rename counts as a deletion plus an addition, so the old path, its unit and the
+  // units that import it stay in the scope.
+  const committed = list(git(root, ['diff', '-z', '--name-only', '--no-renames', `${base}...HEAD`]));
+  const uncommitted = [...list(git(root, ['diff', '-z', '--name-only', '--no-renames', 'HEAD'])), ...list(git(root, ['ls-files', '-z', '--others', '--exclude-standard']))];
   return buildScope({
     root,
     base,
