@@ -51,7 +51,7 @@ Node 24 runs the TypeScript sources directly (type stripping). There is no build
 1. Validates the request: no assistant prefill, at most 4 cache breakpoints, ids are UUIDs, attachments carry a token bound.
 2. Reads the task's model and effort, the caps and the usage totals, and validates each with zod. The model has to be in the registry, with an effort level and a `max_tokens` its entry allows.
 3. Checks the caps. A reached cap throws `CapError` and nothing else happens.
-4. Writes a reservation row to the ledger at the call's worst case. If that insert fails twice, the API is not called.
+4. Writes a reservation row to the ledger at the call's worst case. If that insert fails twice, the API is not called and `ReservationError` names the id. When the first attempt reached the store and only its response was lost, that row stays in the ledger, open at its worst case.
 5. Checks the caps again, with everything else in flight and without its own reservation. A reached cap closes the reservation with a zero-usage row and throws `CapError`. A store with an atomic `reserve` does steps 4 and 5 in one statement.
 6. Calls `client.beta.messages`, with server-side fallbacks when the model's entry has them. Only the gateway builds the request body.
 7. Writes a second row that closes the reservation: the measured response, an incomplete row for a cut call, or a zero-usage row for a request that was not billed.

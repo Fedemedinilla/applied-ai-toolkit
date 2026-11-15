@@ -828,6 +828,18 @@ describe('the ledger', () => {
     expect(harness.failures).toEqual([{ event: 'reservation_failed', data: { usageId: harness.recordAttempts[0]?.id, task: 'triage', error: 'connection_failure' } }]);
   });
 
+  it('if the first reservation insert lands but its response is lost and the retry fails, the error says the row may be open', async () => {
+    const { gateway, harness, requests } = setup([]);
+    harness.recordBehavior = ['store_then_fail', 'fail'];
+    const error = await failure(gateway.structured(Triage, REQUEST));
+    const [reservation] = harness.ledger;
+    expect(error).toBeInstanceOf(ReservationError);
+    expect(error).toMatchObject({ code: 'reservation_failed', usageId: reservation?.id });
+    expect(error.message).toBe(`Could not confirm reservation ${reservation?.id}: Claude was not called, and the row may be in the ledger, open at its worst case`);
+    expect(requests).toHaveLength(0);
+    expect(harness.openReservations).toEqual([reservation]);
+  });
+
   it('when closing rows always fail, each call leaves its worst-case reservation and the caps end up cutting', async () => {
     // Like a deploy that writes a column the database does not have yet, only on closing rows.
     const { gateway, harness, requests } = setup(Array.from({ length: 20 }, () => () => jsonResponse(triageResponse())));
