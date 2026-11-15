@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,21 @@ describe('blind.ts', () => {
     expect(r.status).toBe(2);
     expect(r.stderr).toContain('k.json already exists');
     expect(existsSync(pieces)).toBe(false);
+  });
+});
+
+describe('blind.ts --seed', () => {
+  it('refuses a seed that is not an integer from 0 to 2^32 - 1, and stores the one it used', () => {
+    const rows = file('seed-rows.jsonl', jsonl([row('V0', 1), row('V4', 1)]));
+    for (const bad of ['abc', '', '1.5', '-1', '4294967296']) {
+      const r = node(script('blind'), rows, join(dir, `sp-${bad}.jsonl`), join(dir, `sk-${bad}.json`), '--seed', bad);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain('--seed must be an integer from 0 to 4294967295');
+      expect(existsSync(join(dir, `sp-${bad}.jsonl`))).toBe(false);
+    }
+    const k = join(dir, 'sk-ok.json');
+    expect(node(script('blind'), rows, join(dir, 'sp-ok.jsonl'), k, '--seed', '4294967295').status).toBe(0);
+    expect(JSON.parse(readFileSync(k, 'utf8')).seed).toBe(4294967295);
   });
 });
 
