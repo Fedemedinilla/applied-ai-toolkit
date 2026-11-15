@@ -94,8 +94,18 @@ export const CROSS: readonly Area[] = [
   {
     id: 'dependencies',
     kind: 'cross',
-    paths: 'package.json, package-lock.json, docs-site/package.json, wp-hardening/composer.json',
-    globs: ['package.json', 'package-lock.json', '.npmrc', 'docs-site/package.json', 'docs-site/package-lock.json', 'wp-hardening/composer.json', 'wp-hardening/composer.lock'],
+    paths: 'package.json, package-lock.json, docs-site/package.json, wp-hardening/composer.json, .github/dependabot.yml and its test',
+    globs: [
+      'package.json',
+      'package-lock.json',
+      '.npmrc',
+      'docs-site/package.json',
+      'docs-site/package-lock.json',
+      'wp-hardening/composer.json',
+      'wp-hardening/composer.lock',
+      '.github/dependabot.yml',
+      'test/maintenance/dependabot.test.ts',
+    ],
     context: 'npm audit (root and docs-site, with and without --omit=dev), packages declared but unused, used but undeclared (runtime imports resolved only through hoisting), version consistency across workspaces, very fresh pins.',
   },
 ];

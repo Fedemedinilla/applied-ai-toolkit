@@ -1,0 +1,89 @@
+# Dependabot version updates: one entry per lockfile, plus the actions pinned in the workflows and
+# in the three composite actions.
+#
+# - Weekly, on Monday mornings, a few hours after the weekly Quality run (quality.yml).
+# - Minor and patch updates of an entry go into one grouped PR per week. Majors match no group, so
+#   each major gets its own PR and its own review.
+# - npm and Composer keep exact pins exact: `increase` raises the pinned version and never writes a
+#   range (.npmrc sets save-exact, and composer.json pins its dev tools).
+# - A 7-day cooldown skips versions published in the last week, as docs-site/.npmrc does with
+#   min-release-age=7, so a fresh bad release is not proposed the day it appears.
+# - site-check has no entry: its pyproject.toml declares no dependencies (stdlib only).
+# - No labels are set: the repository has none for dependencies.
+#
+# test/maintenance/dependabot.test.ts checks that every tracked lockfile has an entry and that each
+# entry keeps these settings. MAINTENANCE.md says how to review the PRs.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    versioning-strategy: "increase"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      npm-root-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/docs-site"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    versioning-strategy: "increase"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "deps(docs-site)"
+    groups:
+      npm-docs-site-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "composer"
+    directory: "/wp-hardening"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    versioning-strategy: "increase"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "deps(wp-hardening)"
+    groups:
+      composer-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    # "/" reads .github/workflows/; the three composite actions pin actions/setup-node too.
+    directories: ["/", "/csp-build-guard", "/import-fences", "/slop-lint"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
