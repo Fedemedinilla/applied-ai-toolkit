@@ -177,6 +177,17 @@ describe('huge inputs', () => {
     expect(out.length).toBeGreaterThan(0);
   });
 
+  // A long run of trailing-punctuation characters inside a bare URL, then a letter: a regex
+  // anchored at the end restarts the run at every position.
+  const runs = ['https://', 'shop.example/'].flatMap((head) => ['.', '!', ',;:?'].map((p) => [head, p] as const));
+  it.each(runs)('200 kB of %j then a run of %j and a letter renders in linear time', (head, p) => {
+    const s = head + p.repeat(Math.ceil(200_000 / p.length)) + 'a';
+    const t0 = performance.now();
+    const out = renderMarkdown(s, { ...opts, maxLength: Infinity });
+    expect(performance.now() - t0).toBeLessThan(1500);
+    expect(out).toContain('<a ');
+  });
+
   it('the default limit cuts a 1 MB reply to 20,000 characters', () => {
     const out = md('a'.repeat(1_000_000));
     expect(out).toBe(`<p>${'a'.repeat(20_000)}…</p>`);

@@ -161,6 +161,8 @@ const LINK = /\[([^[\]\n]+)\]\(([^()[\]\s]+)\)/g;
 // A bare URL stops at whitespace, a parenthesis, an escaped quote or angle bracket, or a
 // placeholder, so the quotes around "https://site.example" and a code span after it stay outside.
 const BARE_URL = /https?:\/\/(?:(?!&(?:quot|#39|lt|gt);)[^\s()\u0000])+/g;
+/** Punctuation that ends a sentence after a bare URL and is left outside the link. */
+const TRAILING = '.,;:!?';
 const RESTORE = new RegExp(`${Z}(\\d+)${Z}`, 'g');
 
 /** Inline formatting over text that is already escaped and cleaned. */
@@ -168,8 +170,11 @@ function inlineEscaped(s: string, r: Resolved): string {
   const tokens: string[] = [];
   const stash = (html: string) => `${Z}${tokens.push(html) - 1}${Z}`;
   const bare = (m: string) => {
-    const trail = /[.,;:!?]+$/.exec(m)?.[0] ?? '';
-    const core = m.slice(0, m.length - trail.length);
+    // A backward scan: the regex /[.,;:!?]+$/ restarts at every character of a long run.
+    let end = m.length;
+    while (end > 0 && TRAILING.includes(m[end - 1] ?? '')) end--;
+    const trail = m.slice(end);
+    const core = m.slice(0, end);
     const a = anchor(core, core, r);
     return a ? stash(a) + trail : m;
   };
