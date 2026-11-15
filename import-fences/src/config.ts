@@ -46,8 +46,14 @@ const glob = text.superRefine((value, ctx) => {
   }
 });
 const globs = z.array(glob);
-/** Module specifiers, not paths: `node:*`, `@vendor/sdk`. */
-const specifierList = z.array(text);
+/**
+ * A module specifier, not a path: `@vendor/sdk` (subpaths match) or a prefix ending in `*`, such as
+ * `node:*`. Any other `*` would be compared literally and match nothing, so it stops the run.
+ */
+const specifier = text.refine((value) => !value.slice(0, -1).includes('*'), {
+  message: 'only a trailing * is supported, as in "node:*"; a * anywhere else is not a wildcard',
+});
+const specifierList = z.array(specifier);
 const why = z.string().min(1).optional();
 
 const Group = z.strictObject({
@@ -83,7 +89,7 @@ const ForbiddenImport = z.strictObject({
 const SingleImporter = z.strictObject({
   rule: z.literal('single-importer'),
   group: text,
-  package: text,
+  package: specifier,
   /** The only files of the group that may import the package's values. */
   allow: globs,
   /** `allow`: any file may import the package's types. */

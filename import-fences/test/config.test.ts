@@ -27,6 +27,15 @@ describe('parseConfig', () => {
     expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: ['x'], except: ['a.ts'] }] })).toThrow(/except narrows paths/);
   });
 
+  it('rejects a specifier pattern with a * anywhere but at the end, since it would match nothing', () => {
+    for (const pattern of ['node:**', '@vendor/*-internal', '*x*']) {
+      expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: [pattern] }] }), pattern).toThrow(/rules\.0\.specifiers\.0: only a trailing \*/);
+      expect(() => parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', paths: ['a/**'], external: [pattern] }] }), pattern).toThrow(/rules\.0\.external\.0: only a trailing \*/);
+    }
+    expect(() => parseConfig({ ...base, rules: [{ rule: 'single-importer', group: 'src', package: '@vendor/*-sdk', allow: [] }] })).toThrow(/rules\.0\.package: only a trailing \*/);
+    expect(parseConfig({ ...base, rules: [{ rule: 'forbidden-import', group: 'src', specifiers: [...NODE_BUILTINS, '@vendor/*', 'virtual:*'] }] }).rules).toHaveLength(1);
+  });
+
   it('rejects a glob that cannot compile, naming its key', () => {
     const config = { groups: { src: { include: ['src/{a,b.ts'] } }, rules: [{ rule: 'dynamic-import', group: 'src' }] };
     expect(() => parseConfig(config)).toThrow(ConfigError);
