@@ -64,6 +64,22 @@ describe('runAttack, the turn loop', () => {
     expect((await runAttack(handler, attack({ id: 'c', turns: ['x'], checks: { replyMustNotMatch: ['secret'] } }))).outcome).toBe('pass');
   });
 
+  it('fails a replyMustNotMatch check when a turn got no reply because the call failed', async () => {
+    const checks = { replyMustNotMatch: ['secret'] };
+    const thrown: ChatHandler = async () => {
+      throw new Error('529 overloaded');
+    };
+    const down = await runAttack(thrown, attack({ id: 'a', turns: ['x', 'y'], checks }));
+    expect(down).toMatchObject({
+      outcome: 'fail',
+      reasons: ['turn 1: no reply (status 0), so the reply checks were not run', 'turn 2: no reply (status 0), so the reply checks were not run'],
+    });
+    const broken = await runAttack(async () => ({ status: 500, error: 'internal' }), attack({ id: 'b', turns: ['x'], checks }));
+    expect(broken.outcome).toBe('fail');
+    // A refusal before the model is a defence, not a gap: it still passes.
+    expect((await runAttack(async () => ({ status: 400, error: 'history' }), attack({ id: 'c', turns: ['x'], checks }))).outcome).toBe('pass');
+  });
+
   it('records a handler that throws as status 0 and goes on with the run', async () => {
     let n = 0;
     const handler: ChatHandler = async () => {
