@@ -262,6 +262,25 @@ describe('guessGenre', () => {
     expect(guess.signals.length).toBeGreaterThan(0);
   });
 
+  it('does not read a cover letter that says "follow up" as a sure follow-up', () => {
+    const after = `${letter('en-after.txt')}\nAt Brightwell I would follow up on every open ticket within a day.\n`;
+    expect(guessGenre(after)).toMatchObject({ genre: 'cover-letter', confidence: 'high' });
+    const before = `${letter('en-before.txt')}\nI am also used to following up with vendors every week.\n`;
+    expect(guessGenre(before).confidence).toBe('low');
+    // A long text with no subject line that does point back is still only a low guess.
+    const pointsBack = `${letter('en-after.txt')}\nI am following up on my application of 3 March.\n`;
+    expect(guessGenre(pointsBack)).toMatchObject({ genre: 'follow-up', confidence: 'low' });
+  });
+
+  it.each([
+    ['a reference to an earlier message alone', 'As I mentioned in my last note, the file is ready.', 'follow-up', 'low'],
+    ['a short mail with a greeting and a sign-off', 'Hi Dana,\n\nThe file is in the shared folder.\n\nThanks,\nSam', 'email', 'low'],
+    ['a chat with emoji and closing periods', 'Te paso el tablero 📊.\nLo vemos el jueves.', 'whatsapp', 'low'],
+    ['a chat with emoji and open lines', 'Te paso el tablero 📊\nLo vemos el jueves', 'whatsapp', 'high'],
+  ] as const)('gives %s the right genre and confidence', (_name, text, genre, confidence) => {
+    expect(guessGenre(text)).toMatchObject({ genre, confidence });
+  });
+
   it('is not called by lint(): without a genre a mail is read as a cover letter', () => {
     expect('genre' in lint(genreFixture('email-es.txt'), { lang: 'es' })).toBe(false);
   });
