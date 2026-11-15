@@ -1,4 +1,4 @@
-// The audit units of this repository, as data: the 30 units and 4 cross-cutting areas of the full
+// The audit units of this repository, as data: the 31 units and 4 cross-cutting areas of the full
 // audit, plus one area of our own for the repository tooling the full audit leaves out. Each area
 // owns the files its globs match (globs as in import-fences: `**` spans folders, `*` one segment).
 // A file may belong to more than one area: apps/caja/vite.config.ts is in apps-caja and in
@@ -11,7 +11,7 @@
 import { globMatcher } from '../../import-fences/src/index.ts';
 
 export type AreaKind =
-  /** One of the 30 units of the full audit: a folder or an app. */
+  /** One of the 31 units of the full audit: a folder or an app. */
   | 'unit'
   /** One of the 4 cross-cutting areas of the full audit. */
   | 'cross'
@@ -45,6 +45,7 @@ export const UNITS: readonly Area[] = [
   folder('pdf-receipt', 'pdf-lib receipts, WinAnsi sanitizer, pagination, amount box fitting.'),
   folder('deterministic-sim', 'Seeded streams, one rounding per formula, canonical SHA-256 run hash, purity test on the syntax tree, guard hooks.'),
   folder('content-forge', 'LLM candidates validated by zod schemas, range rules, cross-references; per-candidate verdicts; promote never overwrites hand-written files.'),
+  folder('prose-rewriter', 'Rewrites a user text with slop-lint findings and the CV as the only fact source: zod contract, edits over exact quotes, fact diff per edit (nothing added that is not in the text or CV, nothing lost), fixtures fictional with a witness test.'),
   folder('style-refs', 'Data and validator only, no I/O: sources with legal status per jurisdiction, principles, excerpts, fictional examples. Nothing protected in the US may enter; unverified counts as not free.'),
   folder('fake-supabase-auth', 'Fetch fake of Supabase Auth and PostgREST with real ES256/HS256 JWTs and JWKS.'),
   folder('agent-playbook', 'Session hook, test env isolation, workflow-secrets policy parser (quoted keys, flow mappings, fail closed), edit hooks, reviewer agent, CLAUDE.md template.'),
