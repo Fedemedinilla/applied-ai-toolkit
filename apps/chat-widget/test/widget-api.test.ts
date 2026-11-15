@@ -177,6 +177,15 @@ describe('POST /widget/chat', () => {
       expect(api.requests).toHaveLength(3);
       expect(store.turns.size).toBe(3);
     });
+
+    it('holds the monthly cap too when requests arrive together', async () => {
+      const { app, api, store } = setup({ limits: { tenantMonthlyTurns: 3, tenantBurstTurns: 100, ipTurns: 100 }, replies: Array.from({ length: 8 }, () => streamed('Ok.')) });
+      const responses = await Promise.all(Array.from({ length: 8 }, (_, i) => app(chat({ ip: `192.0.2.${i + 1}` }))));
+      expect(responses.map((r) => r.status)).toEqual(Array.from({ length: 8 }, () => 429));
+      for (const response of responses) expect(await json(response)).toEqual({ error: 'monthly_limit' });
+      expect(api.requests).toHaveLength(0);
+      expect(store.turns.size).toBe(0);
+    });
   });
 
   describe('monthly cap', () => {
