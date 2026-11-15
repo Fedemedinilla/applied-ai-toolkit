@@ -23,6 +23,16 @@ describe('trigger and data', () => {
     expect(mainTargets(workflow, 'Combine items')).toEqual(['Summarize with Claude']);
   });
 
+  // HTTP Request 4.2 turns a JSON array into one item per element, so [] gives no
+  // item, and n8n runs no node after one that output nothing. Combine items,
+  // Claude and the email are skipped: an empty list sends no email at all.
+  it('says in the setup note that an empty list sends no email, since no node forces an output', () => {
+    for (const name of ['Fetch data (HTTP)', 'Combine items']) {
+      expect(nodeNamed(workflow, name), name).not.toHaveProperty('alwaysOutputData');
+    }
+    expect(String(nodeNamed(workflow, 'Setup 2').parameters.content)).toContain('an empty list (`[]`) sends no email');
+  });
+
   it('fetches from a placeholder host', () => {
     expect(new URL(String(nodeNamed(workflow, 'Fetch data (HTTP)').parameters.url)).hostname).toMatch(/\.example$/);
   });
@@ -40,6 +50,8 @@ describe('Summarize with Claude, prompt', () => {
     expect(prompt([{ blob: 'x'.repeat(500_000) }]).length).toBe(base + 50_000);
   });
 
+  // n8n never hands the chain this item for an empty list (see "trigger and data"):
+  // the instruction covers data that arrives but is empty or an error, such as [{}].
   it('leaves the tags empty when there is no data, and tells the model what to do then', () => {
     const text = evaluateString(chain.parameters.text, { json: {} });
     expect(text).toContain('<data>\n\n</data>');

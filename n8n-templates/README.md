@@ -127,7 +127,7 @@ The files on kyndredai.com are in Spanish. Node names, notes, prompts and field 
 - WhatsApp to HubSpot got the GET verification branch Meta requires before it delivers anything, a Code node that skips status updates and handles batched messages, and deduplication by message id. The rating goes to custom properties, because HubSpot's `hs_lead_status` only accepts its own values and would reject `hot`.
 - Calendly got a check of the event and the payload and deduplication by invitee URI. Tiendanube got the store id pin and deduplication by order id. Both send WhatsApp template messages instead of free-form text, to digit-only phone numbers.
 - Email triage labels each email by category and urgency instead of discarding those fields, drops the unused summary, avoids `Re: Re:` subjects and sends the draft to the bare address from `From`.
-- The report got an Aggregate node, so a list response gets one Claude call and one email instead of one per item. Its prompt now says when the data is empty instead of inventing a report.
+- The report got an Aggregate node, so a list response gets one Claude call and one email instead of one per item. Its prompt now says when the data is empty or an error instead of inventing a report. An empty list (`[]`) never reaches the prompt, because the HTTP node then outputs no item and n8n runs nothing after it, so that day sends no email.
 - In all flows, JSON bodies go through `JSON.stringify`, Sheets appends use RAW mode with automatic mapping set explicitly, parsers use JSON Schema with enums, and outgoing messages drop the n8n attribution line.
 
 A one-off script (not included) checked the files against the node definitions in `n8n-nodes-base` 2.15.1, `@n8n/n8n-nodes-langchain` 2.45.6 and the filter operators in `n8n-workflow`. Every node type and version exists there, and every parameter name is declared. The changed versions have not been run against live accounts yet.
@@ -210,6 +210,7 @@ Graph walks check that no side-effect node in the MercadoPago, Tiendanube and Ca
 - Sheets appends keep automatic retries, so a timeout after Google accepted the write can add a duplicate row.
 - The HubSpot flow creates a contact per new message. Updating an existing contact needs a search by phone first.
 - The email triage flow reads Gmail's `snippet`, the first part of the body, not the full message.
+- The daily report sends no email on a day the source answers with an empty list, so a quiet day and a broken source look the same. Check the executions list, or make the source return a row that says there is no data.
 - Chains fail the execution if the model's output does not match the schema. There is no retry or fallback branch for that case.
 - The tests run the Code nodes and evaluate expressions in a port of n8n's rules, written from its published source. They do not run n8n's own expression engine or any node's real code, so a difference between the port and n8n would not show up here.
 - The AFIP template assumes an invoicing provider with a REST API. It does not implement WSAA or WSFEv1, and the request body is a shape to adapt, not any provider's real schema.
