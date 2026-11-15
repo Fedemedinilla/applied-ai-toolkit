@@ -281,18 +281,19 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
       return fail('invalid', 400);
     }
 
-    // After validation, so a typo does not spend one of the visitor's sends.
-    if (limited(context.clientAddress || 'unknown')) {
-      log({ kind: 'rejected', reason: 'limited' });
-      return fail('limited', 429);
-    }
-
     // No key, no fake success. A visitor told "received" waits for a reply that never comes; an
-    // error shows them the address that does work.
+    // error shows them the address that does work. Before the limit, so it spends no send.
     const transport = config.transport;
     if (!transport) {
       log({ kind: 'not_configured' });
       return fail('not_configured', 503);
+    }
+
+    // After validation, so a typo does not spend one of the visitor's sends.
+    const limitKey = context.clientAddress || 'unknown';
+    if (limited(limitKey)) {
+      log({ kind: 'rejected', reason: 'limited' });
+      return fail('limited', 429);
     }
 
     // 1) The message, to the owner, whole. Replying from the mail client answers the visitor.
@@ -311,6 +312,8 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
         text: `${name} <${email}>${phone ? ` · ${phone}` : ''}\n${source || 'no page'} · ${lang}\n\n${message}\n`,
       });
     } catch {
+      // Nothing was delivered, so the retry the error page invites must not be counted against them.
+      limited.refund(limitKey);
       log({ kind: 'send_failed' });
       return fail('send_failed', 502);
     }

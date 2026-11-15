@@ -36,9 +36,9 @@ export const POST = createContactHandler({
 3. **Trap field.** A hidden field (`fax_number` by default) that only bots fill. A filled one answers success and sends nothing.
 4. **Clock.** A submit less than `minFillMs` (2,500 ms) after the page's script stamped `rendered_at` answers success and sends nothing.
 5. **Validation.** A name, one email address, and a message of at least two characters. Failures get 400.
-6. **Per-IP limit.** Five accepted sends in fifteen minutes by default. Over it gets 429.
-7. **No transport, no success.** Without a transport the answer is 503.
-8. The notice goes to the owner with the whole message and `Reply-To` set to the visitor. A provider error gets 502.
+6. **No transport, no success.** Without a transport the answer is 503.
+7. **Per-IP limit.** Five accepted sends in fifteen minutes by default. Over it gets 429.
+8. The notice goes to the owner with the whole message and `Reply-To` set to the visitor. A provider error gets 502 and gives the visitor's send back to the limit.
 9. The acknowledgment goes to the visitor. If it fails, the answer is still success, with `acknowledged: false`.
 
 JSON requests get `{ ok, acknowledged }` or `{ ok: false, error }` with a stable code (`origin`, `invalid`, `limited`, `not_configured`, `send_failed`, `too_large`, `media_type`). Form posts get a full HTML page for every outcome.
@@ -59,7 +59,7 @@ JSON requests get `{ ok, acknowledged }` or `{ ok: false, error }` with a stable
 
 **The origin is rebuilt from the forwarded headers.** Some adapters build `request.url` from an internal host. In the source, a framework built it as `https://localhost/...` behind the platform's proxy, and on the day of a domain move every browser got a 403 from this check. The handler accepts the URL's origin, `Host`, the first entry of `X-Forwarded-Host` with `X-Forwarded-Proto` (or the URL's scheme when that header is missing), `Host` with `X-Forwarded-Proto` for a TLS proxy that keeps the original host, and `allowedOrigins`. `trustForwardedHeaders: false` turns the forwarded pair off for a server with no proxy in front.
 
-**The limit counts only accepted sends.** The source's first limiter stored refused attempts too. Its "try again in a few minutes" page invited retries, each retry pushed the window forward, and a person who kept trying stayed blocked. A test retries once a minute through a full window and then gets through. Validation runs before the limit, so a typo does not spend a send. The map holds at most 10,000 keys, least recently used out first. It lives in one process, so on serverless it is a ceiling per warm instance, not a hard defence.
+**The limit counts only accepted sends.** The source's first limiter stored refused attempts too. Its "try again in a few minutes" page invited retries, each retry pushed the window forward, and a person who kept trying stayed blocked. A test retries once a minute through a full window and then gets through. Validation and the transport check run before the limit, and a provider error refunds the send, so neither a typo nor a provider outage spends one. A test fails five sends in a row and gets the sixth through. The map holds at most 10,000 keys, least recently used out first. It lives in one process, so on serverless it is a ceiling per warm instance, not a hard defence.
 
 **No key, no fake success.** A visitor told "received" waits for an answer that never comes. Without a transport the handler answers 503, and the no-JS page prints the public address, which works without the provider.
 

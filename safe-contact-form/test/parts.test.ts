@@ -72,6 +72,18 @@ describe('createLimiter', () => {
     t = 1000;
     expect(limited('a')).toBe(false);
   });
+
+  it('refund gives back the last attempt of a key, and does nothing for an unknown one', () => {
+    let t = 0;
+    const limited = createLimiter({ max: 1, windowMs: 1000 }, () => t);
+    expect(limited('a')).toBe(false);
+    limited.refund('a');
+    expect(limited('a')).toBe(false);
+    expect(limited('a')).toBe(true);
+    limited.refund('nobody');
+    t = 10;
+    expect(limited('a')).toBe(true);
+  });
 });
 
 describe('resendTransport', () => {

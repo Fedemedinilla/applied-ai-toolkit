@@ -461,6 +461,23 @@ describe('the per-IP limit', () => {
     expect((await s.handler(asJson(good(s.now)), at)).status).toBe(200);
   });
 
+  it('a provider failure does not spend a send, so retries after an outage get through', async () => {
+    const s = setup({ rateLimit: { max: 5, windowMs: 15 * 60_000 } });
+    const at = { clientAddress: '203.0.113.11' };
+    for (let n = 1; n <= 5; n++) s.resend.failCall(n, 'network');
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) statuses.push((await s.handler(asJson(good(s.now)), at)).status);
+    expect(statuses).toEqual([502, 502, 502, 502, 502, 200]);
+  });
+
+  it('without a transport the answer is 503 every time, never 429', async () => {
+    const s = setup({ transport: null, rateLimit: { max: 1, windowMs: 60_000 } });
+    const at = { clientAddress: '203.0.113.12' };
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) statuses.push((await s.handler(asJson(good(s.now)), at)).status);
+    expect(statuses).toEqual([503, 503, 503]);
+  });
+
   it('an invalid submit does not spend a send', async () => {
     const s = setup({ rateLimit: { max: 1, windowMs: 60_000 } });
     const at = { clientAddress: '203.0.113.10' };
