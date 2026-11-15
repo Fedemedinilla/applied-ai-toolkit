@@ -58,7 +58,10 @@ export interface Knobs {
    * Auth down behind the gateway (502, 503, 504). PostgREST is not affected.
    */
   failWith: number | null;
-  /** While true, every request (Auth and PostgREST) waits until its signal aborts. */
+  /**
+   * While true, every request (Auth and PostgREST) waits until its signal aborts. A string or URL
+   * input with no signal fails at once; a Request input always counts as having one.
+   */
   hang: boolean;
   /**
    * Milliseconds before a route answers, keyed by pathname ('/auth/v1/verify'). A request aborted
@@ -394,7 +397,10 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     fetch: async (input, init) => {
       const request = new Request(input, init);
       // The Request merges the signal of `init` and of a Request passed as `input`. A constructed
-      // Request always has one; it is the caller's only when init or input carried a signal.
+      // Request always has one, and nothing public tells whether the caller gave it, so a Request
+      // passed as `input` always counts as carrying the caller's signal. With knobs.hang, a Request
+      // built without a signal therefore waits until the test times out; only a string or URL input
+      // with no init.signal fails at once.
       const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : null);
       const signal = callerSignal === null ? null : request.signal;
       // Like Node's fetch: with the signal already aborted, nothing goes out.

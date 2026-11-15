@@ -57,7 +57,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 | `tamper` | Issued tokens carry another user's sub with the original signature. |
 | `symmetric` | New tokens are HS256 with no `kid`, and the JWKS is empty, as on a project with the shared JWT secret. |
 | `failWith` | Every Auth request answers this status with a body that is not JSON. PostgREST is not affected. |
-| `hang` | Every request waits until its `AbortSignal` fires, then fails the way Node's fetch does. A request with no signal fails at once with an error that says so, instead of stalling until the test timeout. |
+| `hang` | Every request waits until its `AbortSignal` fires, then fails the way Node's fetch does. A string or URL input with no signal fails at once with an error that says so, instead of stalling until the test timeout. A `Request` passed as the input always has a signal, even one built without it, and the fake cannot tell the two apart, so give such a `Request` a timeout. |
 | `delays` | Milliseconds of delay per path, for example `{ '/auth/v1/verify': 300 }`, also abortable. The signal can come in `init` or on a `Request` passed as the input. |
 | `override` | Answers any request before the fake does: a 429 on `/otp`, a hook rejection, a single 500. |
 | `rest` | The PostgREST handler. `restTables({ notes: [...] })` in `src/rest.ts` serves GET reads with `select`, `eq`, `limit` and `.single()`. |
@@ -76,7 +76,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 
 **A gateway check on the key.** A request whose `apikey` header is not the publishable key gets the gateway's 401 before Auth or PostgREST sees it. A client built with the wrong key fails in the test instead of only in production.
 
-**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404, and a PostgREST feature that `restTables` does not implement (a count, `order`, a filter other than `eq`, a `limit` that is not a whole number, a response format such as `.csv()`, a schema other than `public`, a JSON path or a `*` inside a column list) answers 501. A column that no row of the table has gets PostgREST's 400 `42703`, so a typo in a column name fails as it would in production; an empty table cannot tell and answers `[]`. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
+**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404. A PostgREST feature that `restTables` does not implement answers 501. That covers a count, `order`, a filter other than `eq` and a `limit` that is not a whole number. It also covers a response format such as `.csv()`, a schema other than `public`, a JSON path and a `*` inside a column list. A column that no row of the table has gets PostgREST's 400 `42703`, so a typo in a column name fails as it would in production; an empty table cannot tell and answers `[]`. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
 
 ## What the installed client does
 
