@@ -211,6 +211,15 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(result.stderr).toContain('protected.json cannot be read');
   });
 
+  it('blocks every edit when a glob uses syntax it does not read, instead of protecting nothing', () => {
+    for (const glob of ['content/**/*.{json,md}', 'db/migrations/', 'rulesets/[v]1/**']) {
+      writeFileSync(join(root, '.claude/protected.json'), JSON.stringify({ paths: [glob] }));
+      const result = hook(edit('src/a.ts'));
+      expect(result.code, glob).toBe(2);
+      expect(result.stderr).toContain(glob);
+    }
+  });
+
   it('allows everything when the project has no config', () => {
     rmSync(join(root, '.claude/protected.json'));
     expect(decide(edit('test/golden/a.json'), root, {})).toEqual({ code: 0, message: '' });

@@ -29,7 +29,10 @@ export interface ProtectedConfig {
   readonly jsonFlag?: string;
 }
 
-/** `**` crosses folders, `*` stays inside one name. Paths use forward slashes. */
+/**
+ * `**` crosses folders, `*` stays inside one name, `?` is one character. Paths use forward slashes.
+ * No other glob syntax: the config parser refuses braces, brackets and a trailing slash.
+ */
 export function globToRegExp(glob: string): RegExp {
   let source = '';
   for (let i = 0; i < glob.length; i += 1) {
@@ -105,6 +108,10 @@ function parseConfig(raw: unknown): ProtectedConfig {
   if (typeof raw !== 'object' || raw === null) throw new Error('protected.json must be an object');
   const { paths, jsonFlag } = raw as { paths?: unknown; jsonFlag?: unknown };
   if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) throw new Error('protected.json: "paths" must be a list of globs');
+  // globToRegExp reads *, ** and ? only. Braces, brackets or a folder written as `dir/` would
+  // match nothing and protect nothing in silence, so the config is refused and every edit blocks.
+  const unreadable = paths.find((p) => /[{}[\]]/.test(p) || p.endsWith('/'));
+  if (unreadable !== undefined) throw new Error(`protected.json: "${unreadable}" uses syntax the guard does not read (only *, ** and ?; write a folder as dir/**)`);
   if (jsonFlag !== undefined && typeof jsonFlag !== 'string') throw new Error('protected.json: "jsonFlag" must be a string');
   return jsonFlag === undefined ? { paths } : { paths, jsonFlag };
 }
