@@ -206,6 +206,20 @@ describe('evaluate', () => {
     ]);
   });
 
+  it("honors backslash escapes next to the brackets, like n8n's tournament splitter", () => {
+    expect(splitExpression('Use \\{{ name }} literally')).toEqual([{ type: 'text', text: 'Use \\{{ name }} literally' }]);
+    expect(splitExpression('C:\\\\path {{ $json.a }}')).toEqual([
+      { type: 'text', text: 'C:\\path ' },
+      { type: 'code', text: ' $json.a ' },
+    ]);
+    expect(splitExpression('\\\\{{ 1 }}')).toEqual([
+      { type: 'text', text: '\\' },
+      { type: 'code', text: ' 1 ' },
+    ]);
+    expect(splitExpression('{{ "x\\}}y" }}')).toEqual([{ type: 'code', text: ' "x}}y" ' }]);
+    expect(evaluate('={{ "x\\}}y" }}', scope)).toBe('x}}y');
+  });
+
   it('formats $now on a fixed clock for the two formats the templates use, and refuses others', () => {
     expect(evaluate("={{ $now.toFormat('yyyy-LL-dd HH:mm') }}", scope)).toBe('2026-01-31 10:00');
     expect(evaluate("={{ $now.toFormat('yyyy-LL-dd') }}", { ...scope, now: '2026-12-01T08:00' })).toBe('2026-12-01');

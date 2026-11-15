@@ -6,7 +6,8 @@
 //
 // - A parameter is an expression only when it starts with "=".
 // - Text between "{{" and the next "}}" is JavaScript. The first "}}" closes
-//   the block, even inside an object literal.
+//   the block, even inside an object literal. A bracket after an odd number
+//   of backslashes is text, as in tournament's splitter (see splitExpression).
 // - A parameter that is one block and nothing else yields the block's value
 //   with its type. Text mixed with blocks yields a string: each block's value
 //   is kept when it is truthy, 0 or false, replaced by "" otherwise, and the
@@ -65,20 +66,47 @@ export interface Chunk {
   text: string;
 }
 
-/** Splits the part after "=" into text and code chunks, closing each block at the first "}}". */
+/** Number of backslashes at the end of `text`. */
+function trailingBackslashes(text: string): number {
+  return /\\*$/.exec(text)?.[0].length ?? 0;
+}
+
+/**
+ * Splits the part after "=" into text and code chunks, closing each block at
+ * the first "}}". As in tournament's ExpressionSplitter, a "{{" or "}}" after
+ * an odd number of backslashes is not a bracket, the first "\\}}" of a block
+ * becomes "}}", and "\\\\" becomes "\\" in a text chunk that precedes a block.
+ */
 export function splitExpression(body: string): Chunk[] {
   const chunks: Chunk[] = [];
-  let rest = body;
+  let index = 0;
+  let buffer = '';
+  let open: number | undefined;
   for (;;) {
-    const open = rest.indexOf('{{');
-    if (open === -1) break;
-    const close = rest.indexOf('}}', open + 2);
-    if (close === -1) throw new ExpressionHarnessError(`unclosed {{ in: ${body.slice(0, 80)}`);
-    if (open > 0) chunks.push({ type: 'text', text: rest.slice(0, open) });
-    chunks.push({ type: 'code', text: rest.slice(open + 2, close) });
-    rest = rest.slice(close + 2);
+    const bracket = open === undefined ? '{{' : '}}';
+    const found = body.indexOf(bracket, index);
+    if (found === -1) {
+      if (open !== undefined) throw new ExpressionHarnessError(`unclosed {{ in: ${body.slice(0, 80)}`);
+      buffer += body.slice(index);
+      break;
+    }
+    buffer += body.slice(index, found);
+    index = found + 2;
+    if (trailingBackslashes(buffer) % 2 === 1) {
+      buffer += bracket;
+      continue;
+    }
+    if (open === undefined) {
+      const text = buffer.replace(/\\\\/g, '\\');
+      if (text !== '') chunks.push({ type: 'text', text });
+      open = found;
+    } else {
+      chunks.push({ type: 'code', text: buffer.replace('\\}}', '}}') });
+      open = undefined;
+    }
+    buffer = '';
   }
-  if (rest !== '') chunks.push({ type: 'text', text: rest });
+  if (buffer !== '') chunks.push({ type: 'text', text: buffer });
   return chunks;
 }
 
