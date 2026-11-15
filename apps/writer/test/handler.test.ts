@@ -246,6 +246,30 @@ describe('requests refused before any call', () => {
     expect(api.requests).toHaveLength(0);
   });
 
+  it('a body whose Content-Length passes the limit is refused unread', async () => {
+    const { handler, api } = setup([]);
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(titlesTurn)));
+        controller.close();
+      },
+      // No pull until someone reads, so `pulled` counts reads.
+    }, { highWaterMark: 0 });
+    const request = new Request('http://writer.test/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': String(MAX_BODY_BYTES + 1) },
+      body,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+    expect(request.headers.get('content-length')).toBe(String(MAX_BODY_BYTES + 1));
+    const res = await handler(request);
+    expect(res.status).toBe(400);
+    expect(pulled).toBe(0);
+    expect(api.requests).toHaveLength(0);
+  });
+
   it('the history rule in isolation', () => {
     const turns = (n: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? ('assistant' as const) : ('user' as const), content: 'x' }));
     expect(historyProblem(turns(MAX_MESSAGES))).toBeNull();
