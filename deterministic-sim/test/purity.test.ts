@@ -81,6 +81,10 @@ function isNumericLiteral(node: ts.Expression): boolean {
   return sign && isNumericLiteral(node.operand);
 }
 
+function isCast(node: ts.Node): node is ts.AsExpression | ts.TypeAssertion {
+  return ts.isAsExpression(node) || ts.isTypeAssertionExpression(node);
+}
+
 // `a ?? 8`, `a || 8` and their assignment forms `a ??= 8`, `a ||= 8`.
 const FALLBACK_OPERATORS = new Set([ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionEqualsToken, ts.SyntaxKind.BarBarEqualsToken]);
 
@@ -115,8 +119,11 @@ export function scan(fileName: string, source: string): Violation[] {
     }
     if (ts.isIdentifier(node) && GLOBALS.has(node.text) && isReference(node)) report(node, `${node.text}: ${GLOBALS.get(node.text) ?? ''}`);
     if (node.kind === ts.SyntaxKind.AnyKeyword) report(node, 'the any type');
-    if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.UnknownKeyword && ts.isAsExpression(node.parent)) {
-      report(node.parent, 'as unknown as');
+    // The double cast in every spelling: `x as unknown as T`, `(x as unknown) as T`, `<T><unknown>x`.
+    if (isCast(node) && node.type.kind === ts.SyntaxKind.UnknownKeyword) {
+      let outer = node.parent;
+      while (ts.isParenthesizedExpression(outer)) outer = outer.parent;
+      if (isCast(outer)) report(outer, 'as unknown as');
     }
     ts.forEachChild(node, visit);
   };
@@ -186,6 +193,9 @@ describe('the scanner itself', () => {
     ['const w = new WebSocket("x");', 'network'],
     ['let v: any = 1;', 'any'],
     ['const v = x as unknown as number;', 'as unknown as'],
+    ['const v = (x as unknown) as number;', 'as unknown as'],
+    ['const v = <number><unknown>x;', 'as unknown as'],
+    ['const v = <number>(x as unknown);', 'as unknown as'],
     ['// @ts-ignore\nconst v = 1;', '@ts-'],
     ['const M = Math; const r = M.random();', 'Math used other than'],
     ['const { random } = Math;', 'Math used other than'],
