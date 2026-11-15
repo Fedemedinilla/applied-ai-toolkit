@@ -74,7 +74,7 @@ describe('--genre', () => {
     const r = run(['--list-rules', '--json', '--genre', 'whatsapp', '--no-config']);
     const listed = JSON.parse(r.stdout) as { rules: Array<{ id: string; severity: string; default?: unknown }>; off: string[] };
     expect(listed.off).toContain('FMT-02');
-    expect(listed.rules.find((x) => x.id === 'REG-01')).toMatchObject({ severity: 'disqualify', default: { level: 1, severity: 'high' } });
+    expect(listed.rules.find((x) => x.id === 'EST-09')).toMatchObject({ severity: 'low', default: { level: 2, severity: 'medium' } });
   });
 
   it('names the genre in the SARIF run, and describes the rules with the profile', () => {

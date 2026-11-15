@@ -256,7 +256,7 @@ describe('genre and variety in the config', () => {
     expect(settings.rules.find((r) => r.id === 'FMT-01')).toBeUndefined();
     // The profile turns FMT-02 off; the config's own setting brings it back, as the config says.
     expect(settings.rules.find((r) => r.id === 'FMT-02')).toMatchObject({ level: 1, severity: 'low', message: 'Emoji in a professional message.' });
-    expect(settings.rules.find((r) => r.id === 'REG-01')?.severity).toBe('disqualify');
+    expect(settings.rules.find((r) => r.id === 'EST-09')?.severity).toBe('low');
   });
 
   it('takes the genre and the variety from an override, and the flags win over both', () => {
