@@ -45,6 +45,12 @@ export interface WordNumber {
   lastScale: number;
 }
 
+function joinsTenAndUnit(before: string | undefined, after: string | undefined): boolean {
+  const ten = NUMBER_WORDS[before ?? ''];
+  const unit = NUMBER_WORDS[after ?? ''];
+  return ten !== undefined && unit !== undefined && ten >= 30 && ten <= 90 && ten % 10 === 0 && unit >= 1 && unit <= 9;
+}
+
 /** "dos mil quinientos" -> 2500, reading from `start` as far as the number continues. */
 export function readWordNumber(
   raw: readonly string[],
@@ -62,8 +68,10 @@ export function readWordNumber(
   for (; i < raw.length; i++) {
     const t = raw[i]!;
 
-    // "treinta y cinco": the "y" inside a number is part of it.
-    if (found && t === 'y' && NUMBER_WORDS[raw[i + 1] ?? ''] !== undefined) continue;
+    // "treinta y cinco": the "y" inside a number is part of it. Spanish puts it only between a ten
+    // from treinta to noventa and a unit; anywhere else it joins two figures ("entre veinte y
+    // veinticinco mil" is a range, not 45.000), and the rules that read joiners have to see both.
+    if (found && t === 'y' && joinsTenAndUnit(raw[i - 1], raw[i + 1])) continue;
 
     const unit = NUMBER_WORDS[t];
     if (unit !== undefined) {

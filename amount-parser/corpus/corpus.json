@@ -2122,5 +2122,44 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "1800000"
+ },
+ {
+  "phrase": "el gasista me pidio entre veinte y veinticinco mil",
+  "family": "ranges",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": null,
+  "ambiguous": true,
+  "note": "The digit twin \"entre 20 y 25 mil\" asks. In words, \"y\" between two whole numbers is not the \"y\" of \"treinta y cinco\": it only joins a ten from treinta to noventa to a unit. A range is a question, never 45.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "45000"
+ },
+ {
+  "phrase": "cobre ciento veinte mil y cuarenta mil de sena",
+  "family": "multi-and-edge",
+  "kind": "income",
+  "quantity": null,
+  "unit_price": null,
+  "total": 120000,
+  "ambiguous": false,
+  "note": "The digit twin \"cobre 120 mil y 40 mil de sena\" gives 120.000: the down payment is part of the price. Spelled out, both figures used to fold into one number, 160.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "160000"
+ },
+ {
+  "phrase": "pague cinco mil de luz y tres mil de gas",
+  "family": "multi-and-edge",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 8000,
+  "ambiguous": false,
+  "note": "CONTROL. Two spelled-out figures joined by \"y\" are still two parts of one movement and add up: 5.000 + 3.000 = 8.000.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "8000"
  }
 ]
