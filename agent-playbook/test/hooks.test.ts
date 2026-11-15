@@ -96,6 +96,37 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     }
   });
 
+  it('refuses an outside settings file reached through a link inside the project', () => {
+    const home = mkdtempSync(join(tmpdir(), 'agent-playbook-home-'));
+    try {
+      mkdirSync(join(home, '.claude'));
+      writeFileSync(join(home, '.claude/settings.json'), '{}');
+      mkdirSync(join(root, 'notes'));
+      symlinkSync(join(home, '.claude/settings.json'), join(root, 'notes/x.json'));
+      const result = hook(edit('notes/x.json'));
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('Claude Code settings file outside the project');
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an outside settings file with no config or a broken one, and a broken config blocks outside edits too', () => {
+    const home = mkdtempSync(join(tmpdir(), 'agent-playbook-home-'));
+    try {
+      writeFileSync(join(root, '.claude/protected.json'), '{ "paths": "x" }');
+      expect(hook(edit(join(home, '.claude/settings.json'))).code).toBe(2);
+      const outside = hook(edit(join(home, 'notes.md')));
+      expect(outside.code).toBe(2);
+      expect(outside.stderr).toContain('protected.json cannot be read');
+      rmSync(join(root, '.claude/protected.json'));
+      expect(hook(edit(join(home, '.claude/settings.json'))).code).toBe(2);
+      expect(hook(edit(join(home, 'notes.md')))).toEqual({ code: 0, stderr: '' });
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('resolves symbolic links before matching, so a link cannot hide a protected target', () => {
     mkdirSync(join(root, 'test/golden'), { recursive: true });
     writeFileSync(join(root, 'test/golden/race.json'), '{}');

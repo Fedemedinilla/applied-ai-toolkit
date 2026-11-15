@@ -129,25 +129,32 @@ export function targetOf(input: HookInput): string {
 /** Exit code and message for one hook call. Throws on input it cannot read; the caller blocks. */
 export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): { code: 0 | 2; message: string } {
   const target = targetOf(input);
-  const configFile = resolve(root, '.claude/protected.json');
-  // No config means nothing is protected; a broken config blocks, so a typo cannot open every path.
-  if (!existsSync(configFile)) return { code: 0, message: '' };
   const absolute = resolve(root, target);
   const real = realTarget(absolute);
-  const candidates = [projectPath(root, absolute), projectPath(realTarget(root), real)].filter((p): p is string => p !== null);
-  if (candidates.length === 0) {
-    if (!SETTINGS_FILE.test(real.replaceAll('\\', '/')) && !SETTINGS_FILE.test(absolute.replaceAll('\\', '/'))) return { code: 0, message: '' };
+  const inside = projectPath(root, absolute);
+  const realInside = projectPath(realTarget(root), real);
+  // A settings file outside the project is refused whatever the config says, and also when the
+  // written path is inside the project but a link takes it outside.
+  const outsideSettings =
+    (inside === null && SETTINGS_FILE.test(absolute.replaceAll('\\', '/'))) || (realInside === null && SETTINGS_FILE.test(real.replaceAll('\\', '/')));
+  if (outsideSettings) {
     return {
       code: 2,
       message: `Blocked: ${absolute} is a Claude Code settings file outside the project, which could switch the hooks off. Stop and ask the person.`,
     };
   }
+  const configFile = resolve(root, '.claude/protected.json');
+  // No config means nothing in the project is protected; a broken config blocks every edit, so a
+  // typo cannot open every path.
+  if (!existsSync(configFile)) return { code: 0, message: '' };
   let config: ProtectedConfig;
   try {
     config = parseConfig(JSON.parse(readFileSync(configFile, 'utf8')));
   } catch (error) {
     return { code: 2, message: `Blocked: .claude/protected.json cannot be read (${(error as Error).message}).` };
   }
+  const candidates = [inside, realInside].filter((p): p is string => p !== null);
+  if (candidates.length === 0) return { code: 0, message: '' };
   const readJson = (path: string): unknown => {
     try {
       return JSON.parse(readFileSync(resolve(root, path), 'utf8'));
