@@ -95,8 +95,9 @@ export type Resolved =
 export function resolveUrl(site: Site, from: string, url: string, specifier = false): Resolved {
   if (specifier && !/^(?:[a-z][a-z0-9+.-]*:|\/|\.\.?\/)/i.test(url)) return { kind: 'bare', url };
   // A URL the browser cannot parse (`https://bad host/a.js`) loads nothing; it is reported, not thrown.
-  if (!URL.canParse(url, new URL(from, 'http://site.invalid'))) return { kind: 'invalid', url };
-  const parsed = new URL(url, new URL(from, 'http://site.invalid'));
+  const base = new URL(from, 'http://site.invalid').href;
+  if (!URL.canParse(url, base)) return { kind: 'invalid', url };
+  const parsed = new URL(url, base);
   if (parsed.origin !== 'http://site.invalid') return { kind: 'external', url };
   let path: string;
   try {
