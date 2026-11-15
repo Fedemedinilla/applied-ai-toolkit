@@ -94,6 +94,19 @@ describe('runAttack, the turn loop', () => {
     expect(summarize(recs)).toEqual({ L1: { pass: 0, fail: 0, review: 4 }, L2: { pass: 0, fail: 0, review: 2 } });
   });
 
+  it('summarize keeps a lens named like an Object.prototype key, and leaves the prototype alone', async () => {
+    const { handler } = echoHandler();
+    const recs = await runAttacks(handler, [
+      attack({ id: 'a', lens: '__proto__', turns: ['x'], checks: { replyMustNotMatch: ['secret'] } }),
+      attack({ id: 'b', lens: 'constructor', turns: ['x'] }),
+    ]);
+    const sum = summarize(recs);
+    expect(Object.keys(sum)).toEqual(['__proto__', 'constructor']);
+    expect(sum['__proto__']).toEqual({ pass: 1, fail: 0, review: 0 });
+    expect(sum['constructor']).toEqual({ pass: 0, fail: 0, review: 1 });
+    expect(({} as Record<string, unknown>)['pass']).toBeUndefined();
+  });
+
   it('runAttacks refuses a concurrency that is not a number instead of running nothing', async () => {
     const { handler, calls } = echoHandler();
     await expect(runAttacks(handler, [attack({ id: 'a', turns: ['x'] })], { concurrency: NaN })).rejects.toThrow(/concurrency must be a number/);

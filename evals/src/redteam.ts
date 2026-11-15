@@ -189,10 +189,14 @@ export async function runAttacks(
 
 /** Counts by lens and outcome, for the summary line of a run. */
 export function summarize(records: readonly AttackRecord[]): Record<string, Record<Outcome, number>> {
-  const out: Record<string, Record<Outcome, number>> = {};
+  // A Map, because the lens comes from the attacks file: on a plain object a
+  // lens such as "__proto__" would reach Object.prototype. Object.fromEntries
+  // defines own properties, so the result holds that lens like any other.
+  const out = new Map<string, Record<Outcome, number>>();
   for (const r of records) {
-    const row = (out[r.lens] ??= { pass: 0, fail: 0, review: 0 });
+    const row = out.get(r.lens) ?? { pass: 0, fail: 0, review: 0 };
+    out.set(r.lens, row);
     row[r.outcome]++;
   }
-  return out;
+  return Object.fromEntries(out);
 }
