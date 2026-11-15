@@ -226,3 +226,15 @@ describe('settling after a cut stream', () => {
     expect(rows[1]?.estimatedInputTokens).toBeGreaterThan(0);
   });
 });
+
+describe('model_prices', () => {
+  it.each(['input', 'output', 'cache_read', 'cache_write_5m', 'cache_write_1h'])('refuses a %s price of zero, which would price calls at nothing', async (column) => {
+    await seedDb(db, SEED);
+    const values = { input: 2, output: 10, cache_read: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, [column]: 0 };
+    const insert = db.query(
+      `insert into public.model_prices (model, valid_from, input, output, cache_read, cache_write_5m, cache_write_1h, source) values ('claude-sonnet-5-5', now(), $1, $2, $3, $4, $5, 'test')`,
+      [values.input, values.output, values.cache_read, values.cache_write_5m, values.cache_write_1h],
+    );
+    await expect(insert).rejects.toThrow(`model_prices_${column}_positive`);
+  });
+});

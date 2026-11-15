@@ -164,7 +164,7 @@ describe('countAttachments', () => {
 // Cases added after the mutation run of 2026-11-14 (see "Mutation testing" in the README): each one
 // fails against a mutant that the tests above let through.
 describe('pricesInForce, boundaries and order', () => {
-  const row = (validFrom: string, input: number): PriceRow => ({ model: 'claude-sonnet-5-5', validFrom, input, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
+  const row = (validFrom: string, input: number): PriceRow => ({ model: 'claude-sonnet-5-5', validFrom, input, output: 1, cacheRead: 1, cacheWrite5m: 1, cacheWrite1h: 1 });
 
   it('a price whose validFrom is exactly `at` is already in force', () => {
     expect(pricesInForce([row('2026-10-23T15:00:00Z', 7)], AT).get('claude-sonnet-5-5')?.input).toBe(7);
@@ -222,5 +222,12 @@ describe('countAttachments, values that are not blocks', () => {
     expect(countAttachments(null)).toBe(0);
     expect(countAttachments([{ type: 'document', source: null }, { type: 'text', text: 'x', citations: null }])).toBe(0);
     expect(countAttachments({ type: 'document', source: 'base64' })).toBe(0);
+  });
+});
+
+describe('PriceRow, zero prices', () => {
+  it.each(['input', 'output', 'cacheRead', 'cacheWrite5m', 'cacheWrite1h'])('a %s price of zero fails the schema, since it would price calls at nothing', (field) => {
+    const row = { model: 'claude-sonnet-5-5', validFrom: '2026-10-01T00:00:00Z', input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4, [field]: 0 };
+    expect(PriceRow.safeParse(row).error?.issues.map((i) => `${i.path.join('.')}: ${i.code}`)).toEqual([`${field}: too_small`]);
   });
 });

@@ -320,6 +320,15 @@ describe('structured', () => {
     expect(harness.notices).toEqual([{ event: 'prices_unavailable', data: { usageId: meta.usageId, error: 'connection_failure' } }]);
   });
 
+  it('a zero price row in the price table is not read as a price: the call is recorded without cost, at the bound', async () => {
+    const { gateway, harness } = setup([() => jsonResponse(triageResponse())]);
+    // A later row at zero would otherwise be in force and price every call at nothing.
+    harness.stores.prices.rows.push({ model: 'claude-sonnet-5-5', validFrom: '2026-10-02T00:00:00Z', input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
+    const { meta } = await gateway.structured(Triage, REQUEST);
+    expect(meta.costUsd).toBeNull();
+    expect(harness.notices).toEqual([{ event: 'prices_unavailable', data: { usageId: meta.usageId, error: 'schema' } }]);
+  });
+
   it('a call without a user reads no account caps and only the monthly cap applies', async () => {
     const { gateway, harness } = setup([() => jsonResponse(triageResponse())]);
     harness.stores.config.accounts.clear();

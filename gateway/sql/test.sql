@@ -194,6 +194,14 @@ select pg_temp.check_rejects($q$
   insert into public.llm_usage (id, task, prompt_version, model_requested, model_responded, max_tokens, error_code)
   values (gen_random_uuid(), 'triage', 'v1', 'claude-sonnet-5-5', 'claude-sonnet-5-5', 10, ' ') $q$, 'llm_usage_error_code_not_blank');
 
+-- A price of zero in force would value every call of the model at nothing.
+select pg_temp.check_rejects($q$
+  insert into public.model_prices (model, valid_from, input, output, cache_read, cache_write_5m, cache_write_1h, source)
+  values ('claude-sonnet-5-5', now(), 0, 10, 0.2, 2.5, 4, 'test') $q$, 'model_prices_input_positive');
+select pg_temp.check_rejects($q$
+  insert into public.model_prices (model, valid_from, input, output, cache_read, cache_write_5m, cache_write_1h, source)
+  values ('claude-sonnet-5-5', now(), 2, 10, 0, 2.5, 4, 'test') $q$, 'model_prices_cache_read_positive');
+
 -- One closing row per reservation; an unbilled error row without a model is accepted.
 create temp table r as select pg_temp.add_reservation(:user_a) as id;
 insert into public.llm_usage (id, replaces, task, prompt_version, model_requested, cost_usd, max_tokens, error_code)
