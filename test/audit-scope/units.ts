@@ -88,7 +88,7 @@ export const CROSS: readonly Area[] = [
     id: 'root-docs-truth',
     kind: 'cross',
     paths: 'README.md, CONTRIBUTING.md, SECURITY.md, docs-site/pages/*.md, every claim with a number',
-    globs: ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'LICENSE', 'docs-site/pages/*.md', '.github/*.md'],
+    globs: ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'MAINTENANCE.md', 'LICENSE', 'docs-site/pages/*.md', '.github/*.md'],
     context: 'Every command in Run everything runs as written; every number matches a run you do or a dated folder README; every link resolves; claims about what a folder does match its code.',
   },
   {

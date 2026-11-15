@@ -1,6 +1,6 @@
 # Audit scope
 
-The first step of the diff-scoped audit: which audit units a branch touches. It lists the files the branch changed, maps each one to the unit of the full audit that owns it, and adds the units that import a changed file. The `audit-diff` workflow in `.claude/workflows/audit-diff.js` takes its JSON as input.
+The first step of the diff-scoped audit: which audit units a branch touches. It lists the files the branch changed, maps each one to the unit of the full audit that owns it, and adds the units that import a changed file. The `audit-diff` workflow in `.claude/workflows/audit-diff.js` takes its JSON as input, and [MAINTENANCE.md](../../MAINTENANCE.md) has the whole procedure.
 
 ## Run it
 
