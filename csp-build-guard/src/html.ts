@@ -93,7 +93,9 @@ export function hashSources(text: string): InlineItem['hashes'] {
 }
 
 // One pass over the document, in order: comments, raw-text elements with their content, other start tags.
-const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+// The raw-text tag name must end at whitespace, "/" or ">", so a custom element such as
+// <style-switcher> or <script-loader> is an ordinary tag (a \b would match before the "-").
+const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
 
 export function parsePage(html: string): PageParts {
   const inline: InlineItem[] = [];

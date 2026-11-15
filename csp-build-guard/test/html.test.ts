@@ -31,6 +31,12 @@ describe('parsePage', () => {
     expect(inlineJs).toEqual(['import "./a.js";']);
   });
 
+  it('reads custom elements named style-* or script-* as ordinary tags, not raw-text elements', () => {
+    const parts = parsePage('<style-switcher></style-switcher><p>hi</p><script>a()</script><script-loader></script-loader><script src="/a.js"></script>');
+    expect(parts.inline.map((i) => [i.kind, i.text])).toEqual([['script-elem', 'a()']]);
+    expect(parts.scriptSrcs).toEqual(['/a.js']);
+  });
+
   it('reads a ">" inside a quoted attribute as part of the attribute', () => {
     const { scriptSrcs, inline } = parsePage('<script data-x="a>b" src="/x.js"></script><script data-y=\'>\'>run()</script>');
     expect(scriptSrcs).toEqual(['/x.js']);
