@@ -14,17 +14,21 @@ const MAX_PRODUCT_ID = 9_007_199_254_740_991;
  * sending so a request that can only fail never goes out, and never spends a retry.
  */
 export function linesProblem(lines: readonly OrderLine[]): string | null {
-  if (lines.length < 1 || lines.length > MAX_LINES) return `an order has 1 to ${MAX_LINES} lines`;
+  // The lines often come straight from request JSON, so the shape is checked before any field.
+  const untrusted: unknown = lines;
+  if (!Array.isArray(untrusted) || untrusted.length < 1 || untrusted.length > MAX_LINES) return `an order has 1 to ${MAX_LINES} lines`;
   const seen = new Set<number>();
-  for (const line of lines) {
-    if (!Number.isSafeInteger(line.productId) || line.productId < 1 || line.productId > MAX_PRODUCT_ID) {
+  for (const line of untrusted as readonly unknown[]) {
+    if (typeof line !== 'object' || line === null) return 'every line is an object with productId and quantity';
+    const { productId, quantity } = line as Record<string, unknown>;
+    if (typeof productId !== 'number' || !Number.isSafeInteger(productId) || productId < 1 || productId > MAX_PRODUCT_ID) {
       return 'every productId is a positive integer';
     }
-    if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_QUANTITY) {
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
       return `every quantity is an integer from 1 to ${MAX_QUANTITY}`;
     }
-    if (seen.has(line.productId)) return `product ${line.productId} appears twice`;
-    seen.add(line.productId);
+    if (seen.has(productId)) return `product ${productId} appears twice`;
+    seen.add(productId);
   }
   return null;
 }

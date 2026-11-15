@@ -92,11 +92,11 @@ An outage turns every client into a loop of resends, and the retries can keep th
 - `Retry-After` is honored. When the server asks for a longer pause than `maxDelayMs`, the client stops retrying and goes to the re-read instead of waiting or ignoring it.
 - Definite refusals are never retried, and a request that fails the client's own validation (the same rules as `validate_lines`) is never sent.
 - After `unknown` the next attempt is the user's tap, with the same key. However many times they tap within the window, the database holds one order.
-- With the defaults a call can take up to about 33 s, made of three 8 s attempts, up to 900 ms of backoff and an 8 s re-read. Set `timeoutMs` and `maxAttempts` so that fits inside the server's request limit. If the platform kills the handler first, the browser gets the `unknown` case.
+- With the defaults a call can take up to about 40 s. That is three 8 s attempts, an 8 s re-read and up to two waits of `maxDelayMs` (4 s each) when the server sends a `Retry-After` of 4 s or less. Without `Retry-After` the backoff adds at most 900 ms. Set `timeoutMs` and `maxAttempts` so that fits inside the server's request limit. If the platform kills the handler first, the browser gets the `unknown` case.
 
 ## Why the key is generated on the client
 
-The key names one user action. Only the browser knows that two requests are the same action, for example a tap after a timeout or a resend after a reload. A key minted by the server arrives in the response, and the lost response is the case the key exists for. The browser would then have nothing to resend with, and its next tap would be a new order. So the browser makes the key with `crypto.randomUUID()` (16 random bytes in hex where that is missing) before the first send. `ActionKey` keeps it in memory and mirrors it to `localStorage` for 24 hours, the lifetime the source app used. Memory wins, so a retry from the same page keeps its key when storage is blocked. Storage is what survives a reload. The key is cleared on success, and when the user chooses "Send as a new order". A failure or an `unknown` keeps it.
+The key names one user action. Only the browser knows that two requests are the same action, for example a tap after a timeout or a resend after a reload. A key minted by the server arrives in the response, and the lost response is the case the key exists for. The browser would then have nothing to resend with, and its next tap would be a new order. So the browser makes the key with `crypto.randomUUID()` (16 random bytes in hex where that is missing) before the first send. `ActionKey` keeps it in memory and mirrors it to `localStorage` for 24 hours, the lifetime the source app used. Storage is what survives a reload, and the tabs of the page share it. When one tab clears the key after a success, the next `current()` in another tab starts a new action instead of resending the cleared one. Memory wins only while storage cannot be read or written, so a retry from the same page keeps its key when storage is blocked or full, and when the device clock moves back. The key is cleared on success, and when the user chooses "Send as a new order". A failure or an `unknown` keeps it.
 
 The browser keeps the key longer (24 hours) than the database accepts it as a resend (60 minutes). A tap hours later still carries the old key, so the server can show the earlier order instead of silently making a second one. The page then offers a new order.
 
@@ -130,16 +130,17 @@ The server still decides who the customer is from the session, never from the bo
 
 ## What the tests cover
 
-92 tests, all offline.
+129 tests, all offline.
 
 | File | Covers |
 |---|---|
-| `test/place-order.test.ts` | Prices from the database; a resend; ten same-key calls sent together; a changed cart; another customer's key; the 60-minute window and `find_order`'s `within_window`; a confirmed order's key; a resend after an edit; unavailable products before and after the lookup; 22023 for every shape error; the lookup-to-insert race through the `unique_violation` handler; a violation of another constraint raised; no order without lines |
+| `test/place-order.test.ts` | Prices from the database; a resend; ten same-key calls sent together; a changed cart; another customer's key; the 60-minute window and `find_order`'s `within_window`; a confirmed order's key; a resend after an edit; unavailable products before and after the lookup; 22023 for every shape error; `find_order` refusing a NULL, empty or too long customer; the lookup-to-insert race through the `unique_violation` handler; a violation of another constraint raised; no order without lines |
 | `test/confirm-order.test.ts` | The claim and the stock; two interleaved confirms; a resend of the winning confirm; version conflicts; shortages with nothing written; a property test over random mixes of orders, each confirmed twice at once, checking stock never goes negative and equals the starting stock minus the confirmed lines; the check constraint; `edit_order` versions, races and refusals |
 | `test/privileges.test.ts` | Every function, table privilege and sequence taken back from `anon` and `authenticated` against Supabase-like default grants; `service_role` can place and confirm; RLS on every table; the schema applies again over itself |
-| `test/client.test.ts` | The client against a fake PostgREST that runs the real SQL and can drop a request before it runs, drop the response after the commit, answer 504 after the commit, cut the body, return the wrong shape, hang, or answer any status with `Retry-After`. Covers the lost response, the re-read, the 60-minute rule after a lost attempt and in the re-read, `unknown`, refusals, a refusal after a lost response, `not_deployed`, double taps in one and two processes, a joined tap not ended by another caller's abort, the retry bounds and backoff sequence, timeouts, aborts, and the same cases for confirms |
+| `test/client.test.ts` | The client against a fake PostgREST that runs the real SQL and can drop a request before it runs, drop the response after the commit, answer 504 after the commit, cut the body, return the wrong shape, hang, or answer any status with `Retry-After`. Covers the lost response, the re-read, the 60-minute rule after a lost attempt and in the re-read, `unknown`, refusals, a refusal after a lost response, `not_deployed`, double taps in one and two processes, no join across another cart or customer under one key, a joined tap not ended by another caller's abort, the retry bounds and backoff sequence, out-of-range options, malformed request shapes from an untrusted body, timeouts, aborts, and the same cases for confirms |
 | `test/lines.test.ts` | The TypeScript fingerprint equals `order_fingerprint`, and the client's line validation accepts exactly what `validate_lines` accepts (property tests against PGlite) |
-| `test/key.test.ts` | Keys across a reload, `clear()`, the lifetime, blocked storage, stored values the class did not write (jsdom) |
+| `test/key.test.ts` | Keys across a reload, `clear()`, the lifetime and its range, a clock moved back, two tabs across a `clear()`, blocked or full storage, stored values the class did not write (jsdom) |
+| `test/redirect.test.ts` | A 307 to another origin is not followed, so the `apikey` header never leaves the configured URL (two loopback servers) |
 
 PGlite has one backend, so two calls never overlap there: "concurrent" calls are interleaved whole. The race between the lookup and the insert is reproduced by `injectTwinAfterLookup` in `test/helpers/db.ts`. It turns `products` into a view whose filter inserts a twin order the first time `place_order` reads it, which falls between the lookup and the insert. A mutation check confirmed that removing the handler fails those tests. Real lock waits are what `sql/race.sh` is for. Its timing changed after its last run against a real Postgres, so a rerun of `race.sh` is pending.
 
@@ -151,7 +152,7 @@ sql/
   race.sh          the races on a real Postgres, opt-in
 src/
   client.ts        the retry protocol: placeOrder, confirmOrder
-  wire.ts          one RPC call, classified as body, refused, ambiguous or aborted
+  wire.ts          one RPC call, classified as body, refused, ambiguous or aborted; redirects not followed
   responses.ts     zod schemas of what the functions return
   key.ts           newKey and ActionKey, browser-safe
   lines.ts         line validation and the fingerprint
