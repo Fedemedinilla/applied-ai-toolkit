@@ -1,0 +1,1 @@
+{ "genre": "whatsapp", "variety": "rioplatense", "overrides": [{ "files": ["mail/**"], "genre": "email", "variety": "neutral" }] }
