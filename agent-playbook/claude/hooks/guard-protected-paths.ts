@@ -111,17 +111,24 @@ export interface HookInput {
   readonly tool_input?: { readonly file_path?: unknown; readonly notebook_path?: unknown };
 }
 
-/** The edited path, undefined for a tool call without one. Throws on a path that is not a string. */
-export function targetOf(input: HookInput): string | undefined {
-  const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (target !== undefined && typeof target !== 'string') throw new Error('the file path is not a string');
+/**
+ * The edited path. The hook is wired only to tools that always carry one, so input without a
+ * readable path (no tool_input object, no file_path or notebook_path, a null, an array) throws and
+ * the caller blocks: a change in the shape of the input must not let every edit through.
+ */
+export function targetOf(input: HookInput): string {
+  const toolInput: unknown = input.tool_input;
+  if (typeof toolInput !== 'object' || toolInput === null || Array.isArray(toolInput)) throw new Error('the tool input is not an object');
+  const fields = toolInput as Record<string, unknown>;
+  const target = Object.hasOwn(fields, 'file_path') ? fields['file_path'] : fields['notebook_path'];
+  if (target === undefined) throw new Error('the tool input has no file_path or notebook_path');
+  if (typeof target !== 'string') throw new Error('the file path is not a string');
   return target;
 }
 
 /** Exit code and message for one hook call. Throws on input it cannot read; the caller blocks. */
 export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): { code: 0 | 2; message: string } {
   const target = targetOf(input);
-  if (target === undefined) return { code: 0, message: '' };
   const configFile = resolve(root, '.claude/protected.json');
   // No config means nothing is protected; a broken config blocks, so a typo cannot open every path.
   if (!existsSync(configFile)) return { code: 0, message: '' };
@@ -169,7 +176,7 @@ export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): 
 export function run(raw: string, env: NodeJS.ProcessEnv, cwd: string): { code: 0 | 2; message: string } {
   try {
     const parsed: unknown = raw.trim() === '' ? {} : JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) throw new Error('the hook input is not a JSON object');
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('the hook input is not a JSON object');
     const input = parsed as HookInput;
     const root = env['CLAUDE_PROJECT_DIR'] ?? (typeof input.cwd === 'string' ? input.cwd : cwd);
     return decide(input, root, env);

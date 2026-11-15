@@ -117,6 +117,22 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(hook('"a string"').code).toBe(2);
   });
 
+  it('blocks a tool call whose input has no path it can read: null, missing, an array, not an object', () => {
+    for (const input of [
+      { tool_name: 'Edit', tool_input: { file_path: null } },
+      { tool_name: 'Edit', tool_input: { path: 'src/a.ts' } },
+      { tool_name: 'Edit', tool_input: 'src/a.ts' },
+      { tool_name: 'Edit', tool_input: ['src/a.ts'] },
+      { tool_name: 'Edit' },
+      [],
+      '',
+    ]) {
+      const result = hook(input);
+      expect(result.code, JSON.stringify(input)).toBe(2);
+      expect(result.stderr).toMatch(/^Blocked: guard error/);
+    }
+  });
+
   it('blocks through the settings command when Node cannot run the hook at all', () => {
     const settings = JSON.parse(readFileSync(join(FOLDER, 'claude/settings.json'), 'utf8')) as {
       hooks: { PreToolUse: { hooks: { command: string }[] }[] };
