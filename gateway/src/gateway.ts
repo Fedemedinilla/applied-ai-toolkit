@@ -110,8 +110,9 @@ export interface GatewayDeps<M extends string = SupportedModel> {
   readonly failures: EventLog<FailureEvent>;
   /**
    * Receives one span per call after it ends (observe.ts). Optional: without it nothing is
-   * measured for tracing. With it, each call reads the prices once more, after the result, to
-   * value its reservation.
+   * measured for tracing. With it, each call reads the prices once more when it ends, to value
+   * its reservation, and the result is returned after that read. The read is not counted in the
+   * span's duration.
    */
   readonly observer?: CallObserver;
   /** IANA zone of the cap's day and month. */
@@ -526,6 +527,8 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
       errorCode = error instanceof GatewayError ? error.code : 'unknown';
       throw error;
     } finally {
+      // The end of the call, read before the span's own price read so that read is not counted.
+      const durationMs = Math.round(deps.clock.monotonicMs() - trace.startMono);
       const row = trace.closing;
       const span: CallSpan = {
         operation,
@@ -547,7 +550,7 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
         reservationId: trace.reservationId,
         usageId: row?.id ?? null,
         startTime: trace.startTime,
-        durationMs: Math.round(deps.clock.monotonicMs() - trace.startMono),
+        durationMs,
       };
       try {
         observer.onCall(span);
@@ -559,8 +562,10 @@ export function createGateway<M extends string = SupportedModel>(deps: GatewayDe
 
   /**
    * The reservation's worst case for the span: the estimated input and maxTokens of output at the
-   * highest price in force among the registry's models, the way the stores value an open
-   * reservation. Null when nothing was reserved or the prices cannot be read. Never throws.
+   * highest price in force among the registry's models. The stores value an open reservation at
+   * the highest price of every model in their price table, so a priced model outside the registry
+   * with higher rates makes this lower than what the caps hold. Null when nothing was reserved or
+   * the prices cannot be read. Never throws.
    */
   async function reservedUsd(trace: Trace, maxTokens: number): Promise<number | null> {
     if (trace.estimatedInput === null) return null;

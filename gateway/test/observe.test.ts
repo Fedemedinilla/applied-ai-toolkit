@@ -155,6 +155,23 @@ describe('one span per call', () => {
     expect(harness.notices).toContainEqual({ event: 'observer_failed', data: { task: 'triage', error: 'TypeError' } });
   });
 
+  it("the span's duration ends before the observer's own price read", async () => {
+    const api = fakeApi([() => jsonResponse(answer())]);
+    const { deps, harness } = fakeDeps(api.client);
+    const spans: CallSpan[] = [];
+    const prices = deps.prices;
+    // The read made for the span comes after the closing row; it takes 100 clock steps here.
+    const slowAfterClose = {
+      pricesFor: async (models: readonly string[], at: Date) => {
+        if (harness.ledger.some((row) => !row.reservation)) for (let i = 0; i < 100; i += 1) deps.clock.monotonicMs();
+        return prices.pricesFor(models, at);
+      },
+    };
+    await createGateway({ ...deps, prices: slowAfterClose, observer: { onCall: (span) => void spans.push(span) } }).structured(Verdict, REQUEST);
+    expect(spans[0]?.reservedUsd).toBeGreaterThan(0.8);
+    expect(spans[0]?.durationMs).toBeLessThan(100 * CLOCK_STEP_MS);
+  });
+
   it('without an observer the clock is read exactly as before', async () => {
     const api = fakeApi([() => jsonResponse(answer())]);
     const { deps, harness } = fakeDeps(api.client);

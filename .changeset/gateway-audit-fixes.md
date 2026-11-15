@@ -9,3 +9,5 @@ Require an ISO 8601 date-time with an offset for a registry price's `validFrom`,
 Say in `ReservationError` that the reservation may be in the ledger, open at its worst case, when an attempt reached the store before failing.
 
 Reject a timeout above 2,147,483,647 ms at startup and per request. Node fires a longer `setTimeout` after 1 ms, which made every call time out.
+
+End a span's `durationMs` before the observer's own price read, so tracing no longer adds that read to the measured call.
