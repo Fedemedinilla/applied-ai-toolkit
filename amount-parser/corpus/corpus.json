@@ -2057,5 +2057,70 @@
   "corrected": false,
   "source": "audit",
   "earlier_parser": "ambiguous range"
+ },
+ {
+  "phrase": "vendi el auto en un millon ochocientos cincuenta mil",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "income",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1850000,
+  "ambiguous": false,
+  "note": "A million and then a whole thousands group of two words: 1.000.000 + 850 x 1.000 = 1.850.000. Only the first word of the group used to be scaled.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1800050"
+ },
+ {
+  "phrase": "cobre dos millones quinientos cincuenta mil por la obra",
+  "family": "income-verbs",
+  "kind": "income",
+  "quantity": null,
+  "unit_price": null,
+  "total": 2550000,
+  "ambiguous": false,
+  "note": "2.000.000 + 550 x 1.000 = 2.550.000. The \"mil\" closes the whole group, not only \"quinientos\".",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "2500050"
+ },
+ {
+  "phrase": "gaste un millon doscientos cincuenta en la camioneta",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1250000,
+  "ambiguous": false,
+  "note": "The colloquial reading of \"un millon doscientos\" (1.200.000) applied to a two-word group: the bare group after a million is thousands, so 1.250.000. Nobody says this for 1.000.250.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1200050"
+ },
+ {
+  "phrase": "pague un millon trescientos cuarenta y cinco mil seiscientos de deuda",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1345600,
+  "ambiguous": false,
+  "note": "The full standard reading: a million, 345 thousand, 600. The group after the explicit \"mil\" is plain units, not thousands again.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1900045"
+ },
+ {
+  "phrase": "gaste un millon trescientos mil quinientos en materiales",
+  "family": "slang-and-fuzzy-amounts",
+  "kind": "expense",
+  "quantity": null,
+  "unit_price": null,
+  "total": 1300500,
+  "ambiguous": false,
+  "note": "\"quinientos\" after the \"mil\" is units: 1.000.000 + 300.000 + 500 = 1.300.500.",
+  "corrected": false,
+  "source": "audit",
+  "earlier_parser": "1800000"
  }
 ]

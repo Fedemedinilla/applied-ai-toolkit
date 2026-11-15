@@ -55,6 +55,7 @@ export function readWordNumber(
   let current = 0;
   let found = false;
   let usedMillion = false;
+  let scaledAfterMillion = false;
   let lastScale = 1;
   let i = start;
 
@@ -66,14 +67,6 @@ export function readWordNumber(
 
     const unit = NUMBER_WORDS[t];
     if (unit !== undefined) {
-      // "un millon doscientos" is said for 1.200.000: after a million, a bare group under a
-      // thousand is understood as thousands. That is the colloquial reading, and the corpus
-      // agrees with it.
-      if (usedMillion && current === 0 && total >= 1_000_000) {
-        current = unit * 1000;
-        found = true;
-        continue;
-      }
       current = current === 0 ? unit : current + unit;
       found = true;
       continue;
@@ -81,13 +74,9 @@ export function readWordNumber(
 
     const scale = scales[t];
     if (scale !== undefined) {
-      if (usedMillion && current >= 1000) {
-        // "un millon doscientos mil": the group already carries its own thousands.
-        total += current;
-        current = 0;
-        found = true;
-        continue;
-      }
+      // A scale after the million closes the group in front of it ("un millon doscientos cincuenta
+      // MIL"), so what follows is read as it is said ("... mil quinientos" is 500, not 500.000).
+      if (usedMillion && scale < 1_000_000) scaledAfterMillion = true;
       // "mil millones": a bigger scale after a smaller one multiplies what came before it.
       // Adding them would give 1.001.000 for a thousand million.
       if (scale > lastScale && total > 0 && current === 0) {
@@ -110,6 +99,10 @@ export function readWordNumber(
   }
 
   if (!found) return null;
+  // "un millon doscientos" is said for 1.200.000, and "un millon doscientos cincuenta" for
+  // 1.250.000: after a million, a bare group under a thousand with no scale of its own is
+  // understood as thousands. That is the colloquial reading, and the corpus agrees with it.
+  if (usedMillion && !scaledAfterMillion && total >= 1_000_000 && current > 0 && current < 1000) current *= 1000;
   const value = total + current;
   return Number.isFinite(value) && value > 0 ? { value, consumed: i - start, lastScale } : null;
 }
