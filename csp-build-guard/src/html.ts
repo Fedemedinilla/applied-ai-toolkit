@@ -21,8 +21,14 @@ export interface InlineItem {
 
 export interface PageParts {
   readonly inline: readonly InlineItem[];
-  /** `src` of external scripts, in document order. */
+  /**
+   * `src` of external scripts a browser with module support loads, in document order. A classic
+   * script with `nomodule` is skipped there ("prepare the script element"), so it is listed in
+   * `nomoduleSrcs` instead.
+   */
   readonly scriptSrcs: readonly string[];
+  /** `src` of classic scripts with `nomodule`, the legacy bundles only old browsers load. */
+  readonly nomoduleSrcs: readonly string[];
   /** `href` of `<link rel="modulepreload">`. */
   readonly modulePreloads: readonly string[];
   /** `component-url`, `renderer-url` and `before-hydration-url` of `<astro-island>` elements. */
@@ -37,6 +43,8 @@ export interface PageParts {
   readonly ignoredMetaPolicies: ReadonlyArray<{ readonly content: string; readonly where: string }>;
   /** Text of inline scripts that run as JavaScript (classic or module), for import and syntax scans. */
   readonly inlineJs: readonly string[];
+  /** `inlineJs` without classic `nomodule` scripts: what a browser with module support runs on load. */
+  readonly inlineJsOnLoad: readonly string[];
   /**
    * True when a `<meta>` policy comes after a script, style or stylesheet link. A meta policy only
    * applies to what the parser meets after it, so anything earlier runs unrestricted.
@@ -110,6 +118,8 @@ const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)(?=[\s/>])((?:[^>"']|"[^"]*
 export function parsePage(html: string): PageParts {
   const inline: InlineItem[] = [];
   const scriptSrcs: string[] = [];
+  const nomoduleSrcs: string[] = [];
+  const inlineJsOnLoad: string[] = [];
   const modulePreloads: string[] = [];
   const islandUrls: string[] = [];
   const metaPolicies: string[] = [];
@@ -155,8 +165,11 @@ export function parsePage(html: string): PageParts {
     if (rawElement === 'script') {
       const src = attrs.get('src');
       const kind = scriptKind(attrs.get('type'));
+      // nomodule only applies to classic scripts; a module script with it still runs.
+      const legacy = kind === 'js' && attrs.has('nomodule');
       if (src !== undefined) {
-        if (kind === 'js' || kind === 'module') scriptSrcs.push(src);
+        if (legacy) nomoduleSrcs.push(src);
+        else if (kind === 'js' || kind === 'module') scriptSrcs.push(src);
         continue;
       }
       if (kind === 'data') continue;
@@ -165,7 +178,10 @@ export function parsePage(html: string): PageParts {
       // is empty, so an empty <script></script> needs no hash. Whitespace-only text is still checked.
       if (text === '') continue;
       add('script-elem', text, `<script${kind === 'module' ? ' type="module"' : kind === 'checked' ? ` type="${attrs.get('type')}"` : ''}>`);
-      if (kind !== 'checked') inlineJs.push(text);
+      if (kind !== 'checked') {
+        inlineJs.push(text);
+        if (!legacy) inlineJsOnLoad.push(text);
+      }
     } else if (rawElement === 'style') {
       add('style-elem', m[3] ?? '', '<style>');
     } else if (tagName === 'link') {
@@ -186,5 +202,5 @@ export function parsePage(html: string): PageParts {
       }
     }
   }
-  return { inline, scriptSrcs, modulePreloads, islandUrls, metaPolicies, ignoredMetaPolicies, inlineJs, metaAfterContent };
+  return { inline, scriptSrcs, nomoduleSrcs, modulePreloads, islandUrls, metaPolicies, ignoredMetaPolicies, inlineJs, inlineJsOnLoad, metaAfterContent };
 }

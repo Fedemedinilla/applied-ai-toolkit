@@ -37,6 +37,14 @@ describe('parsePage', () => {
     expect(parts.scriptSrcs).toEqual(['/a.js']);
   });
 
+  it('keeps classic nomodule scripts out of the on-load lists, and in the inline scan list', () => {
+    const parts = parsePage('<script nomodule src="/legacy.js"></script><script nomodule>old()</script><script type="module" nomodule src="/m.js"></script><script>now()</script>');
+    expect(parts.scriptSrcs).toEqual(['/m.js']);
+    expect(parts.nomoduleSrcs).toEqual(['/legacy.js']);
+    expect(parts.inlineJs).toEqual(['old()', 'now()']);
+    expect(parts.inlineJsOnLoad).toEqual(['now()']);
+  });
+
   it('reads a ">" inside a quoted attribute as part of the attribute', () => {
     const { scriptSrcs, inline } = parsePage('<script data-x="a>b" src="/x.js"></script><script data-y=\'>\'>run()</script>');
     expect(scriptSrcs).toEqual(['/x.js']);

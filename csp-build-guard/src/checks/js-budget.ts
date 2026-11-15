@@ -1,7 +1,8 @@
 /**
  * Check 5. The JavaScript a page makes the browser download on load, compressed, against a budget:
  * external scripts, modulepreload links, Astro island URLs, inline scripts, and every module those
- * import statically. Dynamic import() calls do not count, since they load later, on demand. Sizes
+ * import statically. Dynamic import() calls do not count, since they load later, on demand, and
+ * neither do classic nomodule scripts, which a browser with module support never loads. Sizes
  * are gzip level 9 and brotli quality 11 of each file; 1 kB is 1000 bytes.
  */
 import { readFileSync } from 'node:fs';
@@ -75,7 +76,7 @@ export function checkJsBudget(ctx: Context): CheckResult {
     const from = pageUrl(ctx.site, page.path);
     const queue: Array<{ from: string; url: string; specifier: boolean }> = [
       ...[...page.parts.scriptSrcs, ...page.parts.modulePreloads, ...page.parts.islandUrls].map((url) => ({ from, url, specifier: false })),
-      ...page.parts.inlineJs.flatMap((code) => staticImports(code).map((url) => ({ from, url, specifier: true }))),
+      ...page.parts.inlineJsOnLoad.flatMap((code) => staticImports(code).map((url) => ({ from, url, specifier: true }))),
     ];
     const seen = new Map<string, Sizes>();
     const unmeasured: Array<{ url: string; reason: string }> = [];
@@ -96,7 +97,7 @@ export function checkJsBudget(ctx: Context): CheckResult {
       for (const url of imports) queue.push({ from: resolved.url, url, specifier: true });
     }
     // Inline scripts travel inside the compressed HTML; each is measured on its own, which can only overcount.
-    const inlineSizes = page.parts.inlineJs.map((code) => compressedSizes(Buffer.from(code))).reduce(add, ZERO);
+    const inlineSizes = page.parts.inlineJsOnLoad.map((code) => compressedSizes(Buffer.from(code))).reduce(add, ZERO);
     const total = [...seen.values()].reduce(add, inlineSizes);
     const files = [...seen].map(([url, sizes]) => ({ url, ...sizes })).sort((a, b) => b.gzip - a.gzip);
     weights.push({

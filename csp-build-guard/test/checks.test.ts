@@ -127,6 +127,26 @@ describe('js-budget inputs', () => {
   });
 });
 
+describe('js-budget nomodule', () => {
+  it('leaves out classic nomodule scripts, which a browser with module support never loads', () => {
+    const legacy = 'var x=' + JSON.stringify(Array.from({ length: 4000 }, (_, i) => `legacy-${i}`));
+    const report = guard(
+      {
+        'index.html': `<script type="module" src="/app.js"></script><script nomodule src="/legacy.js"></script><script nomodule>${legacy}</script><script type="module" nomodule src="/m.js"></script>`,
+        'app.js': 'run()',
+        'legacy.js': legacy,
+        'm.js': 'go()',
+      },
+      { budgets: [{ pages: '**/*.html', gzipKb: 1 }] },
+    );
+    expect(check(report, 'js-budget')?.status).toBe('pass');
+    const weight = (check(report, 'js-budget')?.details as Array<{ files: Array<{ url: string }>; inline: { raw: number } }>)[0];
+    // A module script ignores nomodule, so /m.js counts.
+    expect(weight?.files.map((f) => f.url).sort()).toEqual(['/app.js', '/m.js']);
+    expect(weight?.inline.raw).toBe(0);
+  });
+});
+
 describe('js-budget globs', () => {
   it('fails a budget whose glob matches no page, which would otherwise measure nothing', () => {
     const files = { 'index.html': '<script src="/a.js"></script>', 'a.js': 'run()' };
