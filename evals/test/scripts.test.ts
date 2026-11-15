@@ -73,3 +73,15 @@ describe('runs.ts', () => {
     expect(ok.stdout).toContain('V0: 1/1 pass');
   });
 });
+
+describe('report.ts', () => {
+  it('refuses an empty margin and the --name=value form', () => {
+    const run = file('run.json', JSON.stringify({ format: 'evals-run/1', rubric: { name: 'r', version: '1' }, label: 'x', results: [{ case: 'c', sample: 1, status: 'scored', pass: true, metrics: {} }], tables: [] }));
+    const empty = node(script('report'), run, run, join(dir, 'r1.html'), '--margin', '');
+    expect(empty.status).toBe(2);
+    expect(empty.stderr).toContain('--margin must be a number');
+    expect(existsSync(join(dir, 'r1.html'))).toBe(false);
+    expect(node(script('report'), run, run, join(dir, 'r2.html'), '--margin=0.5').status).toBe(2);
+    expect(node(script('report'), run, run, join(dir, 'r3.html'), '--margin', '0.5').status).toBe(0);
+  });
+});

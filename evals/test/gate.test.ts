@@ -249,6 +249,17 @@ describe('the gate script', () => {
     expect(cli(big, near, '--margin', '0.02').status).toBe(3);
   });
 
+  it('refuses a margin written as --margin=value, or empty, instead of using another one', () => {
+    const same = file('same-margin.json', run('main', 36, 40));
+    const eq = cli(main, same, '--margin=0.5');
+    expect(eq.status).toBe(2);
+    expect(eq.stderr).toContain('--margin=0.5: write the value as a separate argument (--margin 0.5)');
+    const empty = cli(main, same, '--margin', '');
+    expect(empty.status).toBe(2);
+    expect(empty.stderr).toContain('--margin must be a number');
+    expect(cli(main, same, '--margin', '0.5').status).toBe(0);
+  });
+
   it('exits 2, not 1, when the summary file cannot be written', () => {
     const same = file('same.json', run('pr', 36, 40));
     expect(cli(main, same).status).toBe(3);

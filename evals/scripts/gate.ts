@@ -18,7 +18,7 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { DEFAULT_MARGIN, gate, gateMarkdown, GateRefusal, gateText } from '../src/gate.ts';
 import { parseRun, RunError, type StoredRun } from '../src/run.ts';
-import { flag, hasFlag, positional, usageError } from './cli.ts';
+import { flag, hasFlag, numberFlag, positional, usageError } from './cli.ts';
 
 const USAGE = 'usage: node evals/scripts/gate.ts <baseline.json> <candidate.json> [--margin 0.1] [--json | --markdown] [--summary <file>] [--allow-missing]';
 const [baselinePath, candidatePath] = positional(2, USAGE) as [string, string];
@@ -40,7 +40,7 @@ function load(path: string): StoredRun {
 
 let result;
 try {
-  result = gate(load(baselinePath), load(candidatePath), { margin: Number(flag('margin', String(DEFAULT_MARGIN))), allowMissing: hasFlag('allow-missing') });
+  result = gate(load(baselinePath), load(candidatePath), { margin: numberFlag('margin', DEFAULT_MARGIN), allowMissing: hasFlag('allow-missing') });
 } catch (e) {
   if (e instanceof GateRefusal) usageError(`gate: REFUSED (exit 2)\n${e.message}`);
   throw e;
