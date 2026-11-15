@@ -120,3 +120,27 @@ describe('cleanup on the push service answer', () => {
     expect((await store.list()).map((s) => s.endpoint)).toEqual([alive.endpoint]);
   });
 });
+
+describe('the host web-push connects to', () => {
+  // The allowlist reads the host with WHATWG URL and web-push connects to the host url.parse
+  // reads. Whatever a visitor puts between a private address and a push suffix, an accepted
+  // endpoint must be sent to the push service and nowhere else.
+  const separators = Array.from({ length: 0x7e - 0x21 + 1 }, (_, i) => String.fromCharCode(0x21 + i));
+
+  it('is the push service for every endpoint the default allowlist accepts', async () => {
+    const store = memoryStore();
+    const handler = createHandler({ store, send: webPushSender(vapid), vapid, minIntervalMs: 0 });
+    const post = (path: string, body: unknown) =>
+      handler(new Request(`http://lab.test/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+    const accepted: string[] = [];
+    for (const c of separators) {
+      const endpoint = `https://10.0.0.5${c}.push.apple.com/x`;
+      if ((await post('subscribe', { endpoint, keys: fakeDevice(c).keys })).status >= 300) continue;
+      accepted.push(endpoint);
+      await post('test', { endpoint, kind: 'test' });
+    }
+    const wrong = service.sent.filter((req) => !req.host.endsWith('.push.apple.com'));
+    expect(wrong.map((req) => req.host)).toEqual([]);
+    expect(service.sent.length).toBeLessThanOrEqual(accepted.length);
+  });
+});

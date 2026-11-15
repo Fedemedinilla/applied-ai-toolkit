@@ -265,6 +265,11 @@ describe('endpoints outside the known push services', () => {
     ['a look-alike host', 'https://web.push.apple.com.example.test/x'],
     ['another Google host', 'https://storage.googleapis.com/bucket/x'],
     ['a push host on another port', 'https://web.push.apple.com:8443/x'],
+    // WHATWG URL keeps ';' in the host and reads a push suffix; web-push's url.parse connects to
+    // the part before it.
+    ['an internal address hidden before a ; in the host', 'https://127.0.0.1;.push.apple.com/admin'],
+    ['a metadata address hidden before a ; in the host', 'https://169.254.169.254;.notify.windows.com/latest/meta-data'],
+    ['another host hidden before a ; in the host', 'https://evil.test;.x.push.apple.com/x'],
   ])('refuses %s on subscribe and on test, and sends nothing', async (_label, endpoint) => {
     const { call, store, sent } = strict();
     const subscribe = await call('api/subscribe', { ...fakeDevice('x'), endpoint });

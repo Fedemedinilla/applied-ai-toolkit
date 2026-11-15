@@ -140,6 +140,10 @@ export function serviceOf(endpoint: string): 'apple' | 'google' | 'mozilla' | 'w
   // A port or credentials in the URL are never part of a push endpoint.
   if (url.protocol !== 'https:' || url.port !== '' || url.username !== '' || url.password !== '') return 'other';
   const host = url.hostname;
+  // Letters, digits, dots and hyphens only. WHATWG URL keeps characters such as ';' in a host,
+  // while web-push picks the host it connects to with the legacy url.parse, which stops there:
+  // https://127.0.0.1;.push.apple.com/ reads as Apple here and connects to 127.0.0.1.
+  if (!/^[a-z0-9.-]+$/u.test(host)) return 'other';
   const match = PUSH_HOSTS.find(({ suffix, exact }) => host === suffix || (!exact && host.endsWith(`.${suffix}`)));
   return match?.service ?? 'other';
 }
