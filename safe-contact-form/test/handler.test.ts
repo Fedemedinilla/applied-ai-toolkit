@@ -1,7 +1,7 @@
 // The handler end to end: a Request in, the emails the fake Resend received and the Response out.
 
 import { describe, expect, it } from 'vitest';
-import { createContactHandler, resendTransport, type ContactConfig, type ContactEvent } from '../src/index.ts';
+import { createContactHandler, resendTransport, TEXTS, type ContactConfig, type ContactEvent } from '../src/index.ts';
 import { FAKE_KEY, fakeResend } from './helpers/fake-resend.ts';
 
 const SITE = 'https://studio.example';
@@ -415,6 +415,34 @@ describe('request shape', () => {
     });
     const req = new Request(`${SITE}/api/contact`, { method: 'POST', headers: { 'content-type': 'application/json', origin: SITE }, body: stream, duplex: 'half' } as RequestInit);
     expect((await s.handler(req, ctx())).status).toBe(413);
+  });
+});
+
+describe('the body limit fits what the form allows', () => {
+  it('a native post of 5000 CJK characters, within the textarea maxlength, gets through', async () => {
+    // Each 3-byte character is 9 bytes once percent-encoded: about 45 KB for the message alone.
+    const s = setup();
+    const req = asForm(good(s.now, { lang: 'es', full_name: '例'.repeat(100), topic: '例'.repeat(90), body: '例'.repeat(5000) }));
+    const res = await s.handler(req, ctx());
+    expect(res.status).toBe(200);
+    expect(s.resend.sent).toHaveLength(2);
+  });
+
+  it('a body over the limit gets a page that says it is too long, not that details are missing', async () => {
+    const s = setup({ maxBodyBytes: 1024 });
+    const res = await s.handler(asForm(good(s.now, { body: 'x'.repeat(2000) })), ctx());
+    expect(res.status).toBe(413);
+    const html = await res.text();
+    expect(html).toContain('The message is too long.');
+    expect(html).not.toContain('Some details are missing.');
+  });
+
+  it('custom texts without a too-long page fall back to the invalid page', async () => {
+    const { tooLarge: _dropped, ...pages } = TEXTS.en.pages;
+    const s = setup({ maxBodyBytes: 1024, texts: { en: { ...TEXTS.en, pages } } });
+    const res = await s.handler(asForm(good(s.now, { body: 'x'.repeat(2000) })), ctx());
+    expect(res.status).toBe(413);
+    expect(await res.text()).toContain('Some details are missing.');
   });
 });
 

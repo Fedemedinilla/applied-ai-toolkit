@@ -31,7 +31,7 @@ export const POST = createContactHandler({
 
 ## What a submit goes through
 
-1. Any method but POST gets 405 with `Allow: POST`. A content type other than JSON, urlencoded or multipart gets 415, so a cross-site page cannot send JSON as `text/plain` and skip the CORS preflight. A body over `maxBodyBytes` (32 KiB) gets 413; the body is read up to that limit even with no `Content-Length`.
+1. Any method but POST gets 405 with `Allow: POST`. A content type other than JSON, urlencoded or multipart gets 415, so a cross-site page cannot send JSON as `text/plain` and skip the CORS preflight. A body over `maxBodyBytes` (64 KiB) gets 413 and a page that says the message is too long; the body is read up to that limit even with no `Content-Length`. The default fits the example form's caps posted natively in CJK, where each character is 9 bytes once percent-encoded.
 2. **Origin.** When the browser sends `Origin`, it must be one of the request's own origins or `allowedOrigins`. `"null"` never matches. A request with no `Origin` (an old client, a script) goes on to the next checks.
 3. **Trap field.** A hidden field (`fax_number` by default) that only bots fill. A filled one answers success and sends nothing.
 4. **Clock.** A submit less than `minFillMs` (2,500 ms) after the page's script stamped `rendered_at` answers success and sends nothing.

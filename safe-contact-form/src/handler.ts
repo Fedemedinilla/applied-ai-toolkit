@@ -70,7 +70,11 @@ export interface ContactConfig {
   readonly allowedOrigins?: readonly string[];
   /** Read X-Forwarded-Host and X-Forwarded-Proto to rebuild the public origin. Default true. */
   readonly trustForwardedHeaders?: boolean;
-  /** Request bodies above this many bytes get 413. Default 32 KiB. */
+  /**
+   * Request bodies above this many bytes get 413. Default 64 KiB: a native urlencoded post
+   * percent-encodes each CJK character as 9 bytes, so the example form's caps (5,350 characters)
+   * can reach about 48 KB.
+   */
   readonly maxBodyBytes?: number;
   readonly sendAcknowledgment?: boolean;
   readonly texts?: Partial<Record<Lang, Texts>>;
@@ -161,7 +165,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
   const minFill = config.minFillMs ?? 2_500;
   const quoteMax = config.quoteMax ?? 300;
   const greetingMax = config.greetingMax ?? 32;
-  const maxBody = config.maxBodyBytes ?? 32 * 1024;
+  const maxBody = config.maxBodyBytes ?? 64 * 1024;
   const log = config.log ?? (() => {});
   const textsFor = (lang: Lang): Texts => config.texts?.[lang] ?? TEXTS[lang];
 
@@ -171,7 +175,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
   /** The page a browser without JavaScript lands on. Same template for success and errors. */
   const page = (lang: Lang, key: keyof Texts['pages'], status: number) => {
     const t = textsFor(lang);
-    const p: PageText = t.pages[key];
+    const p: PageText = t.pages[key] ?? t.pages.invalid;
     const body = fill(p.body, { address: config.publicAddress });
     const html =
       `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">` +
@@ -194,7 +198,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
     limited: 'limited',
     not_configured: 'unavailable',
     send_failed: 'unavailable',
-    too_large: 'invalid',
+    too_large: 'tooLarge',
     media_type: 'invalid',
     method: 'invalid',
   };
