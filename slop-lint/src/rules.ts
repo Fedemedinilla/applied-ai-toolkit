@@ -1303,6 +1303,24 @@ const mail: Rule[] = [
     deviation: 'The report gives no tier, so it is level 2 at medium severity, like the other calques of section 11 (REG-02). It also matches the plural and spaces around the slash.',
     examples: [{ lang: 'es', fire: 'Estimado/a equipo:', pass: 'Estimada Laura:' }],
   },
+  {
+    kind: 'pattern',
+    id: 'MAIL-03',
+    name: 'Generic subject line',
+    lang: 'es',
+    level: 2,
+    severity: 'medium',
+    // Without the m flag, ^ is the start of the text: only a subject on the first line counts.
+    patterns: { es: String.raw`(?<=^\s*(?:asunto|subject)[ \t]*:[^\n]*)${B}oportunidad(?:es)? emocionantes?${E}` },
+    flags: 'giu',
+    message: 'Generic subject. It says nothing the reader can sort the mail by.',
+    suggestion: 'Role, name and one fact: "Analista de datos · Ana Ruiz · Power BI y Python".',
+    source: { evidence: ['SÍNTESIS'], ref: 'Section 11, item 8 (subject: role, name and a fact; not "Oportunidad emocionante")', section: '11' },
+    deviation:
+      'The subject is read from a first line that starts with "Asunto:" or "Subject:" (design decision D6). The report names one generic ' +
+      'subject and no list, so only that phrase and its plural are matched; a subject that lacks the role, the name or the fact is not reported.',
+    examples: [{ lang: 'es', fire: 'Asunto: Oportunidad emocionante\n\nHola, Laura:', pass: 'Asunto: Analista de datos · Ana Ruiz · Power BI\n\nHola, Laura:' }],
+  },
 ];
 
 export const GENRE_RULES: readonly Rule[] = [...mail];
