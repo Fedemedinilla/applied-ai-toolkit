@@ -47,13 +47,15 @@ export function htmlDocument(body: string, lang: string, title: string): string 
 }
 
 /**
- * A bare domain with any TLD: labels of letters, digits, `_` or `-` joined by dots, ending in a TLD
- * of two or more letters in any script or a punycode one, plus whatever follows up to whitespace.
+ * A bare domain with any TLD: labels of letters, combining marks, digits, `_` or `-` joined by
+ * dots, ending in a TLD of two or more letters in any script or a punycode one, plus whatever
+ * follows up to whitespace. Marks count because Devanagari or Tamil words (`.भारत`) and a
+ * decomposed accent (`cafe` plus U+0301) carry them inside the label.
  * The edges are lookarounds because `\b` only knows ASCII letters and would miss `пример.рф`. No
  * dot in the lookbehind, so a domain right after an ellipsis still starts a match. The cost is a
  * few false positives in the quote ("gracias.Saludos", "EE.UU."), which is the cheaper mistake.
  */
-const DOMAIN = /(?<![\p{L}\p{N}_-])[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.(?:\p{L}{2,}|xn--[a-z0-9-]+)(?![\p{L}\p{N}_-])\S*/giu;
+const DOMAIN = /(?<![\p{L}\p{M}\p{N}_-])[\p{L}\p{M}\p{N}_-]+(?:\.[\p{L}\p{M}\p{N}_-]+)*\.(?:\p{L}[\p{L}\p{M}]+|xn--[a-z0-9-]+)(?![\p{L}\p{M}\p{N}_-])\S*/giu;
 
 /** Removes Markdown links, URLs, `www.` hosts and bare domains, writing `placeholder` instead. */
 export function stripLinks(s: string, placeholder: string): string {
