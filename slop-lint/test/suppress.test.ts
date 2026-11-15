@@ -175,6 +175,13 @@ describe('an invalid directive', () => {
     }
   });
 
+  it('reports a rule that cannot run on this file: another language, or plain text only in Markdown', () => {
+    const other = md(`<!-- slop-lint-disable-next-line LEX-01 -->\nThe team shipped the report in May.`);
+    expect(problems(other)).toEqual([['SUP-03', 1, expect.stringMatching(/^LEX-01 is not a rule that applies to this file/u)]]);
+    const plain = md(`<!-- slop-lint-disable-next-line FMT-01 -->\nI use **Python** daily.`);
+    expect(problems(plain)).toEqual([['SUP-03', 1, expect.stringMatching(/^FMT-01 is not a rule that applies to this file/u)]]);
+  });
+
   it('reports a rule the config turned off, and an enable with nothing to close', () => {
     const { rules } = settingsFor({ ruleSettings: { 'LEX-03': 'off' } }, undefined);
     const off = md(`<!-- slop-lint-disable-next-line LEX-03 -->\n${BANNED}`, { rules });

@@ -122,7 +122,7 @@ export function applyDirectives(
     for (const id of d.ids) {
       const rule = byId.get(id);
       if (!rule) {
-        problem('SUP-03', d, `${id} is not a rule that applies to this file: it does not exist, or the config turns it off`);
+        problem('SUP-03', d, `${id} is not a rule that applies to this file: it does not exist, the config turns it off, or it does not run on this language or format`);
       } else if (rule.severity === 'disqualify' && !options.allowDisqualify) {
         problem('SUP-02', d, `${id} has the severity disqualify, which a comment in the text cannot suppress; suppressions.allowDisqualify in the config allows it`);
       } else {

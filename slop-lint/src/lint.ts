@@ -233,10 +233,12 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
 
   // Directives are applied last, on finished findings: a suppressed hit has already spent its
   // rule's budget and its place in the Tier 2 pool, so suppressing it never changes another finding.
+  // Only the rules that ran can be named: a rule of the other language, or a plain-text rule in
+  // Markdown, is SUP-03, not an unused SUP-01.
   const view = mode.view;
   const applied =
     view && (view.directives.length > 0 || view.directiveIssues.length > 0)
-      ? applyDirectives(all, view.directives, view.directiveIssues, rules, { allowDisqualify: options.suppressions?.allowDisqualify ?? false }, source, starts)
+      ? applyDirectives(all, view.directives, view.directiveIssues, rules.filter((r) => appliesTo(r, lang) && active(r)), { allowDisqualify: options.suppressions?.allowDisqualify ?? false }, source, starts)
       : { kept: all, suppressed: [], problems: [] };
   const findings = applied.kept;
 
