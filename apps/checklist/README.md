@@ -23,7 +23,7 @@ node apps/checklist/scripts/icons.ts                            # redraws the ic
 
 The output uses relative URLs only (`base: './'`), so it works at a domain root or under a subpath. The service worker needs `localhost` or HTTPS.
 
-The build (Vite 8.3.4) writes 41.37 kB of JavaScript, 14.34 kB gzipped, 7.14 kB of CSS and a 2.14 kB service worker. The catalogue is a separate 109 kB `catalogue.json`, fetched at start and precached. csp-build-guard checks the build under a strict policy given as a `literal` (`'self'` only, no inline script or style, no plugins). It finds no regex lookbehind and measures `index.html` at 14.2 kB gzip and 12.8 kB brotli, under a 20 kB budget.
+The build (Vite 8.3.4) writes 44.88 kB of JavaScript, 15.37 kB gzipped, 9.17 kB of CSS and a 2.24 kB service worker. It also emits the three IBM Plex fonts of `apps/shared/brand.css` as woff2 files of 14.70, 20.30 and 45.71 kB, so a first visit downloads and precaches about 81 kB of fonts. The catalogue is a separate 109 kB `catalogue.json`, fetched at start and precached. csp-build-guard checks the build under a strict policy given as a `literal` (`'self'` only, no inline script or style, no plugins). It finds no regex lookbehind and measures `index.html` at 15.2 kB gzip and 13.7 kB brotli, under budgets of 20 kB gzip and 18 kB brotli.
 
 ## The flow
 
