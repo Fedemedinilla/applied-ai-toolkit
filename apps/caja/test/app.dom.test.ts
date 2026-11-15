@@ -309,15 +309,15 @@ describe('tabs and the phrases tab', () => {
     expect($('#panel-frases').hidden).toBe(false);
 
     await vi_waitFor(() => document.querySelectorAll('#corpus-list li').length > 0);
-    expect(document.querySelectorAll('#corpus-list li')).toHaveLength(165);
-    expect(text('#corpus-count')).toBe('Mostrando 165 de 165 frases. El parser coincide con el corpus en 164 de 165.');
+    expect(document.querySelectorAll('#corpus-list li')).toHaveLength(194);
+    expect(text('#corpus-count')).toBe('Mostrando 194 de 194 frases. El parser coincide con el corpus en 193 de 194.');
 
     const q = $<HTMLInputElement>('#corpus-q');
     q.value = 'docena';
     q.dispatchEvent(new Event('input', { bubbles: true }));
     const shown = document.querySelectorAll('#corpus-list li').length;
     expect(shown).toBeGreaterThan(0);
-    expect(shown).toBeLessThan(165);
+    expect(shown).toBeLessThan(194);
     expect(text('#corpus-list li:first-child')).toContain('Familia');
 
     $<HTMLButtonElement>('#tab-frases').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
@@ -337,7 +337,7 @@ describe('tabs and the phrases tab', () => {
     await vi_waitFor(() => text('#corpus-count').startsWith('No se pudieron'));
     click('#tab-caja');
     click('#tab-frases');
-    await vi_waitFor(() => document.querySelectorAll('#corpus-list li').length === 165);
+    await vi_waitFor(() => document.querySelectorAll('#corpus-list li').length === 194);
     expect(calls).toBe(2);
     // Opening it once more does not fetch again.
     click('#tab-caja');

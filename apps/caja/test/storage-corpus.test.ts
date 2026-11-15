@@ -126,8 +126,8 @@ describe('corpus tab data', () => {
   const cases = readCorpus(raw);
   const lines = corpusLines(cases);
 
-  it('reads all 165 phrases in 15 families', () => {
-    expect(cases).toHaveLength(165);
+  it('reads all 194 phrases in 15 families', () => {
+    expect(cases).toHaveLength(194);
     expect(families(cases)).toHaveLength(15);
   });
 
@@ -153,7 +153,7 @@ describe('corpus tab data', () => {
     const iva = filterLines(lines, { text: '', family: 'tax-and-discounts', asksOnly: true });
     expect(iva.length).toBeGreaterThan(0);
     expect(iva.every((l) => l.case.family === 'tax-and-discounts' && l.parsed?.ambiguous)).toBe(true);
-    expect(filterLines(lines, { text: '', family: '', asksOnly: false })).toHaveLength(165);
+    expect(filterLines(lines, { text: '', family: '', asksOnly: false })).toHaveLength(194);
   });
 });
 
