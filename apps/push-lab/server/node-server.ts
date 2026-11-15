@@ -92,6 +92,21 @@ async function sendResponse(res: ServerResponse, response: Response): Promise<vo
   res.end(response.body ? Buffer.from(await response.arrayBuffer()) : undefined);
 }
 
+export const DEFAULT_PORT = 4330;
+
+/**
+ * The port for a PORT value: the default when it is absent or blank, a whole number from 1 to
+ * 65535 otherwise. Anything else throws. `Number('')` is 0, and port 0 makes Node pick a random
+ * one, so an empty PORT used to start the lab where nobody could find it.
+ */
+export function portFrom(value: string | undefined): number {
+  const text = (value ?? '').trim();
+  if (text === '') return DEFAULT_PORT;
+  const port = /^\d+$/u.test(text) ? Number(text) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`PORT must be a whole number from 1 to 65535, got "${value}"`);
+  return port;
+}
+
 export interface NodeServerOptions {
   readonly handler: (request: Request) => Promise<Response>;
   /** The build output (dist/apps/push-lab). */

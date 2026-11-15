@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { connect, type AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createHandler } from '../server/handler.ts';
-import { createNodeServer, CSP, resolveStatic } from '../server/node-server.ts';
+import { createNodeServer, CSP, DEFAULT_PORT, portFrom, resolveStatic } from '../server/node-server.ts';
 import { memoryStore } from '../server/store.ts';
 import { generateVapidPair } from '../server/vapid.ts';
 import { fakeDevice } from './helpers/fake-push-service.ts';
@@ -162,5 +162,24 @@ describe('a request target the URL parser refuses', () => {
   it.each(['//[', '//a:99999/'])('answers 400 to %s and keeps serving', async (target) => {
     expect(await rawRequest(target)).toMatch(/^HTTP\/1\.1 400 /u);
     expect((await fetch(`${base}/`)).status).toBe(200);
+  });
+});
+
+describe('portFrom, the PORT variable serve.ts listens on', () => {
+  it('uses the default when PORT is absent or empty, so an empty value is not port 0', () => {
+    expect(DEFAULT_PORT).toBe(4330);
+    expect(portFrom(undefined)).toBe(4330);
+    expect(portFrom('')).toBe(4330);
+    expect(portFrom('  ')).toBe(4330);
+  });
+
+  it('reads a port number', () => {
+    expect(portFrom('8080')).toBe(8080);
+    expect(portFrom(' 1 ')).toBe(1);
+    expect(portFrom('65535')).toBe(65535);
+  });
+
+  it.each(['abc', '0', '65536', '80.5', '-1', '0x50'])('refuses %s with an error that names PORT', (value) => {
+    expect(() => portFrom(value)).toThrow(/PORT/u);
   });
 });
