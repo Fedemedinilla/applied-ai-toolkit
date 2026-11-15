@@ -53,6 +53,14 @@ describe('parsePage', () => {
     expect(parts.islandUrls).toEqual(['/d.js', '/e.js', '/f.js']);
   });
 
+  it('turns CRLF and lone CR into LF in attribute values too, as the HTML parser does', () => {
+    const { inline } = parsePage('<button onclick="a();\r\nb()" style="color:red;\rmargin:0">x</button>');
+    expect(inline.map((i) => i.text)).toEqual(['a();\nb()', 'color:red;\nmargin:0']);
+    expect(inline[0]?.hashes.sha256).toBe(sha256('a();\nb()'));
+    // A CR written as a character reference survives, as in the browser.
+    expect(parsePage('<p onclick="a()&#13;">').inline[0]?.text).toBe('a()\r');
+  });
+
   it('records event handlers and style attributes with their decoded values', () => {
     const { inline } = parsePage(`<button ONCLICK="go(&quot;x&quot;)" style='color:red'>x</button>`);
     expect(inline.map((i) => [i.kind, i.label, i.text])).toEqual([

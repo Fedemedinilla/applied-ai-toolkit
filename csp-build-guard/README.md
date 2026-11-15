@@ -76,7 +76,7 @@ The five checks below map to the five failures above. The report also has a sixt
 
 ### 1. Inline hashes (`inline-hashes`)
 
-A policy that allows inline scripts by hash breaks the moment the script changes. In the source site, `vercel.json` listed one sha256 for a small theme script inlined in every page. Edit that script and the hash no longer matches: the browser blocks it, the wrong theme flashes, and nothing in the build fails. The check hashes every inline `<script>` and `<style>` of every page, the way the browser does (after the HTML parser turns CRLF into LF), and fails when:
+A policy that allows inline scripts by hash breaks the moment the script changes. In the source site, `vercel.json` listed one sha256 for a small theme script inlined in every page. Edit that script and the hash no longer matches: the browser blocks it, the wrong theme flashes, and nothing in the build fails. The check hashes every inline `<script>` and `<style>` of every page, the way the browser does (after the HTML parser turns CRLF into LF, in element content and attribute values alike), and fails when:
 
 - an inline script or style has no listed hash in the directive that governs it (`script-src-elem`, then `script-src`, then `default-src`, as CSP3 falls back);
 - a listed hash matches no inline content on the pages served with that policy. A stale hash keeps allowing a script nobody ships. A hash in a directive that more specific ones shadow (`script-src` next to both `script-src-elem` and `script-src-attr`) is reported too, since it has no effect;

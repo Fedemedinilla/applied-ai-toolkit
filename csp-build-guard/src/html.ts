@@ -11,7 +11,7 @@ export type InlineKind = 'script-elem' | 'script-attr' | 'style-elem' | 'style-a
 
 export interface InlineItem {
   readonly kind: InlineKind;
-  /** The text the browser hashes: element content with CRLF normalized, or the attribute value. */
+  /** The text the browser hashes: element content or the attribute value, with CRLF normalized. */
   readonly text: string;
   /** A short label for reports: the element, or the element and attribute name. */
   readonly label: string;
@@ -108,7 +108,9 @@ export function parsePage(html: string): PageParts {
   let metaAfterContent = false;
   const add = (kind: InlineKind, text: string, label: string) => inline.push({ kind, text, label, hashes: hashSources(text) });
 
-  for (const m of html.matchAll(TOKENS)) {
+  // The HTML parser turns CRLF and lone CR into LF before tokenizing, so element content and
+  // attribute values alike are hashed with LF. A CR written as &#13; is decoded later and stays.
+  for (const m of html.replace(/\r\n?/g, '\n').matchAll(TOKENS)) {
     const whole = m[0];
     if (whole.startsWith('<!--')) continue;
     const rawElement = m[1]?.toLowerCase();
@@ -129,15 +131,14 @@ export function parsePage(html: string): PageParts {
         continue;
       }
       if (kind === 'data') continue;
-      // The HTML parser turns CRLF and lone CR into LF before the browser hashes the text.
-      const text = (m[3] ?? '').replace(/\r\n?/g, '\n');
+      const text = m[3] ?? '';
       // "Prepare the script element" stops before any CSP check when there is no src and the text
       // is empty, so an empty <script></script> needs no hash. Whitespace-only text is still checked.
       if (text === '') continue;
       add('script-elem', text, `<script${kind === 'module' ? ' type="module"' : kind === 'checked' ? ` type="${attrs.get('type')}"` : ''}>`);
       if (kind !== 'checked') inlineJs.push(text);
     } else if (rawElement === 'style') {
-      add('style-elem', (m[3] ?? '').replace(/\r\n?/g, '\n'), '<style>');
+      add('style-elem', m[3] ?? '', '<style>');
     } else if (tagName === 'link') {
       const rel = (attrs.get('rel') ?? '').toLowerCase().split(/\s+/);
       const href = attrs.get('href');
