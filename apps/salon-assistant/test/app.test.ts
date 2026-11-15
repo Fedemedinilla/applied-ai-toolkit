@@ -162,6 +162,13 @@ describe('env', () => {
     expect(historySecretFromEnv({ ASSISTANT_HISTORY_SECRET: 'short' })).toBeNull();
     expect(historySecretFromEnv({ ASSISTANT_HISTORY_SECRET: 'x'.repeat(32) })).toBe('x'.repeat(32));
   });
+
+  it('counts the secret in UTF-8 bytes, with the boundary at 32', () => {
+    expect(historySecretFromEnv({ ASSISTANT_HISTORY_SECRET: 'x'.repeat(31) })).toBeNull();
+    // 'ñ' is two bytes in UTF-8 and one UTF-16 code unit.
+    expect(historySecretFromEnv({ ASSISTANT_HISTORY_SECRET: 'ñ'.repeat(16) })).toBe('ñ'.repeat(16));
+    expect(historySecretFromEnv({ ASSISTANT_HISTORY_SECRET: 'ñ'.repeat(15) + 'x' })).toBeNull();
+  });
 });
 
 describe('the per-minute limiter', () => {
