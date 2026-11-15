@@ -309,6 +309,9 @@ describe('validation', () => {
     ['no domain dot', { reply_email: 'me@localhost' }],
     ['two @', { reply_email: 'a@b@c.example' }],
     ['a space', { reply_email: 'me @visitor.example' }],
+    ['two dots in a row in the domain', { reply_email: 'me@visitor..example' }],
+    ['a domain that starts with a dot', { reply_email: 'me@.visitor.example' }],
+    ['a trailing dot', { reply_email: 'me@visitor.example.' }],
     ['no name', { full_name: '  ' }],
     ['a one-character message', { body: 'x' }],
   ];

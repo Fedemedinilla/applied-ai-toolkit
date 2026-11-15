@@ -98,9 +98,10 @@ export type ContactHandler = (request: Request, context?: RequestContext) => Pro
  * One address, nothing else. No comma or semicolon: providers read `to` as a list, so
  * `me@mine.example,victim@other.example` would pass a classic pattern and turn the
  * acknowledgment into a relay. No angle brackets, quotes or parentheses either, which a
- * provider could read as a display name.
+ * provider could read as a display name. Domain labels are non-empty, so `a@b..example` and a
+ * trailing dot are a typo the visitor can fix (400), not a refusal from the provider (502).
  */
-export const EMAIL = /^[^@\s,;<>"'()\\]+@[^@\s,;<>"'()\\]+\.[^@\s,;<>"'()\\]+$/;
+export const EMAIL = /^[^@\s,;<>"'()\\]+@(?:[^@\s,;<>"'()\\.]+\.)+[^@\s,;<>"'()\\.]+$/;
 
 type ErrorCode = 'origin' | 'invalid' | 'limited' | 'not_configured' | 'send_failed' | 'too_large' | 'media_type' | 'method';
 
