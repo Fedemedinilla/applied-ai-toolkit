@@ -1,7 +1,8 @@
 /**
  * A small PostgREST stand-in for reads: GET /rest/v1/<table> with `select` (plain column lists),
- * `eq` filters and `limit`, plus the single-object Accept header that `.single()` sends. Anything
- * else answers 501 with code `not_in_fake`, so a test that needs more fails loudly and writes its
+ * `eq` filters and `limit`, plus the single-object Accept header that `.single()` sends, on the
+ * public schema. Anything else (another Accept such as `.csv()`, another schema through
+ * `.schema()`) answers 501 with code `not_in_fake`, so a test that needs more fails loudly and writes its
  * own handler instead of getting a plausible wrong answer.
  */
 import type { RecordedRequest, RestHandler } from './fake-auth.ts';
@@ -9,6 +10,8 @@ import type { RecordedRequest, RestHandler } from './fake-auth.ts';
 export type Row = Readonly<Record<string, unknown>>;
 
 const SINGLE_OBJECT = 'application/vnd.pgrst.object+json';
+/** The Accept values restTables answers: none, plain JSON, any, or the single object of `.single()`. */
+const ACCEPTED = new Set([null, 'application/json', '*/*', SINGLE_OBJECT]);
 
 export function notInFake(what: string): Response {
   return Response.json({ code: 'not_in_fake', message: `The fake does not emulate ${what}` }, { status: 501 });
@@ -28,6 +31,12 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
     if (request.method !== 'GET') return notInFake(`${request.method} on PostgREST`);
     const prefer = request.headers.get('prefer') ?? '';
     if (/\bcount=/.test(prefer)) return notInFake(`counts (Prefer: ${prefer})`);
+    const accept = request.headers.get('accept');
+    if (!ACCEPTED.has(accept)) return notInFake(`the response format ${accept}`);
+    for (const name of ['accept-profile', 'content-profile']) {
+      const profile = request.headers.get(name);
+      if (profile !== null && profile !== 'public') return notInFake(`the schema ${profile} (${name})`);
+    }
     const table = request.path.slice('/rest/v1/'.length);
     const rows = tables[table];
     if (rows === undefined) {
@@ -61,7 +70,7 @@ export function restTables(tables: Readonly<Record<string, readonly Row[]>>): Re
     if (limit !== null) result = result.slice(0, limit);
     const projected = result.map((row) => project(row, columns));
 
-    if (request.headers.get('accept') === SINGLE_OBJECT) {
+    if (accept === SINGLE_OBJECT) {
       if (projected.length !== 1) {
         return Response.json(
           {

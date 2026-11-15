@@ -433,6 +433,18 @@ describe('PostgREST', () => {
     expect(bad.status).toBe(501);
   });
 
+  it('an Accept other than JSON or a single object, and a schema other than public, get not_in_fake', async () => {
+    fake.knobs.rest = restTables({ notes: NOTES });
+    const client = clientFor(fake);
+
+    expect((await client.from('notes').select('id').eq('id', 1).maybeSingle()).data).toEqual({ id: 1 });
+    expect(await client.from('notes').select('id').csv()).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').geojson()).toMatchObject({ status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.from('notes').select('id').explain()).toMatchObject({ status: 501, error: { code: 'not_in_fake' } });
+    expect(await client.schema('private').from('notes').select('id')).toMatchObject({ data: null, status: 501, error: { code: 'not_in_fake' } });
+    expect(fake.requests.at(-1)?.headers.get('accept-profile')).toBe('private');
+  });
+
   it('a GET that gets 503 is retried three times by postgrest-js, honoring Retry-After; Auth failWith does not touch it', async () => {
     fake.knobs.failWith = 503;
     fake.knobs.rest = () => new Response('schema cache loading', { status: 503, headers: { 'retry-after': '0' } });
