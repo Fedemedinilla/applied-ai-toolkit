@@ -96,6 +96,8 @@ describe('the action script', () => {
 
   const workspace = (files: Record<string, string>): string => {
     const dir = mkdtempSync(join(tmpdir(), 'slop-lint-ws-'));
+    // A .git marker, as in cli-config.test.ts, so config discovery never looks above the workspace.
+    mkdirSync(join(dir, '.git'));
     for (const [path, text] of Object.entries(files)) {
       mkdirSync(dirname(join(dir, path)), { recursive: true });
       writeFileSync(join(dir, path), text);
