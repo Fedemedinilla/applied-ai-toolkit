@@ -39,6 +39,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   gateway: ['gateway/src/index.ts'],
   'grounded-assistant': ['grounded-assistant/src/index.ts'],
   'idempotent-orders': ['idempotent-orders/src/index.ts'],
+  'import-fences': ['import-fences/src/index.ts'],
   'pdf-receipt': ['pdf-receipt/src/index.ts'],
   'safe-markdown': ['safe-markdown/src/index.ts'],
   // The example run that the report and the checklist app agree on; read by the checklist's tests.
@@ -68,6 +69,9 @@ export const APP_USES: Readonly<Record<string, readonly string[]>> = {
  */
 export const LIBRARY_USES: Readonly<Record<string, readonly string[]>> = {
   'content-forge': ['gateway/src/index.ts'],
+  // The diff-scoped audit (test/audit-scope/) maps files with the glob matcher and reads imports
+  // with the same extractor the fences use, so its dependents match what the fences see.
+  test: ['import-fences/src/index.ts'],
 };
 
 export interface Layout {
