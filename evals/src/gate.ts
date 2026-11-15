@@ -29,7 +29,7 @@
  * narrower than this one, so the gate errs towards "inconclusive".
  */
 import { wilson } from './aggregate.ts';
-import { byCodeUnit, summarize, type RunSummary, type StoredRun } from './run.ts';
+import { byCodeUnit, repeatedResult, summarize, type RunSummary, type StoredRun } from './run.ts';
 
 export type GateState = 'pass' | 'fail' | 'inconclusive';
 
@@ -103,8 +103,9 @@ const some = (items: string[]) => items.slice(0, 5).join(', ') + (items.length >
 
 /**
  * Compares two stored runs. Throws `GateRefusal` when they cannot be compared:
- * another rubric or version, other cases, another number of samples for a
- * case, nothing scored, or results missing on either side.
+ * another rubric or version, a case and sample repeated within a run, other
+ * cases, another number of samples for a case, nothing scored, or results
+ * missing on either side.
  */
 export function gate(baseline: StoredRun, candidate: StoredRun, opts: GateOptions = {}): GateResult {
   const margin = opts.margin ?? DEFAULT_MARGIN;
@@ -114,6 +115,10 @@ export function gate(baseline: StoredRun, candidate: StoredRun, opts: GateOption
   }
   if (baseline.rubric.version !== candidate.rubric.version) {
     throw new GateRefusal(`the runs use different versions of ${baseline.rubric.name}: baseline "${baseline.rubric.version}", candidate "${candidate.rubric.version}"`);
+  }
+  for (const [side, run] of [['baseline', baseline], ['candidate', candidate]] as const) {
+    const i = repeatedResult(run.results);
+    if (i >= 0) throw new GateRefusal(`the ${side} holds ${run.results[i]!.case} sample ${run.results[i]!.sample} twice; a run has one result per case and sample`);
   }
   const b = caseCounts(baseline);
   const c = caseCounts(candidate);

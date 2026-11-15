@@ -158,5 +158,7 @@ describe('scoreItems', () => {
     expect(() => parseRun({ format: 'evals-run/0' }, 'old.json')).toThrow(/old.json is not a stored run \(evals-run\/1\): format/);
     const run = scoreItems(rubric, 'x', items);
     expect(() => parseRun({ ...run, results: [{ ...run.results[0], pass: null }] })).toThrow(/pass must be set exactly when status is "scored"/);
+    const first = run.results[0]!;
+    expect(() => parseRun({ ...run, results: [first, { ...first, pass: !first.pass }] }, 'dup.json')).toThrow(/dup.json is not a stored run \(evals-run\/1\): results\.1: case .* sample 1 appears twice/);
   });
 });

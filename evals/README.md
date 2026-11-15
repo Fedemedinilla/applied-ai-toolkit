@@ -205,7 +205,7 @@ The built-in rubrics:
 
 So a run of 10 or 20 cases can only fail on a collapse or come out inconclusive. Raise the count with more cases or more samples per case before reading a pass into it.
 
-**What it refuses.** Two runs are compared only when they have the same rubric name and version, the same case ids and the same number of results per case. A run with failed calls or outputs that could not be scored is refused unless `--allow-missing`, which keeps them out of the rates and prints their count. A candidate that fails more calls would otherwise shrink its own denominator.
+**What it refuses.** Two runs are compared only when they have the same rubric name and version, the same case ids and the same number of results per case. A run that holds one case and sample twice is refused when it is read, and by the gate. A run with failed calls or outputs that could not be scored is refused unless `--allow-missing`, which keeps them out of the rates and prints their count. A candidate that fails more calls would otherwise shrink its own denominator.
 
 In a workflow:
 

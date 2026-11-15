@@ -46,14 +46,37 @@ export const RunResult = z
   .refine((r) => (r.status === 'scored') === (r.pass !== null), { message: 'pass must be set exactly when status is "scored"' });
 export type RunResult = z.infer<typeof RunResult>;
 
-export const StoredRun = z.strictObject({
-  format: z.literal(RUN_FORMAT),
-  rubric: z.strictObject({ name: z.string().min(1), version: z.string().min(1) }),
-  /** Which side this is: a variant id, a branch, a model name. */
-  label: z.string().min(1),
-  results: z.array(RunResult),
-  tables: z.array(TableSchema),
-});
+/**
+ * The index of the first result that repeats an earlier (case, sample) pair,
+ * or -1. A run holds one result per pair: a repeat (two runs concatenated, a
+ * variant listed twice) would count twice in the gate and once in the report.
+ */
+export function repeatedResult(results: readonly Pick<RunResult, 'case' | 'sample'>[]): number {
+  const seen = new Set<string>();
+  return results.findIndex((r) => {
+    const id = `${r.case}\0${r.sample}`;
+    if (seen.has(id)) return true;
+    seen.add(id);
+    return false;
+  });
+}
+
+export const StoredRun = z
+  .strictObject({
+    format: z.literal(RUN_FORMAT),
+    rubric: z.strictObject({ name: z.string().min(1), version: z.string().min(1) }),
+    /** Which side this is: a variant id, a branch, a model name. */
+    label: z.string().min(1),
+    results: z.array(RunResult),
+    tables: z.array(TableSchema),
+  })
+  .superRefine((run, ctx) => {
+    const i = repeatedResult(run.results);
+    if (i >= 0) {
+      const r = run.results[i]!;
+      ctx.addIssue({ code: 'custom', path: ['results', i], message: `case ${JSON.stringify(r.case)} sample ${r.sample} appears twice` });
+    }
+  });
 export type StoredRun = z.infer<typeof StoredRun>;
 
 export class RunError extends Error {

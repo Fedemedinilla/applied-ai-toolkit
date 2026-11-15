@@ -133,6 +133,11 @@ describe('gate', () => {
     const twice = run('pr', 30, 40);
     twice.results.push({ ...twice.results[0]!, sample: 2 });
     expect(() => gate(base, twice)).toThrow(/different number of samples for 1 case\(s\): case-001 \(1 and 2\)/);
+    const repeated = run('pr', 30, 40);
+    repeated.results[1] = { ...repeated.results[0]!, pass: false };
+    const pairs = run('main', 30, 40);
+    pairs.results[1] = { ...pairs.results[0]!, sample: 2 };
+    expect(() => gate(pairs, repeated)).toThrow(/the candidate holds case-001 sample 1 twice/);
     expect(() => gate(base, twice)).toThrow(GateRefusal);
   });
 
