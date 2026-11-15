@@ -172,7 +172,11 @@ function inlineEscaped(s: string, r: Resolved): string {
   const bare = (m: string) => {
     // A backward scan: the regex /[.,;:!?]+$/ restarts at every character of a long run.
     let end = m.length;
-    while (end > 0 && TRAILING.includes(m[end - 1] ?? '')) end--;
+    while (end > 0 && TRAILING.includes(m.charAt(end - 1))) {
+      // The ; that closes an escaped & belongs to the URL: cutting it would leave "&amp".
+      if (m.endsWith('&amp;', end)) break;
+      end--;
+    }
     const trail = m.slice(end);
     const core = m.slice(0, end);
     const a = anchor(core, core, r);

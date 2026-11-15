@@ -66,6 +66,15 @@ describe('inline', () => {
     expect(renderInline('See https://shop.example/faq.', opts)).toBe('See <a href="https://shop.example/faq">https://shop.example/faq</a>.');
   });
 
+  it('a bare URL that ends in & keeps the & and leaves no stray ;', () => {
+    expect(renderInline('https://maps.example/?q=1&', opts)).toBe(
+      '<a href="https://maps.example/?q=1&amp;" target="_blank" rel="noopener noreferrer">https://maps.example/?q=1&amp;</a>',
+    );
+    expect(renderInline('Go to shop.example/a&b&.', opts)).toBe(
+      'Go to <a href="https://shop.example/a&amp;b&amp;">shop.example/a&amp;b&amp;</a>.',
+    );
+  });
+
   it('a bare internal host with a path becomes a link; any other bare host does not', () => {
     expect(renderInline('Go to shop.example/book, or other.example/x', opts)).toBe(
       'Go to <a href="https://shop.example/book">shop.example/book</a>, or other.example/x',
