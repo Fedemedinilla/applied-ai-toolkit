@@ -6,7 +6,8 @@
 // --sarif prints one SARIF 2.1.0 log for every file instead; --sarif-uri names stdin in it ("stdin" by default).
 // slop-lint.config.json is looked for from the working directory upward, up to the repository root; --config names
 // one, --no-config ignores it. A flag given here wins over the config file, which may also supply --lang.
-// --list-rules prints every rule that applies, after the config file; with one file, as that file's overrides leave them.
+// --list-rules prints every rule the config file leaves on, for both languages (the lang column says which); with one file,
+// as that file's overrides leave them. It does not read --lang.
 // Exit codes: 0 no level 1 finding, 1 at least one level 1 finding in any file, 2 bad usage, a bad config file or unreadable input.
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
@@ -114,7 +115,7 @@ function summary(result: LintResult): string {
 
 const pad = (value: string | number, width: number): string => String(value).padEnd(width);
 
-/** --list-rules: every rule that applies, with where it comes from and what the config changed. */
+/** --list-rules: every rule the config leaves on, for both languages, with where it comes from and what the config changed. */
 function listRules(settings: Settings, configFile: string | null, json: boolean): string {
   const defaults = new Map(RULES.map((r) => [r.id, r]));
   const rows = settings.rules.map((r: Rule) => {

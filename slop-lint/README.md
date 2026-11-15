@@ -323,7 +323,7 @@ When the quote is later removed, the directive matches nothing and the next run 
 
 ### List the rules
 
-`--list-rules` prints every rule that applies, after the config. Each row has the id, level, severity, language, kind, source (`built-in` or `config`) and name, with the default next to a level or severity the config changed. The rules that are off come last. With one file argument it applies that file's overrides. `--json` prints the same as `{ config, rules, off }`. It needs no input file and no `--lang`.
+`--list-rules` prints every rule the config leaves on, for both languages. A rule runs only on files of its language, which the `lang` column shows, so a Spanish file never runs the rules marked `en`. Each row has the id, level, severity, language, kind, source (`built-in` or `config`) and name, with the default next to a level or severity the config changed. The rules that are off come last. With one file argument it applies that file's overrides. `--json` prints the same as `{ config, rules, off }`. It needs no input file and does not read `--lang`.
 
 ```text
 id             level  severity    lang  kind        source    name
