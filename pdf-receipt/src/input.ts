@@ -94,7 +94,10 @@ function quantity(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_QUANTITY) {
     throw new ReceiptInputError('invalid_quantity', field, `must be a number above 0 and at most ${MAX_QUANTITY}`);
   }
-  if (Math.abs(value * 1000 - Math.round(value * 1000)) > 1e-6) {
+  const thousandths = Math.round(value * 1000);
+  // The tolerance absorbs float noise (1.375 * 1000); a positive value under 0.0005 would still pass
+  // it and print as quantity 0 with a $0 line, so it is refused too.
+  if (Math.abs(value * 1000 - thousandths) > 1e-6 || thousandths < 1) {
     throw new ReceiptInputError('invalid_quantity', field, 'must have at most three decimals');
   }
   return value;

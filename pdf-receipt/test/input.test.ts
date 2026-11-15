@@ -31,7 +31,7 @@ describe('numbers that cannot be printed truthfully throw, with the field', () =
     expect(await failure(item({ quantity: 2, unitPriceCents: MAX_CENTS }))).toEqual({ code: 'amount_too_large', field: 'items[0]' });
   });
 
-  it.each([0, -1, 1.0001, Number.NaN, 1_000_001])('quantity %s', async (q) => {
+  it.each([0, -1, 1.0001, 1e-10, 0.0004, Number.NaN, 1_000_001])('quantity %s', async (q) => {
     expect(await failure(item({ quantity: q }))).toEqual({ code: 'invalid_quantity', field: 'items[0].quantity' });
   });
 
