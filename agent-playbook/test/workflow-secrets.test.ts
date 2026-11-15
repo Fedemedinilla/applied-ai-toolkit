@@ -109,6 +109,17 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('NODE_ENV: test', 'NOTES: |\n        API_KEY: some text'))).toEqual([]);
   });
 
+  it('reports literal container credentials and a password inside a URL', () => {
+    const container = (password: string) =>
+      CLEAN.replace('    runs-on: ubuntu-latest\n', `    runs-on: ubuntu-latest\n    container:\n      image: ghcr.io/example/app\n      credentials:\n        username: ci\n        password: ${password}\n`);
+    expect(rules(container('hunter2-real-password'))).toEqual(['13:credential-value']);
+    expect(rules(container('ci-placeholder-registry'))).toEqual([]);
+    const url = (value: string) => CLEAN.replace('NODE_ENV: test', `DATABASE_URL: ${value}`);
+    expect(rules(url('postgres://admin:realpass@db.example.test/app'))).toEqual(['11:credential-value']);
+    expect(rules(url("'postgres://admin:ci-placeholder-db@localhost/app'"))).toEqual([]);
+    expect(rules(url('postgres://localhost/app'))).toEqual([]);
+  });
+
   it('accepts a quoted placeholder', () => {
     expect(rules(CLEAN.replace('ci-placeholder-app-0001', "'ci-placeholder-app-0001'"))).toEqual([]);
   });

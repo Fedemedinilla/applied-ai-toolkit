@@ -82,6 +82,8 @@ export interface Finding {
 
 const CREDENTIAL_NAME = /(KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|PRIVATE)/i;
 const PINNED = /@[0-9a-f]{40}(\s|$)/;
+/** The password of a URL with credentials in it, as in scheme://user:password@host. */
+const URL_PASSWORD = /:\/\/[^/\s:@]+:([^@\s]+)@/;
 
 interface Line {
   readonly number: number;
@@ -233,14 +235,21 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
       if (persist === undefined || unquote(persist) !== 'false') add(line, 'persisted-credentials');
     }
 
-    if (/^\s*env\s*:\s*$/.test(code)) {
+    // An env: block, or the registry login of a container or service (credentials: with username
+    // and password under it).
+    if (/^\s*(env|credentials)\s*:\s*$/.test(code)) {
       // Each entry, the name quoted or not. An entry the check cannot read is a finding, so it
       // fails closed as the permissions check does; the lines of a multi-line value are skipped.
       for (const entry of entriesUnder(all, i)) {
         const pair = KEY_VALUE.exec(entry.code);
-        const [name, value] = [pair?.[2], pair?.[3]];
+        const [name, value] = [pair?.[2], pair?.[3] === undefined ? undefined : unquote(pair[3])];
         if (name === undefined || value === undefined) add(entry, 'credential-value');
-        else if (CREDENTIAL_NAME.test(name) && !policy.placeholder.test(unquote(value))) add(entry, 'credential-value');
+        else if (CREDENTIAL_NAME.test(name) && !policy.placeholder.test(value)) add(entry, 'credential-value');
+        else {
+          // A password inside a URL (DATABASE_URL: postgres://user:pass@host) under any name.
+          const password = URL_PASSWORD.exec(value)?.[1];
+          if (password !== undefined && !policy.placeholder.test(password)) add(entry, 'credential-value');
+        }
       }
     }
   });
