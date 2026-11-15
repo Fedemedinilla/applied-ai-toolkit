@@ -41,7 +41,7 @@ CI enforces most of these, so a pull request that breaks one fails before review
 - **TypeScript stays strict.** `npm run check` passes with the settings in `tsconfig.json`, among them `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `erasableSyntaxOnly` and `verbatimModuleSyntax`. No `any` to get past an error.
 - **Docs pass slop-lint.** Every Markdown file a reader opens is listed in the `lint:docs` script and passes `npm run lint:docs`. A new doc goes on that list. Code, comments and docs are in English.
 - **Dependencies use exact versions.** `.npmrc` sets `save-exact`, and `package-lock.json` and `wp-hardening/composer.lock` are committed. Say in the pull request why a new dependency is needed.
-- **Actions are pinned to a full commit SHA**, with the version tag in a comment, as in `.github/workflows/ci.yml`. Resolve the SHA from the release tag on the action's own repository; never copy one from an unverified source.
+- **Actions are pinned to a full commit SHA**, with the version tag in a comment, as in `.github/workflows/ci.yml`. Resolve the SHA from the release tag on the action's own repository; never copy one from an unverified source. A composite action runs the actions it calls inside it, so pick a release whose own `action.yml` pins each of them by SHA as well.
 - **Workflows hold no secrets.** `agent-playbook/src/workflow-secrets.ts` checks every workflow for secret reads and write permissions. A workflow that needs more gets its own named policy in that module, with a test.
 - **Fixtures are fictional.** No client data, real diagnostic run, conversation log, key or account identifier. Use `.example` or `.test` hosts, `YOUR_...` placeholders and zero-filled phone numbers, as the root README describes under Fixtures and data.
 
