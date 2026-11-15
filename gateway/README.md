@@ -33,12 +33,16 @@ npm test -- gateway   # offline, no API key
 npm run check         # tsc --noEmit (strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess)
 ```
 
-Two opt-in checks, neither part of the test suite:
+Three opt-in checks, none part of the test suite:
 
 ```sh
 # Applies sql/schema.sql inside a transaction, runs the assertions, rolls back.
 # Checked on PostgreSQL 16.
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f gateway/sql/test.sql
+
+# Fires 20 reserve_usage calls at once from separate connections, three rounds, in a scratch
+# database it creates and drops. Needs a role that can create databases. Checked on PostgreSQL 16.
+PGHOST=localhost PGUSER=postgres bash gateway/sql/race.sh
 
 # One real structured call. Without the variable it prints usage and exits.
 ANTHROPIC_API_KEY=sk-ant-... node gateway/examples/live-call.ts
@@ -266,7 +270,7 @@ The second case needed a fetch wrapper. The SDK treats any fetch error whose tex
 | `test/caps.test.ts` | Window boundaries in a time zone and across DST, cap precedence, null handling, float-safe sums |
 | `test/client.test.ts` | Environment isolation, `maxRetries` 0, API version header, connect failures against real local TCP servers |
 
-The two Postgres suites run on PGlite, which has one connection. They exercise the SQL as written and the interleaving of the gateway's steps between statements. They do not make two connections wait on the advisory lock; that part rests on the reasoning under Design decisions.
+The two Postgres suites run on PGlite, which has one connection. They exercise the SQL as written and the interleaving of the gateway's steps between statements. They do not make two connections wait on the advisory lock. `sql/race.sh` does, on a real server. With the lock every call returns a different total, and with the lock line removed the totals repeat in every run.
 
 `test/helpers/fake-claude.ts` is the fake API. It answers the real client with JSON or server-sent events in the API's format. It can cut a stream after any event, send an error event, hang until aborted or fail the connection. No test touches the network or needs a key.
 
@@ -340,6 +344,7 @@ src/
 sql/
   schema.sql       tables, constraints, indexes, usage_for_caps(), reserve_usage()
   test.sql         assertions, run in a rolled-back transaction
+  race.sh          parallel reserve_usage calls over separate connections, opt-in
 examples/
   live-call.ts     one real call, opt-in
 test/              Vitest suites and the fake API
@@ -359,7 +364,7 @@ test/              Vitest suites and the fake API
 ## Limits
 
 - The in-memory stores are only correct within one process.
-- The Postgres adapter was tested on PGlite, with one connection. The advisory lock was not exercised across connections, and `sql/test.sql` does not cover `reserve_usage`.
+- The Postgres adapter was tested on PGlite, with one connection. The advisory lock is exercised across connections only by `sql/race.sh`, an opt-in script that CI does not run, and `sql/test.sql` does not cover `reserve_usage`.
 - Concurrent calls can overrun a cap by one worst-case reservation. With a store that has no atomic `reserve`, a burst of calls near a cap can all be refused, as described above.
 - The bound for unpriced rows uses standard prices. A complete row left without a cost because its usage reported another tariff (priority tier, fast speed, a pinned region) is billed at a premium the bound does not include.
 - The built-in entries, the fallback header and the request rules are pinned to SDK 1.1.0 and API version 2026-10-21. Two points are still open in the source app. One is whether `fallbacks: "default"` together with `output_config.format` is valid for every fallback target. The other is the prices of fallback models, which are not loaded, so those calls are counted at the upper bound.
