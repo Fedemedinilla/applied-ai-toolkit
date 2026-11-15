@@ -215,6 +215,27 @@ final class ServerRules implements Control
         return $found;
     }
 
+    /**
+     * Whether the block in uploads/.htaccess carries the rules uploadsBlock() prints now. hasBlock()
+     * only finds the markers, so a block pasted from an earlier version would still count as in
+     * place. Only the uploads block is compared: the root block changes with the integrations.
+     */
+    private function uploadsBlockIsCurrent(): bool
+    {
+        $file = $this->paths()->uploads . '/.htaccess';
+        if (!is_file($file) || !is_readable($file)) {
+            return false;
+        }
+        $text = (string) file_get_contents($file, false, null, 0, 1 << 20);
+        $begin = strpos($text, self::BEGIN);
+        $end = $begin === false ? false : strpos($text, self::END, $begin);
+        if ($begin === false || $end === false) {
+            return false;
+        }
+        $lines = static fn (string $block): array => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $block) ?: []), static fn (string $l): bool => $l !== ''));
+        return $lines(substr($text, $begin, $end + \strlen(self::END) - $begin)) === $lines($this->uploadsBlock());
+    }
+
     public static function hasBlock(string $file): bool
     {
         if (!is_file($file) || !is_readable($file)) {
@@ -258,6 +279,13 @@ final class ServerRules implements Control
         }
         if (!$installed['uploads']) {
             $missing[] = __('the uploads/ .htaccess', 'wp-hardening');
+        }
+        if ($missing === [] && !$this->uploadsBlockIsCurrent()) {
+            return new Report(
+                State::Recommended,
+                __('The uploads/ block is from an earlier version of the plugin and lets a name such as avatar.php.jpg run as PHP.', 'wp-hardening'),
+                [__('Print it again with `wp harden htaccess` and replace the old block in uploads/.htaccess, between the BEGIN and END lines.', 'wp-hardening')],
+            );
         }
         if ($missing === []) {
             return new Report(State::Good, __('Both generated blocks are in place: the site root and uploads/.', 'wp-hardening'), [

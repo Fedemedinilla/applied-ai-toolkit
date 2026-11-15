@@ -243,6 +243,21 @@ final class ServerRulesTest extends TestCase
         self::assertStringContainsString('nginx', $nginx->report(true)->summary);
     }
 
+    public function testAnUploadsBlockFromAnEarlierVersionIsReportedAsOutdated(): void
+    {
+        $rules = $this->rules();
+        file_put_contents($this->root . '/.htaccess', $rules->rootBlock());
+        // The block printed by 0.1.0 before the extension could sit anywhere in the chain.
+        $old = str_replace('(?:\.|$)">', '$">', $rules->uploadsBlock());
+        self::assertNotSame($rules->uploadsBlock(), $old);
+        file_put_contents($this->root . '/wp-content/uploads/.htaccess', "# a comment the owner kept\n" . $old);
+        $report = $rules->report(true);
+        self::assertSame(State::Recommended, $report->state);
+        self::assertStringContainsString('earlier version', $report->summary);
+        file_put_contents($this->root . '/wp-content/uploads/.htaccess', "# a comment the owner kept\n" . $rules->uploadsBlock());
+        self::assertSame(State::Good, $rules->report(true)->state);
+    }
+
     /** @return list<string> */
     private static function listing(string $dir): array
     {
