@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -51,6 +51,19 @@ describe('cli', () => {
 
     writeFileSync(bad, JSON.stringify({ csp: { from: 'vercel-json', file: 'missing.json' } }));
     expect(cli(['--dir', join(FOLDER, 'fixtures', 'pass', 'site'), '--config', bad])).toMatchObject({ code: 2, stderr: expect.stringContaining('does not exist') });
+  });
+
+  it('exits 2 when --dir holds no HTML page to check, instead of passing every check', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'csp-guard-'));
+    const site = join(tmp, 'site');
+    mkdirSync(site);
+    writeFileSync(join(site, 'a.js'), 'run()');
+    const config = join(tmp, 'c.json');
+    writeFileSync(config, JSON.stringify({ csp: { from: 'literal', value: "script-src 'self'" }, budgets: [{ pages: '**', gzipKb: 1 }] }));
+    expect(cli(['--dir', site, '--config', config])).toMatchObject({ code: 2, stdout: '', stderr: expect.stringContaining('holds no .html page') });
+    writeFileSync(join(site, 'index.html'), '<p></p>');
+    writeFileSync(config, JSON.stringify({ exclude: ['**'], csp: { from: 'literal', value: "script-src 'self'" } }));
+    expect(cli(['--dir', site, '--config', config])).toMatchObject({ code: 2, stderr: expect.stringContaining('holds no .html page outside exclude') });
   });
 
   it('loads a .ts config through its default export', () => {

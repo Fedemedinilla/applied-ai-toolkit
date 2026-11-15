@@ -44,7 +44,14 @@ export function openSite(dir: string, basePath: string, exclude: readonly string
     }
   }
   const staticRoot = buildOutput ? join(root, 'static') : root;
-  const pages = listFiles(staticRoot).filter((p) => p.endsWith('.html') && !matchesAny(p, exclude));
+  const html = listFiles(staticRoot).filter((p) => p.endsWith('.html'));
+  const pages = html.filter((p) => !matchesAny(p, exclude));
+  // With no page, every page-based check would pass over nothing: a wrong --dir or a build that
+  // wrote elsewhere would turn CI green.
+  if (pages.length === 0) {
+    const where = buildOutput ? `${dir}/static` : dir;
+    throw new InputError(`--dir ${where} holds no .html page${html.length ? ' outside exclude' : ''}, so there is nothing to check`);
+  }
   return { dir: root, staticRoot, buildOutput, basePath: basePath.replace(/\/+$/, ''), pages };
 }
 
