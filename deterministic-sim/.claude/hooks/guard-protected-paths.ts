@@ -77,6 +77,45 @@ const WRITE_COMMAND = /\btee\b|\bsed\s+(?:-[a-zA-Z]*\s+)*-i|\bperl\s+-[a-zA-Z]*i
 // Commands that remove or replace a whole folder: naming a folder that holds a protected path counts.
 const TREE_COMMAND = /\b(?:mv|rm|rmdir)\b|\bgit\s+(?:checkout|restore|rm|mv|clean|reset)\b/u;
 const SPLIT = /[\s'"`;|&()<>=]+/u;
+const CHANGE_DIR = /\b(?:cd|pushd|popd)\b/u;
+
+/**
+ * The simple commands of a command list: the text split on ;, newlines, &&, || and |, outside
+ * quotes, so `sed -i 's/a;b/c/' f` stays one part. A write command's words count only in its part,
+ * and `cat protected.ts; rm /tmp/x` is a read followed by an unrelated write.
+ */
+function commandParts(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charAt(i);
+    const next = text.charAt(i + 1);
+    if (quote !== '') {
+      if (c === '\\' && quote !== "'") {
+        current += c + next;
+        i++;
+      } else {
+        if (c === quote) quote = '';
+        current += c;
+      }
+      continue;
+    }
+    if (c === '\\') {
+      current += c + next;
+      i++;
+    } else if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      current += c;
+    } else if (c === ';' || c === '\n' || (c === '&' && next === '&') || (c === '|' && text.charAt(i - 1) !== '>')) {
+      parts.push(current);
+      current = '';
+      if (next === c) i++;
+    } else current += c;
+  }
+  parts.push(current);
+  return parts;
+}
 
 /** The fixed folder of a pattern like "test/golden/**": the part before a final "/**" with no glob in it. */
 function protectedFolder(pattern: string): string | null {
@@ -138,19 +177,24 @@ function unquote(word: string): string {
 /**
  * Protected paths a shell command writes, by heuristic. A redirect counts only for the word it writes
  * to, so `cat rules-v1.ts > /tmp/x` and `vitest run src 2>&1` pass. Every word of a writing command
- * (sed -i, mv, cp, rm and similar) counts, after it is resolved against the project root, so absolute
- * and ./ forms match too. For commands that remove or replace a folder (rm, mv, git checkout and the
+ * (sed -i, mv, cp, rm and similar) counts, within its part of a command list, after it is resolved
+ * against the project root, so absolute and ./ forms match too. For commands that remove or replace a folder (rm, mv, git checkout and the
  * like), a folder that holds a protected file counts as well.
  */
 export function bashTargets(command: string, root: string, config: GuardConfig): string[] {
   const text = command.replace(FD_DUP, ' ');
   const candidates: string[] = [];
   for (const match of text.matchAll(REDIRECT)) if (match[1] !== undefined) candidates.push(unquote(match[1]));
-  const writes = WRITE_COMMAND.test(text);
-  if (writes) candidates.push(...text.split(SPLIT).filter(Boolean));
-  const tree = TREE_COMMAND.test(text);
+  // A cd moves the base of every later relative word, so after one the whole command stays one part.
+  const parts = CHANGE_DIR.test(text) ? [text] : commandParts(text);
+  const words: Array<{ word: string; tree: boolean }> = candidates.map((word) => ({ word, tree: false }));
+  for (const part of parts) {
+    if (!WRITE_COMMAND.test(part)) continue;
+    const tree = TREE_COMMAND.test(part);
+    for (const word of part.split(SPLIT)) if (word !== '') words.push({ word, tree });
+  }
   const named = new Set<string>();
-  for (const word of candidates) {
+  for (const { word, tree } of words) {
     const rel = shellWordPath(root, word);
     if (rel === null) continue;
     if (rel !== '' && isProtected(root, rel, config)) {

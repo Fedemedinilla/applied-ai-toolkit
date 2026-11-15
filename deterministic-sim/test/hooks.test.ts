@@ -85,6 +85,19 @@ describe('guard-protected-paths', () => {
     expect(bash(`cd /tmp && echo x > ${join(ROOT, '../elsewhere/rules-v1.ts')}`)).toEqual([]);
   });
 
+  it('counts the words of a writing command only in its own part of a command list', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('cat test/purity.test.ts; rm /tmp/x')).toEqual([]);
+    expect(bash('cat test/golden/runs.json && rm -f /tmp/scratch.json')).toEqual([]);
+    expect(bash('grep -n x src/tournament/rules-v1.ts | tee /tmp/out.txt')).toEqual([]);
+    expect(bash('cat /tmp/x\nrm -f /tmp/y || cat test/purity.test.ts')).toEqual([]);
+    expect(bash('npm test; rm test/golden/runs.json')).toEqual(['test/golden/runs.json']);
+    expect(bash("sed -i 's/a;b/c/' src/tournament/rules-v1.ts")).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash('sed -i "s/a|b/c/" src/tournament/rules-v1.ts')).toEqual(['src/tournament/rules-v1.ts']);
+    // After a cd the words of every part may name the same file, so the whole command counts as before.
+    expect(bash('cd src/tournament && rm rules-v1.ts')).toEqual(['src/tournament']);
+  });
+
   it('unquotes the target of a redirect, in both quote styles', () => {
     const bash = (command: string) => bashTargets(command, ROOT, config);
     expect(bash('echo x > "src/tournament/rules-v1.ts"')).toEqual(['src/tournament/rules-v1.ts']);
