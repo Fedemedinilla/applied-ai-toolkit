@@ -144,3 +144,25 @@ describe('checkCaps, the error for a null total', () => {
     expect(thrown).toMatchObject({ code: 'invalid_usage_totals', message: `Usage totals returned null in ${field}` });
   });
 });
+
+describe('capWindows, when the clocks skip midnight', () => {
+  it('the day starts at the first instant of the local date, not at 23:00 the day before', () => {
+    // Santiago moves from UTC-4 to UTC-3 on 2026-09-06 at 00:00 local: that day starts at 01:00 (04:00 UTC).
+    expect(capWindows(new Date('2026-09-06T05:00:00Z'), 'America/Santiago').dayStart).toEqual(new Date('2026-09-06T04:00:00Z'));
+    // Havana moves from UTC-5 to UTC-4 on 2026-03-08 at 00:00 local: that day starts at 01:00 (05:00 UTC).
+    expect(capWindows(new Date('2026-03-08T12:00:00Z'), 'America/Havana').dayStart).toEqual(new Date('2026-03-08T05:00:00Z'));
+  });
+
+  it('every dayStart of 2026 is on the local date of now, and the instant before it is not', () => {
+    const zones = ['America/Santiago', 'America/Havana', 'America/Asuncion', 'America/New_York', 'Europe/Berlin', 'Australia/Lord_Howe', 'Asia/Beirut', 'Pacific/Apia'];
+    const bad: string[] = [];
+    for (const zone of zones) {
+      const date = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
+      for (let t = Date.UTC(2026, 0, 1); t < Date.UTC(2027, 0, 1); t += 6 * 3_600_000) {
+        const { dayStart } = capWindows(new Date(t), zone);
+        if (date.format(dayStart) !== date.format(t) || date.format(dayStart.getTime() - 1) === date.format(t)) bad.push(`${zone} ${new Date(t).toISOString()}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});

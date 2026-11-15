@@ -189,7 +189,7 @@ The rest go under the `claude_gateway.` prefix, namely `operation`, `task`, `pro
 
 **Nulls fail closed.** The usage totals return null for windows that were not requested, and the bound is null when there are unpriced rows and no price in force at all. The gateway throws `invalid_usage_totals` on a null where it asked for a sum instead of reading it as zero. A user with no account caps row gets `unknown_account`. An account can lower a global cap and never raise it.
 
-**Windows in a configured time zone.** The day and month start at local midnight in an IANA zone passed to the gateway, never the process zone, which is UTC on most hosts. Local midnight is computed in two passes so a daylight saving change on that day does not shift it.
+**Windows in a configured time zone.** The day and month start at local midnight in an IANA zone passed to the gateway, never the process zone, which is UTC on most hosts. Local midnight is computed in two passes so a daylight saving change on that day does not shift it. Where the clocks skip midnight, as in Santiago and Havana, the day starts at the first local instant of that date, 01:00, and a test sweeps every day of 2026 in eight zones.
 
 ### The ledger
 
