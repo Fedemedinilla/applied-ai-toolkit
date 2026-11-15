@@ -212,7 +212,9 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
 
     const usesRaw = /^\s*(?:-\s*)?uses\s*:\s*(.+)$/.exec(code)?.[1];
     const uses = usesRaw === undefined ? undefined : unquote(usesRaw);
-    if (uses !== undefined && !uses.startsWith('./') && !uses.startsWith('docker://') && !PINNED.test(`${uses} `)) {
+    // A container image is pinned by its digest; a tag such as :latest can be replaced upstream.
+    const pinned = uses?.startsWith('docker://') === true ? /@sha256:[0-9a-f]{64}$/.test(uses) : PINNED.test(`${uses ?? ''} `);
+    if (uses !== undefined && !uses.startsWith('./') && !pinned) {
       add(line, 'unpinned-action');
     }
     // actions/checkout keeps the job's token in .git/config unless the step says otherwise.

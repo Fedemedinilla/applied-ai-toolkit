@@ -192,6 +192,13 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test', '      - uses: ./.github/actions/setup'))).toEqual([]);
   });
 
+  it('reports a container action by tag, and accepts one pinned to a digest', () => {
+    expect(rules(CLEAN.replace('      - run: npm test', '      - uses: docker://alpine:latest'))).toEqual(['17:unpinned-action']);
+    expect(rules(CLEAN.replace('      - run: npm test', '      - uses: docker://alpine'))).toEqual(['17:unpinned-action']);
+    expect(rules(CLEAN.replace('      - run: npm test', `      - uses: docker://alpine@sha256:${'a'.repeat(64)}`))).toEqual([]);
+    expect(rules(CLEAN.replace('      - run: npm test', `      - uses: docker://alpine:3.20@sha256:${'a'.repeat(64)}`))).toEqual([]);
+  });
+
   it('ignores what a comment says, at the end of a line or on a line of its own', () => {
     // Without the comment stripping, each of these lines would produce a finding.
     expect(rules(CLEAN.replace('      - run: npm test', '      - run: npm test # ${{ secrets.APP_API_KEY }}'))).toEqual([]);
