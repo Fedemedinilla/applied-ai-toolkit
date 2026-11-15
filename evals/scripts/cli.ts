@@ -1,5 +1,6 @@
 /** Argument parsing and the API-key gate for the live scripts. */
 import Anthropic from '@anthropic-ai/sdk';
+import { existsSync } from 'node:fs';
 import { freshOutput } from '../src/files.ts';
 
 /** Flags that take no value, so the next argument is not swallowed as one. */
@@ -18,6 +19,18 @@ export function freshOutputOrExit(path: string): string {
   } catch (e) {
     usageError(String((e as Error).message));
   }
+}
+
+/**
+ * `freshOutputOrExit` for several files: every path is checked before any is
+ * created, so a refusal on the last one leaves no half-written set behind
+ * that would block the next run.
+ */
+export function freshOutputsOrExit(paths: readonly string[]): void {
+  for (const path of paths) {
+    if (existsSync(path)) usageError(`${path} already exists; pick a new file so two runs never mix`);
+  }
+  for (const path of paths) freshOutputOrExit(path);
 }
 
 export function positional(n: number, usage: string): string[] {

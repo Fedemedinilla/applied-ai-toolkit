@@ -13,13 +13,12 @@ import { writeFileSync } from 'node:fs';
 import { blind } from '../src/blind.ts';
 import { appendJsonl, readJsonl } from '../src/files.ts';
 import type { EvalFailure, EvalRow } from '../src/runner.ts';
-import { flag, freshOutputOrExit, positional } from './cli.ts';
+import { flag, freshOutputsOrExit, positional } from './cli.ts';
 
 const [rowsPath, piecesPath, keyPath] = positional(3, 'usage: node evals/scripts/blind.ts <rows.jsonl> <pieces.jsonl> <key.json> [--seed N]') as [string, string, string];
 const seed = Number(flag('seed', String(randomInt(2 ** 31))));
 const { pieces, key } = blind(readJsonl<EvalRow | EvalFailure>(rowsPath), seed);
-freshOutputOrExit(piecesPath);
-freshOutputOrExit(keyPath);
+freshOutputsOrExit([piecesPath, keyPath]);
 for (const p of pieces) appendJsonl(piecesPath, p);
 writeFileSync(keyPath, JSON.stringify({ seed, key }, null, 1));
 const withheld = Object.values(key).filter((k) => k.withheld).length;
