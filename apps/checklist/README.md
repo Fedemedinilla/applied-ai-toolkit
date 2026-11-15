@@ -103,7 +103,7 @@ Second, the check must have failed earlier, in its current state or in the recor
 - **One device, one run.** The run lives in this browser's IndexedDB. There is no sync and no sharing; the run JSON is the copy and the way to move it.
 - **The catalogue is the method's, rewritten.** The thresholds come from the method's tables. Several commerce rows have no threshold yet ("measured on the first case"), and the app does not invent one.
 - **No measurement of its own.** The app records what a person or site-check found. It sends no request to the audited site, so nothing in it can probe a site without permission.
-- **The import reads site-check schema version 1 only**, and only the fields listed in [`src/sitecheck-import.ts`](src/sitecheck-import.ts). Another tool's output needs its own importer.
+- **The import reads site-check schema versions 1 (`datos.json`) and 2 (`run.json`) only**, and only the fields listed in [`src/sitecheck-import.ts`](src/sitecheck-import.ts). Another tool's output needs its own importer.
 - **One "before" per run.** It is recorded once, with the site profile and catalogue of that moment. If the profile changes later, the before and after report says so and counts "before" with its own profile. Measuring again for a second before and after means a new run, or exporting this one first.
 - **Times come from the device clock.** A wrong clock gives wrong incident times; they can be corrected by hand within the order the dependencies allow.
 - **The reports are Markdown.** There is no PDF export, and the reader's renderer decides how the tables look.
