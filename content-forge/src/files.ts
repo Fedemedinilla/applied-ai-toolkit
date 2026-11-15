@@ -9,7 +9,7 @@
  *       cards/ember-scout.json      written by generate, moved by promote
  *       reports/<run>.json          one per generate run
  */
-import { link, mkdir, readdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { emptyRaw, type Problem, type RawCatalog } from './catalog.ts';
 import { ENTITIES, ENTITY_NAMES, type EntityName } from './schemas.ts';
@@ -85,7 +85,20 @@ async function loadTree(root: string, prefix: string, only?: EntityName, require
   return { raw, problems };
 }
 
-export const loadCatalog = (dir: string): Promise<Loaded> => loadTree(dir, '');
+/**
+ * The catalogue under `dir`. A folder that does not exist is a problem, not an empty catalogue: a
+ * mistyped --dir would otherwise validate and send generate on a paid call. An empty folder that
+ * exists is a catalogue being started.
+ */
+export async function loadCatalog(dir: string): Promise<Loaded> {
+  try {
+    await stat(dir);
+  } catch (error) {
+    if (isErrno(error, 'ENOENT')) return { raw: emptyRaw(), problems: [{ where: '--dir', path: '', message: 'no catalogue folder there' }] };
+    throw error;
+  }
+  return loadTree(dir, '');
+}
 
 export const loadCandidates = (dir: string, entity?: EntityName): Promise<Loaded> => loadTree(join(dir, CANDIDATES), `${CANDIDATES}/`, entity, true);
 

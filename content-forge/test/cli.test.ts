@@ -119,6 +119,19 @@ describe('the command line', () => {
     expect(r.out).toContain('  accepted brine-scout, but its file could not be written to _candidates/: EEXIST');
   });
 
+  it('exits 1 for a --dir that does not exist, and generate makes no call and creates nothing', async () => {
+    const missing = join(dir, 'no-such-catalogue');
+    const a = io();
+    expect(await runCli(['validate', '--dir', missing], a.io)).toBe(1);
+    expect(a.err).toEqual(['--dir: no catalogue folder there', '1 problem(s)']);
+
+    const b = io([messageText(await response('card-batch'))]);
+    expect(await runCli(['generate', '--entity', 'keyword', '--count', '1', '--dir', missing], b.io)).toBe(1);
+    expect(b.err[0]).toContain('--dir: no catalogue folder there');
+    expect(b.api.requests).toHaveLength(0);
+    await expect(readdir(missing)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('prints one line for an unexpected error, with its code and no path or stack trace', async () => {
     const r = io();
     expect(await runCli(['validate', '--dir', README], r.io)).toBe(1);

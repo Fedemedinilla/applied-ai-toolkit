@@ -26,7 +26,7 @@ node content-forge/cli.ts promote --entity card --all          # or a list of id
 node content-forge/cli.ts promote --entity card quick-study --replace
 ```
 
-Every command takes `--dir` for another catalogue. The exit code is 0 when the command did its job. It is 1 when the catalogue or a promote has problems, when a run accepted nothing or could not write a candidate, and on an unexpected error, which prints one line with its code. It is 2 for bad usage, and 3 when the model could not be called (no key, a cap, the network, an API error).
+Every command takes `--dir` for another catalogue. A `--dir` that does not exist is a catalogue problem, so `validate` fails on a typo and `generate` makes no call; an empty folder that exists is a catalogue being started. The exit code is 0 when the command did its job. It is 1 when the catalogue or a promote has problems, when a run accepted nothing or could not write a candidate, and on an unexpected error, which prints one line with its code. It is 2 for bad usage, and 3 when the model could not be called (no key, a cap, the network, an API error).
 
 This is the CLI's output for the test fixture `test/fixtures/responses/card-batch.json`, served by the fake API. The fixture was written by hand to fail in specific ways; it is not a real model response, and the cost is the fake's token counts at the listed price. Candidates are numbered from 1 in the order the model returned them. A test compares this block with the CLI's output line by line.
 
