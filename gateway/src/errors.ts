@@ -11,9 +11,9 @@ type RefusalCategory = NonNullable<Anthropic.Beta.BetaRefusalStopDetails['catego
 /** The catalog. A code keeps one meaning; tests check that every error class uses a listed code. */
 export const ERROR_CODES = {
   // Before calling
-  invalid_setup: 'A value the gateway or client was built with is unusable: an empty key, a timeout that is not a positive integer, an unknown time zone.',
+  invalid_setup: 'A value the gateway or client was built with is unusable: an empty key, a timeout that is not a positive integer, an unknown time zone, a model entry that fails its schema.',
   invalid_request: 'The request breaks a gateway rule (prefill, too many cache breakpoints, an unsupported schema). A bug in the caller; the API is not called.',
-  invalid_config: 'Task or cap configuration read from the store is missing or fails its schema, for example a model the gateway was not verified with.',
+  invalid_config: 'Task or cap configuration read from the store is missing or fails its schema, for example a model outside the registry or an effort level its model does not take.',
   unknown_account: 'The user has no account caps row, so the gateway cannot tell which caps apply. Fails closed.',
   invalid_usage_totals: 'The usage totals for the caps failed their schema, came back null where a sum was requested, or could not be read for the second check after the reservation. A cap that did not sum cannot stop anything.',
   cap_monthly_global: 'Spend this month across all users reached the global monthly cap.',
@@ -41,7 +41,7 @@ export const ERROR_CODES = {
   api_error: 'An API error without a more specific class.',
   sdk_error: 'The SDK failed on its own, outside the network.',
   // The ledger
-  reservation_failed: 'The reservation row could not be written, even after one retry. The API was not called.',
+  reservation_failed: 'The reservation row could not be confirmed, even after one retry. The API was not called. The row may be in the ledger, open at its worst case, if an attempt reached the store.',
   record_failed: 'The row that closes the reservation could not be written. The result is withheld and the reservation keeps counting at its worst case.',
 } as const;
 
@@ -395,14 +395,21 @@ export function classifyApiError(error: unknown, signals: CutSignals, nowMs: num
 // The ledger
 // ---------------------------------------------------------------------------
 
-/** The reservation could not be written, even after one retry. The API was not called. */
+/**
+ * The reservation could not be confirmed, even after one retry. The API was not called. If an
+ * attempt reached the store and only its response was lost, the row is in the ledger, open at
+ * its worst case, and nothing closes it: look for `usageId` before treating the call as unwritten.
+ */
 export class ReservationError extends GatewayError {
   declare readonly code: 'reservation_failed';
-  /** The id the reservation was attempted with. It is not in the ledger. */
+  /**
+   * The id the reservation was attempted with. Usually it is not in the ledger, but it may be
+   * there as an open reservation if an attempt reached the store before failing.
+   */
   readonly usageId: string;
 
   constructor(usageId: string, options?: ErrorOptions) {
-    super('reservation_failed', `Could not write reservation ${usageId}: Claude was not called`, options);
+    super('reservation_failed', `Could not confirm reservation ${usageId}: Claude was not called, and the row may be in the ledger, open at its worst case`, options);
     this.usageId = usageId;
   }
 }

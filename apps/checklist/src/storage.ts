@@ -16,8 +16,9 @@ export interface LoadResult {
   /** A stored value existed but was not a valid run. It was copied aside and not used. */
   readonly invalid: boolean;
   /**
-   * Reading failed, so whether a run is stored is unknown. Until a later load succeeds, save()
-   * writes nothing and resolves false: an empty run must not replace one that could not be read.
+   * Reading failed, so whether a run is stored is unknown, or an invalid value could not be copied
+   * aside. Until a later load succeeds, save() writes nothing and resolves false: an empty run must
+   * not replace one that could not be read or kept.
    */
   readonly unreadable: boolean;
 }
@@ -92,7 +93,10 @@ function idbStore(db: IDBDatabase): Store {
         copy.objectStore(STORE).put(value, `invalid-${Date.now()}`);
         await done(copy);
       } catch {
-        // The copy failing leaves the value where it was; the app still starts empty.
+        // The value is still only under KEY, so the first save would delete it: writes stop, as
+        // after a failed read, and the app says nothing is saved over it.
+        readFailed = true;
+        return { run: null, invalid: true, unreadable: true };
       }
       return { run: null, invalid: true, unreadable: false };
     },

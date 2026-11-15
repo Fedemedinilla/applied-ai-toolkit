@@ -22,6 +22,25 @@ export function needlesFor(value: string): Array<{ form: string; bytes: Buffer }
   return forms.filter(([, text]) => !seen.has(text) && seen.add(text)).map(([form, text]) => ({ form, bytes: Buffer.from(text) }));
 }
 
+/**
+ * The base64 and base64url text of a value inside a larger encoded blob. Base64 writes 6 bits per
+ * character, so the encoding of a value depends on where it starts in the blob (its byte offset
+ * modulo 3), and the characters at each end mix in the neighbouring bytes. For each of the three
+ * offsets this keeps only the characters made entirely of the value's own bits.
+ */
+export function embeddedBase64Needles(value: string): Array<{ form: string; bytes: Buffer }> {
+  const bytes = Buffer.from(value);
+  const out: Array<{ form: string; bytes: Buffer }> = [];
+  for (const offset of [0, 1, 2]) {
+    const shifted = Buffer.concat([Buffer.alloc(offset), bytes]);
+    const start = Math.ceil((offset * 8) / 6);
+    const end = Math.floor(((offset + bytes.length) * 8) / 6);
+    for (const form of ['base64', 'base64url'] as const) out.push({ form, bytes: Buffer.from(shifted.toString(form).slice(start, end)) });
+  }
+  const seen = new Set<string>();
+  return out.filter(({ bytes: b }) => b.length > 0 && !seen.has(b.toString()) && seen.add(b.toString()));
+}
+
 function contentsOf(path: string): Buffer[] {
   const raw = readFileSync(path);
   const out = [raw];
@@ -39,7 +58,7 @@ export function checkSecrets(ctx: Context): CheckResult {
   if (config === undefined) return { id: 'secrets', status: 'skip', summary: 'no secrets in the config', failures: [] };
   const failures: Failure[] = [];
   const skipped: string[] = [];
-  const searched: Array<{ name: string; needles: ReturnType<typeof needlesFor> }> = [];
+  const searched: Array<{ name: string; needles: Array<{ form: string; bytes: Buffer }> }> = [];
   for (const name of config.env) {
     const value = ctx.env[name] ?? '';
     if (value.length < config.minLength) {
@@ -48,7 +67,9 @@ export function checkSecrets(ctx: Context): CheckResult {
       else skipped.push(`${name} (${why})`);
       continue;
     }
-    searched.push({ name, needles: needlesFor(value) });
+    const standalone = needlesFor(value);
+    const embedded = embeddedBase64Needles(value).filter((n) => !standalone.some((m) => m.bytes.equals(n.bytes)));
+    searched.push({ name, needles: [...standalone, ...embedded] });
   }
   const files = listFiles(ctx.site.dir);
   for (const file of files) {

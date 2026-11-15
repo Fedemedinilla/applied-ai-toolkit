@@ -12,7 +12,7 @@ Offline, no key, from the repository root:
 
 ```sh
 npm ci
-npx vitest run content-forge                 # 75 tests, fake Anthropic API, no key
+npx vitest run content-forge                 # 90 tests, fake Anthropic API, no key
 npm run check                                # tsc --noEmit, strict
 node content-forge/cli.ts validate           # the example catalogue in content-forge/catalog/
 node content-forge/cli.ts stats              # pass rate per entity type and prompt version
@@ -26,7 +26,7 @@ node content-forge/cli.ts promote --entity card --all          # or a list of id
 node content-forge/cli.ts promote --entity card quick-study --replace
 ```
 
-Every command takes `--dir` for another catalogue. The exit code is 0 when the command did its job. It is 1 when the catalogue or a promote has problems, when a run accepted nothing or could not write a candidate, and on an unexpected error, which prints one line with its code. It is 2 for bad usage, and 3 when the model could not be called (no key, a cap, the network, an API error).
+Every command takes `--dir` for another catalogue. A `--dir` that does not exist is a catalogue problem, so `validate` fails on a typo and `generate` makes no call; an empty folder that exists is a catalogue being started. The exit code is 0 when the command did its job. It is 1 when the catalogue or a promote has problems, when a run accepted nothing or could not write a candidate, and on an unexpected error, which prints one line with its code. It is 2 for bad usage, and 3 when the model could not be called (no key, a cap, the network, an API error).
 
 This is the CLI's output for the test fixture `test/fixtures/responses/card-batch.json`, served by the fake API. The fixture was written by hand to fail in specific ways; it is not a real model response, and the cost is the fake's token counts at the listed price. Candidates are numbered from 1 in the order the model returned them. A test compares this block with the CLI's output line by line.
 
@@ -87,7 +87,7 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 
 **The catalogue must be valid before a run.** generate refuses to call the model when the catalogue has a single problem, and prints them all. That makes the references stage attributable. Any problem in "catalogue plus accepted candidates plus this one" is caused by this candidate, even when it is reported on another entity, such as a set pushed past its size.
 
-**Candidates are checked against the ones accepted before them.** Two candidates in one batch can be fine alone and conflict together, with the same id or name, or by filling one set between them. Each candidate is merged with the catalogue and the candidates accepted so far. In the fixture, `scout-call` summons `brine-scout`, accepted a moment earlier, and is rejected because `brine-scout` is not a token.
+**Candidates are checked against the ones accepted before them.** Two candidates in one batch can be fine alone and conflict together, with the same id or name, or by filling one set between them. Each candidate is merged with the catalogue, the candidates still pending in `_candidates/` from earlier runs, and the candidates accepted so far. A pending file that does not parse, or that reuses a catalogue id to wait for `--replace`, is left out of that merge. When the pending candidates no longer fit the catalogue, generate refuses before the call, since their problems would be blamed on the new ones. In the fixture, `scout-call` summons `brine-scout`, accepted a moment earlier, and is rejected because `brine-scout` is not a token.
 
 **Range rules only bind generated content.** The schemas say what any entry may be. The rules add limits for a generated one, at generate time and again at promote time. A card stays on the cost curve (budget 2 x cost + 1), is not legendary and has at most two keywords. A faction names no rival, since that would need an edit to another file. A new set is released after the last one, and no candidate says `handwritten: true`. A hand-written legendary such as The Drowned Queen is valid in the catalogue and would be rejected from the model; a test checks both.
 
@@ -95,11 +95,11 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 
 **The hand-written guard.** A target with `handwritten: true` is never replaced, with or without `--replace`. A target that cannot be read as JSON is treated as hand-written. Only `handwritten: true` protects a file. The field defaults to false, so a hand-written file without it counts as generated and `--replace` can overwrite it. A generated target is replaced only with `--replace`, and is checked again right before the write. A new file is written to a temporary name and hard-linked into place. The link fails with `EEXIST` if anything appeared there since the check, so a new file never lands on top of another. Temporary names start with a dot, which the loader skips, so a file left by a crash does not make the catalogue invalid.
 
-**A paid call always leaves a report.** generate refuses before the call when a pending file is not JSON or is named after another id, since either would hide an id from the pending check. If a candidate still cannot be written after the call (a file appeared at its path meanwhile), the report records it under `unwritten` with the error code, the command exits 1, and the cost stays counted.
+**A paid call always leaves a report.** generate refuses before the call when a pending file is not JSON, has no string id or is named after another id. Each would hide an id from the pending check. promote reports such a file instead of skipping it. If a candidate still cannot be written after the call (a file appeared at its path meanwhile), the report records it under `unwritten` with the error code, the command exits 1, and the cost stays counted.
 
 **Spending goes through the gateway.** [`src/model.ts`](src/model.ts) is the only file that imports the gateway, through its public entry. It sets `claude-sonnet-5-5` at medium effort, `max_tokens` 16,000 (the gateway's limit without streaming) and a US$1 cap per process. The gateway reserves each call's worst case first: for the card request in the tests (7,728 estimated input tokens) that is about US$0.18. The key is read only in [`cli.ts`](cli.ts) and passed in. Failures print the gateway's error code, never the model's text or the API's message.
 
-**The brief is data.** `--brief` is limited to 400 characters, goes inside `<brief>` tags with angle brackets removed, and the prompt says an instruction inside it is ignored. Whatever it says, the output can only be candidates, and candidates reach the catalogue only through the checks and a person running promote.
+**The brief is data.** `--brief` is limited to 400 characters, goes inside `<brief>` tags with angle brackets removed, and the prompt says an instruction inside it is ignored. Whatever it says, the output can only be candidates, and candidates reach the catalogue only through the checks and a person running promote. A rejected candidate's id is printed and stored only when it is a valid id, so a label never carries what the model put there, and the run output shows control characters escaped.
 
 ## What the tests cover
 
@@ -108,10 +108,11 @@ Each run writes `_candidates/reports/<run>.json`, validated with zod when it is 
 | `test/generate.test.ts` | The full generate path over the real gateway and the real SDK client against a fake Anthropic HTTP API ([`test/helpers/fake-anthropic.ts`](test/helpers/fake-anthropic.ts)): a card batch with two good candidates and five bad ones, each rejected for all of its reasons; a deck batch and a faction batch; the files written and the report read back; the ledger rows and cost; the output format (enums kept, ranges in descriptions, no extra keys); the rule texts and catalogue ids in the system blocks; pending ids; the strict envelope that loses the batch; truncated and malformed responses as failed runs; extra candidates ignored; a 529 and a spent cap with no report; an invalid catalogue refused before any request; bad counts and briefs; a misnamed pending file refused before the call; a candidate file that appears during the call, recorded as unwritten with the report still written |
 | `test/catalog.test.ts` | The example catalogue; prefault defaults, and `.default({})` leaving them out; unknown keys at three levels; discriminated bodies; single-entity refinements reported together; every cross-reference, both sides of rivalries and summons, set limits, deck limits, duplicate ids and names, schema problems next to the references they break |
 | `test/promote.test.ts` | Moving all or some candidates; a hand-written target kept even with `--replace`, with nothing moved; `--replace` for a generated target; an unreadable target; a candidate that claims to be hand-written; a catalogue that changed after the run; range rules applied again to an edited candidate; a set replaced with its own release order; the hard-link write that refuses to overwrite; a leftover temporary file that the loader skips |
+| `test/promote-race.test.ts` | A target that changes between the check and the write: a new file that appeared, and a generated target marked hand-written, each stopping promote with the file named and the count already moved |
 | `test/rules-report.test.ts` | The cost curve for each card type, token exemption, the hand-written legendary, set order, keyword count, rule texts in every prompt; the output schema's lenient elements; the Wilson interval; pooling by version; unusable runs and unknown costs; reports whose numbers do not add up; invalid report files listed and not counted |
 | `test/cli.test.ts` | The whole loop through `runCli` (validate, generate, stats, promote, validate), with the generate output compared to the sample above; exit codes 1, 2 and 3; error output with codes only, also for an unexpected error; `cli.ts` run as a child process |
 
-75 tests, all offline. The fixture responses in `test/fixtures/responses/` are written by hand in the shape of a structured-output response, with candidates that are wrong on purpose. None is a recorded model response.
+90 tests, all offline. The fixture responses in `test/fixtures/responses/` are written by hand in the shape of a structured-output response, with candidates that are wrong on purpose. None is a recorded model response.
 
 ## Layout
 

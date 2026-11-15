@@ -1,7 +1,7 @@
 // Build for apps/caja: `npm run build:caja` from the repository root writes dist/apps/caja.
 //
 // base './' makes every URL relative, so the same output works at a domain root or under any
-// subpath (GitHub Pages serves it at /<repo>/apps/caja/). The plugin below does three things the
+// subpath (GitHub Pages serves it at /<repo>/caja/). The plugin below does three things the
 // app needs and Vite does not do on its own:
 //   1. Serves and emits corpus.json, the parser's spec, read from ../../amount-parser/corpus/.
 //      One file in the repository, no copy to keep in sync.
@@ -94,9 +94,11 @@ export default defineConfig(({ command }) => ({
   define: { __CAJA_DEV__: JSON.stringify(command === 'serve') },
   plugins: [cajaPlugin()],
   // Model mode's endpoint, when server/dev-server.ts runs. Without it the proxy answers with an
-  // error, the health check fails, and the toggle stays hidden.
-  server: { proxy: { '/api': `http://127.0.0.1:${API_PORT}` } },
-  preview: { proxy: { '/api': `http://127.0.0.1:${API_PORT}` } },
+  // error, the health check fails, and the toggle stays hidden. changeOrigin sets Host to
+  // 127.0.0.1:8787, the only name the dev server answers besides localhost (server/dev-host.ts);
+  // Vite checks the Host of the page's own request first.
+  server: { proxy: { '/api': { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: true } } },
+  preview: { proxy: { '/api': { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: true } } },
   build: {
     outDir: resolve(here, '../../dist/apps/caja'),
     emptyOutDir: true,

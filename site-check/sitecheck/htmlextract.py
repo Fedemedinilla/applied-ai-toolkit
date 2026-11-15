@@ -22,7 +22,7 @@ class as spam, and ``data_forms`` counts the forms that ask for
 personal data (an e-mail, a phone, a name or a document; never a search box),
 which is what the privacy law is about.
 
-Personal data: anchors keep their href, but nothing here is copied to datos.json
+Personal data: anchors keep their href, but nothing here is copied to run.json
 by default. Phone numbers are never stored whole (VIS-18 keeps the last 4
 digits); e-mail addresses are never stored.
 """
@@ -137,7 +137,10 @@ _SUBRESOURCE_ATTRS: dict[str, tuple[str, ...]] = {
     "input": ("src",),
 }
 _DATA_ATTR_HINTS: tuple[str, ...] = ("phone", "number", "tel", "settings", "whatsapp")
-_CSS_URL_RE = re.compile(r"""url\(\s*['"]?([^'")\s]+)['"]?\s*\)""", re.IGNORECASE)
+# "(" is outside the captured class on purpose: with it, "url(url(url(..." made
+# every match attempt read to the end of the text, so the time grew with the
+# square of a 5 MiB body. CSS does not allow an unescaped "(" in url() anyway.
+_CSS_URL_RE = re.compile(r"""url\(\s*['"]?([^'"()\s]+)['"]?\s*\)""", re.IGNORECASE)
 _SPACE_RE = re.compile(r"\s+")
 _SCHEME_RE = re.compile(r"^\s*([a-zA-Z][a-zA-Z0-9+.\-]*):")
 _FIELD_SKIP_TYPES: frozenset[str] = frozenset({"hidden", "submit", "button", "image", "reset"})

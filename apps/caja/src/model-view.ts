@@ -243,10 +243,19 @@ export function collectAnswers(card: ParentNode, answers: ModelAnswers): ModelAn
   if (amount !== undefined) next.amount = amount;
   const typed = card.querySelector<HTMLInputElement>('#m-typed');
   if (typed) next.typed = typed.value;
+  // A field on the card that is now empty clears its answer, so a day or category the owner
+  // removed after a re-render is never saved. A category from the other side's list is kept: the
+  // select could not show it, and it comes back if the owner flips the kind again.
   const category = card.querySelector<HTMLSelectElement>('#m-category');
-  if (category && category.value !== '') next.category = category.value;
+  if (category) {
+    if (category.value !== '') next.category = category.value;
+    else if ([...category.options].some((o) => o.value === next.category)) delete next.category;
+  }
   const date = card.querySelector<HTMLInputElement>('#m-date');
-  if (date && date.value !== '') next.date = date.value;
+  if (date) {
+    if (date.value !== '') next.date = date.value;
+    else delete next.date;
+  }
   return next;
 }
 
@@ -254,12 +263,16 @@ export interface ModelSave {
   answer: Answer;
   kind: Kind;
   category: CategoryGuess;
-  /** Set only when the movement happened on another day than today. */
+  /** Set only when the movement happened on another day than the day it is saved on. */
   day: string | null;
 }
 
-/** Turns the card into what resolve() needs, or the first question still open. */
-export function modelSave(s: ModelState): { ok: true; save: ModelSave } | { ok: false; message: string } {
+/**
+ * Turns the card into what resolve() needs, or the first question still open. `savedOn` is the
+ * local day at save time. A row with no day is filed under its save time, so a sentence read as
+ * "hoy" at 23:59 and saved at 00:01 must carry its day; it defaults to the day the sentence was read.
+ */
+export function modelSave(s: ModelState, savedOn: string = s.today): { ok: true; save: ModelSave } | { ok: false; message: string } {
   const v = s.verdict;
   const q = questions(v);
   const a = s.answers;
@@ -287,5 +300,5 @@ export function modelSave(s: ModelState): { ok: true; save: ModelSave } | { ok: 
     }
     date = a.date;
   }
-  return { ok: true, save: { answer, kind, category: cat.guess, day: date === s.today ? null : date } };
+  return { ok: true, save: { answer, kind, category: cat.guess, day: date === savedOn ? null : date } };
 }

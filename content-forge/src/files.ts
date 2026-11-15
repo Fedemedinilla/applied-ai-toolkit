@@ -9,7 +9,7 @@
  *       cards/ember-scout.json      written by generate, moved by promote
  *       reports/<run>.json          one per generate run
  */
-import { link, mkdir, readdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { emptyRaw, type Problem, type RawCatalog } from './catalog.ts';
 import { ENTITIES, ENTITY_NAMES, type EntityName } from './schemas.ts';
@@ -28,6 +28,12 @@ export const relativeSource = (entity: EntityName, file: string): string => `${E
 export const idOf = (value: unknown): string | null =>
   typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' ? value.id : null;
 
+/**
+ * JSON.parse after one leading byte order mark is dropped. Some Windows editors save JSON with
+ * U+FEFF first, and JSON.parse rejects it.
+ */
+export const parseJson = (text: string): unknown => JSON.parse(text.startsWith('\uFEFF') ? text.slice(1) : text);
+
 function isErrno(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
 }
@@ -43,12 +49,16 @@ async function listJson(folder: string): Promise<string[] | null> {
 
 export interface Loaded {
   readonly raw: RawCatalog;
-  /** File-level problems: unreadable JSON, a name that is not the id, a file that is not JSON. */
+  /** File-level problems: unreadable JSON, a name that is not the id, a file that is not JSON, a candidate with no id. */
   readonly problems: readonly Problem[];
 }
 
-/** Reads one folder per entity type under `root` (the catalogue, or its `_candidates/`). */
-async function loadTree(root: string, prefix: string, only?: EntityName): Promise<Loaded> {
+/**
+ * Reads one folder per entity type under `root` (the catalogue, or its `_candidates/`). For
+ * candidates, a file with no string id is a file-level problem: its name would be missing from the
+ * pending ids, and promote could not find it. In the catalogue the schema reports it.
+ */
+async function loadTree(root: string, prefix: string, only?: EntityName, requireId = false): Promise<Loaded> {
   const raw = emptyRaw();
   const problems: Problem[] = [];
   for (const entity of only ? [only] : ENTITY_NAMES) {
@@ -61,22 +71,36 @@ async function loadTree(root: string, prefix: string, only?: EntityName): Promis
       }
       let value: unknown;
       try {
-        value = JSON.parse(await readFile(join(folder, file), 'utf8'));
+        value = parseJson(await readFile(join(folder, file), 'utf8'));
       } catch {
         problems.push({ where, path: '', message: 'not valid JSON' });
         continue;
       }
       const id = idOf(value);
       if (id !== null && `${id}.json` !== file) problems.push({ where, path: 'id', message: `the file name must be "${id}.json"` });
+      if (id === null && requireId) problems.push({ where, path: 'id', message: 'has no string id' });
       raw[entity].push({ source: where, value });
     }
   }
   return { raw, problems };
 }
 
-export const loadCatalog = (dir: string): Promise<Loaded> => loadTree(dir, '');
+/**
+ * The catalogue under `dir`. A folder that does not exist is a problem, not an empty catalogue: a
+ * mistyped --dir would otherwise validate and send generate on a paid call. An empty folder that
+ * exists is a catalogue being started.
+ */
+export async function loadCatalog(dir: string): Promise<Loaded> {
+  try {
+    await stat(dir);
+  } catch (error) {
+    if (isErrno(error, 'ENOENT')) return { raw: emptyRaw(), problems: [{ where: '--dir', path: '', message: 'no catalogue folder there' }] };
+    throw error;
+  }
+  return loadTree(dir, '');
+}
 
-export const loadCandidates = (dir: string, entity?: EntityName): Promise<Loaded> => loadTree(join(dir, CANDIDATES), `${CANDIDATES}/`, entity);
+export const loadCandidates = (dir: string, entity?: EntityName): Promise<Loaded> => loadTree(join(dir, CANDIDATES), `${CANDIDATES}/`, entity, true);
 
 /**
  * A temporary name next to `path`, on the same file system so rename and link work. It starts with
@@ -132,7 +156,7 @@ export async function occupant(path: string): Promise<Occupant> {
     return 'unreadable';
   }
   try {
-    const value: unknown = JSON.parse(text);
+    const value: unknown = parseJson(text);
     if (typeof value !== 'object' || value === null) return 'unreadable';
     return 'handwritten' in value && value.handwritten === true ? 'handwritten' : 'generated';
   } catch {

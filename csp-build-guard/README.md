@@ -2,6 +2,26 @@
 
 A CLI that audits a built static site (a `dist/` folder) or a Vercel Build Output folder before it is deployed. It catches five failures that only show in production, because a dev server neither bundles like the build nor sends the deploy's headers. An inline script whose hash went stale is blocked by the browser. A policy drifts from what was reviewed. A secret is inlined by the bundler. A regex lookbehind stops a whole module on older Safari. The JavaScript a page loads keeps growing. Each check reads the build and the deploy configuration from disk, with no server and no network. I extracted it from the build scripts of two production sites, where each check was added after one of those failures or to keep it from happening.
 
+## Install
+
+```sh
+npm install --save-dev @fedemedinilla/csp-build-guard
+npx csp-build-guard --dir dist --config csp-guard.config.json
+```
+
+```ts
+import { formatReport, loadConfig, runGuard, toSarif } from '@fedemedinilla/csp-build-guard';
+```
+
+The `csp-build-guard` bin is built from `cli.ts` and takes the same arguments as `node csp-build-guard/cli.ts`. The package has one entry, built from [`src/index.ts`](src/index.ts): `runGuard`, the config loader and its schema, the text report, the SARIF log, the two error classes and the report types. The helpers the checks share stay internal, so they can change without a breaking release. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
+
+- **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps that carry the text of the `.ts` sources, which are not shipped.
+- **`zod` is the one dependency, pinned to 4.6.7.** It validates the config. A caller never passes a zod schema in, so nothing has to be shared with the project's copy.
+- **A `.ts` config still works.** It is the project's own file, outside `node_modules`, so Node 24 strips its types when the installed bin imports it. It has to be erasable TypeScript (no `enum`, no `namespace`). The JSON form needs none of that.
+- **`import` and `require()` both load it.** Each `exports` entry pairs `types` with `default`, and Node 24 loads an ES module through `require()`.
+- **Node 24 or newer** (`engines`). That is the only version the tests and CI run.
+- **The build is checked as installed.** [`test/packaging/pack-check.ts`](../test/packaging/pack-check.ts) packs the package, installs the tarball in an empty project, compares the exports of every entry with the source, and runs the installed bin and `node csp-build-guard/cli.ts` on the same fixtures to compare output and exit code.
+
 ## Run it
 
 From the repository root:
@@ -38,7 +58,7 @@ OK: 5 checks passed, 1 skipped
 
 Caja has no deploy config yet, so it sends no policy of its own. Its config holds, as a `literal` policy, the strict one a host should send for it (`'self'` for scripts, styles, the manifest, the worker, the corpus fetch and the model-mode API, `data:` images, no plugins). The run shows that the build works under that policy with no inline script to hash. No module uses a regex lookbehind that older Safari cannot parse, and the JavaScript of `index.html` stays within its budget. Caja's optional server reads `ANTHROPIC_API_KEY`, so the config lists it under `secrets` with `missing: "skip"`. CI sets a placeholder value for it and for each other app's secret variables, so the search runs there; a local run without them skips it. In a project with real secrets, run the guard with the same environment the build had.
 
-Without `--config` it looks for `csp-guard.config.json`, then `csp-guard.config.ts`, in the current folder. Exit codes: 0 when every check passed or was skipped, 1 when a check failed, 2 for bad usage, an invalid config or a missing input file. They are the same for every output format. `--json` prints the full report, with per-page sizes and the files behind them. `--sarif` prints SARIF 2.1.0 for GitHub code scanning (see [SARIF output](#sarif-output)). The two are mutually exclusive, and passing both is a usage error. On exit 2 nothing is printed to stdout, only the error to stderr.
+Without `--config` it looks for `csp-guard.config.json`, then `csp-guard.config.ts`, in the current folder. A byte order mark at the start of a JSON config, a `vercel.json` or a `_headers` file is ignored, as Windows editors write one. Exit codes: 0 when every check passed or was skipped, 1 when a check failed, 2 for bad usage, an invalid config, a missing input file or a `--dir` with no `.html` page left after `exclude`. They are the same for every output format. `--json` prints the full report, with per-page sizes and the files behind them. `--sarif` prints SARIF 2.1.0 for GitHub code scanning (see [SARIF output](#sarif-output)). The two are mutually exclusive, and passing both is a usage error. On exit 2 nothing is printed to stdout, only the error to stderr.
 
 The human report has one line per check, then one line per failure. This is the `stale-hash` fixture, cut after the first passing check:
 
@@ -56,21 +76,21 @@ The five checks below map to the five failures above. The report also has a sixt
 
 ### 1. Inline hashes (`inline-hashes`)
 
-A policy that allows inline scripts by hash breaks the moment the script changes. In the source site, `vercel.json` listed one sha256 for a small theme script inlined in every page. Edit that script and the hash no longer matches: the browser blocks it, the wrong theme flashes, and nothing in the build fails. The check hashes every inline `<script>` and `<style>` of every page, the way the browser does (after the HTML parser turns CRLF into LF), and fails when:
+A policy that allows inline scripts by hash breaks the moment the script changes. In the source site, `vercel.json` listed one sha256 for a small theme script inlined in every page. Edit that script and the hash no longer matches: the browser blocks it, the wrong theme flashes, and nothing in the build fails. The check hashes every inline `<script>` and `<style>` of every page, the way the browser does (after the HTML parser turns CRLF into LF, in element content and attribute values alike), and fails when:
 
 - an inline script or style has no listed hash in the directive that governs it (`script-src-elem`, then `script-src`, then `default-src`, as CSP3 falls back);
 - a listed hash matches no inline content on the pages served with that policy. A stale hash keeps allowing a script nobody ships. A hash in a directive that more specific ones shadow (`script-src` next to both `script-src-elem` and `script-src-attr`) is reported too, since it has no effect;
 - that directive holds `'unsafe-inline'`. This fails even next to hashes: CSP3 browsers then ignore it, but browsers without hash support fall back to it, and it signals that the policy was loosened;
 - an event handler (`onclick="..."`) or a `style="..."` attribute is present without `'unsafe-hashes'` and its hash, since a hash-only policy blocks it;
-- a page has no policy at all, so there is nothing to compare against.
+- a page has no policy at all, or one whose value is empty (`""`, `;`, an empty `<meta>` content), so there is nothing to compare against.
 
-JSON-LD and other data blocks are skipped, since CSP does not apply to them. Import maps are hashed, since it does. An empty `<script></script>` is skipped, since the browser runs no CSP check on it; a whitespace-only one is hashed. sha256, sha384 and sha512 hashes are all recognized. As in the browser, the algorithm can be in any case and the digest in base64 or base64url.
+JSON-LD and other data blocks are skipped, since CSP does not apply to them. Import maps are hashed, since it does. An empty `<script></script>` is skipped, since the browser runs no CSP check on it; a whitespace-only one is hashed. sha256, sha384 and sha512 hashes are all recognized. As in the browser, the algorithm can be in any case and the digest in base64 or base64url. The digest keeps its `=` padding in both: CSP3 maps `-` to `+` and `_` to `/`, then compares the digest as text with the padded base64 of the content, so an unpadded digest (what Node's `digest('base64url')` returns) matches nothing.
 
 ### 2. Exact policy (`policy`)
 
-The policy every page receives is compared with the expected one as sets: the same directives, and in each the same sources, except for hashes where the config allows them. An extra source (`https:`, `*`, a host, `'unsafe-inline'`) or a directive nobody listed fails even when everything expected is there. Comparing the header as text would fail an equivalent policy whose sources are reordered; checking only that the expected sources are present would pass one that was loosened.
+The policy every page receives is compared with the expected one as sets: the same directives, and in each the same sources, except for hashes where the config allows them. An extra source (`https:`, `*`, a host, `'unsafe-inline'`) or a directive nobody listed fails even when everything expected is there. Comparing the header as text would fail an equivalent policy whose sources are reordered; checking only that the expected sources are present would pass one that was loosened. With a header source or `literal`, a `<meta>` policy in a page's `<head>` is read as well. The browser enforces it next to the header, so the inline check holds content to both, and the policy check fails, since one policy is expected.
 
-The parser reads the header as the browser does (CSP3 and Chromium). A directive with a character outside ASCII is dropped whole. In Chromium 141, `script-src 'none'` followed by a no-break space and another source was dropped, so the page had no script restriction and an inline script ran. When a directive repeats, the browser uses the first one, so a stricter copy later in the header does nothing even though a reviewer reads it. Both are failures. So are two rules in the deploy config that both set the policy for one page. A `<meta>` policy fails when it comes after a script or style, since it only covers what follows it. It also fails when it holds `frame-ancestors`, `report-uri` or `sandbox`, which the browser ignores in a `<meta>`. Each `<meta>` content is read as one policy, where a comma separates nothing, and a page with two `<meta>` policies fails, since the browser enforces both.
+The parser reads the header as the browser does (CSP3 and Chromium). A directive with a character outside ASCII is dropped whole. In Chromium 141, `script-src 'none'` followed by a no-break space and another source was dropped, so the page had no script restriction and an inline script ran. When a directive repeats, the browser uses the first one, so a stricter copy later in the header does nothing even though a reviewer reads it. Both are failures. So are two rules in the deploy config that both set the policy for one page. A `<meta>` policy fails when it comes after a script or style, since it only covers what follows it. It also fails when it holds `frame-ancestors`, `report-uri` or `sandbox`, which the browser ignores in a `<meta>`. Each `<meta>` content is read as one policy, where a comma separates nothing, and a page with two `<meta>` policies fails, since the browser enforces both. A `<meta>` policy outside `<head>`, inside `<noscript>` or inside `<template>` is not counted as delivered, since the browser ignores it there, and the policy check reports it. Inside `<title>`, `<noframes>` or another element whose content the browser reads as text, a `<meta>` or `<script>` is text and is not counted at all.
 
 ### Other headers (`headers`, optional)
 
@@ -78,15 +98,15 @@ A `headers` map in the config checks other response headers (`X-Content-Type-Opt
 
 ### 3. Secrets (`secrets`)
 
-A server-only value can end up in a client bundle through one wrong import, and the build does not complain. The check reads the value of each named environment variable and searches every file under `--dir` for it, server functions included. It also searches the JSON-escaped, URL-encoded, base64 and base64url forms, and the decompressed contents of `.gz` and `.br` files. A variable that is unset or shorter than `minLength` (default 8) fails, because a check that could not run must not pass. Reports name the variable and the file, never the value; a test checks that the value is absent from both the text and the JSON output.
+A server-only value can end up in a client bundle through one wrong import, and the build does not complain. The check reads the value of each named environment variable and searches every file under `--dir` for it, server functions included. It also searches the JSON-escaped, URL-encoded, base64 and base64url forms, and the decompressed contents of `.gz` and `.br` files. The base64 forms are found inside a larger encoded blob too (an encoded JSON config), at any of the three byte offsets, by the characters that only the value's own bits decide. A variable that is unset or shorter than `minLength` (default 8) fails, because a check that could not run must not pass. Reports name the variable and the file, never the value; a test checks that the value is absent from both the text and the JSON output.
 
 ### 4. Regex lookbehind (`lookbehind`)
 
-Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a module and the whole module fails to load, with no error the visitor can see. In the source site two interactive demos did nothing on an iPhone running iOS 15 for exactly this reason. The check scans the configured browser files and every inline script and reports file, line and column. A byte order mark at the start of a file takes no column, as in an editor. Named groups, `(?<name>`, are fine since Safari 11.1 and are not flagged. With `targets`, it runs only when a target predates support: Chrome 62, Edge 79, Firefox 78, Safari and Safari on iOS 16.4, Opera 49, Samsung Internet 8.2 (MDN compatibility data).
+Safari before 16.4 cannot parse a regex lookbehind, `(?<=` or `(?<!`. One in a module and the whole module fails to load, with no error the visitor can see. In the source site two interactive demos did nothing on an iPhone running iOS 15 for exactly this reason. The check scans the configured browser files and every inline script and reports file, line and column. A byte order mark at the start of a file takes no column, as in an editor. Named groups, `(?<name>`, are fine since Safari 11.1 and are not flagged. With `targets`, it runs only when a target predates support: Chrome 62, Edge 79, Firefox 78, Safari and Safari on iOS 16.4, Opera 49, Samsung Internet 8.2 (MDN compatibility data). An empty `targets` object is a config error, since it names no browser to compare against.
 
 ### 5. JavaScript budget (`js-budget`)
 
-The JavaScript a page makes the browser download on load is measured against a budget per page glob. It counts external scripts, `modulepreload` links, Astro island URLs and inline scripts, then follows every static `import` and `export ... from` in those files. Dynamic `import()` does not count, since it loads later, on demand. Each file is measured compressed with gzip (level 9) and brotli (quality 11); a budget can limit either or both, in kB of 1000 bytes. A script from another origin, a bare specifier or a URL missing from the build is a failure, since an unmeasured file would read as zero.
+The JavaScript a page makes the browser download on load is measured against a budget per page glob. A budget whose glob matches no page fails, since it measures nothing. It counts external scripts, `modulepreload` links, Astro island URLs and inline scripts, then follows every static `import` and `export ... from` in those files. Dynamic `import()` does not count, since it loads later, on demand. Neither does a classic script with `nomodule` (a legacy bundle), which a browser with module support never loads; a `type="module"` script with `nomodule` still counts, as it still runs. The lookbehind check still scans them, since old browsers do load them. Each file is measured compressed with gzip (level 9) and brotli (quality 11); a budget can limit either or both, in kB of 1000 bytes. A script from another origin, a bare specifier, a URL missing from the build or one that is not a valid URL is a failure, since an unmeasured file would read as zero.
 
 ## SARIF output
 
@@ -212,7 +232,7 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 **Stale hashes fail.** Leaving an old hash costs nothing on the day it goes stale, so old hashes pile up. Each one keeps allowing a script the site no longer ships, so anyone who can inject markup can replay that exact old script, and the policy no longer says what the site runs. Hashes are matched per group of pages that share one policy, so a hash used on one page of the group is not stale.
 
-**A check that cannot run fails.** An unset secret variable fails, and so do a script URL that is not in the build and a page with no policy. A guard in CI that turns green because its input was missing is worse than no guard.
+**A check that cannot run fails.** An unset secret variable fails, and so do a script URL that is not in the build and a page with no policy. A build folder with no HTML page exits with code 2. A guard in CI that turns green because its input was missing is worse than no guard.
 
 **Unreadable deploy rules are config errors.** vercel.json `source` patterns are converted from a subset of path-to-regexp. A pattern outside that subset, or a rule with `has` or `missing` conditions, exits with code 2 instead of being treated as a rule that never matches, which would leave pages unchecked.
 
@@ -222,16 +242,16 @@ When `--dir` holds a `config.json` with a numeric `version` and a `static/` fold
 
 ## What the tests cover
 
-151 tests in 9 files, all offline.
+170 tests in 9 files, all offline.
 
 | File | Covers |
 |---|---|
 | `test/csp.test.ts` | The parser: whitespace, empty and repeated directives, non-ASCII drops, comma-joined policies; the exact comparison: extra and missing sources, hashes only where allowed, unlisted directives, case; CSP3 fallback lists |
-| `test/html.test.ts` | Inline script and style extraction with CRLF normalization, empty scripts, data blocks, import maps, comments, quoted `>` in attributes, event handlers, meta policies and their position |
+| `test/html.test.ts` | Inline script and style extraction with CRLF normalization in content and attributes, empty scripts, data blocks, import maps, comments, `style-*` and `script-*` custom elements, quoted `>` in attributes, event handlers, `nomodule` scripts, meta policies and their position, including `<body>`, `<noscript>` and `<template>`, and text-only elements such as `<title>` |
 | `test/routes.test.ts` | vercel.json `source` patterns, Build Output routes, Netlify `_headers`, unsupported syntax, globs |
 | `test/fixtures.test.ts` | Every committed fixture through the full run, with the exact failures each one must produce |
-| `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies |
-| `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config |
+| `test/checks.test.ts` | Each encoded form of a secret found in a built file, a `.br` file decompressed, minified static imports with dynamic `import()` left out, version targets compared part by part (`"16.10"`, `"16.3"`), an empty inline script, uppercase and base64url hashes, a hash in a shadowed directive, commas and repeats in `<meta>` policies; a secret inside a base64 blob at each offset, import-like text in comments and literals, invalid script URLs, `nomodule` bundles, a budget glob that matches nothing, an empty `targets`, an empty delivered policy, `'unsafe-inline'` without hashes, a `<meta>` next to a header policy or in `<body>`, a dangling symlink |
+| `test/cli.test.ts` | Exit codes, the text and JSON reports, a secret value absent from all output, config errors, a `.ts` config, files saved with a byte order mark, a build folder with no HTML page |
 | `test/sarif.test.ts` | The SARIF log against a zod schema of what code scanning requires; every failure of every failing fixture as one error result; a check that could not run as an error at the config file; skipped checks as notes; regions only where a line is known; paths relative to the current folder and to `--sarif-base`; fingerprints equal across two builds whose asset names carry different hashes; identical output on two runs; `--json` with `--sarif` as a usage error; the text and JSON reports unchanged |
 | `test/output-regression.test.ts` | The text and `--json` output of six fixtures, byte for byte against `test/golden/`, which the CLI of the commit before `--sarif` wrote; `meta` and `meta-misplaced` pin the SKIP lines. `sarif.test.ts` compares the CLI with the report functions it calls, so only these files catch an edit to `formatReport` or to the report shape |
 | `test/action.test.ts` | `action.yml` read as text: no `${{ }}` in a `run:` script, each input passed only through `env:`, setup-node pinned to the commit SHA of `ci.yml`, the zod version of `package.json`, every input and output in this README; its shell step run with bash as GitHub runs it: the default SARIF path, `fail: false`, exit code 2 failing whatever `fail` says, a `sarif-file` that is a folder or cannot be created, `dir` and `config` paths that start with `-`, shell syntax in an input left unrun |
@@ -257,16 +277,23 @@ test/                  Vitest suites; test/golden/ holds the output output-regre
 fixtures/              small builds that pass and fail each check
 ```
 
+## What it does not do
+
+- It does not write or suggest a policy. It compares the build with the policy the config states.
+- It does not talk to a server or a browser. It reads files on disk, so it says nothing about headers a host adds, a CDN rewrites or a server sets at request time.
+- It does not scan for secrets it was not told about. It searches for the values of the variables the config names, not for patterns that look like keys.
+- It does not fix the build, and it does not upload SARIF. The action writes the file, and the workflow uploads it.
+
 ## Limits
 
 - Two checks of the source scripts were left out because they need the app's own server. One ran the server function with marker values in place of each secret and searched the rendered responses. The other checked that the session cookie carries `Secure` on a real redirect. A secret that only reaches a page at request time is not caught here.
 - Pages are found as `.html` files. Pages rendered on demand by a server function are not seen, nor are headers a server sets at runtime.
-- The HTML reader is a tokenizer for what build tools emit, not a full HTML parser. It ignores `<base href>` and `<template>` contents.
+- The HTML reader is a tokenizer for what build tools emit, not a full HTML parser. It ignores `<base href>` and `<template>` contents. It tracks where `<head>` ends from tags only, so text before the first body tag, which ends the head in a browser, does not end it here.
 - vercel.json patterns support a path-to-regexp subset. They are matched case-insensitively against each URL a page can be served at (`/blog/`, `/blog`, `/blog/index.html`). When two rules set the policy for one page the guard fails instead of guessing how the host merges them.
 - Netlify `_headers` support covers path lines with `*` and `:placeholder` and indented header lines. It does not read `netlify.toml`.
 - The lookbehind check searches text, so a lookbehind inside a string or a comment is also reported. That one only throws if the string reaches `new RegExp`, and the message says the whole script fails only for a regex literal.
-- The secrets search finds standalone encoded forms; a value embedded inside a larger base64 blob at an unaligned offset is not found.
-- Static imports are found with a regex, not a JavaScript parser. Any quoted specifier after `import` or `export ... from` is followed, so a query string (`./x.js?v=1`) still finds its file and an extensionless one fails as not in the build. Text in a string literal that looks like an import is followed too, and fails the same way. Inline scripts are compressed one by one, which slightly overcounts them.
+- The secrets search knows the five forms above. A value encoded twice (base64 of base64) or in another encoding (hex, a split string) is not found.
+- Static imports are found with a regex over the code after a small lexer blanks comments, string literals, template text and regex literals, not with a JavaScript parser. Any quoted specifier after `import` or `export ... from` is followed, so a query string (`./x.js?v=1`) still finds its file and an extensionless one fails as not in the build. The lexer reads a `/` after `)` as a division and after `}` as a regex, so `if (x) /re/` or `{}/2` can be misread; a misread string or regex ends at the end of its line. Inline scripts are compressed one by one, which slightly overcounts them.
 - Nonces and `'strict-dynamic'` are outside the model, so a policy that relies on them fails the inline check.
 - The action makes SARIF paths relative to the workspace. A repository checked out into a subfolder (the `path` input of `actions/checkout`) gets paths that code scanning cannot map; run the CLI with `--sarif-base` set to that subfolder instead.
 - The action runs the guard twice, once per output, so it takes twice as long as one CLI run. The CLI prints one format per run, and keeping it that way kept the text and JSON outputs unchanged.

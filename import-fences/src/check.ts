@@ -168,9 +168,12 @@ export function check(config: FencesConfig, files: FileSource, configLabel = 'im
     seen.add(key);
     return true;
   });
-  unique.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
+  unique.sort((a, b) => compare(a.file, b.file) || a.line - b.line || a.column - b.column || compare(a.rule, b.rule));
   return { violations: unique, files: all.length, rules: config.rules.length };
 }
+
+/** Code-unit order, the same on every machine; localeCompare depends on the locale. */
+const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 type Report = (violation: Omit<Violation, 'why'>) => void;
 type Get = (path: string) => Parsed | null;
@@ -207,6 +210,7 @@ function forbiddenImport(
   };
   const external = (s: string) => rule.external.some((p) => matchesSpecifier(s, p));
   const installed = (from: string, name: string) => {
+    if (files.packageInstalled !== undefined) return files.packageInstalled(from, name);
     for (let dir = posix.dirname(from); ; dir = posix.dirname(dir)) {
       if (files.isFile(posix.join(dir === '.' ? '' : dir, 'node_modules', name, 'package.json'))) return true;
       if (dir === '.' || dir === '') return false;

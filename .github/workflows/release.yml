@@ -1,5 +1,6 @@
 # Versions and publishes the npm packages (@fedemedinilla/claude-gateway from gateway/,
-# @fedemedinilla/slop-lint from slop-lint/) with Changesets. .changeset/README.md explains the
+# @fedemedinilla/slop-lint from slop-lint/, @fedemedinilla/import-fences from import-fences/,
+# @fedemedinilla/csp-build-guard from csp-build-guard/) with Changesets. .changeset/README.md explains the
 # flow and the one-time setup on npmjs.com; until the repository variable NPM_RELEASE is set to
 # "enabled", no job runs.
 #
@@ -109,10 +110,10 @@ jobs:
         run: npm run check
 
       - name: Package tests
-        run: npx vitest run gateway slop-lint
+        run: npx vitest run gateway slop-lint import-fences csp-build-guard
 
       # The same check CI runs: each tarball installed outside the repository, its exports, its
-      # types and the slop-lint bin.
+      # types and the bins.
       - name: Pack check
         run: npm run pack:check
 

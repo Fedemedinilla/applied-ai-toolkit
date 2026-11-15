@@ -1,0 +1,59 @@
+{
+  "name": "@fedemedinilla/import-fences",
+  "version": "0.1.0",
+  "description": "Architecture rules about imports as a failing check: forbidden imports followed across files, one importer per SDK, one reader per environment variable. A CLI with SARIF output, a GitHub Action and a library.",
+  "license": "MIT",
+  "author": "Federico Medinilla",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fedemedinilla/applied-ai-toolkit.git",
+    "directory": "import-fences"
+  },
+  "homepage": "https://github.com/Fedemedinilla/applied-ai-toolkit/tree/main/import-fences#readme",
+  "bugs": {
+    "url": "https://github.com/Fedemedinilla/applied-ai-toolkit/issues"
+  },
+  "keywords": [
+    "architecture",
+    "imports",
+    "boundaries",
+    "dependency-rules",
+    "lint",
+    "sarif",
+    "typescript",
+    "monorepo"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "import-fences": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../LICENSE','LICENSE')\" && npm run build"
+  },
+  "dependencies": {
+    "typescript": "5.9.3",
+    "zod": "4.6.7"
+  }
+}

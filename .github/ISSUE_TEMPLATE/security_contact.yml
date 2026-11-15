@@ -1,0 +1,19 @@
+# The fallback of SECURITY.md for when private vulnerability reporting shows no form. The issue
+# is public, so it asks for nothing about the problem: no folder, no description, no proof.
+name: Ask for a private security contact
+description: Only when the private vulnerability form is not available. Says nothing about the problem.
+title: Private security contact request
+labels:
+  - security
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. Do not name the folder, the version or the problem here. The maintainer will reply with a private channel, and the report goes there. See SECURITY.md.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Request
+      options:
+        - label: I have a security report for this repository and need a private way to send it.
+          required: true

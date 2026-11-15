@@ -4,10 +4,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
+import { connect, type AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createHandler } from '../server/handler.ts';
-import { createNodeServer, CSP, resolveStatic } from '../server/node-server.ts';
+import { createNodeServer, CSP, DEFAULT_PORT, portFrom, resolveStatic } from '../server/node-server.ts';
 import { memoryStore } from '../server/store.ts';
 import { generateVapidPair } from '../server/vapid.ts';
 import { fakeDevice } from './helpers/fake-push-service.ts';
@@ -15,6 +15,22 @@ import { fakeDevice } from './helpers/fake-push-service.ts';
 let dir = '';
 let server: Server;
 let base = '';
+
+/** One raw request over a socket, for request targets fetch would refuse to send. */
+function rawRequest(target: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = connect((server.address() as AddressInfo).port, '127.0.0.1');
+    let answer = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk: string) => (answer += chunk));
+    socket.on('end', () => resolve(answer));
+    socket.on('error', reject);
+    // A server that never answers fails the test instead of hanging it.
+    socket.setTimeout(2000, () => socket.destroy());
+    socket.on('close', () => resolve(answer));
+    socket.write(`GET ${target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+  });
+}
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'push-lab-serve-'));
@@ -52,6 +68,26 @@ describe('static files', () => {
     expect(asset.headers.get('cache-control')).toContain('immutable');
     const manifest = await fetch(`${base}/manifest.webmanifest`);
     expect(manifest.headers.get('content-type')).toBe('application/manifest+json');
+  });
+
+  it('decides immutable from the path inside the build, not from where the build lives', async () => {
+    const parent = mkdtempSync(join(tmpdir(), 'push-lab-serve-'));
+    const nested = join(parent, 'assets', 'push-lab');
+    mkdirSync(join(nested, 'assets'), { recursive: true });
+    writeFileSync(join(nested, 'index.html'), '<!doctype html><title>t</title>');
+    writeFileSync(join(nested, 'sw.js'), 'self;');
+    writeFileSync(join(nested, 'assets', 'index-abc.js'), 'x;');
+    const other = createNodeServer({ handler: async () => new Response(null, { status: 404 }), dir: nested });
+    await new Promise<void>((resolve) => other.listen(0, '127.0.0.1', resolve));
+    const at = `http://127.0.0.1:${(other.address() as AddressInfo).port}`;
+    try {
+      expect((await fetch(`${at}/`)).headers.get('cache-control')).toBe('no-cache');
+      expect((await fetch(`${at}/sw.js`)).headers.get('cache-control')).toBe('no-cache');
+      expect((await fetch(`${at}/assets/index-abc.js`)).headers.get('cache-control')).toContain('immutable');
+    } finally {
+      await new Promise((resolve) => other.close(resolve));
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   it('refuses paths that leave the build folder', () => {
@@ -117,5 +153,33 @@ describe('the API through node:http', () => {
     const response = await fetch(`${base}/api/redirect-check`, { redirect: 'manual' });
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('../?redirected=1');
+  });
+});
+
+describe('a request target the URL parser refuses', () => {
+  // node:http accepts these, WHATWG URL throws on them. Thrown in the request listener, that was
+  // an uncaught exception and the end of the process.
+  it.each(['//[', '//a:99999/'])('answers 400 to %s and keeps serving', async (target) => {
+    expect(await rawRequest(target)).toMatch(/^HTTP\/1\.1 400 /u);
+    expect((await fetch(`${base}/`)).status).toBe(200);
+  });
+});
+
+describe('portFrom, the PORT variable serve.ts listens on', () => {
+  it('uses the default when PORT is absent or empty, so an empty value is not port 0', () => {
+    expect(DEFAULT_PORT).toBe(4330);
+    expect(portFrom(undefined)).toBe(4330);
+    expect(portFrom('')).toBe(4330);
+    expect(portFrom('  ')).toBe(4330);
+  });
+
+  it('reads a port number', () => {
+    expect(portFrom('8080')).toBe(8080);
+    expect(portFrom(' 1 ')).toBe(1);
+    expect(portFrom('65535')).toBe(65535);
+  });
+
+  it.each(['abc', '0', '65536', '80.5', '-1', '0x50'])('refuses %s with an error that names PORT', (value) => {
+    expect(() => portFrom(value)).toThrow(/PORT/u);
   });
 });

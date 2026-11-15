@@ -187,3 +187,26 @@ def run_cli(argv: list[str]) -> tuple[int, str, str]:
         except SystemExit as exc:  # argparse usage errors and --help
             code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 2)
     return int(code), out.getvalue(), err.getvalue()
+
+
+def read_run(path: Path) -> dict:
+    """A stored run (run.json, or a datos.json of the earlier format) as the tool itself reads it.
+
+    The tests assert on the names the rules use inside the package
+    (``meta.dominio``, ``checks[].estado``); run.json spells them in English
+    (sitecheck/runformat.py). Reading through the tool's own reader keeps one
+    set of names in the assertions; tests/test_runformat.py checks the file
+    as it is on disk.
+    """
+    from sitecheck import outputs
+
+    return outputs.read_datos(Path(path))
+
+
+def read_comparison(path: Path) -> dict:
+    """A comparison.json with the names the package uses inside (see read_run)."""
+    import json
+
+    from sitecheck import runformat
+
+    return runformat.comparison_to_internal(json.loads(Path(path).read_text(encoding="utf-8")))

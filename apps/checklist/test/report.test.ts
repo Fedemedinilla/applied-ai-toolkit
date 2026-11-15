@@ -2,7 +2,8 @@
 // their denominator and evidence notes that cannot inject Markdown.
 
 import { describe, expect, it } from 'vitest';
-import { ackPostChange, ackPreChange, closeRun, postChangePending, recordBaseline, setEvidence, setState, type Run, type State } from '../src/run.ts';
+import { ackPostChange, ackPreChange, closeRun, postChangePending, recordBaseline, setEvidence, setProfile, setState, type Run, type State } from '../src/run.ts';
+import { summarise } from '../src/colours.ts';
 import { md, reportMarkdown } from '../src/report.ts';
 import { at, loadCatalogue, ok, runWith } from './helpers.ts';
 
@@ -102,5 +103,38 @@ describe('the before and after report (template B)', () => {
     expect(text).toContain('Acknowledged 2026-11-04 13:20 UTC.');
     expect(text).toContain('Run closed 2026-11-04 13:40 UTC.');
     expect(text).not.toContain('Payments');
+  });
+});
+
+describe('the before and after report says what it can back', () => {
+  it('claims the same profile and the change control only when both hold', () => {
+    let run = ok(recordBaseline(externalRun(), at(10)));
+    run = catalogue.preChange.reduce((r, row) => ok(ackPreChange(catalogue, r, row.id, true, at(20))), run);
+    run = mark(run, 'EXT-05', 'fixed', 'dig output');
+    for (const row of postChangePending(catalogue, run)) run = ok(ackPostChange(catalogue, run, row.id, true, at(30)));
+    const text = reportMarkdown(catalogue, run, 'before-after', at(60));
+    expect(text).toContain('with the same checklist and the same site profile. Each change was made after the pre-change list and checked with the post-change matrix (listed at the end).');
+  });
+
+  it('counts "before" with the profile it was recorded with, and says the profile and change control differ', () => {
+    let run = ok(recordBaseline(externalRun(), at(10)));
+    expect(run.baseline?.profile).toEqual(run.profile);
+    expect(run.baseline?.catalogueId).toBe(catalogue.id);
+    run = ok(setProfile(run, { ...run.profile, authorized: true }));
+    const text = reportMarkdown(catalogue, run, 'before-after', at(60));
+    expect(text).not.toContain('the same site profile');
+    expect(text).not.toContain('Each change was made after the pre-change list');
+    expect(text).toContain('The site profile changed after "before" was recorded: written authorization was not signed then and is now. Each column counts the checks of its own profile.');
+    expect(text).toContain('The pre-change list or the post-change matrix is not fully acknowledged; see the change control record at the end.');
+    const before = summarise(catalogue, { ...run, profile: externalRun().profile }, null, run.baseline ?? undefined);
+    expect(text).toContain(`| Checks passed | ${before.passed} of ${before.applicable} applicable |`);
+    expect(before.applicable).toBe(43);
+  });
+
+  it('does not claim the same profile for a "before" recorded without one', () => {
+    const run = ok(recordBaseline(externalRun(), at(10)));
+    const { profile: _p, catalogueId: _c, ...old } = run.baseline ?? { at: '', states: {}, evidence: {} };
+    const text = reportMarkdown(catalogue, { ...run, baseline: old }, 'before-after', at(60));
+    expect(text).toContain('The site profile of "before" was not recorded in this run, so both columns use the current one.');
   });
 });

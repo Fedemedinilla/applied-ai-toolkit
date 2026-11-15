@@ -58,7 +58,10 @@ export interface Knobs {
    * Auth down behind the gateway (502, 503, 504). PostgREST is not affected.
    */
   failWith: number | null;
-  /** While true, every request (Auth and PostgREST) waits until its signal aborts. */
+  /**
+   * While true, every request (Auth and PostgREST) waits until its signal aborts. A string or URL
+   * input with no signal fails at once; a Request input always counts as having one.
+   */
   hang: boolean;
   /**
    * Milliseconds before a route answers, keyed by pathname ('/auth/v1/verify'). A request aborted
@@ -74,7 +77,7 @@ export interface Knobs {
 }
 
 export interface FakeSupabaseOptions {
-  /** Defaults to http://supabase.test. Only the fake ever sees it. */
+  /** An origin with no path. Defaults to http://supabase.test. Only the fake ever sees it. */
   readonly url?: string;
   /** Defaults to sb_publishable_fake. A request with any other apikey gets a 401. */
   readonly publishableKey?: string;
@@ -150,6 +153,12 @@ function never(signal: AbortSignal | null): Promise<Response> {
 
 function wait(ms: number, signal: AbortSignal | null): Promise<void> {
   return new Promise((resolve, reject) => {
+    // The signal can abort while the body is read, before the wait starts; a listener added then
+    // would never fire.
+    if (signal?.aborted) {
+      reject(abortReason(signal));
+      return;
+    }
     const onAbort = (): void => {
       clearTimeout(timer);
       reject(abortReason(signal!));
@@ -167,6 +176,14 @@ export function authError(status: number, errorCode: string, msg: string): Respo
   return Response.json({ code: status, error_code: errorCode, msg }, { status });
 }
 
+/**
+ * A real Auth feature the fake does not have. 404 like an unknown route (a 5xx would make auth-js
+ * retry), in Auth's shape so auth-js reports error.code 'not_in_fake'.
+ */
+function notInFakeAuth(what: string): Response {
+  return authError(404, 'not_in_fake', `The fake does not emulate ${what}`);
+}
+
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 function bearer(headers: Headers): string | null {
@@ -180,7 +197,12 @@ function field(body: unknown, name: string): unknown {
 
 export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Promise<FakeSupabase> {
   const url = (options.url ?? 'http://supabase.test').replace(/\/$/, '');
-  const origin = new URL(url).origin;
+  const parsedUrl = new URL(url);
+  // Routing matches /auth/v1/ and /rest/v1/ from the root, so a base path would make every call 404.
+  if (parsedUrl.pathname !== '/' || parsedUrl.search !== '' || parsedUrl.hash !== '') {
+    throw new Error(`createFakeSupabase: url must be an origin such as http://supabase.test, not ${url}`);
+  }
+  const origin = parsedUrl.origin;
   const publishableKey = options.publishableKey ?? 'sb_publishable_fake';
   const otpCode = options.otpCode ?? '123456';
   const seeded = options.users ?? [DEFAULT_USER];
@@ -204,7 +226,10 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     rest: null,
   };
 
-  const findByEmail = (email: string): FakeUser | undefined => [...users.values()].find((u) => u.email === email);
+  // Auth trims and lowercases the email before it looks the user up, so case never makes a new user.
+  const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+  const findByEmail = (email: string): FakeUser | undefined =>
+    [...users.values()].find((u) => normalizeEmail(u.email) === normalizeEmail(email));
 
   function userJson(user: FakeUser) {
     return {
@@ -263,18 +288,23 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
   }
 
   async function otp(body: unknown): Promise<Response> {
-    const email = field(body, 'email');
-    if (typeof email !== 'string' || email === '') return authError(400, 'validation_failed', 'An email address is required');
-    if (findByEmail(email) === undefined) {
+    const raw = field(body, 'email');
+    if (raw === undefined && field(body, 'phone') !== undefined) return notInFakeAuth('phone sign-in on /otp');
+    const email = typeof raw === 'string' ? normalizeEmail(raw) : '';
+    if (email === '') return authError(400, 'validation_failed', 'An email address is required');
+    let user = findByEmail(email);
+    if (user === undefined) {
       if (field(body, 'create_user') === false) return authError(422, 'otp_disabled', 'Signups not allowed for otp');
-      const created = { id: crypto.randomUUID(), email };
-      users.set(created.id, created);
+      user = { id: crypto.randomUUID(), email };
+      users.set(user.id, user);
     }
-    pendingOtp.add(email);
+    pendingOtp.add(user.email);
     return Response.json({});
   }
 
   async function verify(body: unknown): Promise<Response> {
+    if (field(body, 'token_hash') !== undefined) return notInFakeAuth('token_hash verification on /verify (magic and confirmation links)');
+    if (field(body, 'email') === undefined && field(body, 'phone') !== undefined) return notInFakeAuth('phone verification on /verify');
     const email = field(body, 'email');
     const user = typeof email === 'string' ? findByEmail(email) : undefined;
     // Auth gives the same answer for a wrong code, a used one and an email that never asked.
@@ -302,7 +332,12 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     const token = field(body, 'refresh_token');
     const stored = typeof token === 'string' ? refreshTokens.get(token) : undefined;
     if (stored === undefined) return authError(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
-    if (stored.revoked) return authError(400, 'refresh_token_already_used', 'Invalid Refresh Token: Already Used');
+    if (stored.revoked) {
+      // Reuse detection: a spent token coming back means it may have been stolen, so Auth revokes
+      // every token of that session (the token family), not just this one.
+      for (const other of refreshTokens.values()) if (other.sessionId === stored.sessionId) other.revoked = true;
+      return authError(400, 'refresh_token_already_used', 'Invalid Refresh Token: Already Used');
+    }
     const user = users.get(stored.userId);
     if (user === undefined) return authError(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
     // Rotation: the token just used is spent.
@@ -333,7 +368,7 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
       case 'POST /token':
         if (grant === 'pkce') return exchangePkce(request.body);
         if (grant === 'refresh_token') return refresh(request.body);
-        return authError(400, 'unsupported_grant_type', 'unsupported_grant_type');
+        return notInFakeAuth(`the grant_type ${grant ?? '(none)'} on /token`);
       case 'GET /user': {
         const who = await authenticate(request.headers);
         return who instanceof Response ? who : Response.json(userJson(who.user));
@@ -389,7 +424,10 @@ export async function createFakeSupabase(options: FakeSupabaseOptions = {}): Pro
     fetch: async (input, init) => {
       const request = new Request(input, init);
       // The Request merges the signal of `init` and of a Request passed as `input`. A constructed
-      // Request always has one; it is the caller's only when init or input carried a signal.
+      // Request always has one, and nothing public tells whether the caller gave it, so a Request
+      // passed as `input` always counts as carrying the caller's signal. With knobs.hang, a Request
+      // built without a signal therefore waits until the test times out; only a string or URL input
+      // with no init.signal fails at once.
       const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : null);
       const signal = callerSignal === null ? null : request.signal;
       // Like Node's fetch: with the signal already aborted, nothing goes out.

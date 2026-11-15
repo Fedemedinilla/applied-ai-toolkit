@@ -187,6 +187,44 @@ function startsAWord(haystack: string, needle: string): boolean {
   return false;
 }
 
+/** Words and marks that can sit around a row's full name without naming anything else. */
+const FILLER = new Set(['un', 'una', 'el', 'la', 'los', 'las', 'de', 'del', 'para', 'por', 'favor', 'turno', 'y', 'e', 'con', 'mas',
+  'a', 'an', 'the', 'for', 'please', 'and', 'with', 'plus']);
+const EDGE_MARKS = /^[\s.,;:!?¿¡+&/\u2013\u2014-]+|[\s.,;:!?¿¡+&/\u2013\u2014-]+$/g;
+
+/** What a request says besides one row's full name, with filler words and marks at the edges dropped. */
+function besides(n: string, name: string): string {
+  const i = n.indexOf(name);
+  let rest = i < 0 ? n : `${n.slice(0, i)} ${n.slice(i + name.length)}`;
+  for (let prev = ''; rest !== prev; ) {
+    prev = rest;
+    rest = rest.replace(EDGE_MARKS, '');
+    rest = rest.replace(/^(\p{L}+)(?=[^\p{L}\p{N}']|$)/u, (w) => (FILLER.has(w) ? '' : w));
+    rest = rest.replace(/(?<=^|[^\p{L}\p{N}'])(\p{L}+)$/u, (w) => (FILLER.has(w) ? '' : w));
+  }
+  return rest;
+}
+
+/**
+ * The rows a request names in full, with whatever else it names. "Corte de hombre (máquina y
+ * tijera) + barba" used to be the men's cut alone, so the card promised 30 minutes at $16.000 for
+ * a visit the combo row prices at 50 minutes and $23.000. A row named with something more comes
+ * back with the rows that something could be, so the request is a question; with something more
+ * that is no row, the row does not come back at all, and the request is not loaded.
+ */
+function namedInFull(n: string, lang: Lang, contains: (whole: string, part: string) => boolean): Service[] {
+  const out: Service[] = [];
+  for (const s of SALON_SERVICES) {
+    const name = normalize(lang === 'en' ? serviceName(s, 'en') : s.name);
+    if (!contains(n, name)) continue;
+    const rest = besides(n, name);
+    const more = rest ? findServices(rest, lang) : [];
+    if (rest && !more.length) continue;
+    out.push(s, ...more);
+  }
+  return out;
+}
+
 /**
  * Every row the fragment could mean; empty when it means none. Exact name or id first. The loose
  * match used to answer anything: in the source, findService(''), ('a') and ('de') all came back
@@ -201,15 +239,14 @@ export function findServices(name: string, lang: Lang = 'es'): Service[] {
     const exact = SALON_SERVICES.find((s) => normalize(serviceName(s, 'en')) === n || s.id === n || normalize(s.name) === n);
     if (exact) return [exact];
     if (n.length < EN_LOOSE_MIN) return [];
-    return SALON_SERVICES.filter((s) => {
-      const en = normalize(serviceName(s, 'en'));
-      return startsAWord(en, n) || startsAWord(n, en);
-    });
+    const found = new Set([...SALON_SERVICES.filter((s) => startsAWord(normalize(serviceName(s, 'en')), n)), ...namedInFull(n, 'en', startsAWord)]);
+    return SALON_SERVICES.filter((s) => found.has(s));
   }
   const exact = SALON_SERVICES.find((s) => normalize(s.name) === n || s.id === n);
   if (exact) return [exact];
   if (n.length < LOOSE_MIN) return [];
-  return SALON_SERVICES.filter((s) => normalize(s.name).includes(n) || n.includes(normalize(s.name)));
+  const found = new Set([...SALON_SERVICES.filter((s) => normalize(s.name).includes(n)), ...namedInFull(n, 'es', (whole, part) => whole.includes(part))]);
+  return SALON_SERVICES.filter((s) => found.has(s));
 }
 
 export function findService(name: string, lang: Lang = 'es'): Service | null {

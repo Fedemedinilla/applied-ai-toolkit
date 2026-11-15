@@ -19,6 +19,8 @@ export interface Texts {
     readonly limited: PageText;
     readonly unavailable: PageText;
     readonly forbidden: PageText;
+    /** A body over `maxBodyBytes`. Optional so older custom texts still type-check; without it the invalid page is used. */
+    readonly tooLarge?: PageText;
   };
   readonly ack: {
     /** `{site}` is replaced by the site name. */
@@ -43,6 +45,7 @@ export const TEXTS: Readonly<Record<Lang, Texts>> = {
       limited: { title: 'Too many messages in a row.', body: 'Try again in a few minutes, or write directly to {address}.' },
       unavailable: { title: 'The message could not be sent.', body: 'The problem is on our side. Write directly to {address}.' },
       forbidden: { title: 'This form only accepts messages sent from its own page.', body: 'Open the contact page again and send it from there, or write to {address}.' },
+      tooLarge: { title: 'The message is too long.', body: 'Go back, shorten it and send it again, or write directly to {address}.' },
     },
     ack: {
       subject: 'We got your message · {site}',
@@ -61,6 +64,7 @@ export const TEXTS: Readonly<Record<Lang, Texts>> = {
       limited: { title: 'Demasiados envíos seguidos.', body: 'Intenta de nuevo en unos minutos, o escribe directamente a {address}.' },
       unavailable: { title: 'No se pudo enviar el mensaje.', body: 'El problema es nuestro. Escribe directamente a {address}.' },
       forbidden: { title: 'Este formulario solo acepta mensajes enviados desde su propia página.', body: 'Abre otra vez la página de contacto y envíalo desde ahí, o escribe a {address}.' },
+      tooLarge: { title: 'El mensaje es demasiado largo.', body: 'Vuelve atrás, acórtalo y envíalo de nuevo, o escribe directamente a {address}.' },
     },
     ack: {
       subject: 'Recibimos tu mensaje · {site}',

@@ -20,7 +20,8 @@ What is allowed on the target (registrable domain D):
 * the RSS/Atom feed only if the home links it with <link rel=alternate>;
 * pages the home links with <a href> on D (interna, --form-page,
   hreflang alternates, VIS-09 link checks): admitted with admit_linked;
-* og:image, on ANY host, for that single URL and its redirect hops;
+* og:image, on ANY host not on the exclusion list (set_exclusion), for that
+  single URL and its redirect hops;
 * one TLS handshake per site host (canonical host and the other apex/www host).
 
 Never, even when linked: DENY_PATTERNS (readme.html, /wp-json, ?author=,
@@ -57,7 +58,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -190,7 +191,7 @@ def strip_controls(text: str) -> str:
 
 
 def _audit_url(url: str) -> str:
-    """A URL as written to datos.json or a message: e-mails, phone-like numbers and control characters masked."""
+    """A URL as written to run.json or a message: e-mails, phone-like numbers and control characters masked."""
     return _LONG_DIGITS_RE.sub("[numero]", _EMAIL_RE.sub("[correo]", strip_controls(str(url))))
 
 
@@ -212,7 +213,7 @@ def _is_ip_literal(host: str) -> bool:
 
 @dataclass
 class Admission:
-    """Why a URL is allowed; listed in datos.json meta.scope for auditability."""
+    """Why a URL is allowed; listed in run.json meta.scope for auditability."""
 
     url: str
     purpose: Purpose
@@ -292,6 +293,7 @@ class ScopeGuard:
         self._feed: str | None = None
         self._og_image: str | None = None
         self._og_image_host: str | None = None
+        self._excluded: Callable[[str], bool] | None = None
         self._variant_keys = {domains.compare_key(v) for v in domains.site_variants(self.registrable)}
         self._input_key = domains.compare_key(self.input_url)
 
@@ -346,6 +348,17 @@ class ScopeGuard:
         return out
 
     # ------------------------------------------------------------------ admissions
+    def set_exclusion(self, excluded: Callable[[str], bool]) -> None:
+        """Hosts on the exclusion list: the og:image and its hops never go there.
+
+        The pipeline checks the input host, D and the canonical host itself;
+        the og:image is the one URL the page can aim at any host.
+        """
+        self._excluded = excluded
+
+    def _is_excluded(self, host: str) -> bool:
+        return self._excluded is not None and bool(self._excluded(host))
+
     def set_canonical(self, final_url: str) -> None:
         """Record H, the final URL of the input chain. Must be on D, else ScopeError."""
         t = _parse(final_url)
@@ -489,6 +502,9 @@ class ScopeGuard:
             return False
         if not self._port_ok(t):
             self._note(url, Purpose.OG_IMAGE, f"port {t.port}")
+            return False
+        if self._is_excluded(t.host):
+            self._note(url, Purpose.OG_IMAGE, "excluded")
             return False
         if self._on_site(t.host) and self._deny(t) is not None:
             self.refusals.append({"url": _audit_url(url), "purpose": str(Purpose.OG_IMAGE), "reason": "deny-pattern"})
@@ -653,6 +669,11 @@ class ScopeGuard:
                 raise self._refuse(to_url, purpose, "test isolation")
             if not self.test_loopback and t.scheme != "https":
                 return RedirectVerdict.LEAVE
+            if not self.test_loopback and (_is_ip_literal(t.host) or t.host == "localhost" or t.port != 443):
+                # The authoritative server is a public https NAME; the HTTP
+                # client also pins this hop to a public address.
+                self._note(to_url, purpose, "rdap hop to an IP address, localhost or a non-default port")
+                return RedirectVerdict.LEAVE
             self._admit(to_url, purpose, "rdap.org redirect")
             return RedirectVerdict.FOLLOW
         if purpose in API_PURPOSES or purpose is Purpose.CONTROL:
@@ -661,6 +682,9 @@ class ScopeGuard:
         if purpose is Purpose.OG_IMAGE:
             if _is_ip_literal(t.host) or t.host == "localhost" or not self._port_ok(t):
                 self._note(to_url, purpose, "og:image hop to an IP address or a non-default port")
+                return RedirectVerdict.LEAVE
+            if self._is_excluded(t.host):
+                self._note(to_url, purpose, "og:image hop to an excluded host")
                 return RedirectVerdict.LEAVE
             if not self._isolation_ok(t):
                 raise self._refuse(to_url, purpose, "test isolation")
@@ -714,7 +738,7 @@ class ScopeGuard:
         return t is not None and self._on_site(t.host)
 
     def describe(self) -> dict:
-        """JSON-ready summary for datos.json meta.scope: admissions and refusals with reasons."""
+        """JSON-ready summary for run.json meta.scope: admissions and refusals with reasons."""
         return {
             "dominio": self.registrable,
             "url_entrada": _audit_url(self.input_url),

@@ -33,9 +33,9 @@ describe('kindOf', () => {
     expect(kindOf('45 mil de luz')).toEqual({ kind: 'expense', keyword: null });
   });
 
-  it('agrees with the kind recorded in the parser corpus on 164 of 165 phrases', () => {
+  it('agrees with the kind recorded in the parser corpus on 193 of 194 phrases', () => {
     const misses = corpus.filter((c) => kindOf(c.phrase).kind !== c.kind).map((c) => c.phrase);
-    expect(corpus).toHaveLength(165);
+    expect(corpus).toHaveLength(194);
     // The one miss: "hice 5 destapaciones" is income only if you know the speaker is a plumber.
     expect(misses).toEqual(['hice 5 destapaciones a 35 lucas cada una']);
   });

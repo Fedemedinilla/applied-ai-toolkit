@@ -151,7 +151,7 @@ final class SecurityHeaders implements Control
         }
         $details[] = __('X-Frame-Options is left off embed views (/embed/), which other sites frame on purpose.', 'wp-hardening');
         $names = implode(', ', array_keys($this->headers($https)));
-        $twice = $this->rules?->serverHeaders() ?? [];
+        $twice = $this->sentTwice($https);
         if ($twice !== []) {
             return new Report(
                 State::Recommended,
@@ -162,6 +162,24 @@ final class SecurityHeaders implements Control
         return new Report(State::Good, \sprintf(__('Sent on pages, the dashboard and the login screen: %s.', 'wp-hardening'), $names), $details);
     }
 
+    /**
+     * The headers the root .htaccess sets that this plugin also sends. A server name the plugin
+     * does not send (an enforcing Content-Security-Policy, HSTS at max-age 0) is no duplicate.
+     *
+     * @return list<string>
+     */
+    private function sentTwice(bool $https): array
+    {
+        $sent = array_map('strtolower', array_keys($this->headers($https)));
+        $out = [];
+        foreach ($this->rules?->serverHeaders() ?? [] as $name) {
+            if (\in_array(strtolower($name), $sent, true)) {
+                $out[] = $name;
+            }
+        }
+        return $out;
+    }
+
     public function plan(): array
     {
         $lines = [];
@@ -170,7 +188,7 @@ final class SecurityHeaders implements Control
         }
         $lines[] = 'Strict-Transport-Security is sent only on HTTPS requests; X-Frame-Options is not sent on /embed/ views.';
         $lines[] = 'A header already set from PHP is left as it is. Headers the web server adds are invisible to PHP: if the server configuration already sends these, remove them there or leave this control off, or responses carry two copies.';
-        $twice = $this->rules?->serverHeaders() ?? [];
+        $twice = $this->sentTwice(true);
         if ($twice !== []) {
             $lines[] = 'Found in the root .htaccess: ' . implode(', ', $twice) . '. Remove those Header lines before turning this on.';
         }

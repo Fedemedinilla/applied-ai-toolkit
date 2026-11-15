@@ -24,6 +24,22 @@ export type TaskConfig = z.infer<typeof TaskConfig>;
 export const CallConfig = z.strictObject({ model: z.enum(SUPPORTED_MODELS), effort: z.enum(EFFORTS) });
 export type CallConfig = z.infer<typeof CallConfig>;
 
+/** TaskConfig and CallConfig for the models of a registry: the same shapes, with any registered id as the model. */
+export type RegisteredTaskConfig = Omit<TaskConfig, 'model'> & { readonly model: string };
+export type RegisteredCallConfig = Omit<CallConfig, 'model'> & { readonly model: string };
+export interface ConfigSchemas {
+  readonly task: z.ZodType<RegisteredTaskConfig>;
+  readonly call: z.ZodType<RegisteredCallConfig>;
+}
+
+/** The two schemas above with `model` limited to those ids. An id outside them fails like any other schema error. */
+export function configSchemasFor(modelIds: readonly string[]): ConfigSchemas {
+  const model = z.enum(modelIds);
+  return { task: TaskConfig.extend({ model }), call: CallConfig.extend({ model }) };
+}
+
+const BUILT_IN_SCHEMAS: ConfigSchemas = { task: TaskConfig, call: CallConfig };
+
 export const GlobalCaps = z.object({
   perJobUsd: z.number().positive(),
   dailyPerUserUsd: z.number().positive(),
@@ -71,15 +87,15 @@ function parse<S extends z.ZodType>(schema: S, value: unknown, code: ConfigError
 }
 
 /** Config carried by the request is part of the request: if it is wrong, the request is malformed. */
-export function parseCallConfig(value: unknown): CallConfig {
-  const result = CallConfig.safeParse(value);
+export function parseCallConfig(value: unknown, schemas: ConfigSchemas = BUILT_IN_SCHEMAS): RegisteredCallConfig {
+  const result = schemas.call.safeParse(value);
   if (result.success) return result.data;
   throw new RequestError(`Malformed request: config fails its schema (${describeIssues(result.error)})`, { cause: result.error });
 }
 
-export function parseTaskConfig(row: unknown, task: string): TaskConfig {
+export function parseTaskConfig(row: unknown, task: string, schemas: ConfigSchemas = BUILT_IN_SCHEMAS): RegisteredTaskConfig {
   if (row === null) throw new ConfigError('invalid_config', `No task config for ${task}`);
-  const config = parse(TaskConfig, row, 'invalid_config', `task config of ${task}`);
+  const config = parse(schemas.task, row, 'invalid_config', `task config of ${task}`);
   if (config.task !== task) throw new ConfigError('invalid_config', `Asked for the config of ${task} and got ${config.task}`);
   return config;
 }

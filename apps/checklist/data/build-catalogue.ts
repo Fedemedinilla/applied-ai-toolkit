@@ -74,7 +74,8 @@ function cells(line: string): string[] {
 /** Every table in a Markdown text, keyed by the nearest heading above it. */
 export function tables(text: string, file: string): Map<string, Row[]> {
   const out = new Map<string, Row[]>();
-  const lines = text.split('\n');
+  // A Windows checkout may write CRLF line endings, and an editor may add a byte order mark.
+  const lines = text.replace(/^\uFEFF/u, '').split(/\r?\n/u);
   let heading = '';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
@@ -265,7 +266,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     } catch {
       // A missing file is stale too.
     }
-    if (current !== fresh) {
+    // The committed file may carry CRLF in a Windows checkout; only its content is compared.
+    if (current.replace(/\r\n/gu, '\n') !== fresh) {
       console.error('apps/checklist/public/catalogue.json is stale: run node apps/checklist/data/build-catalogue.ts');
       process.exit(1);
     }

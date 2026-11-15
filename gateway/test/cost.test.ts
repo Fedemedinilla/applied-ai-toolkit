@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { costUsd, countAttachments, estimateInputTokens, pricesInForce, splitUsage, sumTokens, tariffModifiers, type AttemptUsage, type PriceRow } from '../src/cost.ts';
+import { costUsd, countAttachments, estimateInputTokens, PriceRow, pricesInForce, splitUsage, sumTokens, tariffModifiers, type AttemptUsage } from '../src/cost.ts';
 import { fakeMessage, fakeUsage } from './helpers/fake-claude.ts';
 import { PRICES } from './helpers/fake-stores.ts';
 
@@ -158,5 +158,76 @@ describe('countAttachments', () => {
       { role: 'user', content: [{ type: 'document', source: { type: 'text', media_type: 'text/plain', data: 'pasted text' } }] },
     ];
     expect(countAttachments(messages)).toBe(0);
+  });
+});
+
+// Cases added after the mutation run of 2026-11-14 (see "Mutation testing" in the README): each one
+// fails against a mutant that the tests above let through.
+describe('pricesInForce, boundaries and order', () => {
+  const row = (validFrom: string, input: number): PriceRow => ({ model: 'claude-sonnet-5-5', validFrom, input, output: 1, cacheRead: 1, cacheWrite5m: 1, cacheWrite1h: 1 });
+
+  it('a price whose validFrom is exactly `at` is already in force', () => {
+    expect(pricesInForce([row('2026-10-23T15:00:00Z', 7)], AT).get('claude-sonnet-5-5')?.input).toBe(7);
+  });
+
+  it('the latest row wins whatever the order of the rows', () => {
+    const rows = [row('2026-10-23T00:00:00Z', 2), row('2026-01-01T00:00:00Z', 3)];
+    expect(pricesInForce(rows, AT).get('claude-sonnet-5-5')?.input).toBe(2);
+  });
+
+  it('a row with a date that does not parse fails the schema with "invalid date"', () => {
+    const result = PriceRow.safeParse(row('next Tuesday', 1));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((i) => i.message)).toEqual(['invalid date']);
+  });
+});
+
+describe('splitUsage, advisor and compaction iterations', () => {
+  const tokens = { input_tokens: 40, output_tokens: 9, cache_read_input_tokens: 5, cache_creation_input_tokens: 0, cache_creation: null };
+
+  it('an advisor attempt is priced at the advisor model, a compaction at the response model', () => {
+    const response = fakeMessage({
+      model: 'claude-sonnet-5-5',
+      usage: fakeUsage({
+        iterations: [
+          { ...tokens, type: 'advisor_message', model: 'claude-opus-4-8' },
+          { ...tokens, type: 'compaction' },
+        ],
+      }),
+    });
+    expect(splitUsage(response, 'claude-fable-5-1')).toEqual([
+      attempt({ kind: 'advisor_message', model: 'claude-opus-4-8', input: 40, output: 9, cacheRead: 5 }),
+      attempt({ kind: 'compaction', model: 'claude-sonnet-5-5', input: 40, output: 9, cacheRead: 5 }),
+    ]);
+  });
+});
+
+describe('estimateInputTokens, what the binary filter leaves alone', () => {
+  const bytes = (text: string) => new TextEncoder().encode(text).length;
+  const estimate = (content: unknown) => estimateInputTokens({ messages: [{ role: 'user', content }] } as Parameters<typeof estimateInputTokens>[0]);
+
+  it('blanks the base64 data and keeps the rest of the source', () => {
+    const block = (data: string) => [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }];
+    expect(estimate(block('JVBERi0xLjcK'.repeat(1000)))).toBe(bytes(JSON.stringify({ system: null, messages: [{ role: 'user', content: block('') }], format: null })));
+  });
+
+  it('counts the data of a plain-text document: it is text, with tokens by size', () => {
+    const pasted = 'pasted text '.repeat(500);
+    expect(estimate([{ type: 'document', source: { type: 'text', media_type: 'text/plain', data: pasted } }])).toBeGreaterThan(bytes(pasted));
+  });
+});
+
+describe('countAttachments, values that are not blocks', () => {
+  it('null, a null source and a source that is not an object count nothing and do not throw', () => {
+    expect(countAttachments(null)).toBe(0);
+    expect(countAttachments([{ type: 'document', source: null }, { type: 'text', text: 'x', citations: null }])).toBe(0);
+    expect(countAttachments({ type: 'document', source: 'base64' })).toBe(0);
+  });
+});
+
+describe('PriceRow, zero prices', () => {
+  it.each(['input', 'output', 'cacheRead', 'cacheWrite5m', 'cacheWrite1h'])('a %s price of zero fails the schema, since it would price calls at nothing', (field) => {
+    const row = { model: 'claude-sonnet-5-5', validFrom: '2026-10-01T00:00:00Z', input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4, [field]: 0 };
+    expect(PriceRow.safeParse(row).error?.issues.map((i) => `${i.path.join('.')}: ${i.code}`)).toEqual([`${field}: too_small`]);
   });
 });

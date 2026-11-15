@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/slop-lint/schema/config.schema.json",
+  "title": "slop-lint config",
+  "description": "slop-lint.config.json. Command-line flags win over every value here.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "lang": {
+      "$ref": "#/$defs/lang",
+      "description": "Language of the text when --lang is not given."
+    },
+    "format": {
+      "$ref": "#/$defs/format",
+      "description": "How every file is read when --format is not given. Left out, a .md file is Markdown and anything else is text."
+    },
+    "anchors": {
+      "$ref": "#/$defs/anchors",
+      "description": "Extra anchor terms, such as tool names written in lowercase. --anchors replaces them."
+    },
+    "ignore": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glob"
+      },
+      "description": "Files that are skipped even when named on the command line."
+    },
+    "ruleSettings": {
+      "$ref": "#/$defs/ruleSettings"
+    },
+    "rules": {
+      "type": "array",
+      "description": "Custom pattern rules.",
+      "items": {
+        "$ref": "#/$defs/customRule"
+      }
+    },
+    "overrides": {
+      "type": "array",
+      "description": "Settings for the files that match. Every matching entry applies, in order, so a later one wins.",
+      "items": {
+        "$ref": "#/$defs/override"
+      }
+    },
+    "suppressions": {
+      "$ref": "#/$defs/suppressions"
+    }
+  },
+  "$defs": {
+    "lang": {
+      "enum": [
+        "en",
+        "es"
+      ]
+    },
+    "format": {
+      "enum": [
+        "text",
+        "markdown"
+      ]
+    },
+    "level": {
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "description": "1 banned: reported and the run fails. 2 reported, the run passes. 3 context word: passes in a sentence with an anchor, otherwise joins the Tier 2 budget."
+    },
+    "severity": {
+      "enum": [
+        "disqualify",
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "What the finding costs the score: disqualify sets it to 0, high 3 points, medium 1.5, low 0.5."
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "glob": {
+      "type": "string",
+      "pattern": "^(?!/)(?!!)(?!\\./)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]*/)?\\.\\.(?:/|$))[\\s\\S]*[^/]$",
+      "description": "A path pattern relative to the folder of the config file, with forward slashes. * stays inside one path segment, ? is one character, ** crosses folders. No braces, classes or negation, no leading ./ and no trailing slash."
+    },
+    "ruleSettings": {
+      "type": "object",
+      "description": "Per rule id: \"off\", or a new level, severity or both. The id is a built-in rule's or a custom rule's.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "const": "off"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "level": {
+                "$ref": "#/$defs/level"
+              },
+              "severity": {
+                "$ref": "#/$defs/severity"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "customRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "message",
+        "suggestion",
+        "lang",
+        "level",
+        "severity",
+        "pattern"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^X-[A-Z0-9]+(?:-[A-Z0-9]+)*$",
+          "description": "Starts with X-, so it can never take the id of a built-in rule."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short name for --list-rules and SARIF. The id when left out."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What is wrong, shown with every finding."
+        },
+        "suggestion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What to write instead."
+        },
+        "lang": {
+          "enum": [
+            "en",
+            "es",
+            "both"
+          ]
+        },
+        "level": {
+          "$ref": "#/$defs/level"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "JavaScript regex source. It must compile and must not match the empty string. Its running time is yours to keep in check: there is no time limit."
+        },
+        "flags": {
+          "type": "string",
+          "pattern": "^[gimsu]*$",
+          "description": "Any of g, i, m, s, u, each once. \"giu\" when left out; g and u are always added."
+        }
+      }
+    },
+    "override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/glob"
+          }
+        },
+        "lang": {
+          "$ref": "#/$defs/lang"
+        },
+        "format": {
+          "$ref": "#/$defs/format"
+        },
+        "anchors": {
+          "$ref": "#/$defs/anchors",
+          "description": "Added to the top-level anchors."
+        },
+        "ruleSettings": {
+          "$ref": "#/$defs/ruleSettings"
+        }
+      }
+    },
+    "suppressions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the inline directives of Markdown mode behave.",
+      "properties": {
+        "allowDisqualify": {
+          "type": "boolean",
+          "description": "Lets a directive suppress a rule whose severity is disqualify. Default false."
+        },
+        "mask": {
+          "type": "boolean",
+          "description": "Honors the directives without a rule id, which hide a span from every rule. Default true."
+        },
+        "failOnProblems": {
+          "type": "boolean",
+          "description": "Exit 1 on an unused, refused or invalid directive. Default false."
+        }
+      }
+    }
+  }
+}

@@ -59,10 +59,12 @@ final class ServerRulesTest extends TestCase
         $block = $this->rules()->uploadsBlock();
         self::assertSame(1, preg_match('/<FilesMatch "(.+)">/', $block, $m));
         $pattern = '/' . $m[1] . '/';
-        foreach (['shell.php', 'shell.PHP', 'a.php5', 'a.php7', 'x.phtml', 'x.phar', 'x.pht', 'x.phps'] as $name) {
+        // mod_mime runs a handler mapped to .php for any name with .php among its extensions, so
+        // a.php.jpg executes under `AddHandler application/x-httpd-php .php`.
+        foreach (['shell.php', 'shell.PHP', 'a.php5', 'a.php7', 'x.phtml', 'x.phar', 'x.pht', 'x.phps', 'a.php.jpg', 'avatar.PHP.png', 'x.phtml.gif'] as $name) {
             self::assertSame(1, preg_match($pattern, $name), $name);
         }
-        foreach (['photo.jpg', 'doc.pdf', 'php.png', 'notes.phpx', 'a.php.jpg'] as $name) {
+        foreach (['photo.jpg', 'doc.pdf', 'php.png', 'notes.phpx', 'a.phpx.jpg', 'my.photo.jpg'] as $name) {
             self::assertSame(0, preg_match($pattern, $name), $name);
         }
         self::assertStringContainsString('X-Content-Type-Options "nosniff"', $block);
@@ -98,6 +100,19 @@ final class ServerRulesTest extends TestCase
         self::assertSame('/wp-content/uploads', $odd->uploadsUri, 'a path nginx would need quoted falls back to the default');
     }
 
+    /** With core in /wp/, readme.html and xmlrpc.php are served at /wp/..., where an exact location at / never reaches. */
+    public function testNginxDeniesFollowTheCoreDirectory(): void
+    {
+        $paths = new Paths($this->root . '/wp', $this->root . '/wp/wp-content', $this->root . '/wp/wp-content/uploads', $this->root . '/wp/wp-content/mu-plugins', $this->root, '/wp/wp-content/uploads', '/wp');
+        $block = (new ServerRules($paths, new Integrations(new FakeConstants(), Settings::fromArray([])), []))->nginxBlock();
+        self::assertStringContainsString('location = /wp/readme.html { deny all; }', $block);
+        self::assertStringContainsString('location = /wp/xmlrpc.php { deny all; }', $block);
+        self::assertStringContainsString('location ^~ /wp/wp-content/uploads/ {', $block);
+        $odd = new Paths($this->root, $this->root, $this->root, $this->root, null, '/wp-content/uploads', '/w p;}');
+        self::assertSame('', $odd->siteUri, 'a path nginx would need quoted falls back to the URL root');
+        self::assertSame('', (new Paths($this->root, $this->root, $this->root, $this->root, null, '/wp-content/uploads', '/'))->siteUri);
+    }
+
     public function testGuardAnInstalledXmlrpcDenyIsCriticalWhenJetpackUsesIt(): void
     {
         // The root block was pasted before Jetpack was installed, so it still denies xmlrpc.php.
@@ -112,6 +127,32 @@ final class ServerRulesTest extends TestCase
         file_put_contents($this->root . '/.htaccess', $jetpack->rootBlock());
         self::assertFalse($jetpack->deniesXmlrpc());
         self::assertNotSame(State::Critical, $jetpack->report(true)->state);
+    }
+
+    /** Security plugins and guides write the deny in several forms; a commented-out one denies nothing. */
+    public function testXmlrpcDenyFormsAndComments(): void
+    {
+        $rules = $this->rules();
+        $denies = [
+            "<Files 'xmlrpc.php'>\n  Require all denied\n</Files>\n",
+            "<FilesMatch \"^(xmlrpc\\.php)$\">\n  Require all denied\n</FilesMatch>\n",
+            "RewriteEngine On\nRewriteRule ^xmlrpc\\.php$ - [F,L]\n",
+            "RewriteRule ^xmlrpc\\.php$ - [NC,R=403,L]\n",
+        ];
+        foreach ($denies as $text) {
+            file_put_contents($this->root . '/.htaccess', $text);
+            self::assertTrue($rules->deniesXmlrpc(), $text);
+        }
+        $none = [
+            "# <Files xmlrpc.php>\n#   Require all denied\n# </Files>\n",
+            "  #RewriteRule ^xmlrpc\\.php$ - [F,L]\n",
+            "RewriteRule ^xmlrpc\\.php$ /index.php [L]\n",
+            "<Files xmlrpc.php.bak>\n  Require all denied\n</Files>\n",
+        ];
+        foreach ($none as $text) {
+            file_put_contents($this->root . '/.htaccess', $text);
+            self::assertFalse($rules->deniesXmlrpc(), $text);
+        }
     }
 
     public function testServerHeadersAreFoundInTheRootHtaccess(): void
@@ -200,6 +241,21 @@ final class ServerRulesTest extends TestCase
         self::assertSame(State::Good, $rules->report(true)->state);
         $nginx = $this->rules([], ['SERVER_SOFTWARE' => 'nginx']);
         self::assertStringContainsString('nginx', $nginx->report(true)->summary);
+    }
+
+    public function testAnUploadsBlockFromAnEarlierVersionIsReportedAsOutdated(): void
+    {
+        $rules = $this->rules();
+        file_put_contents($this->root . '/.htaccess', $rules->rootBlock());
+        // The block printed by 0.1.0 before the extension could sit anywhere in the chain.
+        $old = str_replace('(?:\.|$)">', '$">', $rules->uploadsBlock());
+        self::assertNotSame($rules->uploadsBlock(), $old);
+        file_put_contents($this->root . '/wp-content/uploads/.htaccess', "# a comment the owner kept\n" . $old);
+        $report = $rules->report(true);
+        self::assertSame(State::Recommended, $report->state);
+        self::assertStringContainsString('earlier version', $report->summary);
+        file_put_contents($this->root . '/wp-content/uploads/.htaccess', "# a comment the owner kept\n" . $rules->uploadsBlock());
+        self::assertSame(State::Good, $rules->report(true)->state);
     }
 
     /** @return list<string> */

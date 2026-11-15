@@ -13,6 +13,7 @@ export function checkPolicy(ctx: Context): CheckResult {
   const problems: Array<{ page: string; message: string }> = [];
   for (const page of ctx.pages) {
     const add = (message: string) => problems.push({ page: page.display, message });
+    for (const where of new Set(page.parts.ignoredMetaPolicies.map((m) => m.where))) add(`a <meta> policy ${where}, which the browser ignores`);
     if (page.csp.length === 0) {
       add('no Content-Security-Policy');
       continue;
@@ -29,11 +30,18 @@ export function checkPolicy(ctx: Context): CheckResult {
       for (const diff of diffParsedPolicy(parseSerializedCsp(page.csp[0]?.value ?? ''), policy)) add(diff);
       continue;
     }
-    if (page.csp.length > 1) {
-      add(`${page.csp.length} rules set Content-Security-Policy (${page.csp.map((c) => c.origin).join('; ')}); what the host sends then depends on how it merges them`);
+    const headers = page.csp.filter((c) => c.meta !== true);
+    const metas = page.csp.length - headers.length;
+    if (metas) add(`the page also carries ${metas === 1 ? 'a <meta> policy' : `${metas} <meta> policies`}, which the browser enforces next to the header; one policy is expected`);
+    if (headers.length === 0) {
+      add('no Content-Security-Policy header');
       continue;
     }
-    for (const diff of diffPolicy(page.csp[0]?.value ?? '', policy)) add(diff);
+    if (headers.length > 1) {
+      add(`${headers.length} rules set Content-Security-Policy (${headers.map((c) => c.origin).join('; ')}); what the host sends then depends on how it merges them`);
+      continue;
+    }
+    for (const diff of diffPolicy(headers[0]?.value ?? '', policy)) add(diff);
   }
   const failures = [...groupBy(problems, (p) => p.message)].map(([message, list]) => ({
     message: `${pagesLabel(list.map((p) => p.page))}: ${message}`,

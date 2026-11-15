@@ -18,7 +18,9 @@ final class WpCliOutput implements Output
 
     public function json(mixed $data): void
     {
-        \WP_CLI::line((string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        // Evidence holds file names from disk, which need not be UTF-8. Without the substitute
+        // flag one such name makes json_encode() return false and the whole report vanish.
+        \WP_CLI::line(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR));
     }
 
     public function error(string $message): never

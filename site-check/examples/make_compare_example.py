@@ -9,7 +9,7 @@ inputs, and copies that run into examples/after/. Then it runs
 
     python3 site_check.py --compare examples examples/after
 
-which writes examples/after/comparacion.md and comparacion.json. No request
+which writes examples/after/comparison.md and comparison.json. No request
 leaves 127.0.0.1, and tests/test_compare.py checks that the committed files
 match a fresh build byte for byte.
 """
@@ -45,7 +45,7 @@ FILES = (*make_example.FILES, REPORT, DATA)
 def build(before: Path, dest: Path) -> tuple[int, str, str]:
     """Measure the improved school into ``dest`` and compare it against ``before``.
 
-    ``before`` is a folder holding the "before" datos.json (examples/ itself).
+    ``before`` is a folder holding the "before" run.json (examples/ itself).
     Returns (exit code, stdout, stderr) of the step that ended the build.
     """
     if dest.exists():

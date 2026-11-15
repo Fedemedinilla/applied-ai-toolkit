@@ -194,6 +194,30 @@ describe('fingerprints', () => {
     expect(alone).toEqual([fingerprint('LEX-03', 'b.txt', 'passionate about', 0), fingerprint('LEX-03', 'b.txt', 'passionate about', 1)]);
   });
 
+  it('stay the same for a whole-document finding when a paragraph is added or a word changes', () => {
+    // Eight sentences of the same length and no anchor: ESP-02 and EST-11 cover the whole prose.
+    const lines = Array.from({ length: 8 }, (_, i) => `We wrote the plain report for the team and then we sent it out again ${'abcdefgh'[i]}.`);
+    const doc = (extra: string[]) => [...extra, ...lines].join('\n');
+    const whole = (text: string) => fingerprints([input('a.txt', text)]).filter((x) => x.ruleId === 'ESP-02' || x.ruleId === 'EST-11');
+    const before = whole(doc([]));
+    expect(before.map((x) => x.ruleId).sort()).toEqual(['ESP-02', 'EST-11']);
+    const added = whole(doc(['We wrote the plain report for the team and then we sent it out again z.']));
+    expect(added.map(({ ruleId, fp }) => ({ ruleId, fp }))).toEqual(before.map(({ ruleId, fp }) => ({ ruleId, fp })));
+    const edited = whole(doc([]).replace('plain', 'short'));
+    expect(edited.map(({ ruleId, fp }) => ({ ruleId, fp }))).toEqual(before.map(({ ruleId, fp }) => ({ ruleId, fp })));
+  });
+
+  it('stay the same for an OFI-01 finding when a paragraph is added or a word changes', () => {
+    // More than one nominalization in twelve words: OFI-01 spans from the first word to the last.
+    const lines = Array.from({ length: 4 }, (_, i) => `The implementation of the configuration needs documentation and a careful evaluation of the deployment ${'abcd'[i]}.`);
+    const doc = (extra: string[]) => [...extra, ...lines].join('\n');
+    const ofi = (text: string) => fingerprints([input('a.txt', text)]).filter((x) => x.ruleId === 'OFI-01').map((x) => x.fp);
+    const before = ofi(doc([]));
+    expect(before).toHaveLength(1);
+    expect(ofi(doc(['The installation of the environment needs maintenance.']))).toEqual(before);
+    expect(ofi(doc([]).replace('careful', 'slow'))).toEqual(before);
+  });
+
   it('do not depend on the column either', () => {
     const a = fingerprints([input('a.txt', 'I am passionate about data.')]);
     const b = fingerprints([input('a.txt', 'Today, I am passionate about data.')]).filter((x) => x.ruleId === 'LEX-03');

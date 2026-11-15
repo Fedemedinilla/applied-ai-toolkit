@@ -22,7 +22,7 @@ REASON_BUDGET = "tope de pedidos"
 REASON_HOME_MISSING = "la página principal no respondió"
 REASON_NOT_LINKED = "la página no está enlazada desde la principal"
 # a non-technical reader does not know what "cuota" or "clave" refer to. The
-# technical detail goes to datos.json: meta.corridas_psi.estado "sin-clave-cuota"
+# technical detail goes to run.json: meta.corridas_psi.estado "sin-clave-cuota"
 # and the finding's nota_interna (PSI_NO_KEY_NOTE). The reason itself is also
 # the "No se midió: {motivo}" cell of the velocity table, so it stays plain.
 REASON_PSI_NO_KEY_QUOTA = "la herramienta de velocidad de Google no dio resultados"
@@ -91,7 +91,7 @@ def not_verified(spec: CheckSpec, reason: str, **fields: Any) -> Finding:
 
 
 def not_applicable(spec: CheckSpec, reason: str, **fields: Any) -> Finding:
-    """NO_APLICA with ``reason`` (not shown in the report, kept in datos.json)."""
+    """NO_APLICA with ``reason`` (not shown in the report, kept in run.json)."""
     return new_finding(spec, State.NO_APLICA, reason=reason, **fields)
 
 
@@ -234,7 +234,7 @@ def psi_unavailable_reason(obs: "Observations") -> str:
 
 
 def psi_internal_note(obs: "Observations") -> str | None:
-    """The note for the operator (datos.json nota_interna) of a PageSpeed grey, or None."""
+    """The note for the operator (run.json nota_interna) of a PageSpeed grey, or None."""
     psi = obs.psi
     if psi is None:
         return None

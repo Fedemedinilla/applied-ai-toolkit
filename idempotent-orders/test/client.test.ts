@@ -49,6 +49,27 @@ const request = (k = key()): PlaceRequest => ({
   ],
 });
 
+describe('createOrdersClient options', () => {
+  it.each<[string, Partial<OrdersClientOptions>]>([
+    ['maxAttempts NaN', { maxAttempts: Number.NaN }],
+    ['maxAttempts Infinity', { maxAttempts: Number.POSITIVE_INFINITY }],
+    ['timeoutMs Infinity', { timeoutMs: Number.POSITIVE_INFINITY }],
+    ['timeoutMs 2^31', { timeoutMs: 2 ** 31 }],
+    ['timeoutMs NaN', { timeoutMs: Number.NaN }],
+    ['timeoutMs negative', { timeoutMs: -1 }],
+    ['baseDelayMs NaN', { baseDelayMs: Number.NaN }],
+    ['baseDelayMs Infinity', { baseDelayMs: Number.POSITIVE_INFINITY }],
+    ['maxDelayMs Infinity', { maxDelayMs: Number.POSITIVE_INFINITY }],
+    ['maxDelayMs negative', { maxDelayMs: -1 }],
+  ])('throws a RangeError for %s instead of losing the bounds', (_, change) => {
+    expect(() => client(change)).toThrow(RangeError);
+  });
+
+  it('accepts the edges of the valid ranges', () => {
+    expect(() => client({ maxAttempts: 1, timeoutMs: 2_147_483_647, baseDelayMs: 0, maxDelayMs: 0 })).not.toThrow();
+  });
+});
+
 describe('placeOrder', () => {
   it('places an order on the first attempt', async () => {
     const r = await client().placeOrder(request());
@@ -179,6 +200,24 @@ describe('placeOrder', () => {
     expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'already_placed', via: 'reread', order: { status: 'confirmed' } });
   });
 
+  it('treats a confirmed order with another cart found by the re-read as key_expired, not_pending', async () => {
+    const k = key();
+    const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetB, quantity: 1 }])).id;
+    await db.query('select confirm_order($1, 1, $2)', [id, key()]);
+    fake.failAlways('place_order', 'drop-before');
+    expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'rejected', reason: 'key_expired', why: 'not_pending', requests: 4 });
+  });
+
+  it('does not report a confirmed order with another cart as placed after a lost attempt', async () => {
+    const k = key();
+    const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetB, quantity: 1 }])).id;
+    await db.query('select confirm_order($1, 1, $2)', [id, key()]);
+    // The first attempt is ambiguous, so only the fingerprint tells this order from this call's.
+    fake.fail('place_order', { status: 503 });
+    expect(await client().placeOrder(request(k))).toMatchObject({ kind: 'rejected', reason: 'key_expired', why: 'not_pending', requests: 2 });
+    expect(await count(db, 'orders')).toBe(1);
+  });
+
   it('answers a confirmed order with no lost attempt as key_expired, not_pending', async () => {
     const k = key();
     const id = orderOf(await place(db, k, 'shop-1', [{ product_id: widgetA, quantity: 2 }, { product_id: widgetB, quantity: 1 }])).id;
@@ -192,6 +231,22 @@ describe('placeOrder', () => {
     const [a, b] = await Promise.all([c.placeOrder(r), c.placeOrder(r)]);
     expect(a).toBe(b);
     expect(fake.count('place_order')).toBe(1);
+  });
+
+  it.each<[string, (r: PlaceRequest) => PlaceRequest, string]>([
+    ['another cart', (r) => ({ ...r, lines: [{ productId: widgetA, quantity: 5 }] }), 'key_reused'],
+    ['another customer', (r) => ({ ...r, customerId: 'shop-2' }), 'key_taken'],
+  ])('does not join a call with the same key and %s', async (_, change, firstReason) => {
+    const c = client({ timeoutMs: 20 });
+    const r = request();
+    // The first call hangs, so the second one runs while it is in flight.
+    fake.fail('place_order', 'hang');
+    const [a, b] = await Promise.all([c.placeOrder(r), c.placeOrder(change(r))]);
+    expect(b).not.toBe(a);
+    expect(b).toMatchObject({ kind: 'placed' });
+    expect(a).toMatchObject({ kind: 'rejected', reason: firstReason });
+    expect(fake.count('place_order')).toBeGreaterThanOrEqual(3);
+    expect(await count(db, 'orders')).toBe(1);
   });
 
   it('does not join a call that brings its own signal, so one abort does not end the other tap', async () => {
@@ -276,6 +331,24 @@ describe('placeOrder', () => {
   });
 });
 
+describe('placeOrder with an untrusted body', () => {
+  // What a server handler can pass straight from request JSON, as in the README.
+  it.each<[string, Record<string, unknown>]>([
+    ['lines null', { lines: null }],
+    ['lines undefined', { lines: undefined }],
+    ['lines an object', { lines: {} }],
+    ['a null line', { lines: [null] }],
+    ['a string line', { lines: ['1x2'] }],
+    ['a key in an array', { key: ['key-cccccccccccccccc'] }],
+    ['a numeric key', { key: 1234567890123456789 }],
+    ['a null customer', { customerId: null }],
+  ])('answers invalid_request for %s and sends nothing', async (_, change) => {
+    const r = await client().placeOrder({ ...request(), ...change } as never);
+    expect(r).toMatchObject({ kind: 'rejected', reason: 'invalid_request', requests: 0 });
+    expect(fake.requests).toHaveLength(0);
+  });
+});
+
 describe('confirmOrder', () => {
   async function pendingOrder(): Promise<number> {
     return orderOf(await place(db, key(), 'shop-1', [{ product_id: widgetA, quantity: 4 }])).id;
@@ -312,6 +385,15 @@ describe('confirmOrder', () => {
     });
   });
 
+  it('reports a missing order found by the confirm re-read as not_found', async () => {
+    fake.failAlways('confirm_order', 'drop-before');
+    expect(await client().confirmOrder({ orderId: 999_999, expectedVersion: 1, key: key() })).toEqual({
+      kind: 'rejected',
+      reason: 'not_found',
+      requests: 4,
+    });
+  });
+
   it('says unknown when the order is still pending after every attempt failed', async () => {
     const id = await pendingOrder();
     fake.failAlways('confirm_order', { status: 503 });
@@ -327,6 +409,12 @@ describe('confirmOrder', () => {
     ]);
     expect([a.kind, b.kind].sort()).toEqual(['confirmed', 'rejected']);
     expect(await onHand(db, widgetA)).toBe(6);
+  });
+
+  it('answers invalid_request for a key that is not a string and sends nothing', async () => {
+    const r = await client().confirmOrder({ orderId: 1, expectedVersion: 1, key: ['key-cccccccccccccccc'] } as never);
+    expect(r).toMatchObject({ kind: 'rejected', reason: 'invalid_request', requests: 0 });
+    expect(fake.requests).toHaveLength(0);
   });
 
   it('passes on version conflicts and shortages', async () => {

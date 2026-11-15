@@ -141,8 +141,8 @@
     },
     {
       "parameters": {
-        "content": "## 2. Your data source\n\nIn **Fetch data (HTTP)**, set the URL of your source (an API, an endpoint, a published sheet) and a credential if it needs one.\n\n*Combine items* merges every item into one `data` list, so there is one Claude call and one email per run. The prompt cuts the data at 50,000 characters to keep the cost of a run bounded: pre-aggregate large sources.",
-        "height": 333,
+        "content": "## 2. Your data source\n\nIn **Fetch data (HTTP)**, set the URL of your source (an API, an endpoint, a published sheet) and a credential if it needs one.\n\n*Combine items* merges every item into one `data` list, so there is one Claude call and one email per run. The prompt cuts the data at 50,000 characters to keep the cost of a run bounded: pre-aggregate large sources.\n\nIf the source answers with an empty list (`[]`), the HTTP node outputs no item and the run stops there, so an empty list (`[]`) sends no email. A quiet day and a broken source look the same: check the executions list, or have your source return a row that says there is no data.",
+        "height": 440,
         "width": 320,
         "color": 4
       },

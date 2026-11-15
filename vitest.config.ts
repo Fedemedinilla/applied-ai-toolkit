@@ -11,7 +11,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'dist/**', '**/dist/**'],
+    // .claude/worktrees/ holds full checkouts while coding agents work; their tests are not this tree's.
+    // docs-site/ has its own node_modules (it is not a workspace), and packages there ship tests.
+    exclude: ['node_modules/**', '**/node_modules/**', 'dist/**', '**/dist/**', '.claude/**', '.stryker-tmp/**', 'reports/**'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },

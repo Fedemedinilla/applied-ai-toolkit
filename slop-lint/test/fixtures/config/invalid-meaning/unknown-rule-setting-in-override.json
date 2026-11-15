@@ -1,0 +1,12 @@
+{
+  "overrides": [
+    {
+      "files": [
+        "docs/**"
+      ],
+      "ruleSettings": {
+        "X-NOPE": "off"
+      }
+    }
+  ]
+}

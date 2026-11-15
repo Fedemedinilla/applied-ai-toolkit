@@ -146,6 +146,11 @@ final class LoginLimiter implements Control
     public function lockedUntil(string $ip): ?int
     {
         $until = get_transient($this->key('lock', $ip));
+        // Without a persistent object cache the transient is a wp_options row, and WordPress
+        // returns a scalar option as a string: "1700000900", not 1700000900.
+        if (\is_string($until) && ctype_digit($until)) {
+            $until = (int) $until;
+        }
         return \is_int($until) && $until > $this->now() ? $until : null;
     }
 

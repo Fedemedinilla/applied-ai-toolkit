@@ -213,8 +213,29 @@ describe('POST api/test', () => {
     expect(await first.json()).toEqual({ error: 'push_failed', statusCode: 503 });
     error = new Error('Socket timeout');
     tick(5000);
-    expect(await (await call('api/test', { endpoint: device.endpoint, kind: 'test' })).json()).toEqual({ error: 'push_failed', statusCode: null });
+    expect(await (await call('api/test', { endpoint: device.endpoint, kind: 'test' })).json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'timeout' });
     expect(await store.list()).toHaveLength(1);
+  });
+
+  it('tells a push service that did not answer in time from one the server could not reach', async () => {
+    let error: Error = new Error('Socket timeout');
+    const send: Sender = async () => {
+      throw error;
+    };
+    const { call, tick, device } = await subscribed({ send });
+    const timeout = await call('api/test', { endpoint: device.endpoint, kind: 'test' });
+    expect(await timeout.json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'timeout' });
+    for (const [message, code] of [
+      ['getaddrinfo ENOTFOUND push.example.test', 'ENOTFOUND'],
+      ['connect ECONNREFUSED 10.0.0.1:443', 'ECONNREFUSED'],
+      ['unable to verify the first certificate', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'],
+    ]) {
+      error = Object.assign(new Error(message), { code });
+      tick(5000);
+      const response = await call('api/test', { endpoint: device.endpoint, kind: 'test' });
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({ error: 'push_failed', statusCode: null, reason: 'unreachable' });
+    }
   });
 
   it('limits one device to one test every few seconds', async () => {
@@ -265,6 +286,11 @@ describe('endpoints outside the known push services', () => {
     ['a look-alike host', 'https://web.push.apple.com.example.test/x'],
     ['another Google host', 'https://storage.googleapis.com/bucket/x'],
     ['a push host on another port', 'https://web.push.apple.com:8443/x'],
+    // WHATWG URL keeps ';' in the host and reads a push suffix; web-push's url.parse connects to
+    // the part before it.
+    ['an internal address hidden before a ; in the host', 'https://127.0.0.1;.push.apple.com/admin'],
+    ['a metadata address hidden before a ; in the host', 'https://169.254.169.254;.notify.windows.com/latest/meta-data'],
+    ['another host hidden before a ; in the host', 'https://evil.test;.x.push.apple.com/x'],
   ])('refuses %s on subscribe and on test, and sends nothing', async (_label, endpoint) => {
     const { call, store, sent } = strict();
     const subscribe = await call('api/subscribe', { ...fakeDevice('x'), endpoint });
@@ -304,6 +330,39 @@ describe('the rate limit', () => {
     await call('api/unsubscribe', { endpoint: device.endpoint });
     await call('api/subscribe', device);
     expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(429);
+  });
+
+  it('is not reset by a 410 that removed the row: subscribing again and testing at once is refused', async () => {
+    let sends = 0;
+    const send: Sender = async () => {
+      sends += 1;
+      throw Object.assign(new Error('Received unexpected response code'), { statusCode: 410 });
+    };
+    const { call } = setup({ send });
+    const device = fakeDevice('gone');
+    await call('api/subscribe', device);
+    expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(410);
+    expect((await call('api/subscribe', device)).status).toBe(201);
+    expect((await call('api/test', { endpoint: device.endpoint, kind: 'test' })).status).toBe(429);
+    expect(sends).toBe(1);
+  });
+
+  it('applies to the endpoint, not to its spelling: host case, :443 and a fragment are one device', async () => {
+    const { call, sent, store } = setup({ allowAnyEndpoint: false });
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/dev1';
+    const keys = fakeDevice('spell').keys;
+    await call('api/subscribe', { endpoint, keys });
+    expect((await call('api/test', { endpoint, kind: 'test' })).status).toBe(200);
+    for (const spelling of ['https://FCM.googleapis.com/fcm/send/dev1', 'https://fcm.googleapis.com:443/fcm/send/dev1']) {
+      expect((await call('api/subscribe', { endpoint: spelling, keys })).status).toBe(200);
+      expect((await call('api/test', { endpoint: spelling, kind: 'test' })).status).toBe(429);
+    }
+    for (const spelling of ['https://fcm.googleapis.com/fcm/send/dev1#a', 'https://fcm.googleapis.com/fcm/send/dev1#']) {
+      expect((await call('api/subscribe', { endpoint: spelling, keys })).status).toBe(400);
+      expect((await call('api/test', { endpoint: spelling, kind: 'test' })).status).toBe(400);
+    }
+    expect(sent).toHaveLength(1);
+    expect((await store.list()).map((row) => row.endpoint)).toEqual([endpoint]);
   });
 
   it('still applies to a device after many others were tested and aged out', async () => {
@@ -389,6 +448,16 @@ describe('routing', () => {
     const wrong = await call('api/test');
     expect(wrong.status).toBe(405);
     expect(wrong.headers.get('allow')).toBe('POST');
+  });
+
+  it('answers 404 for api/constructor, a name the route table must not inherit from Object.prototype', async () => {
+    const { call } = setup();
+    for (const init of [{}, { method: 'POST' }]) {
+      const response = await call('api/constructor', undefined, init);
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: 'not_found' });
+      expect(response.headers.get('allow')).toBeNull();
+    }
   });
 
   it('redirect-check is a bare 302: no body, no content-type', async () => {

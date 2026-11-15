@@ -1,0 +1,13 @@
+{
+  "lang": "en",
+  "format": "markdown",
+  "anchors": [
+    "dbt",
+    "Contoso Agro"
+  ],
+  "ignore": [
+    "CHANGELOG.md",
+    "vendor/**",
+    "**/*.generated.md"
+  ]
+}

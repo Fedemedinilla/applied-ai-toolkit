@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { replay, stateHash, type Input } from '../../../deterministic-sim/src/index.ts';
-import { exportRun, importRun, MAX_FILE_BYTES, slug } from '../src/run-file.ts';
+import { exportRun, importRun, MAX_FILE_BYTES, slug, tooLarge } from '../src/run-file.ts';
 import { apply, hashesOf, newSession, undo } from '../src/session.ts';
 
 const INPUTS: Input[] = [{ kind: 'roll', dice: 3 }, { kind: 'rest' }, { kind: 'roll', dice: 5 }];
@@ -59,6 +59,12 @@ describe('run file', () => {
   it('refuses a file that is not JSON, or too large to be a run', () => {
     expect(importRun('{not json', 9)).toEqual({ ok: false, error: 'the file is not JSON' });
     expect(importRun('{}', MAX_FILE_BYTES + 1).ok).toBe(false);
+  });
+
+  it('refuses a valid run file from its stated size alone, and accepts exactly MAX_FILE_BYTES', () => {
+    const file = exportRun(played().state);
+    expect(importRun(file.text, MAX_FILE_BYTES + 1)).toEqual({ ok: false, error: tooLarge(MAX_FILE_BYTES + 1) });
+    expect(importRun(file.text, MAX_FILE_BYTES).ok).toBe(true);
   });
 
   it('slug keeps letters and digits', () => {

@@ -49,6 +49,58 @@ describe('ActionKey', () => {
     expect(action.current()).not.toBe(k);
   });
 
+  it('keeps the key on this page when the clock moves back', () => {
+    let now = 1_000_000;
+    const action = new ActionKey({ slot: 'checkout', storage: localStorage, now: () => now });
+    const k = action.current();
+    // An NTP or manual correction after an unknown result, before the user taps again.
+    now -= 1000;
+    expect(action.current()).toBe(k);
+  });
+
+  it('keeps the key on this page when the clock moves back and storage is blocked', () => {
+    let now = 1_000_000;
+    const action = new ActionKey({ slot: 'checkout', now: () => now });
+    const k = action.current();
+    now -= 60_000;
+    expect(action.current()).toBe(k);
+  });
+
+  it('starts a new action in a second tab once the first tab cleared the shared key', () => {
+    const tabA = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const tabB = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const k = tabA.current();
+    expect(tabB.current()).toBe(k);
+    tabA.clear();
+    const fresh = tabB.current();
+    expect(fresh).not.toBe(k);
+    // The two tabs agree on the new action too.
+    expect(tabA.current()).toBe(fresh);
+  });
+
+  it('takes the key another tab started after a clear', () => {
+    const tabA = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const tabB = new ActionKey({ slot: 'checkout', storage: localStorage });
+    const k = tabB.current();
+    tabA.clear();
+    const next = tabA.current();
+    expect(next).not.toBe(k);
+    expect(tabB.current()).toBe(next);
+  });
+
+  it('keeps the key in memory when storage reads but cannot write', () => {
+    const full: KeyStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: () => undefined,
+    };
+    const action = new ActionKey({ slot: 'checkout', storage: full });
+    const k = action.current();
+    expect(action.current()).toBe(k);
+  });
+
   it('keeps the key in memory when storage throws', () => {
     const blocked: KeyStorage = {
       getItem: () => {
@@ -74,5 +126,9 @@ describe('ActionKey', () => {
       expect(k).toMatch(KEY_PATTERN);
       expect(k).not.toBe('aaaaaaaaaaaaaaaaaaaa');
     }
+  });
+
+  it.each([Number.NaN, 0, -1])('throws a RangeError for lifetimeMs %s, which would mint a key on every call', (lifetimeMs) => {
+    expect(() => new ActionKey({ slot: 'checkout', storage: localStorage, lifetimeMs })).toThrow(RangeError);
   });
 });

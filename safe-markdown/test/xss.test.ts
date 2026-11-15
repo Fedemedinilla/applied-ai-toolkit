@@ -112,6 +112,32 @@ describe('quotes and attributes', () => {
     inert('[x](mailto:a"onclick="alert(1)@shop.example)');
   });
 
+  // The payloads above end in "alert(1))", and a link URL cannot hold "(", so no link forms and
+  // the quotes stay literal text. These have no parentheses, so the anchor is built and the
+  // assertion is on the escaped href itself.
+  it.each([
+    ['[x](/a"onmouseover="x)', '<a href="/a&quot;onmouseover=&quot;x">x</a>'],
+    ["[x](/a'onmouseover='x)", '<a href="/a&#39;onmouseover=&#39;x">x</a>'],
+    ['[x](#a"onx="y)', '<a href="#a&quot;onx=&quot;y">x</a>'],
+    ['[x](mailto:a"onclick="x@shop.example)', '<a href="mailto:a&quot;onclick=&quot;x@shop.example">x</a>'],
+    ['[x](https://shop.example/"onmouseover="x)', '<a href="https://shop.example/%22onmouseover=%22x">x</a>'],
+  ])('a quote inside a link that forms is escaped in the href: %s', (s, anchor) => {
+    inert(s);
+    expect(md(s)).toBe(`<p>${anchor}</p>`);
+  });
+
+  it('a mailto with headers or percent-encoding is not a link, so it cannot add a hidden recipient', () => {
+    for (const url of [
+      'mailto:a@b.example?cc=evil%40x.example&body=hi',
+      'mailto:a@b.example?bcc=c%40d.example',
+      'mailto:a@b.example?subject=x',
+      'mailto:a%40evil.example@b.example',
+    ]) {
+      expect(md(`[x](${url})`)).not.toContain('<a ');
+    }
+    expect(md('[x](mailto:desk@shop.example)')).toContain('<a href="mailto:desk@shop.example">x</a>');
+  });
+
   it('angle brackets in the URL are percent-encoded in the href', () => {
     expect(md('[x](https://shop.example/<b>)')).toContain('href="https://shop.example/%3Cb%3E"');
   });
@@ -175,6 +201,17 @@ describe('huge inputs', () => {
     const out = renderMarkdown(s, { ...opts, maxLength: Infinity });
     expect(performance.now() - t0).toBeLessThan(1500);
     expect(out.length).toBeGreaterThan(0);
+  });
+
+  // A long run of trailing-punctuation characters inside a bare URL, then a letter: a regex
+  // anchored at the end restarts the run at every position.
+  const runs = ['https://', 'shop.example/'].flatMap((head) => ['.', '!', ',;:?'].map((p) => [head, p] as const));
+  it.each(runs)('200 kB of %j then a run of %j and a letter renders in linear time', (head, p) => {
+    const s = head + p.repeat(Math.ceil(200_000 / p.length)) + 'a';
+    const t0 = performance.now();
+    const out = renderMarkdown(s, { ...opts, maxLength: Infinity });
+    expect(performance.now() - t0).toBeLessThan(1500);
+    expect(out).toContain('<a ');
   });
 
   it('the default limit cuts a 1 MB reply to 20,000 characters', () => {

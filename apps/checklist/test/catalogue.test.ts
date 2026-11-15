@@ -2,7 +2,7 @@
 // valid, and a bad source row stops the build with its file and id.
 
 import { describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -62,6 +62,20 @@ describe('the source parser', () => {
     const t = tables('# A\n\n| X | Y |\n|---|---|\n| a \\| b | c |\n\n## B\n\n| Z |\n|---|\n| d |\n', 'x.md');
     expect(t.get('A')).toEqual([{ X: 'a | b', Y: 'c' }]);
     expect(t.get('B')).toEqual([{ Z: 'd' }]);
+  });
+
+  it('builds the same catalogue from sources with CRLF line endings and a byte order mark, as a Windows checkout may write them', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'checklist-crlf-'));
+    try {
+      cpSync(join(appDir, 'data/source'), dir, { recursive: true });
+      for (const file of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+        const path = join(dir, file);
+        writeFileSync(path, `\uFEFF${readFileSync(path, 'utf8').replace(/\n/gu, '\r\n')}`);
+      }
+      expect(serialise(buildCatalogue(pathToFileURL(`${dir}/`)))).toBe(serialise(buildCatalogue()));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   function withEdit(file: string, from: string, to: string): () => unknown {

@@ -3,15 +3,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
-import { buildReceiptPdf, type ReceiptData } from '../src/index.ts';
-import { LAYOUT } from '../src/receipt.ts';
+import { buildReceiptPdf, LABELS_ES, type ReceiptData, type ReceiptLabels, type ReceiptOptions } from '../src/index.ts';
+import { columns, LAYOUT } from '../src/receipt.ts';
 import { items, order } from './helpers/fixtures.ts';
 import { pageCount, record, type Drawn } from './helpers/record.ts';
 
 const A4 = { width: 595.28, height: 841.89 };
 
-async function layout(data: ReceiptData): Promise<{ drawn: Drawn[]; pages: number }> {
-  const { result, drawn } = await record(() => buildReceiptPdf(data));
+async function layout(data: ReceiptData, options: ReceiptOptions = {}): Promise<{ drawn: Drawn[]; pages: number }> {
+  const { result, drawn } = await record(() => buildReceiptPdf(data, options));
   const pages = (await PDFDocument.load(result)).getPageCount();
   expect(pageCount(drawn)).toBe(pages);
   return { drawn, pages };
@@ -133,5 +133,21 @@ describe('every page', () => {
       expect(onPage(drawn, p)).toContain(`Página ${p + 1} de ${pages}`);
       expect(onPage(drawn, p)).toContain('Gracias por su compra');
     }
+  });
+
+  it('keeps long label overrides inside the margins, and the product head inside its column', async () => {
+    const long = 'Etiqueta muy larga que no entra '.repeat(8);
+    const labels = Object.fromEntries(Object.keys(LABELS_ES).map((k) => [k, k === 'pageOf' ? `${long}{page}/{pages}` : long])) as unknown as ReceiptLabels;
+    const { drawn } = await layout(order({ items: items(40), notes: 'nota larga '.repeat(600) }), { labels });
+    for (const d of drawn) {
+      expect(d.x, d.text).toBeGreaterThanOrEqual(LAYOUT.margin - 0.01);
+      expect(d.x + d.width, d.text).toBeLessThanOrEqual(A4.width - LAYOUT.margin + 0.01);
+    }
+    const col = columns(A4.width);
+    // The product head is the bold text at the name column on the same baseline as a detail head.
+    const headRows = new Set(drawn.filter((d) => d.x === col.detailLeft && d.text.startsWith('Etiq')).map((d) => `${d.page}:${d.y}`));
+    const productHeads = drawn.filter((d) => d.x === col.nameLeft && headRows.has(`${d.page}:${d.y}`));
+    expect(productHeads.length).toBeGreaterThan(0);
+    for (const d of productHeads) expect(d.x + d.width, d.text).toBeLessThanOrEqual(col.detailLeft);
   });
 });

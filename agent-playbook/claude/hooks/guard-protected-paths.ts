@@ -29,7 +29,10 @@ export interface ProtectedConfig {
   readonly jsonFlag?: string;
 }
 
-/** `**` crosses folders, `*` stays inside one name. Paths use forward slashes. */
+/**
+ * `**` crosses folders, `*` stays inside one name, `?` is one character. Paths use forward slashes.
+ * No other glob syntax: the config parser refuses braces, brackets and a trailing slash.
+ */
 export function globToRegExp(glob: string): RegExp {
   let source = '';
   for (let i = 0; i < glob.length; i += 1) {
@@ -98,10 +101,17 @@ export function protectedReason(rel: string, config: ProtectedConfig, readJson: 
   return null;
 }
 
+/** JSON.parse rejects a byte order mark, and editors on Windows often save JSON with one. */
+const readJsonFile = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+
 function parseConfig(raw: unknown): ProtectedConfig {
   if (typeof raw !== 'object' || raw === null) throw new Error('protected.json must be an object');
   const { paths, jsonFlag } = raw as { paths?: unknown; jsonFlag?: unknown };
   if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) throw new Error('protected.json: "paths" must be a list of globs');
+  // globToRegExp reads *, ** and ? only. Braces, brackets or a folder written as `dir/` would
+  // match nothing and protect nothing in silence, so the config is refused and every edit blocks.
+  const unreadable = paths.find((p) => /[{}[\]]/.test(p) || p.endsWith('/'));
+  if (unreadable !== undefined) throw new Error(`protected.json: "${unreadable}" uses syntax the guard does not read (only *, ** and ?; write a folder as dir/**)`);
   if (jsonFlag !== undefined && typeof jsonFlag !== 'string') throw new Error('protected.json: "jsonFlag" must be a string');
   return jsonFlag === undefined ? { paths } : { paths, jsonFlag };
 }
@@ -111,39 +121,53 @@ export interface HookInput {
   readonly tool_input?: { readonly file_path?: unknown; readonly notebook_path?: unknown };
 }
 
-/** The edited path, undefined for a tool call without one. Throws on a path that is not a string. */
-export function targetOf(input: HookInput): string | undefined {
-  const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (target !== undefined && typeof target !== 'string') throw new Error('the file path is not a string');
+/**
+ * The edited path. The hook is wired only to tools that always carry one, so input without a
+ * readable path (no tool_input object, no file_path or notebook_path, a null, an array) throws and
+ * the caller blocks: a change in the shape of the input must not let every edit through.
+ */
+export function targetOf(input: HookInput): string {
+  const toolInput: unknown = input.tool_input;
+  if (typeof toolInput !== 'object' || toolInput === null || Array.isArray(toolInput)) throw new Error('the tool input is not an object');
+  const fields = toolInput as Record<string, unknown>;
+  const target = Object.hasOwn(fields, 'file_path') ? fields['file_path'] : fields['notebook_path'];
+  if (target === undefined) throw new Error('the tool input has no file_path or notebook_path');
+  if (typeof target !== 'string') throw new Error('the file path is not a string');
   return target;
 }
 
 /** Exit code and message for one hook call. Throws on input it cannot read; the caller blocks. */
 export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): { code: 0 | 2; message: string } {
   const target = targetOf(input);
-  if (target === undefined) return { code: 0, message: '' };
-  const configFile = resolve(root, '.claude/protected.json');
-  // No config means nothing is protected; a broken config blocks, so a typo cannot open every path.
-  if (!existsSync(configFile)) return { code: 0, message: '' };
   const absolute = resolve(root, target);
   const real = realTarget(absolute);
-  const candidates = [projectPath(root, absolute), projectPath(realTarget(root), real)].filter((p): p is string => p !== null);
-  if (candidates.length === 0) {
-    if (!SETTINGS_FILE.test(real.replaceAll('\\', '/')) && !SETTINGS_FILE.test(absolute.replaceAll('\\', '/'))) return { code: 0, message: '' };
+  const inside = projectPath(root, absolute);
+  const realInside = projectPath(realTarget(root), real);
+  // A settings file outside the project is refused whatever the config says, and also when the
+  // written path is inside the project but a link takes it outside.
+  const outsideSettings =
+    (inside === null && SETTINGS_FILE.test(absolute.replaceAll('\\', '/'))) || (realInside === null && SETTINGS_FILE.test(real.replaceAll('\\', '/')));
+  if (outsideSettings) {
     return {
       code: 2,
       message: `Blocked: ${absolute} is a Claude Code settings file outside the project, which could switch the hooks off. Stop and ask the person.`,
     };
   }
+  const configFile = resolve(root, '.claude/protected.json');
+  // No config means nothing in the project is protected; a broken config blocks every edit, so a
+  // typo cannot open every path.
+  if (!existsSync(configFile)) return { code: 0, message: '' };
   let config: ProtectedConfig;
   try {
-    config = parseConfig(JSON.parse(readFileSync(configFile, 'utf8')));
+    config = parseConfig(readJsonFile(configFile));
   } catch (error) {
     return { code: 2, message: `Blocked: .claude/protected.json cannot be read (${(error as Error).message}).` };
   }
+  const candidates = [inside, realInside].filter((p): p is string => p !== null);
+  if (candidates.length === 0) return { code: 0, message: '' };
   const readJson = (path: string): unknown => {
     try {
-      return JSON.parse(readFileSync(resolve(root, path), 'utf8'));
+      return readJsonFile(resolve(root, path));
     } catch {
       return null; // a new file or one that is not JSON carries no flag
     }
@@ -169,7 +193,7 @@ export function decide(input: HookInput, root: string, env: NodeJS.ProcessEnv): 
 export function run(raw: string, env: NodeJS.ProcessEnv, cwd: string): { code: 0 | 2; message: string } {
   try {
     const parsed: unknown = raw.trim() === '' ? {} : JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) throw new Error('the hook input is not a JSON object');
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('the hook input is not a JSON object');
     const input = parsed as HookInput;
     const root = env['CLAUDE_PROJECT_DIR'] ?? (typeof input.cwd === 'string' ? input.cwd : cwd);
     return decide(input, root, env);

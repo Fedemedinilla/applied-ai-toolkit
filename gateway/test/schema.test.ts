@@ -98,15 +98,28 @@ describe('toApiJsonSchema', () => {
     ]);
   });
 
-  it('leaves out what constrains nothing: the safe-integer bounds of z.int() and the regex of an accepted format', () => {
+  it("keeps zod's pattern next to an accepted format, because zod checks it on return and the format allows more", () => {
+    // RFC 3339 date-time allows -03:00; z.iso.datetime() accepts only Z. Without the pattern the
+    // model has no hint, and a valid date-time with an offset would fail zod after being billed.
+    const schema = z.object({ at: z.iso.datetime() });
+    expect(schema.safeParse({ at: '2026-11-15T10:00:00-03:00' }).success).toBe(false);
+    const clean = toApiJsonSchema(z.toJSONSchema(schema, { io: 'input' }));
+    expect(clean).toHaveProperty('properties.at.format', 'date-time');
+    const description = JSON.parse(String((clean as { properties: { at: { description: string } } }).properties.at.description)) as { pattern: string };
+    expect(new RegExp(description.pattern).test('2026-11-15T10:00:00Z')).toBe(true);
+    expect(new RegExp(description.pattern).test('2026-11-15T10:00:00-03:00')).toBe(false);
+  });
+
+  it('leaves out what constrains nothing: the safe-integer bounds of z.int()', () => {
     const schema = z.object({ count: z.int(), fromZero: z.int().min(0), small: z.int32(), email: z.email(), id: z.uuid(), at: z.iso.time() });
     const clean = toApiJsonSchema(z.toJSONSchema(schema, { io: 'input' }));
     expect(clean).toHaveProperty('properties.count', { type: 'integer' });
     expect(clean).toHaveProperty('properties.fromZero', { type: 'integer', description: '{"minimum":0}' });
     // A range that does constrain (int32) stays.
     expect(clean).toHaveProperty('properties.small.description', '{"minimum":-2147483648,"maximum":2147483647}');
-    expect(clean).toHaveProperty('properties.email', { type: 'string', format: 'email' });
-    expect(clean).toHaveProperty('properties.id', { type: 'string', format: 'uuid' });
+    // zod's regex is narrower than the format (uuid versions, no IP-literal email domains), so it goes to the description.
+    expect(clean).toHaveProperty('properties.email', { type: 'string', format: 'email', description: expect.stringContaining('pattern') });
+    expect(clean).toHaveProperty('properties.id', { type: 'string', format: 'uuid', description: expect.stringContaining('pattern') });
     // z.iso.time() has no format: its pattern is the only statement of the shape, so it goes to the description.
     expect(clean).toHaveProperty('properties.at.description', expect.stringContaining('pattern'));
   });

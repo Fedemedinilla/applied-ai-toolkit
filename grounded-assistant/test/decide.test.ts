@@ -101,6 +101,16 @@ describe('time', () => {
     expect(decide(b({ date: '2026-11-05' }), TODAY, 'es', '19:50').ok).toBe(true);
   });
 
+  it('a time today that does not fit, once the last start has gone by, is too late today', () => {
+    // Saturday balayage: the last start is 12:00. At 13:00 a 14:00 request must not offer 12:00.
+    const sat = '2026-11-07';
+    expect(decide(b({ time: '14:00' }), sat, 'es', '13:00')).toMatchObject({ ok: false, reason: 'too_late_today', say: 'Hoy ya no llega a entrar Balayage antes del cierre. ¿Vemos otro día?' });
+    expect(reason(decide(b({ time: '14:00' }), sat, 'en', '12:00'))).toBe('too_late_today');
+    // Before the last start, the refusal still names it, and so it does on any other day.
+    expect(decide(b({ time: '14:00' }), sat, 'es', '11:00')).toMatchObject({ reason: 'late_start', say: expect.stringContaining('arranca 12:00') });
+    expect(reason(decide(b({ time: '14:00' }), TODAY, 'es', '13:00'))).toBe('late_start');
+  });
+
   it('today with no time lists only the people who can still start', () => {
     // Wednesday men's cut: Rubén until 15:00, Damián until 20:00. At 16:00 only Damián is left.
     const d = decide(b({ service: 'Corte de hombre (máquina y tijera)', date: TODAY }), TODAY, 'es', '16:00');
@@ -150,7 +160,91 @@ describe('services', () => {
     expect(findService('Men’s cut', 'en')?.id).toBe('corte-hombre');
   });
 
+  it('a request that names a row and something more is not a card for that row alone', () => {
+    // The combo row "Corte + barba" is 23000 and 50 minutes; the men's cut alone is 16000 and 30.
+    const cutAndBeard = decide(b({ service: 'Corte de hombre (máquina y tijera) + barba', date: '2026-11-17' }), TODAY);
+    expect(cutAndBeard).toMatchObject({
+      ok: false,
+      reason: 'ambiguous_service',
+      say: '"Corte de hombre (máquina y tijera) + barba" me da para varios: Corte de hombre (máquina y tijera), Perfilado de barba. ¿Cuál de esos?',
+    });
+    expect(reason(decide(b({ service: 'Balayage y corte de mujer' }), TODAY))).toBe('ambiguous_service');
+    expect(reason(decide(b({ service: "Men's cut (clippers and scissors) + beard" }), TODAY, 'en'))).toBe('ambiguous_service');
+    // Something more that is not a row: not loaded, rather than the row it came with.
+    expect(reason(decide(b({ service: 'Balayage y alisado japonés' }), TODAY))).toBe('service_not_loaded');
+    // Words that name nothing do not change the row.
+    expect(findService('un balayage, por favor')?.id).toBe('balayage');
+    expect(findService('a balayage, please', 'en')?.id).toBe('balayage');
+  });
+
+  it('a refusal quotes the model’s service on one line and cut to 60 characters', () => {
+    expect(decide(b({ service: '  Fade\n  con   diseño ' }), TODAY)).toMatchObject({ say: expect.stringContaining('No tengo cargado "Fade con diseño" como servicio') });
+    const long = `Fade ${'x'.repeat(54)} y más`;
+    expect(decide(b({ service: long }), TODAY)).toMatchObject({ say: expect.stringContaining(`No tengo cargado "Fade ${'x'.repeat(52)}..." como servicio`) });
+    const sixty = `Fade ${'x'.repeat(55)}`;
+    expect(decide(b({ service: sixty }), TODAY)).toMatchObject({ say: expect.stringContaining(`"${sixty}"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(50)}  y` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(50)} y"`) });
+    expect(decide(b({ service: `Fade ${'x'.repeat(51)}   abcd` }), TODAY)).toMatchObject({ say: expect.stringContaining(`"Fade ${'x'.repeat(51)}..."`) });
+  });
+
   it('the card carries the row’s price and minutes, never the model’s', () => {
     expect(decide(b({}), TODAY)).toMatchObject({ ok: true, card: { service: 'Balayage', price: 78_000, minutes: 180 } });
   });
+});
+
+// Cases added after the mutation run of 2026-11-14 (see "Mutation testing" in the README): each one
+// fails against a mutant that the tests above let through.
+describe('the words of a refusal, in full', () => {
+  it('English refusals write the service in lower case inside the sentence', () => {
+    expect(decide(b({ date: '2026-11-10' }), TODAY, 'en')).toMatchObject({ reason: 'nobody', say: 'Nobody does balayage on Tuesdays. Shall we look at another day?' });
+    expect(decide(b({ service: "Men's cut (clippers and scissors)", stylist: 'Vanina' }), TODAY, 'en')).toMatchObject({
+      reason: 'wrong_stylist',
+      say: "On Saturdays, men's cut (clippers and scissors) is done by Rubén or Damián, not Vanina.",
+    });
+    expect(decide(b({ stylist: 'Lucía' }), TODAY, 'en')).toMatchObject({ reason: 'unknown_stylist', say: 'The team here is Rubén, Damián, Carla and Vanina. Balayage is done by Carla.' });
+    expect(decide(b({ time: '12:30' }), TODAY, 'en')).toMatchObject({
+      reason: 'late_start',
+      say: "That time doesn't work: balayage takes 180 minutes, and the last start that day is 12:00 pm.",
+    });
+  });
+
+  it('an ambiguous service lists the rows it could be, by name', () => {
+    expect(decide(b({ service: 'corte' }), TODAY)).toMatchObject({
+      say: '"corte" me da para varios: Corte de hombre (máquina y tijera), Corte al ras, una sola guía, Corte de nene (hasta doce años), Corte de mujer (lavado, corte y secado), Corte + barba. ¿Cuál de esos?',
+    });
+    expect(decide(b({ service: 'cut' }), TODAY, 'en')).toMatchObject({
+      say: '"cut" could be more than one service: Men\'s cut (clippers and scissors); Buzz cut, single guard; Boy\'s cut (up to age twelve); Women\'s cut (wash, cut and blow-dry); Cut + beard. Which one?',
+    });
+  });
+});
+
+describe('a date or a time with something around it', () => {
+  it('a date is the whole string, not a date somewhere inside it', () => {
+    expect(reason(decide(b({ date: 'x2026-11-07' }), TODAY))).toBe('bad_date');
+    expect(reason(decide(b({ date: '2026-11-07x' }), TODAY))).toBe('bad_date');
+  });
+
+  it('a time is the whole string, not a time somewhere inside it', () => {
+    expect(reason(decide(b({ time: 'x10:00' }), TODAY))).toBe('bad_time');
+    expect(reason(decide(b({ time: '10:00x' }), TODAY))).toBe('bad_time');
+  });
+});
+
+describe('timeEn24, case by case', () => {
+  const cases: Array<[string, string]> = [
+    ['5pm', '17:00'],
+    ['1 pm', '13:00'],
+    ['12:15 PM', '12:15'],
+    ['5 p. m.', '17:00'],
+    [' 5 pm ', '17:00'],
+    [' 9:30 ', '09:30'],
+    // Not a 12-hour time, or not only a time: returned as written, for decide() to refuse.
+    ['0 pm', '0 pm'],
+    ['x5 pm', 'x5 pm'],
+    ['5 pm today', '5 pm today'],
+    ['a9:30', 'a9:30'],
+    ['9:305', '9:305'],
+    ['19:30', '19:30'],
+  ];
+  it.each(cases)('%j reads as %j', (raw, read) => expect(timeEn24(raw)).toBe(read));
 });

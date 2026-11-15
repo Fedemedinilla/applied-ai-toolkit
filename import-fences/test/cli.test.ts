@@ -53,6 +53,19 @@ describe('cli', () => {
     ]);
   });
 
+  it('prints the same order under every locale: code-unit order of the paths', () => {
+    const files: Record<string, string> = { 'import-fences.config.ts': CONFIG, 'web/x.ts': '' };
+    for (const name of ['a', 'B', 'z', '\u00e4']) files[`web/${name}.ts`] = "import { x } from './x';";
+    const root = tree(files);
+    const order = (locale: string) => {
+      const result = spawnSync(process.execPath, [CLI], { cwd: root, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', LC_ALL: locale, LANG: locale } });
+      return result.stdout.split('\n').filter((l) => l.startsWith('web/')).map((l) => l.split(':')[0]);
+    };
+    const expected = ['web/B.ts', 'web/a.ts', 'web/z.ts', 'web/\u00e4.ts'];
+    expect(order('en_US.UTF-8')).toEqual(expected);
+    expect(order('sv_SE.UTF-8')).toEqual(expected);
+  });
+
   it('exits 0 on a clean tree and prints JSON with --json', () => {
     const root = tree({ 'fences.config.ts': CONFIG, 'web/a.ts': "import { b } from './b.ts';", 'web/b.ts': '' });
     expect(cli(root, ['--config', 'fences.config.ts'])).toMatchObject({ code: 0, stdout: 'import-fences: 0 violations in 3 files, 2 rules\n' });

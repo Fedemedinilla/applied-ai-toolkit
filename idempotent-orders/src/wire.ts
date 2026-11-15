@@ -64,6 +64,10 @@ export async function callRpc(
         method: 'POST',
         headers: { ...config.headers, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(args),
+        // Never follow: a redirect would resend the headers (the service key in apikey) to
+        // wherever Location points, and its answer would be read as the database's. A 3xx
+        // (or a browser's opaque redirect, status 0) is handled below as ambiguous.
+        redirect: 'manual',
         signal: controller.signal,
       });
     } catch {

@@ -156,14 +156,14 @@ export function createAssistantHandler(config: AssistantConfig): (request: Reque
   const maxTurns = config.maxTurns ?? 8;
   const maxChars = config.maxChars ?? 600;
   const maxBody = config.maxBodyBytes ?? 24 * 1024;
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =>
+    new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...extra } });
   // A failure carries `error` and never `reply`: a stray reply would be shown, and sent back, as
   // something the salon said.
-  const fail = (error: AssistantError, status: number) => json({ error }, status);
+  const fail = (error: AssistantError, status: number, extra: Record<string, string> = {}) => json({ error }, status, extra);
 
   return async (request, context = {}) => {
-    if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
+    if (request.method !== 'POST') return fail('method', 405, { allow: 'POST' });
     // JSON only: a cross-site page can POST text/plain without a preflight.
     if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return fail('media_type', 415);
     if (config.limited?.(context.clientAddress || 'unknown')) return fail('limited', 429);
@@ -225,7 +225,8 @@ export function createAssistantHandler(config: AssistantConfig): (request: Reque
       return fail('model_failed', 502);
     }
 
-    let reply = withoutControls(plainText(out.reply));
+    // Composed accents, so the guard's folding and the staff-name mending read the reply as written.
+    let reply = withoutControls(plainText(out.reply.normalize('NFC')));
     let card: Card | null = null;
     let rejected: string | undefined;
     if (out.booking) {
@@ -233,8 +234,9 @@ export function createAssistantHandler(config: AssistantConfig): (request: Reque
       if (d.ok) card = d.card;
       else {
         // The prose was written for a booking that is not happening.
+        // It can quote the model's `service` verbatim, so it gets the same cleaning as the prose.
         rejected = d.reason;
-        reply = d.say;
+        reply = withoutControls(plainText(d.say.normalize('NFC')));
       }
     }
 

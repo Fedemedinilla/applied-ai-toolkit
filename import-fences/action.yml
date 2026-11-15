@@ -1,0 +1,108 @@
+# import-fences as a composite GitHub Action. See README.md, "Use it in CI".
+#
+#   - uses: Fedemedinilla/applied-ai-toolkit/import-fences@<commit SHA>
+#     with:
+#       config: import-fences.config.json
+#
+# It runs the checker over the workspace twice: once for the text report in the job log, once for
+# the SARIF log that github/codeql-action/upload-sarif takes. Inputs reach the shell only through
+# env: and quoted variables, never as ${{ }} expressions inside run:, so an input cannot inject a
+# command. setup-node is pinned to the commit SHA of its release tag, the same one as the
+# repository's CI. To upgrade it, change both.
+name: import-fences
+description: Check architecture rules about imports, with SARIF output for code scanning.
+author: Federico Medinilla
+
+inputs:
+  config:
+    description: The config file (import-fences.config.json or .ts). Relative to the workspace.
+    required: true
+  sarif-file:
+    description: Where to write the SARIF log. Empty writes import-fences.sarif in the runner's temporary folder.
+    required: false
+    default: ''
+  fail:
+    description: true fails the step when a fence is broken (exit code 1). false only reports it. A usage or config error (exit code 2) always fails.
+    required: false
+    default: 'true'
+
+outputs:
+  sarif-file:
+    description: The path of the SARIF log. Empty when the checker exited with code 2 and wrote none.
+    value: ${{ steps.run.outputs.sarif-file }}
+  exit-code:
+    description: The checker's exit code. 0 no violation, 1 at least one, 2 bad usage or an invalid config.
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    # package-manager-cache: false keeps setup-node from reading the consumer's package.json and
+    # restoring an npm cache in their job; the action installs what it needs on its own.
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+        package-manager-cache: false
+
+    # The checker parses files with the TypeScript compiler API and validates the config with zod,
+    # its two npm dependencies. Installed into the action's own folder, at the versions of the
+    # repository's package.json, without lifecycle scripts.
+    - name: Install typescript and zod
+      shell: bash
+      env:
+        TYPESCRIPT_VERSION: 5.9.3
+        ZOD_VERSION: 4.6.7
+      run: npm install --prefix "$GITHUB_ACTION_PATH" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "typescript@$TYPESCRIPT_VERSION" "zod@$ZOD_VERSION"
+
+    - id: run
+      name: Run import-fences
+      shell: bash
+      env:
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+        INPUT_FAIL: ${{ inputs.fail }}
+      run: |
+        stop() {
+          echo "::error::import-fences: $1"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+          exit 2
+        }
+        case "$INPUT_FAIL" in
+          true | false) ;;
+          *) stop "the fail input must be true or false" ;;
+        esac
+        [ -n "$INPUT_CONFIG" ] || stop "the config input is required"
+        sarif="${INPUT_SARIF_FILE:-$RUNNER_TEMP/import-fences.sarif}"
+        # The path goes into GITHUB_OUTPUT as one line, so a line break could add an output.
+        case "$sarif" in
+          *$'\n'* | *$'\r'*) stop "the sarif-file input must be one line" ;;
+        esac
+        # One argument, --config=value: a separate value that starts with - would read as an option.
+        args=("--config=$INPUT_CONFIG")
+        cli="$GITHUB_ACTION_PATH/cli.ts"
+        # Only a regular file, or nothing yet, can take the log: a folder would be uploaded as it is.
+        if [ -e "$sarif" ] && [ ! -f "$sarif" ]; then stop "the sarif-file input names $sarif, which is not a file"; fi
+        mkdir -p -- "$(dirname -- "$sarif")" || stop "cannot create the folder of $sarif"
+
+        set +e
+        node "$cli" "${args[@]}"
+        code=$?
+        node "$cli" "${args[@]}" --sarif --sarif-base "$GITHUB_WORKSPACE" > "$sarif"
+        sarif_code=$?
+        set -e
+
+        # Exit 2 (or a crash): the checker printed the error and no SARIF. The step fails whatever fail says.
+        if [ "$code" -ne 0 ] && [ "$code" -ne 1 ]; then
+          rm -f -- "$sarif"
+          echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+        fi
+        # A failed redirect also exits 1, so the file itself has to be there and not empty.
+        if [ "$sarif_code" -ne "$code" ] || [ ! -f "$sarif" ] || [ ! -s "$sarif" ]; then
+          if [ -f "$sarif" ]; then rm -f -- "$sarif"; fi
+          stop "the SARIF run exited with $sarif_code and the text run with $code"
+        fi
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "sarif-file=$sarif" >> "$GITHUB_OUTPUT"
+        if [ "$code" -eq 1 ] && [ "$INPUT_FAIL" = true ]; then exit 1; fi
+        exit 0

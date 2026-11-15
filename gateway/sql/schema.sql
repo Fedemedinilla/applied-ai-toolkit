@@ -1,9 +1,11 @@
--- Reference Postgres schema for the gateway's stores. Checked with sql/test.sql on PostgreSQL 16.
+-- Postgres schema for the gateway's stores. Checked with sql/test.sql on PostgreSQL 16, and
+-- loaded into PGlite by test/store-contract.test.ts and test/postgres-store.test.ts.
 --
 -- It is the persistent counterpart of src/memory-store.ts: the same ledger rules and the same cap
--- totals. A production adapter maps UsageRow (camelCase) to llm_usage (snake_case) one to one,
--- calls usage_for_caps for UsageStore.totalsForCaps (UsageWindows.excludeId is p_exclude_id), and
--- reads the three config tables.
+-- totals. src/postgres-store.ts is the adapter: it maps UsageRow (camelCase) to llm_usage
+-- (snake_case) one to one, calls usage_for_caps for UsageStore.totalsForCaps
+-- (UsageWindows.excludeId is p_exclude_id) and reserve_usage for UsageStore.reserve, and reads the
+-- three config tables.
 --
 -- UsageStore.record must insert with `insert into public.llm_usage (...) values (...) on conflict
 -- (id) do nothing`. The gateway retries a failed insert once with the same id. When the first
@@ -28,12 +30,13 @@ create table public.model_prices (
   model text not null
     constraint model_prices_model_format check (model ~ '^claude-[a-z0-9.-]+$'),
   valid_from timestamptz not null,
-  -- US$ per million tokens. Four decimals, so the gateway can sum in integers.
-  input numeric(10, 4) not null constraint model_prices_input_nonnegative check (input >= 0),
-  output numeric(10, 4) not null constraint model_prices_output_nonnegative check (output >= 0),
-  cache_read numeric(10, 4) not null constraint model_prices_cache_read_nonnegative check (cache_read >= 0),
-  cache_write_5m numeric(10, 4) not null constraint model_prices_cache_write_5m_nonnegative check (cache_write_5m >= 0),
-  cache_write_1h numeric(10, 4) not null constraint model_prices_cache_write_1h_nonnegative check (cache_write_1h >= 0),
+  -- US$ per million tokens. Four decimals, so the gateway can sum in integers. Above zero: a
+  -- zero row in force would price every call of the model at nothing and the caps would count none.
+  input numeric(10, 4) not null constraint model_prices_input_positive check (input > 0),
+  output numeric(10, 4) not null constraint model_prices_output_positive check (output > 0),
+  cache_read numeric(10, 4) not null constraint model_prices_cache_read_positive check (cache_read > 0),
+  cache_write_5m numeric(10, 4) not null constraint model_prices_cache_write_5m_positive check (cache_write_5m > 0),
+  cache_write_1h numeric(10, 4) not null constraint model_prices_cache_write_1h_positive check (cache_write_1h > 0),
   source text not null constraint model_prices_source_not_blank check (btrim(source) <> ''),
   created_at timestamptz not null default now(),
   primary key (model, valid_from)
@@ -327,13 +330,102 @@ comment on function public.usage_for_caps(timestamptz, timestamptz, uuid, uuid, 
   'Cap totals for the gateway: cost, unpriced call count and an upper bound for unpriced usage and open reservations, per user day, month and job. Null where a window was not requested, or where a bound cannot be computed.';
 
 -- ---------------------------------------------------------------------------
+-- Atomic reservation
+-- ---------------------------------------------------------------------------
+
+-- Writes a call's reservation and returns the cap totals without it, as one statement that is
+-- ordered against every other reservation. It is what UsageStore.reserve calls
+-- (src/postgres-store.ts); the gateway then compares the totals with the caps.
+--
+-- Why a lock. An insert followed by a read is not enough in one statement: two calls that start
+-- together would each read before the other's row is committed, and both would pass. The function
+-- takes a transaction-level advisory lock first, so reservations run one at a time. The second
+-- caller waits, and when it gets the lock the first one has committed. Each caller therefore sees
+-- every reservation made before its own and none made after: calls that race are decided in lock
+-- order, exactly as if they had arrived one by one.
+--
+-- Why an advisory lock and not a row lock. `select ... for update` on the llm_global_caps row
+-- would serialize the same way, but it needs the UPDATE privilege on that table, and the
+-- application role must not be able to edit the caps. An advisory lock needs no privilege. The
+-- key is the bytes of 'llmusage' as a bigint; nothing else in the database should use it.
+--
+-- Isolation level: READ COMMITTED, the Postgres default. In a volatile plpgsql function at that
+-- level each statement takes a new snapshot, so the totals query, which runs after the lock is
+-- held, sees what the previous holder committed. At REPEATABLE READ or SERIALIZABLE the snapshot
+-- is taken before the lock and the totals would miss those rows, so the function refuses to run.
+-- Call it as a statement of its own (autocommit): the lock is released when that statement's
+-- transaction ends. Transaction-mode connection pooling is fine, since the lock never outlives
+-- the transaction.
+--
+-- The lock is held for one insert and one totals query. Reservations of the whole database queue
+-- behind it; calls to the API do not.
+--
+-- A retried call with the same p_id inserts nothing the second time and returns the totals again.
+create function public.reserve_usage(
+  p_id uuid,
+  p_user_id uuid,
+  p_task text,
+  p_job_id uuid,
+  p_effort public.llm_effort,
+  p_prompt_version text,
+  p_model_requested text,
+  p_max_tokens integer,
+  p_estimated_input_tokens integer,
+  p_day_start timestamptz,
+  p_month_start timestamptz
+)
+returns table (
+  user_day_usd numeric,
+  user_day_unpriced integer,
+  user_day_bound_usd numeric,
+  month_usd numeric,
+  month_unpriced integer,
+  month_bound_usd numeric,
+  job_usd numeric,
+  job_unpriced integer,
+  job_bound_usd numeric
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+begin
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'reserve_usage needs READ COMMITTED isolation, not %', pg_catalog.current_setting('transaction_isolation')
+      using errcode = 'feature_not_supported',
+            hint = 'Call it as a statement of its own, outside a REPEATABLE READ or SERIALIZABLE transaction.';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(7812739804795332453);
+
+  insert into public.llm_usage (
+    id, reservation, user_id, task, job_id, effort, prompt_version, model_requested, max_tokens, incomplete, estimated_input_tokens
+  ) values (
+    p_id, true, p_user_id, p_task, p_job_id, p_effort, p_prompt_version, p_model_requested, p_max_tokens, true, p_estimated_input_tokens
+  )
+  on conflict (id) do nothing;
+
+  return query select * from public.usage_for_caps(p_day_start, p_month_start, p_user_id, p_job_id, p_id);
+end;
+$$;
+
+comment on function public.reserve_usage(uuid, uuid, text, uuid, public.llm_effort, text, text, integer, integer, timestamptz, timestamptz) is
+  'Writes a reservation and returns usage_for_caps without it, one reservation at a time (advisory lock). Needs READ COMMITTED.';
+
+-- ---------------------------------------------------------------------------
 -- Privileges
 -- ---------------------------------------------------------------------------
 
 revoke all on table public.model_prices, public.llm_global_caps, public.llm_task_config, public.llm_account_caps, public.llm_usage from public;
 revoke execute on function public.require_current_price() from public;
 revoke execute on function public.usage_for_caps(timestamptz, timestamptz, uuid, uuid, uuid) from public;
--- For the application role (replace app_server with yours):
---   grant select, insert on public.model_prices, public.llm_usage to app_server;
+revoke execute on function public.reserve_usage(uuid, uuid, text, uuid, public.llm_effort, text, text, integer, integer, timestamptz, timestamptz) from public;
+-- For the application role (replace app_server with yours). It only reads prices: run loadPrices
+-- with the migration or admin role, so the role that makes calls cannot lower the price that
+-- values them.
+--   grant select, insert on public.llm_usage to app_server;
+--   grant select on public.model_prices to app_server;
 --   grant select on public.llm_global_caps, public.llm_task_config, public.llm_account_caps to app_server;
 --   grant execute on function public.usage_for_caps(timestamptz, timestamptz, uuid, uuid, uuid) to app_server;
+--   grant execute on function public.reserve_usage(uuid, uuid, text, uuid, public.llm_effort, text, text, integer, integer, timestamptz, timestamptz) to app_server;

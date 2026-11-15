@@ -42,7 +42,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'pdf-receipt': ['pdf-receipt/src/index.ts'],
   'safe-markdown': ['safe-markdown/src/index.ts'],
   // The example run that the report and the checklist app agree on; read by the checklist's tests.
-  'site-check': ['site-check/examples/datos.json'],
+  'site-check': ['site-check/examples/datos.json', 'site-check/examples/run.json'],
 };
 
 /**
@@ -54,7 +54,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
 export const APP_USES: Readonly<Record<string, readonly string[]>> = {
   caja: ['amount-parser/src/index.ts', 'amount-parser/corpus/*.json', 'gateway/src/index.ts'],
   'chat-widget': ['gateway/src/index.ts'],
-  checklist: ['site-check/examples/datos.json'],
+  checklist: ['site-check/examples/datos.json', 'site-check/examples/run.json'],
   receipt: ['pdf-receipt/src/index.ts'],
   'replay-lab': ['deterministic-sim/src/index.ts'],
   'salon-assistant': ['gateway/src/index.ts', 'grounded-assistant/src/index.ts', 'safe-markdown/src/index.ts'],
@@ -156,7 +156,12 @@ const fences = folderFences({
 export default defineConfig({
   root: '..',
   // wp-hardening/vendor/ (Composer, gitignored) holds third-party JavaScript after `composer install`.
-  ignore: [...DEFAULT_IGNORE, '**/vendor/**'],
+  // .claude/worktrees/ (gitignored locally) holds whole checkouts while coding agents work.
+  // .stryker-tmp/ holds StrykerJS's copies of the repository during a mutation run, reports/ its output.
+  // docs-site/ has its own package.json and lockfile: its Astro config and content config import
+  // packages that exist only after `npm ci` inside it, and .astro/ is generated. Its scripts/ import
+  // Node built-ins alone and stay under the fences.
+  ignore: [...DEFAULT_IGNORE, '**/vendor/**', '.claude/**', '.stryker-tmp/**', 'reports/**', 'docs-site/astro.config.mjs', 'docs-site/src/**', 'docs-site/.astro/**'],
   groups: {
     all: { include: ['**/*'] },
     source: { include: ['**/*'], exclude: [...TESTS, SELF] },

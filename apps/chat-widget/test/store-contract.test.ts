@@ -145,6 +145,20 @@ describe('sql/schema.sql checks', () => {
     await rejects(`insert into widget_tenants (tenant_id, account_id) values ('Bad Id', gen_random_uuid())`, 'widget_tenants_tenant_id_format');
   });
 
+  it('checks each allowed domain and each suggested question the way the zod schema does', async () => {
+    const set = (assignment: string): string => `update widget_tenants set ${assignment} where tenant_id = 'panaderia-sol'`;
+    for (const domain of ['Shop.Example', 'shop..example', '-shop.example', 'shop.example/', 'https://shop.example', '']) {
+      await rejects(set(`allowed_domains = array['shop.example', '${domain}']`), 'widget_tenants_allowed_domains');
+    }
+    await rejects(set(`allowed_domains = array[null]::text[]`), 'widget_tenants_allowed_domains');
+    await rejects(set(`suggested_questions = array['']`), 'widget_tenants_suggested_questions');
+    await rejects(set(`suggested_questions = array[repeat('x', 81)]`), 'widget_tenants_suggested_questions');
+    await rejects(set(`suggested_questions = array[null]::text[]`), 'widget_tenants_suggested_questions');
+    await db.query(set(`allowed_domains = array['shop.example', 'www.shop-2.example'], suggested_questions = array[repeat('x', 80), '¿Abren hoy?']`));
+    const row = await new SqlStore(db).getConfig('panaderia-sol');
+    expect(TenantConfig.safeParse(row).success).toBe(true);
+  });
+
   it('keeps each turn state consistent', async () => {
     const insert = (extra: string): string =>
       `insert into widget_turns (id, tenant_id, session_id, created_at, status${extra.split('|')[0]}) values (gen_random_uuid(), 'panaderia-sol', '${SESSION}', now(), ${extra.split('|')[1]})`;
@@ -156,6 +170,9 @@ describe('sql/schema.sql checks', () => {
 
   it('stores emails lowercase and unique', async () => {
     await rejects(`update widget_owners set email = 'Owner@x.example'`, 'widget_owners_email');
+    for (const email of ['a@b', 'a@b.c', '.a@x.example', 'a..b@x.example', 'a b@x.example', 'a@-x.example']) {
+      await rejects(`update widget_owners set email = '${email}'`, 'widget_owners_email');
+    }
     await db.query(`insert into widget_tenants (tenant_id, account_id) values ('taller-rueda', gen_random_uuid())`);
     await rejects(`insert into widget_owners (tenant_id, email) values ('taller-rueda', 'owner@panaderia-sol.example')`, 'widget_owners_email_key');
   });

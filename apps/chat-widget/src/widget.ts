@@ -302,6 +302,8 @@ export async function mountWidget(options: WidgetOptions): Promise<MountedWidget
       const chip = el(doc, 'button', 'chip', question);
       chip.type = 'button';
       chip.addEventListener('click', () => {
+        // While a reply is pending send() would drop the question, so the chips stay put.
+        if (busy) return;
         chips.remove();
         void send(question);
       });

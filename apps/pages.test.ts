@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assemblePages, landingLinks, PAGES_APPS, PAGES_URL } from './pages.ts';
+import { assemblePages, DOCS_FOLDER, landingLinks, PAGES_APPS, PAGES_URL } from './pages.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const landing = read('./index.html');
@@ -14,6 +14,32 @@ const landing = read('./index.html');
 describe('the landing page', () => {
   it('links every published app once, in the order of PAGES_APPS', () => {
     expect(landingLinks(landing)).toEqual([...PAGES_APPS]);
+  });
+
+  it.each([
+    ['an attribute before href', '<a class="demo-link" href="./writer/">Writer</a>', 'writer'],
+    ['single quotes', "<a href='./push-lab/'>Push</a>", 'push-lab'],
+    ['no trailing slash', '<a href="./chat-widget">Chat</a>', 'chat-widget'],
+    ['no leading ./', '<a href="writer/">Writer</a>', 'writer'],
+    ['a file inside the folder', '<a href="./writer/index.html">Writer</a>', 'writer'],
+    ['a digit in the folder name', '<a href="./app2/">App</a>', 'app2'],
+    ['spaces around =', '<a href = "./salon-assistant/">Salon</a>', 'salon-assistant'],
+  ])('sees a link to an app folder written with %s', (_, link, folder) => {
+    expect(landingLinks(`<a href="./caja/">Caja</a>${link}`)).toEqual(['caja', folder]);
+  });
+
+  it('ignores links that leave the site, fragments, data-href and the docs folder', () => {
+    const html = '<a href="#demos">Skip</a><a href="https://github.com/x">GitHub</a><a href="mailto:a@example.com">m</a>'
+      + '<a href="//example.com/">x</a><a data-href="./writer/">x</a><a href="./docs/">Docs</a><a href="./caja/">Caja</a>';
+    expect(landingLinks(html)).toEqual(['caja']);
+  });
+
+  it('links the docs site once, in a folder that no app uses', () => {
+    expect(landing.split(`<a href="./${DOCS_FOLDER}/">`).length - 1).toBe(1);
+    expect(PAGES_APPS).not.toContain(DOCS_FOLDER);
+    // pages.yml copies the docs build into that folder, and the docs are built for that path.
+    expect(read('../.github/workflows/pages.yml')).toContain(`cp -R docs-site/dist dist/pages/${DOCS_FOLDER}\n`);
+    expect(read('../docs-site/scripts/site.ts')).toContain(`export const BASE = '${new URL(PAGES_URL).pathname}${DOCS_FOLDER}';`);
   });
 
   it('has a language, a strict policy, and no inline script or style', () => {
@@ -50,6 +76,26 @@ describe('the demo links', () => {
   });
 });
 
+describe('the npm scripts', () => {
+  const scripts = (JSON.parse(read('../package.json')) as { scripts: Record<string, string> }).scripts;
+
+  it('build:pages builds exactly PAGES_APPS, in order, then assembles', () => {
+    const steps = (scripts['build:pages'] ?? '').split(' && ');
+    expect(steps.at(-1)).toBe('node apps/pages.ts');
+    expect(steps.slice(0, -1)).toEqual(PAGES_APPS.map((app) => `npm run build:${app}`));
+  });
+
+  it('guard:pages runs csp-build-guard over exactly PAGES_APPS, each with its own config', () => {
+    const steps = (scripts['guard:pages'] ?? '').split(' && ');
+    expect(steps).toEqual(PAGES_APPS.map((app) => `node csp-build-guard/cli.ts --dir dist/apps/${app} --config apps/${app}/csp-guard.config.json`));
+  });
+
+  it.each(PAGES_APPS)('apps/%s/csp-guard.config.json searches the build for the key placeholder pages.yml sets', (app) => {
+    const config: unknown = JSON.parse(read(`./${app}/csp-guard.config.json`));
+    expect(config).toMatchObject({ secrets: { env: expect.arrayContaining(['ANTHROPIC_API_KEY']) } });
+  });
+});
+
 describe('assemblePages', () => {
   let root = '';
   afterEach(() => {
@@ -78,6 +124,18 @@ describe('assemblePages', () => {
     expect(readdirSync(join(out, 'shared/fonts'))).toEqual(['a.woff2']);
     expect(readFileSync(join(out, 'replay-lab/index.html'), 'utf8')).toBe('<title>replay-lab</title>');
     expect(readdirSync(join(out, 'caja/assets'))).toEqual(['a.js']);
+  });
+
+  it('refuses to assemble when the landing page links an app that PAGES_APPS does not list', () => {
+    const url = tree(PAGES_APPS);
+    writeFileSync(join(root, 'apps/index.html'), landing.replace('</ol>', '<li><a class="x" href="./writer/">Writer</a></li></ol>'));
+    expect(() => assemblePages(url)).toThrow(/apps\/index.html links .*writer; PAGES_APPS lists/);
+  });
+
+  it('refuses to assemble when the landing page leaves out an app that PAGES_APPS lists', () => {
+    const url = tree(PAGES_APPS);
+    writeFileSync(join(root, 'apps/index.html'), landing.replace('<a href="./receipt/">Receipt</a>', 'Receipt'));
+    expect(() => assemblePages(url)).toThrow(/apps\/index.html links caja, replay-lab, checklist; PAGES_APPS lists/);
   });
 
   it('refuses to assemble when a published build is missing', () => {

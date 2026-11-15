@@ -63,7 +63,10 @@ export function mountApp(root: Document, deps: AppDeps): void {
   let draft: Draft | null = null;
   let kindOverride: Kind | null = null;
   let persistent = loaded.available && loaded.writable;
-  /** True while the status line holds the "type something first" hint, so a later read clears it. */
+  /**
+   * True while the status line holds a line about one read (the "type something first" hint, or a
+   * model failure), so the next read clears it and a later AI card never sits under "sin IA".
+   */
   let hintShown = false;
   /** Model mode: the request in flight, and the verdict on the card. */
   let pending: AbortController | null = null;
@@ -274,6 +277,7 @@ export function mountApp(root: Document, deps: AppDeps): void {
       pending = null;
       if (!answer.ok) {
         status.textContent = modelErrorMessage(answer.error);
+        hintShown = true;
         renderPreview(true);
         return;
       }
@@ -362,7 +366,7 @@ export function mountApp(root: Document, deps: AppDeps): void {
     if (!model) return;
     const card = preview.querySelector('form[data-action="model-form"]');
     if (card) model.state.answers = collectAnswers(card, model.state.answers);
-    const result = modelSave(model.state);
+    const result = modelSave(model.state, localDay(deps.now()));
     if (!result.ok) {
       showError(result.message);
       return;

@@ -26,4 +26,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for each rule.
 - [ ] New or changed actions are pinned to a full commit SHA with the version tag in a comment.
 - [ ] Workflows still pass the policy in `agent-playbook/src/workflow-secrets.ts`.
 - [ ] Fixtures are fictional: no client data, keys or personal details.
-- [ ] A change to `@fedemedinilla/slop-lint` or `@fedemedinilla/claude-gateway` has a changeset (`npx changeset`).
+- [ ] A change to `@fedemedinilla/slop-lint`, `@fedemedinilla/claude-gateway`, `@fedemedinilla/import-fences` or `@fedemedinilla/csp-build-guard` has a changeset (`npx changeset`).

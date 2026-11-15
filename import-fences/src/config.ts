@@ -1,13 +1,17 @@
 /**
  * The config format. A config is a TypeScript module whose default export goes through
- * defineConfig, so the editor checks it, and it is validated again with zod when the CLI loads it,
- * because a typo in a rule name must stop the run instead of turning a fence off.
+ * defineConfig, so the editor checks it, or a JSON file that an editor checks against
+ * schema/config.schema.json. Either one is validated again with zod when the CLI loads it, because
+ * a typo in a rule name must stop the run instead of turning a fence off.
  */
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { DEFAULT_IGNORE } from './files.ts';
+import { globToRegExp } from './glob.ts';
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
@@ -23,7 +27,34 @@ export const NODE_BUILTINS: readonly string[] = [
 ];
 
 const text = z.string().min(1);
-const globs = z.array(text);
+
+/**
+ * A repository glob is matched against posix paths relative to the root, such as `server/x.ts`.
+ * `./server/**`, `/server/**` and `server\**` would match none of them and turn the rule off
+ * silently, so they stop the run, and so does a glob that does not compile.
+ */
+const glob = text.superRefine((value, ctx) => {
+  if (value.startsWith('./') || value.startsWith('/')) {
+    ctx.addIssue({ code: 'custom', message: `glob ${JSON.stringify(value)} starts with "${value.startsWith('/') ? '/' : './'}"; paths are relative to the root without it, as in "server/**"` });
+  } else if (value.includes('\\')) {
+    ctx.addIssue({ code: 'custom', message: `glob ${JSON.stringify(value)} has a backslash; use forward slashes` });
+  } else {
+    try {
+      globToRegExp(value);
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: (error as Error).message });
+    }
+  }
+});
+const globs = z.array(glob);
+/**
+ * A module specifier, not a path: `@vendor/sdk` (subpaths match) or a prefix ending in `*`, such as
+ * `node:*`. Any other `*` would be compared literally and match nothing, so it stops the run.
+ */
+const specifier = text.refine((value) => !value.slice(0, -1).includes('*'), {
+  message: 'only a trailing * is supported, as in "node:*"; a * anywhere else is not a wildcard',
+});
+const specifierList = z.array(specifier);
 const why = z.string().min(1).optional();
 
 const Group = z.strictObject({
@@ -39,7 +70,7 @@ const ForbiddenImport = z.strictObject({
   rule: z.literal('forbidden-import'),
   group: text,
   /** Package names (subpaths match) or prefixes ending in `*`, such as `node:*`. */
-  specifiers: globs.default([]),
+  specifiers: specifierList.default([]),
   /** Repository globs that the group may not reach through relative imports. */
   paths: globs.default([]),
   /**
@@ -52,14 +83,14 @@ const ForbiddenImport = z.strictObject({
   /** Follow relative imports into every file the group reaches, inside the repository. */
   transitive: z.boolean().default(true),
   /** Bare specifiers that resolve outside node_modules (virtual modules, aliases): not reported as unresolved. */
-  external: globs.default([]),
+  external: specifierList.default([]),
   why,
 });
 
 const SingleImporter = z.strictObject({
   rule: z.literal('single-importer'),
   group: text,
-  package: text,
+  package: specifier,
   /** The only files of the group that may import the package's values. */
   allow: globs,
   /** `allow`: any file may import the package's types. */
@@ -130,16 +161,66 @@ export function parseConfig(value: unknown): FencesConfig {
   return result.data;
 }
 
-/** Imports a config module and returns it with its root resolved to an absolute path. */
+/** Where the committed JSON Schema of a JSON config is published. */
+export const CONFIG_SCHEMA_URL = 'https://raw.githubusercontent.com/Fedemedinilla/applied-ai-toolkit/main/import-fences/schema/config.schema.json';
+
+/**
+ * The JSON Schema (draft 2020-12) of a JSON config, generated from the zod schema above so the two
+ * cannot drift; schema/config.schema.json is this value, and a test compares them. It describes
+ * what a config file may hold before defaults are filled, plus the `$schema` key an editor reads.
+ * The three cross-field checks of the CLI (a rule names a known group, a forbidden-import rule has
+ * specifiers or paths, except needs paths) are not expressible here and stay with the CLI.
+ */
+export function configJsonSchema(): Record<string, unknown> {
+  const { $schema, ...generated } = z.toJSONSchema(Config, { io: 'input' }) as Record<string, unknown>;
+  const properties = (generated['properties'] ?? {}) as Record<string, unknown>;
+  return {
+    $schema,
+    $id: CONFIG_SCHEMA_URL,
+    title: 'import-fences config',
+    ...generated,
+    properties: { $schema: { type: 'string', description: 'The address of this schema, for editors. The CLI ignores it.' }, ...properties },
+  };
+}
+
+/**
+ * A JSON config: the object a module would export, with an optional `$schema` key for editors.
+ * A leading byte order mark, which Windows editors often write, is dropped: JSON.parse rejects it.
+ */
+function readJsonConfig(absolute: string): unknown {
+  const value: unknown = JSON.parse(readFileSync(absolute, 'utf8').replace(/^\uFEFF/, ''));
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const { $schema: _schema, ...config } = value as Record<string, unknown>;
+  return config;
+}
+
+/**
+ * Loads a config and returns it with its root resolved to an absolute path. A path ending in .json
+ * is read as JSON; anything else is imported as a module whose default export is the config. A
+ * module config edited since the last call is imported again; the modules it imports are not.
+ */
 export async function loadConfig(path: string): Promise<{ config: FencesConfig; root: string }> {
   const absolute = resolve(path);
-  let module: { default?: unknown };
-  try {
-    module = (await import(pathToFileURL(absolute).href)) as { default?: unknown };
-  } catch (error) {
-    throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+  let value: unknown;
+  if (absolute.endsWith('.json')) {
+    try {
+      value = readJsonConfig(absolute);
+    } catch (error) {
+      throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+    }
+  } else {
+    let module: { default?: unknown };
+    try {
+      // Node caches a module by URL; a query with the content's hash reads an edited file again.
+      const url = pathToFileURL(absolute);
+      url.search = `v=${createHash('sha256').update(readFileSync(absolute)).digest('hex').slice(0, 16)}`;
+      module = (await import(url.href)) as { default?: unknown };
+    } catch (error) {
+      throw new ConfigError(`cannot load ${path}: ${(error as Error).message}`);
+    }
+    if (module.default === undefined) throw new ConfigError(`${path} has no default export`);
+    value = module.default;
   }
-  if (module.default === undefined) throw new ConfigError(`${path} has no default export`);
-  const config = parseConfig(module.default);
+  const config = parseConfig(value);
   return { config, root: resolve(dirname(absolute), config.root ?? '.') };
 }

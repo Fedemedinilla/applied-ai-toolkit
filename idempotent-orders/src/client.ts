@@ -19,9 +19,9 @@ export interface OrdersClientOptions {
   /** Sent with every request. On Supabase, the server's `apikey` and `Authorization`. */
   readonly headers?: Readonly<Record<string, string>>;
   readonly fetch?: typeof fetch;
-  /** Attempts of the write itself, before the re-read. Default 3. */
+  /** Attempts of the write itself, before the re-read. Default 3. Floored and at least 1; not finite throws a RangeError. */
   readonly maxAttempts?: number;
-  /** Per request. Default 8000. */
+  /** Per request. Default 8000. Like the two delays, a finite number from 0 to 2^31 - 1, or a RangeError. */
   readonly timeoutMs?: number;
   /** First backoff ceiling; it doubles per attempt. Default 300. */
   readonly baseDelayMs?: number;
@@ -137,17 +137,31 @@ type LoopEnd<R> =
   | { readonly end: 'uncertain'; readonly requests: number }
   | { readonly end: 'aborted'; readonly requests: number };
 
+/** The largest delay setTimeout honors; Node and browsers turn a larger one into about 1 ms. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/** A delay option: a finite number setTimeout honors as given. NaN, Infinity or 2^31 would not be. */
+function delayOption(name: string, value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > MAX_TIMER_MS) {
+    throw new RangeError(`${name} is a finite number from 0 to ${MAX_TIMER_MS}`);
+  }
+  return value;
+}
+
 export function createOrdersClient(options: OrdersClientOptions): OrdersClient {
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   const rpc: RpcConfig = {
     url: options.url,
     fetch: fetchImpl,
-    timeoutMs: options.timeoutMs ?? 8000,
+    timeoutMs: delayOption('timeoutMs', options.timeoutMs ?? 8000),
     ...(options.headers ? { headers: options.headers } : {}),
   };
-  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 3));
-  const baseDelayMs = options.baseDelayMs ?? 300;
-  const maxDelayMs = options.maxDelayMs ?? 4000;
+  // NaN would send no write at all, and Infinity would remove the retry bound.
+  const attempts = options.maxAttempts ?? 3;
+  if (!Number.isFinite(attempts)) throw new RangeError('maxAttempts is a finite number');
+  const maxAttempts = Math.max(1, Math.floor(attempts));
+  const baseDelayMs = delayOption('baseDelayMs', options.baseDelayMs ?? 300);
+  const maxDelayMs = delayOption('maxDelayMs', options.maxDelayMs ?? 4000);
   const sleep = options.sleep ?? sleepFor;
   const random = options.random ?? Math.random;
   /**
@@ -340,15 +354,24 @@ export function createOrdersClient(options: OrdersClientOptions): OrdersClient {
   };
 }
 
+/** A key that is a string matching KEY_PATTERN. test() alone would coerce an array or a number. */
+function keyProblem(key: unknown): string | null {
+  return typeof key === 'string' && KEY_PATTERN.test(key) ? null : 'the key does not match KEY_PATTERN';
+}
+
 function placeProblem(request: PlaceRequest): string | null {
-  if (!KEY_PATTERN.test(request.key)) return 'the key does not match KEY_PATTERN';
-  const customerLength = [...request.customerId].length;
+  const keyIssue = keyProblem(request.key);
+  if (keyIssue) return keyIssue;
+  const customer: unknown = request.customerId;
+  if (typeof customer !== 'string') return 'customerId has 1 to 64 characters';
+  const customerLength = [...customer].length;
   if (customerLength < 1 || customerLength > 64) return 'customerId has 1 to 64 characters';
   return linesProblem(request.lines);
 }
 
 function confirmProblem(request: ConfirmRequest): string | null {
-  if (!KEY_PATTERN.test(request.key)) return 'the key does not match KEY_PATTERN';
+  const keyIssue = keyProblem(request.key);
+  if (keyIssue) return keyIssue;
   if (!Number.isSafeInteger(request.orderId) || request.orderId < 1) return 'orderId is a positive integer';
   if (!Number.isInteger(request.expectedVersion) || request.expectedVersion < 1 || request.expectedVersion > 2_147_483_647) {
     return 'expectedVersion is a positive integer';

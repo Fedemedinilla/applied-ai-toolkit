@@ -21,7 +21,7 @@ import { EFFORT, MAX_TOKENS, ResponseError, TASK, type Gateway } from './model.t
 import { batchSchema, catalogueBlock, instructions, MAX_BRIEF, MAX_COUNT, PROMPT_VERSIONS, userMessage } from './prompt.ts';
 import { RunReport, type Rejection, type Stage } from './report.ts';
 import { checkRules } from './rules.ts';
-import { ENTITY_NAMES, SCHEMAS, type EntityName, type EntityTypes } from './schemas.ts';
+import { ENTITY_NAMES, Id, SCHEMAS, type EntityName, type EntityTypes } from './schemas.ts';
 
 export interface GenerateOptions {
   readonly dir: string;
@@ -48,9 +48,35 @@ export async function validCatalog(dir: string): Promise<{ raw: RawCatalog; inde
 
 const runId = (now: Date, entity: EntityName): string => `${now.toISOString().replace(/[:.]/g, '-')}-${entity}`;
 
+/**
+ * Writes the report under its run id. The id has millisecond resolution, so a second run in the
+ * same millisecond finds the name taken; it has paid for its call too, so it takes the run id with
+ * the start of its job id instead of losing the report.
+ */
+async function writeReport(dir: string, report: RunReport): Promise<RunReport> {
+  try {
+    await writeJsonNew(join(reportsDir(dir), `${report.run}.json`), report);
+    return report;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+    const renamed = RunReport.parse({ ...report, run: `${report.run}-${report.jobId.slice(0, 8)}` });
+    await writeJsonNew(join(reportsDir(dir), `${renamed.run}.json`), renamed);
+    return renamed;
+  }
+}
+
+/**
+ * The id of a model candidate when it is a valid id, otherwise null. The raw value can be any
+ * string, control characters included, and it is printed to the terminal and kept in the report.
+ */
+const candidateId = (value: unknown): string | null => {
+  const id = idOf(value);
+  return id !== null && Id.safeParse(id).success ? id : null;
+};
+
 /** Candidates are numbered from 1 in messages; the report's `index` is the 0-based array position. */
 const label = (i: number, value: unknown): string => {
-  const id = idOf(value);
+  const id = candidateId(value);
   return id === null ? `candidate ${i + 1}` : `candidate ${i + 1} (${id})`;
 };
 
@@ -96,6 +122,25 @@ export function judge<E extends EntityName>(
 }
 
 /**
+ * The catalogue with the candidates pending from earlier runs, so a new candidate is checked
+ * against them too: two runs could otherwise each accept one half of a conflict (a name, a set's
+ * last slot, a release order) that promote then refuses together. Only pending files that parse
+ * are merged, and not those that reuse a catalogue id, since those wait to replace an entry with
+ * --replace. If the merge does not validate, the problems belong to the pending candidates, not to
+ * this run, so generate refuses before the call.
+ */
+function withPendingCandidates(entity: EntityName, raw: RawCatalog, index: CatalogIndex, pending: RawCatalog[EntityName]): { raw: RawCatalog; index: CatalogIndex } {
+  const fresh = pending.filter((e) => SCHEMAS[entity].safeParse(e.value).success && !index[entity].has(idOf(e.value) ?? ''));
+  if (fresh.length === 0) return { raw, index };
+  const merged = emptyRaw();
+  for (const name of ENTITY_NAMES) merged[name].push(...raw[name]);
+  merged[entity].push(...fresh);
+  const checked = checkCatalog(merged);
+  if (!checked.ok) throw new ForgeError('refused', 'The pending candidates do not fit the catalogue; promote, fix or remove them first', checked.problems);
+  return { raw: merged, index: checked.index };
+}
+
+/**
  * Runs one generation. A response the model gave but that cannot be used at all (not JSON, cut by
  * max_tokens, a refusal) is a failed run of this prompt version: it gets a report with no accepted
  * candidate, so the pass rate counts it. Any other gateway failure (a cap, the network, a 5xx) says
@@ -110,7 +155,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
   if (brief !== null && brief.length > MAX_BRIEF) throw new ForgeError('bad_request', `--brief is limited to ${MAX_BRIEF} characters`);
 
   const { raw, index } = await validCatalog(dir);
-  // A pending file whose name is not its id, or that is not JSON, would hide an id from the
+  // A pending file whose name is not its id, that has no string id or is not JSON, would hide an id from the
   // pending check and make a write fail after the paid call. Refused before the call instead.
   const pendingFiles = await loadCandidates(dir, entity);
   if (pendingFiles.problems.length > 0) throw new ForgeError('refused', 'The pending candidates have problems; fix or remove them first', pendingFiles.problems);
@@ -118,6 +163,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
     const pendingId = idOf(e.value);
     return pendingId === null ? [] : [pendingId];
   }));
+  const withPending = withPendingCandidates(entity, raw, index, pendingFiles.raw[entity]);
 
   const now = deps.now();
   const id = runId(now, entity);
@@ -162,8 +208,7 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
       passRate: 0,
       rejections: [],
     });
-    await writeJsonNew(join(reportsDir(dir), `${id}.json`), report);
-    return report;
+    return writeReport(dir, report);
   }
 
   const considered = candidates.slice(0, count);
@@ -171,9 +216,9 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
   const rejections: Rejection[] = [];
   considered.forEach((value, i) => {
     const where = label(i, value);
-    const verdict = judge(entity, value, where, { raw, index, pending }, accepted);
+    const verdict = judge(entity, value, where, { ...withPending, pending }, accepted);
     if (verdict.accepted) accepted.push(verdict.accepted);
-    else rejections.push({ index: i, id: idOf(value), problems: [...verdict.problems] });
+    else rejections.push({ index: i, id: candidateId(value), problems: [...verdict.problems] });
   });
 
   // The call is paid for by now, so a failed write is recorded in the report instead of thrown:
@@ -201,6 +246,5 @@ export async function generate(options: GenerateOptions, deps: GenerateDeps): Pr
     passRate: accepted.length / count,
     rejections,
   });
-  await writeJsonNew(join(reportsDir(dir), `${id}.json`), report);
-  return report;
+  return writeReport(dir, report);
 }

@@ -10,17 +10,22 @@ author: Federico Medinilla
 
 inputs:
   files:
-    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that matches no file fails the step.
+    description: Paths or globs to lint, separated by spaces or newlines. ** matches across folders. A pattern that names an existing file is read as that path, brackets included. A pattern that matches no file fails the step.
     required: true
   lang:
-    description: Language of the text, en or es.
-    required: true
+    description: Language of the text, en or es. Empty leaves it to the config file, which may set it per folder; with neither, the step fails.
+    required: false
+    default: ''
   format:
     description: text or markdown. Empty reads a .md file as Markdown and anything else as text.
     required: false
     default: ''
   anchors:
     description: Comma-separated extra anchor terms, such as tool names written in lowercase.
+    required: false
+    default: ''
+  config:
+    description: Path of a slop-lint config file. Empty looks for slop-lint.config.json from the workspace root. The values of lang, format and anchors, when set here, win over it.
     required: false
     default: ''
   sarif-file:
@@ -43,9 +48,12 @@ outputs:
 runs:
   using: composite
   steps:
+    # package-manager-cache: false keeps setup-node from reading the consumer's package.json and
+    # restoring an npm cache in their job; the action installs what it needs on its own.
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24
+        package-manager-cache: false
 
     - id: lint
       shell: bash
@@ -54,6 +62,7 @@ runs:
         SLOP_LANG: ${{ inputs.lang }}
         SLOP_FORMAT: ${{ inputs.format }}
         SLOP_ANCHORS: ${{ inputs.anchors }}
+        SLOP_CONFIG: ${{ inputs.config }}
         SLOP_SARIF_FILE: ${{ inputs.sarif-file }}
         SLOP_FAIL: ${{ inputs.fail }}
       run: |
@@ -70,6 +79,12 @@ runs:
         (( ${#patterns[@]} > 0 )) || fail "files is empty"
         files=()
         for pattern in "${patterns[@]}"; do
+          # A pattern that names an existing file is that file, so docs/[slug]/page.md works.
+          if [[ -f "$pattern" ]]; then
+            [[ "$pattern" == -* ]] && pattern="./$pattern"
+            files+=("$pattern")
+            continue
+          fi
           matched=0
           for path in $pattern; do
             [[ -f "$path" ]] || continue
@@ -81,16 +96,26 @@ runs:
           (( matched )) || fail "no file matches $pattern"
         done
 
-        args=(--lang "$SLOP_LANG")
+        [[ "$SLOP_CONFIG" != *$'\n'* ]] || fail "config must be one path"
+        args=()
+        if [[ -n "$SLOP_LANG" ]]; then args+=(--lang "$SLOP_LANG"); fi
         if [[ -n "$SLOP_FORMAT" ]]; then args+=(--format "$SLOP_FORMAT"); fi
         if [[ -n "$SLOP_ANCHORS" ]]; then args+=(--anchors "$SLOP_ANCHORS"); fi
+        # --config=value keeps a value that starts with - from reading as another option.
+        if [[ -n "$SLOP_CONFIG" ]]; then args+=("--config=$SLOP_CONFIG"); fi
         cli="$GITHUB_ACTION_PATH/cli.ts"
 
         code=0
         node "$cli" "${files[@]}" "${args[@]}" || code=$?
         written=''
         if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
-          mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")" || fail "cannot create the folder of $SLOP_SARIF_FILE"
+          # The CLI has run, so a folder that cannot be created still reports exit-code 2.
+          if ! mkdir -p -- "$(dirname -- "$SLOP_SARIF_FILE")"; then
+            printf 'slop-lint: cannot create the folder of %s\n' "$SLOP_SARIF_FILE" >&2
+            code=2
+          fi
+        fi
+        if (( code != 2 )) && [[ -n "$SLOP_SARIF_FILE" ]]; then
           sarif_code=0
           node "$cli" "${files[@]}" "${args[@]}" --sarif > "$SLOP_SARIF_FILE" || sarif_code=$?
           # A failed redirect also exits 1, so the file itself has to be there and not empty.

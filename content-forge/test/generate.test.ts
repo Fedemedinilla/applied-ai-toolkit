@@ -10,7 +10,7 @@ import { candidatePath, loadCatalog, reportsDir } from '../src/files.ts';
 import { generate } from '../src/generate.ts';
 import { createForgeModel, MAX_TOKENS, MODEL, TASK, type ForgeModel } from '../src/model.ts';
 import { PROMPT_VERSIONS } from '../src/prompt.ts';
-import { RunReport } from '../src/report.ts';
+import { formatRun, RunReport } from '../src/report.ts';
 import { RULES } from '../src/rules.ts';
 import { Card } from '../src/schemas.ts';
 import { copyCatalog, readJson, response, writeJson } from './helpers/catalog-dir.ts';
@@ -174,12 +174,41 @@ describe('the request', () => {
   });
 });
 
+describe('candidates pending from earlier runs', () => {
+  const unit = (id: string, name: string) => ({ id, name, set: 'core', faction: 'grove', rarity: 'common', cost: 2, keywords: [], text: '', body: { type: 'unit', power: 2, health: 3 } });
+
+  it('checks a candidate against them, so a conflict promote would refuse is rejected here', async () => {
+    await writeJson(candidatePath(dir, 'card', 'ember-spark'), unit('ember-spark', 'Ember Spark'));
+    const { model } = setup([message({ candidates: [unit('ember-spark-two', 'Ember Spark'), unit('moss-crawler', 'Moss Crawler')] })]);
+    const report = await run(model, 'card', 2);
+    expect(report.accepted).toEqual(['moss-crawler']);
+    expect(reasons(report, 'ember-spark-two')).toEqual(['references name: card "ember-spark" already has the name "Ember Spark"']);
+  });
+
+  it('refuses before the call when a pending candidate no longer fits the catalogue', async () => {
+    // A pending card that names a set someone removed since its run.
+    await writeJson(candidatePath(dir, 'card', 'ember-spark'), { ...unit('ember-spark', 'Ember Spark'), set: 'moonfall' });
+    const { api, model } = setup([messageText(await response('card-batch'))]);
+    const error = await run(model, 'card', 8).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'refused', problems: [{ where: 'card/ember-spark', path: 'set', message: 'unknown set "moonfall"' }] });
+    expect(api.requests).toHaveLength(0);
+  });
+});
+
 describe('writes after the paid call', () => {
   it('refuses before the call when a pending file is named after another id', async () => {
     await writeJson(join(dir, '_candidates', 'cards', 'old-name.json'), { id: 'brine-scout' });
     const { api, model } = setup([messageText(await response('card-batch'))]);
     const error = await run(model, 'card', 8).catch((e: unknown) => e);
     expect(error).toMatchObject({ code: 'refused', problems: [{ where: '_candidates/cards/old-name.json', path: 'id', message: 'the file name must be "brine-scout.json"' }] });
+    expect(api.requests).toHaveLength(0);
+  });
+
+  it.each([[{ name: 'Brine Scout' }], [{ id: 42 }]])('refuses before the call when a pending file has no string id: %j', async (value) => {
+    await writeJson(candidatePath(dir, 'card', 'brine-scout'), value);
+    const { api, model } = setup([messageText(await response('card-batch'))]);
+    const error = await run(model, 'card', 8).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'refused', problems: [{ where: '_candidates/cards/brine-scout.json', path: 'id', message: 'has no string id' }] });
     expect(api.requests).toHaveLength(0);
   });
 
@@ -192,6 +221,35 @@ describe('writes after the paid call', () => {
     expect(report.costUsd).toBeCloseTo(0.031, 6);
     expect(await readJson(candidatePath(dir, 'card', 'brine-scout'))).toEqual({ id: 'brine-scout', by: 'someone else' });
     expect(RunReport.parse(await readJson(join(reportsDir(dir), `${report.run}.json`)))).toEqual(report);
+  });
+});
+
+describe('ids from the model', () => {
+  it('never puts an id that breaks the id pattern into a label or the report, so control characters stay out of the terminal', async () => {
+    const hostile = 'x\u001b]0;pwned\u0007\u001b[2J';
+    const { model } = setup([message({ candidates: [{ id: hostile, name: 'X' }] })]);
+    const report = await run(model, 'card', 1);
+    expect(report.rejections).toHaveLength(1);
+    expect(report.rejections[0]?.id).toBeNull();
+    expect(report.rejections[0]?.problems.every((p) => p.where === 'candidate 1')).toBe(true);
+    expect(formatRun(report).join('\n')).not.toContain('\u001b');
+    // Any other text a report quotes is printed with its control characters escaped.
+    const quoted = { ...report, rejections: report.rejections.map((r) => ({ ...r, problems: r.problems.map((p) => ({ ...p, message: `${p.message} ${hostile}` })) })) };
+    const lines = formatRun(quoted);
+    for (const line of lines) expect(line).not.toMatch(/[\u0000-\u001f]/);
+    expect(lines.join('\n')).toContain('x\\u001b]0;pwned\\u0007\\u001b[2J');
+  });
+});
+
+describe('two runs in the same millisecond', () => {
+  it('leaves a report for each paid call', async () => {
+    const { api, model } = setup([messageText(await response('card-batch')), messageText('{"candidates": [', undefined, 'max_tokens')]);
+    const first = await run(model, 'card', 1);
+    const second = await run(model, 'card', 1);
+    expect(api.requests).toHaveLength(2);
+    expect(second.run).not.toBe(first.run);
+    expect((await readdir(reportsDir(dir))).sort()).toEqual([`${first.run}.json`, `${second.run}.json`].sort());
+    expect(RunReport.parse(await readJson(join(reportsDir(dir), `${second.run}.json`)))).toEqual(second);
   });
 });
 

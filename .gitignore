@@ -8,3 +8,6 @@ out/
 *.jsonl
 .vitest/
 dist/
+# StrykerJS sandboxes, and the mutation and benchmark reports (npm run mutation, npm run bench).
+.stryker-tmp/
+reports/

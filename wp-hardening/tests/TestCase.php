@@ -69,6 +69,10 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      * Backs get_transient, set_transient and delete_transient with an array, and returns it by
      * reference so a test can read what was stored.
      *
+     * A scalar comes back as a string, as it does on a site without a persistent object cache:
+     * the transient is a wp_options row, maybe_serialize() leaves scalars as they are, and the
+     * database hands them back as text. Arrays are serialized, so they keep their types.
+     *
      * @return \ArrayObject<string, mixed>
      */
     protected function transients(): \ArrayObject
@@ -76,7 +80,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         $store = new \ArrayObject();
         Functions\when('get_transient')->alias(static fn (string $k): mixed => $store[$k] ?? false);
         Functions\when('set_transient')->alias(static function (string $k, mixed $v, int $ttl) use ($store): bool {
-            $store[$k] = $v;
+            $store[$k] = \is_scalar($v) ? (string) $v : $v;
             $store['ttl:' . $k] = $ttl;
             return true;
         });

@@ -43,12 +43,14 @@ final class FileEditing implements Control
     public function report(bool $enabled): Report
     {
         if ($this->constants->defined(self::NAME)) {
-            if ($this->constants->value(self::NAME) === true) {
-                return new Report(State::Good, __('DISALLOW_FILE_EDIT is true: the theme and plugin editors are off.', 'wp-hardening'));
+            // WordPress checks the constant as truthy, so 1 turns the editors off as true does.
+            $value = $this->constants->value(self::NAME);
+            if ((bool) $value) {
+                return new Report(State::Good, \sprintf(__('DISALLOW_FILE_EDIT is %s: the theme and plugin editors are off.', 'wp-hardening'), self::shown($value)));
             }
             return new Report(
                 State::Recommended,
-                __('DISALLOW_FILE_EDIT is defined as false, most likely in wp-config.php. This plugin does not override it.', 'wp-hardening'),
+                \sprintf(__('DISALLOW_FILE_EDIT is defined as %s, most likely in wp-config.php. This plugin does not override it.', 'wp-hardening'), self::shown($value)),
                 [__('Change it to true in wp-config.php, with a copy of the file first: a syntax error there blanks the whole site.', 'wp-hardening')],
             );
         }
@@ -62,9 +64,15 @@ final class FileEditing implements Control
     public function plan(): array
     {
         if ($this->constants->defined(self::NAME)) {
-            $value = $this->constants->value(self::NAME) === true ? 'true' : 'false';
+            $value = self::shown($this->constants->value(self::NAME));
             return ["DISALLOW_FILE_EDIT is already defined as {$value} (wp-config.php); nothing changes."];
         }
         return ['Defines DISALLOW_FILE_EDIT as true on every request. The editors leave the dashboard; wp-config.php is not edited.'];
+    }
+
+    /** The constant's value as wp-config.php would spell it: true, false, 1, '0'. */
+    private static function shown(mixed $value): string
+    {
+        return \is_scalar($value) || $value === null ? var_export($value, true) : get_debug_type($value);
     }
 }

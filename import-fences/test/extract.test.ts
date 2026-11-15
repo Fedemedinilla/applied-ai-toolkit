@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { moduleRefs, namesOf, parse, reexports, stringsContaining } from '../src/extract.ts';
 
+const leaksOf = (code: string) => reexports(parse('a.ts', code), (s) => s === 'sdk').map((l) => l.text);
 const refs = (code: string, path = 'a.ts') => moduleRefs(parse(path, code)).map((r) => ({ kind: r.kind, specifier: r.specifier, typeOnly: r.typeOnly }));
 
 describe('moduleRefs', () => {
@@ -50,6 +51,25 @@ describe('moduleRefs', () => {
     ]);
   });
 
+  it('reads require() behind parentheses and through createRequire', () => {
+    expect(refs("const fs = (require)('node:fs');")).toEqual([{ kind: 'require', specifier: 'node:fs', typeOnly: false }]);
+    const viaCreate = [
+      "import { createRequire } from 'node:module';",
+      'const req = createRequire(import.meta.url);',
+      "export const sdk = req('sdk');",
+    ].join('\n');
+    expect(refs(viaCreate)).toEqual([
+      { kind: 'import', specifier: 'node:module', typeOnly: false },
+      { kind: 'require', specifier: 'sdk', typeOnly: false },
+    ]);
+    expect(refs("import { createRequire as cr } from 'module';\nlet r;\nr = 1;\nconst load = cr(import.meta.url);\nload('a');")[1]).toEqual({ kind: 'require', specifier: 'a', typeOnly: false });
+    expect(refs("import * as m from 'node:module';\nconst r = m.createRequire(import.meta.url);\nr('b');")[1]).toEqual({ kind: 'require', specifier: 'b', typeOnly: false });
+    expect(refs("import { createRequire } from 'node:module';\ncreateRequire(import.meta.url)('c');")[1]).toEqual({ kind: 'require', specifier: 'c', typeOnly: false });
+    expect(refs("const { createRequire } = require('node:module');\nconst r = createRequire(__filename);\nr(name);")[1]).toEqual({ kind: 'require', specifier: null, typeOnly: false });
+    expect(refs("import { createRequire } from './local.ts';\nconst r = createRequire(1);\nr('d');")).toHaveLength(1);
+    expect(leaksOf("import { createRequire } from 'node:module';\nconst req = createRequire(import.meta.url);\nexport const C = req('sdk').Client;")).toEqual(["C = req('sdk').Client"]);
+  });
+
   it('treats a template without ${} as a literal and one with ${} as computed', () => {
     expect(refs('await import(`./fixed.ts`);')[0]?.specifier).toBe('./fixed.ts');
     expect(refs('await import(`./locale/${lang}.ts`);')[0]?.specifier).toBeNull();
@@ -82,6 +102,15 @@ describe('moduleRefs', () => {
       { kind: 'dynamic', specifier: 'split', typeOnly: false },
       { kind: 'import', specifier: 'multi', typeOnly: false },
     ]);
+  });
+
+  it('counts lines the way git and editors do: U+2028 in a string is not a break, a BOM is not a column', () => {
+    const at = (code: string) => moduleRefs(parse('a.ts', code)).map((r) => [r.line, r.column]);
+    expect(at("const s = 'a b c';\nimport x from 'pkg';\n")).toEqual([[2, 1]]);
+    expect(at("﻿import x from 'pkg';")).toEqual([[1, 1]]);
+    expect(at("﻿const a = 1;\r\n  import x from 'pkg';")).toEqual([[2, 3]]);
+    const leak = reexports(parse('a.ts', "import C from 'pkg';\nconst s = ' ';\nexport default C;"), (s) => s === 'pkg');
+    expect(leak.map((l) => [l.line, l.column])).toEqual([[3, 1]]);
   });
 
   it('keeps a Vite query suffix in the specifier', () => {
@@ -122,6 +151,26 @@ describe('reexports', () => {
     expect(leaks("import { C } from 'sdk';\nexport class X extends C {}")).toEqual(['export class X extends C {}']);
     expect(leaks("import { C } from 'sdk';\nexport default class extends C {}")).toEqual(['export default class extends C {}']);
     expect(leaks("import * as sdk from 'sdk';\nclass X extends sdk.C {}\nexport { X };")).toEqual(['X']);
+  });
+
+  it('follows a value wrapped in an object or array literal', () => {
+    expect(leaks("const { Client } = require('sdk');\nmodule.exports = { Client };")).toEqual(['module.exports = { Client };']);
+    expect(leaks("import { Client } from 'sdk';\nexport default { Client };")).toEqual(['export default { Client };']);
+    expect(leaks("import { Client } from 'sdk';\nexport const api = { Client };")).toEqual(['api = { Client }']);
+    expect(leaks("import * as sdk from 'sdk';\nexport const api = { make: sdk.Client, n: 1 };")).toEqual(['api = { make: sdk.Client, n: 1 }']);
+    expect(leaks("import * as sdk from 'sdk';\nexport const api = { ...sdk };")).toEqual(['api = { ...sdk }']);
+    expect(leaks("import { Client } from 'sdk';\nexport const all = [Client];")).toEqual(['all = [Client]']);
+    expect(leaks("import { Client } from 'sdk';\nconst api = { nested: { Client } };\nexport { api };")).toEqual(['api']);
+    expect(leaks("module.exports = { Client: require('sdk').Client };")).toEqual(["module.exports = { Client: require('sdk').Client };"]);
+    expect(leaks("import { Client } from 'sdk';\nexport const api = { n: 1, f() { return 2; } };")).toEqual([]);
+  });
+
+  it('follows export import = require() and export import of a member', () => {
+    expect(leaks("export import sdk = require('sdk');")).toEqual(["export import sdk = require('sdk');"]);
+    expect(leaks("import sdk = require('sdk');\nexport import C = sdk.Client;")).toEqual(['export import C = sdk.Client;']);
+    expect(leaks("import * as sdk from 'sdk';\nimport C = sdk.Client;\nexport { C };")).toEqual(['C']);
+    expect(leaks("export import type T = require('sdk');")).toEqual([]);
+    expect(leaks("export import other = require('other');")).toEqual([]);
   });
 
   it('lets types and unrelated modules leave', () => {

@@ -201,4 +201,14 @@ describe('find_order', () => {
     expect(orderOf(found)).toEqual(placed);
     expect(await findOrder(db, key(), 'shop-1')).toEqual({ outcome: 'not_found' });
   });
+
+  it.each<[string, string | null]>([
+    ['a NULL customer', null],
+    ['an empty customer', ''],
+    ['a customer over 64 characters', 'c'.repeat(65)],
+  ])('raises 22023 for %s instead of showing the key\'s order', async (_, customer) => {
+    const k = key();
+    await place(db, k, 'shop-1', cart());
+    await expect(findOrder(db, k, customer as string)).rejects.toMatchObject({ code: '22023' });
+  });
 });

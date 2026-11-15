@@ -11,7 +11,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { reportsDir } from './files.ts';
+import { parseJson, reportsDir } from './files.ts';
 import { ENTITY_NAMES } from './schemas.ts';
 
 export const STAGES = ['schema', 'rules', 'references'] as const;
@@ -149,7 +149,7 @@ export async function loadReports(dir: string): Promise<LoadedReports> {
   for (const file of files) {
     let json: unknown;
     try {
-      json = JSON.parse(await readFile(join(folder, file), 'utf8'));
+      json = parseJson(await readFile(join(folder, file), 'utf8'));
     } catch {
       invalid.push(file);
       continue;
@@ -163,7 +163,15 @@ export async function loadReports(dir: string): Promise<LoadedReports> {
 
 const pct = (x: number): string => `${(x * 100).toFixed(0)}%`;
 
+/** C0 and C1 control characters, shown escaped: a report's text can quote what the model wrote. */
+const printable = (line: string): string =>
+  line.replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
 export function formatRun(r: RunReport): string[] {
+  return runLines(r).map(printable);
+}
+
+function runLines(r: RunReport): string[] {
   const lines = [
     `${r.entity} ${r.promptVersion}: ${r.accepted.length} of ${r.requested} accepted (${pct(r.passRate)}), ${r.returned} returned${r.ignored > 0 ? `, ${r.ignored} past the count ignored` : ''}`,
   ];

@@ -9,12 +9,23 @@ export interface Located {
   readonly text: string;
 }
 
+/** The sample logo is checked but could not be fetched, so the PDF has none. */
+export const SAMPLE_LOGO_MISSING: Located = {
+  field: 'logo-sample',
+  text: 'No se pudo cargar el logo de ejemplo; el PDF salió sin logo.',
+};
+
 const NAMES: Record<string, string> = {
   number: 'Número',
   'shop.name': 'Nombre del negocio',
   'customer.name': 'Nombre del cliente',
   notes: 'Aclaraciones',
   footer: 'Pie de página',
+  issuedOn: 'Fecha',
+  deliveryOn: 'Entrega',
+  shippingCents: 'Envío',
+  previousBalanceCents: 'Saldo anterior',
+  items: 'Productos',
 };
 
 const IDS: Record<string, string> = {
@@ -45,12 +56,18 @@ export function locate(path: string, rows: readonly RowRef[]): { name: string; i
     const index = Number(item[1]);
     const { id: row, position } = rows[index] ?? { id: index, position: index + 1 };
     const part = item[2];
+    // A path with no part ("items[2]") is about the row's subtotal, which the price drives.
     const id =
       part === 'detail' ? FIELD.itemDetail(row)
       : part === 'quantity' ? FIELD.itemQuantity(row)
-      : part === 'unitPriceCents' ? FIELD.itemUnitPrice(row)
+      : part === 'unitPriceCents' || part === undefined ? FIELD.itemUnitPrice(row)
       : FIELD.itemName(row);
-    const what = part === 'detail' ? 'detalle' : part === 'quantity' ? 'cantidad' : part === 'unitPriceCents' ? 'precio' : 'nombre';
+    const what =
+      part === 'detail' ? 'detalle'
+      : part === 'quantity' ? 'cantidad'
+      : part === 'unitPriceCents' ? 'precio'
+      : part === undefined ? 'subtotal'
+      : 'nombre';
     return { name: `Producto ${position}, ${what}`, id };
   }
   const party = PARTY_LINE.exec(path);
@@ -89,6 +106,13 @@ export function warningText(w: ReceiptWarning, rows: readonly RowRef[]): Located
 }
 
 export function inputErrorText(e: ReceiptInputError, rows: readonly RowRef[]): Located {
+  // The two sums are reported on a field path, but they are about the whole order.
+  if (e.code === 'amount_too_large' && e.field === 'items') {
+    return { field: null, text: 'La suma de los productos es demasiado grande.' };
+  }
+  if (e.code === 'amount_too_large' && e.field === 'shippingCents') {
+    return { field: FIELD.shipping, text: 'El total del remito es demasiado grande.' };
+  }
   const { name, id } = locate(e.field, rows);
   const why =
     e.code === 'amount_too_large' ? 'el importe es demasiado grande'

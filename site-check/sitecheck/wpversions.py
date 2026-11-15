@@ -91,7 +91,7 @@ def branch_of(version: str) -> str | None:
 WP_MAJOR_MIN = 3
 WP_MAJOR_MAX = 9
 
-# Spanish, for the console and datos.json meta.aviso_wordpress.
+# Spanish, for the console and run.json meta.aviso_wordpress.
 TABLE_STALE_NOTE = (
     "La tabla de versiones de WordPress no tiene la rama {rama}: actualizar wpversions.py "
     "(se verificó por última vez el {fecha})."

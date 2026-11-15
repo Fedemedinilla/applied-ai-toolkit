@@ -40,6 +40,14 @@ function spell(n: number): string {
   return [head, rest ? spellBelowThousand(rest) : ''].filter(Boolean).join(' ');
 }
 
+/** 1..999.999.999: "un millon doscientos cincuenta mil", "veintiun millones cuatrocientos". */
+function spellMillions(n: number): string {
+  const millions = Math.floor(n / 1_000_000);
+  const rest = n % 1_000_000;
+  const head = millions === 0 ? '' : millions === 1 ? 'un millon' : `${spellBelowThousand(millions, true)} millones`;
+  return [head, rest ? spell(rest) : ''].filter(Boolean).join(' ');
+}
+
 function withoutSpans(r: ReturnType<typeof parseAmount>) {
   if (r === null) return null;
   const { spans: _spans, ...rest } = r;
@@ -78,6 +86,21 @@ describe('numbers written the Argentine way', () => {
     fc.assert(
       fc.property(fc.integer({ min: 3, max: 999_999 }), (n) => {
         const phrase = `pague ${spell(n)} de luz`;
+        expect(parseAmount(phrase)?.value, phrase).toBe(n);
+      }),
+      { numRuns: 3000 },
+    );
+  });
+
+  it('an integer in the millions spelled out in words parses back to the integer', () => {
+    // Left out: a million followed by a bare group under a thousand ("un millon doscientos"). That
+    // is said for 1.200.000, not 1.000.200, and the corpus pins the colloquial reading.
+    const standard = fc
+      .integer({ min: 1_000_000, max: 999_999_999 })
+      .filter((n) => n % 1_000_000 === 0 || n % 1_000_000 >= 1000);
+    fc.assert(
+      fc.property(standard, (n) => {
+        const phrase = `pague ${spellMillions(n)} de luz`;
         expect(parseAmount(phrase)?.value, phrase).toBe(n);
       }),
       { numRuns: 3000 },

@@ -2,7 +2,7 @@
 
 A deterministic parser that reads one money amount from a sentence written or dictated in Rioplatense Spanish. It has three answers: a number, no amount, or `ambiguous: true` with a reason so the app asks instead of guessing. "vendí 3 docenas a 12 mil la docena" is 36000. "vendí 5 tortas a 8000" is a question: 8000 each and 8000 for the lot are both common readings, and a native speaker cannot tell either.
 
-No model and no runtime dependencies, and `src/` is browser-safe. Extracted from production work with its 165-phrase corpus, which is the spec.
+No model and no runtime dependencies, and `src/` is browser-safe. Extracted from production work with its corpus, which is the spec: 165 phrases from that work and 29 from an audit of this copy.
 
 ## Run it
 
@@ -34,7 +34,7 @@ const r = parseAmount('vendí 5 tortas a 8000');
 if (r?.ambiguous) askTheUser(r.reason, r.spans);
 ```
 
-`parseAmount(text, slang?)` returns `null` (no amount), or a `ParsedAmount` with `value`, `ambiguous`, `reason`, `approximate`, `quantity`, `unitPrice`, `literal`, `source` and `spans`. `slang` adds scale words and overrides built-in ones, for example `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key: `{ gamba: 200 }` leaves the built-in "gambas" at 100. The other exports are `parseNumber`, `normalize` and `BASE_SCALES`.
+`parseAmount(text, slang?)` returns `null` (no amount), or a `ParsedAmount` with `value`, `ambiguous`, `reason`, `approximate`, `quantity`, `unitPrice`, `literal`, `source` and `spans`. `slang` adds scale words and overrides built-in ones, for example `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key: `{ gamba: 200 }` leaves the built-in "gambas" at 100. Keys are normalized like the sentence, so `{ Quinás: 500 }` matches "quinas". A value that is not a finite number above zero throws a `RangeError` instead of coming back as an amount. The other exports are `parseNumber`, `normalize` and `BASE_SCALES`.
 
 ## Why this is not a model call
 
@@ -46,31 +46,31 @@ Where a model is involved, it picks the fragment of a message that talks about m
 
 ## The families
 
-The corpus has 165 phrases in 15 families. The first 126 came from sweeping seven phrasing families. An adversarial review followed, in which every phrase had to be something a person would say and a second reader recomputed every expected value. Sixteen were dropped for sounding synthetic. The other 39 came from a red-team read of the parser, in eight new families. Eight of those cases are controls, sentences that already worked and had to keep working, marked CONTROL in their notes.
+The corpus has 194 phrases in 15 families. The first 126 came from sweeping seven phrasing families. An adversarial review followed, in which every phrase had to be something a person would say and a second reader recomputed every expected value. Sixteen were dropped for sounding synthetic. The other 39 came from a red-team read of the parser, in eight new families. Eight of those cases are controls, sentences that already worked and had to keep working, marked CONTROL in their notes. The last 29 came from an audit of this copy on 2026-11-15, each a sentence the parser misread, with 7 controls.
 
 | Family | Cases | Example | Result |
 |---|---|---|---|
-| `quantity-unit-price` | 17 | compre 3 docenas de facturas a 12 mil la docena | 36000 |
-| `slang-and-fuzzy-amounts` | 18 | le pague 30 lucas y pico al gasista | 30000, approximate |
-| `voice-transcription` | 19 | eh gaste veinte no pera treinta mil en nafta | 30000 |
-| `income-verbs` | 17 | me pagaron 3 fletes a 25 lucas | ask: `unit_or_total` |
+| `quantity-unit-price` | 20 | compre 3 docenas de facturas a 12 mil la docena | 36000 |
+| `slang-and-fuzzy-amounts` | 25 | le pague 30 lucas y pico al gasista | 30000, approximate |
+| `voice-transcription` | 24 | eh gaste veinte no pera treinta mil en nafta | 30000 |
+| `income-verbs` | 19 | me pagaron 3 fletes a 25 lucas | ask: `unit_or_total` |
 | `noisy-numbers` | 18 | emiti la factura 1234 por 89 mil | 89000 |
-| `dates-and-tense` | 20 | el jueves 12 gaste 12 lucas en insumos | 12000 |
-| `multi-and-edge` | 17 | compre 3 bolsas de cemento a 9500 cada una mas 4 mil de flete | 32500 |
+| `dates-and-tense` | 21 | el jueves 12 gaste 12 lucas en insumos | 12000 |
+| `multi-and-edge` | 25 | compre 3 bolsas de cemento a 9500 cada una mas 4 mil de flete | 32500 |
 | `loose-scale-words` | 8 | el arreglo me salio un par de palos | 2000000 |
 | `instalments-and-financing` | 8 | compre el horno en 18 cuotas fijas de 40 mil | 720000 |
 | `tax-and-discounts` | 7 | el proveedor me cobro 200 mil mas el 21 de iva | ask: `tax_unclear` |
 | `foreign-currency` | 5 | vendi la camioneta en 20 mil dolares | ask: `foreign_currency` |
 | `comma-enumeration` | 3 | pague la luz 45 mil, el gas 12 mil | 57000 |
-| `ranges` | 3 | el gasista me pidio de 80 mil a 100 mil | ask: `range` |
-| `count-and-price` | 3 | me devolvieron 3 remeras de 12 mil | ask: `unit_or_total` |
+| `ranges` | 5 | el gasista me pidio de 80 mil a 100 mil | ask: `range` |
+| `count-and-price` | 4 | me devolvieron 3 remeras de 12 mil | ask: `unit_or_total` |
 | `reference-amounts` | 2 | de los 80 mil me devolvieron 20 mil | 20000 |
 
 The ten reasons for asking are `unit_or_total`, `open_remainder` ("un palo y pico"), `range`, `discount_unclear`, `tax_unclear`, `mixed_directions` (money in and out in one sentence), `net_or_gross`, `instalments` ("6 cuotas sin interés de 25 lucas"), `several_quantities` and `foreign_currency`. The last is the one case where the reading is clear. The caller stores one fixed currency, so a figure said in dollars would be filed as that many pesos.
 
 ## The corpus is the spec
 
-[`corpus/corpus.json`](corpus/corpus.json) holds each phrase with its family, the expected `total`, `quantity` and `unit_price`, whether it is `ambiguous`, and a note saying why that is the right answer. The 39 red-team cases also record what the earlier version of the parser returned (`earlier_parser`). Each fix can be read next to the defect it closed. For "se me fueron 30 y pico de lucas" the field says 1000, and for "18 cuotas fijas de 40 mil" it says 40000.
+[`corpus/corpus.json`](corpus/corpus.json) holds each phrase with its family, the expected `total`, `quantity` and `unit_price`, whether it is `ambiguous`, and a note saying why that is the right answer. The 39 red-team cases and the 29 audit cases (`source: "audit"`) also record what the earlier version of the parser returned (`earlier_parser`). Each fix can be read next to the defect it closed. For "se me fueron 30 y pico de lucas" the field says 1000, and for "18 cuotas fijas de 40 mil" it says 40000.
 
 A change to the parser is done when every corpus phrase passes. A new rule starts as a phrase in the corpus, with its control.
 
@@ -99,26 +99,73 @@ The two source versions of the corpus did not disagree. The earlier 126 phrases 
 | File | Covers |
 |---|---|
 | `test/corpus.test.ts` | Every corpus phrase, grouped by family, with the source's acceptance rule, plus quantity and unit price whenever the parser multiplies; the known conflict; a per-family score |
-| `test/regressions.test.ts` | The 39 hand-written cases from the source's test table (identical in both versions), grouped by the audit that found them, each checked as a number, a question or no amount; and the 14 red-team phrases with what the earlier copy returned |
+| `test/regressions.test.ts` | The 39 hand-written cases from the source's test table (identical in both versions), grouped by the audit that found them, each checked as a number, a question or no amount; the 14 red-team phrases with what the earlier copy returned; words that name an `Object.prototype` key; the caller's `slang` |
 | `test/reference.test.ts` | Output identical to the source parser on 212 phrases, field for field |
-| `test/properties.test.ts` | fast-check: an integer formatted the Argentine way (`1.234.567`, `1.234,56`) parses back to itself; integers up to 999999 spelled out in words parse back; "mil" after a figure multiplies it by a thousand; "y pico" never returns an exact value; `normalize` is idempotent; arbitrary Unicode never throws; capitals and extra spaces do not change the result |
+| `test/properties.test.ts` | fast-check: an integer formatted the Argentine way (`1.234.567`, `1.234,56`) parses back to itself; integers up to 999999 spelled out in words parse back, and so do millions up to 999.999.999 except the colloquial "un millon doscientos" shape the corpus pins; "mil" after a figure multiplies it by a thousand; "y pico" never returns an exact value; `normalize` is idempotent; arbitrary Unicode never throws; capitals and extra spaces do not change the result |
 | `test/numbers.test.ts` | `parseNumber` on separators, including the dot as a decimal point ("1.5", "250000.00") |
 | `test/spans.test.ts` | Roles and offsets for each kind of result, and that every span is a slice of the input |
 | `test/limits.test.ts` | The known limits below, pinned as they behave today |
 | `test/package.test.ts` | The CLI on stdin and arguments, with one set of keys for every answer; `src/` imports only its own files (static, side-effect and dynamic imports), uses no Node API and no regex lookbehind, for Safari before 16.4 |
 
-480 tests, all offline.
+525 tests, all offline.
+
+## Mutation testing
+
+```sh
+npm run mutation:amount-parser   # StrykerJS over src/money.ts, numbers.ts and tokens.ts; 7 to 9 minutes on 4 cores
+```
+
+Stryker changes the code one small edit at a time and runs this folder's tests against each mutant; a mutant that survives is a line a bug could change with no test failing. `vocabulary.ts` is left out: it is tables of words, and the corpus is its test. The report goes to `reports/mutation/amount-parser/`.
+
+Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+
+| File | Mutants | Killed | Timeout | Survived | Not covered | Score |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/money.ts` | 1100 | 769 | 0 | 313 | 18 | 69.91% |
+| `src/numbers.ts` | 169 | 132 | 1 | 34 | 2 | 78.70% |
+| `src/tokens.ts` | 391 | 299 | 10 | 77 | 5 | 79.03% |
+| All three | 1660 | 1200 | 11 | 424 | 25 | 72.95% |
+
+A timeout counts as detected: the mutant made a loop run forever. That run took 9 minutes with other jobs on the same cores; the first one, at 72.65% before the new cases below, took 6.6 minutes alone.
+
+The run showed four untested separator rules in `parseNumber`, each now a test: a comma at the start, a dot at the start before a comma, more than one dot, and three digits after a dot that is not the last group.
+
+The survivors are not claimed as equivalent. The corpus pins the reading of 194 sentences end to end (165 when this was measured), and a sentence checks the branches it goes through together, not one at a time. What that leaves open, by area:
+
+- **`money.ts`.** About 220 of its survivors are a single condition, comparison or `&&` inside the rules that pick among several figures in a sentence. A mutant there changes the reading of a sentence shape the corpus does not have. About 45 are strings: the `literal` of a result and the role of a span, which few tests compare.
+- **`numbers.ts`.** `readWordNumber` after a million ("un millón doscientos"): the conditions that treat the next group as thousands survive, so that reading rests on few corpus sentences.
+- **`tokens.ts`.** Offsets of spans after a normalization that changes the length of the text, and the tokenizer's handling of signs that the corpus rarely uses.
+
+The way to raise the score is more corpus sentences per family, not unit tests of private branches: a new sentence is also a new line of the spec.
+
+`thresholds.break` in `stryker.config.json` is 70: a run below it exits non-zero. The weekly workflow `.github/workflows/quality.yml` runs it.
+
+## Benchmarks
+
+```sh
+npm run bench            # every bench of the repository, about 15 seconds; writes reports/bench/result.json
+npm run bench:compare    # compares the run with test/bench/baseline.json; exit 1 on a regression beyond 50%
+```
+
+| Bench | One iteration | Median |
+| --- | --- | --- |
+| `amount-parser/parse-corpus` | `parseAmount` over the 165 corpus phrases | 3.30 ms (20 µs per phrase) |
+
+Measured on 2026-11-14 with Node 24.22.1 on 4 cores of a shared cloud container (Intel Xeon at 2.30 GHz). The milliseconds are that machine's on that day; [`test/bench/README.md`](../test/bench/README.md) explains how a run is compared with the baseline on another machine, and the limits of that comparison.
+
+`test/parse.bench.ts` is the bench the comparison reads. `node amount-parser/bench.ts` is the older standalone script, kept for a number without Vitest; the 27 µs per phrase quoted above is its number, from an earlier run.
 
 ## Limits
 
-- **`CORRECTION_MARKERS` includes "no" and "para".** They are there for spoken self-corrections ("gasté veinte, no, pará, treinta mil"), and both are also ordinary words. When one of them sits between two figures, everything before it is dropped. "gaste 5 mil para la fiesta y 3 mil de envio" returns 3000 instead of 8000, and "pague 20 mil de luz y no 30 mil" returns 30000. Removing them would break the dictated corrections in the corpus, so the fix needs corpus cases for both readings first. `test/limits.test.ts` pins the current behaviour.
-- Idioms are matched as substrings. "dos pesos" means next to nothing, so "pague doscientos dos pesos" returns no amount.
+- **`CORRECTION_MARKERS` includes "no" and "para".** They are there for spoken self-corrections ("gasté veinte, no, pará, treinta mil"), and both are also ordinary words. When one of them sits between two figures, everything before it is dropped. "gaste 5 mil para la fiesta y 3 mil de envio" returns 3000 instead of 8000, and "pague 20 mil de luz y no 30 mil" returns 30000. Removing them would break the dictated corrections in the corpus, so the fix needs corpus cases for both readings first. `test/limits.test.ts` pins the current behaviour. Two more ordinary words in the set, "mejor" and "digo", count only right before the new figure ("mejor dicho treinta", "digo treinta"). So "le pagué 10 mil al mejor gasista y 5 mil de repuestos" keeps its 15000.
+- Idioms are matched as whole words, and they also match inside a longer number. "dos pesos" means next to nothing, so "pague doscientos dos pesos" returns no amount. An idiom vetoes the sentence only when no other figure names the amount: "pagué 80 mil a una banda" is 80000.
 - A zero passes as a value ("gaste 0 pesos" returns 0), and a minus sign is dropped. Callers that store amounts should reject values that are not positive.
 - Fullwidth digits are not read as digits. "gaste ２０ mil" skips the "２０" and returns 1000 for the bare "mil". Folding them with NFKC in `normalize` would fix it, as a deliberate change with corpus cases.
 - "x" is not read as multiplication: "pague 2 mil x 3" returns 2000.
 - "4 cuotas a 90 mil" returns 90000 (one instalment), while "4 pagos a 90 mil" asks `unit_or_total`. The instalments step needs "de" after the count, and the next step skips only the literal "cuota(s)". The source behaves the same way, and changing it needs corpus cases for both nouns.
 - "1e5" splits into 1 and 5 joined by "e", which is also a conjunction, and returns 6. Scientific notation is not something people type into an expense note, but the parser does not reject it.
+- A figure up to 10000 followed by an ordinary word reads as a count ("5 tortas"). When it is the only figure, it is the amount only right after a verb whose object is money and from 100 up: "gasté 3500 ayer" is 3500. "gasté ayer 3500 nafta" and "3500 nafta" still return no amount.
 - One amount per sentence. Two movements ("pague 5 mil de luz y 3 mil de gas") come back as their sum, and money in and out together is refused as `mixed_directions`, not split.
 - The vocabulary is Rioplatense Spanish only. Other Spanish varieties use other slang and, in some countries, the opposite separators.
 - Currencies with an ordinary homograph ("reales", "libras") are not detected, on purpose. A false alarm on "el precio real" would cost more than it saves.
-- The corpus is 165 phrases. It covers the shapes that came up in use and the ones found by reading the parser for weak spots. A phrasing outside them can still switch a rule off.
+- The corpus is 194 phrases. It covers the shapes that came up in use and the ones found by reading the parser for weak spots. A phrasing outside them can still switch a rule off.

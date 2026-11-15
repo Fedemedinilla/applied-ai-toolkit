@@ -35,6 +35,11 @@ describe('production build', () => {
     expect(files).toContain('logo-ejemplo.png');
   });
 
+  it('writes the three brand fonts the shared stylesheet loads', () => {
+    const fonts = walk(out).filter((f) => f.endsWith('.woff2')).map((f) => f.replace(/^assets\/|-[\w-]{8}\.woff2$/gu, '')).sort();
+    expect(fonts).toEqual(['plex-mono-400', 'plex-sans-400', 'plex-serif-500']);
+  });
+
   it('uses relative URLs only, so it works under any subpath', () => {
     const html = readFileSync(join(out, 'index.html'), 'utf8');
     const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/gu)].map((m) => m[1] ?? '');

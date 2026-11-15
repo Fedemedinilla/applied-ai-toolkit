@@ -1,7 +1,7 @@
 // The pieces on their own: link stripping, the limiter and the Resend adapter.
 
 import { describe, expect, it } from 'vitest';
-import { createLimiter, EMAIL, greeting, htmlDocument, quote, resendTransport, stripLinks, TransportError } from '../src/index.ts';
+import { createLimiter, EMAIL, greeting, htmlDocument, paragraphs, quote, resendTransport, stripLinks, TransportError } from '../src/index.ts';
 import { FAKE_KEY, fakeResend } from './helpers/fake-resend.ts';
 
 describe('stripLinks', () => {
@@ -13,6 +13,9 @@ describe('stripLinks', () => {
     ['[click](https://evil.example)', 'click'],
     ['mail me at someone@evil.example', 'mail me at someone@[x]'],
     ['пример.рф', '[x]'],
+    ['visit उदाहरण.भारत/login now', 'visit [x] now'],
+    ['see இலங்கை.இலங்கை/x', 'see [x]'],
+    ['see cafe\u0301.com/login', 'see [x]'],
     ['xn--e1afmkfd.xn--p1ai', '[x]'],
     ['wait...evil.ru', 'wait...[x]'],
     ['evil.co/a?b=c', '[x]'],
@@ -36,9 +39,24 @@ describe('quote and greeting', () => {
     expect(quote(s, 18, '[x]')).toBe(`${'a'.repeat(10)} [x]`);
   });
 
+  const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  it('a cut through an emoji leaves no lone surrogate', () => {
+    expect(quote('😀'.repeat(5), 3, '[l]')).toBe('😀…');
+    expect(greeting('😀😀😀', 3, '')).toBe('😀');
+    expect(lone.test(quote(`${'a'.repeat(299)}😀 more`, 300, '[l]'))).toBe(false);
+  });
+
   it('greeting is one line and falls back when only links were there', () => {
     expect(greeting('Ana\nMaría', 32, 'there')).toBe('Ana María');
     expect(greeting('www.evil.example', 32, 'there')).toBe('there');
+  });
+});
+
+describe('paragraphs', () => {
+  it('CRLF and lone CR line endings, as native form posts send them, keep their paragraphs', () => {
+    const p = (x: string) => `<p style="margin:0 0 14px">${x}</p>`;
+    expect(paragraphs('a\r\n\r\nb\r\nc')).toBe(`${p('a')}${p('b<br>c')}`);
+    expect(paragraphs('a\r\rb')).toBe(`${p('a')}${p('b')}`);
   });
 });
 
@@ -71,6 +89,18 @@ describe('createLimiter', () => {
     expect(limited('b')).toBe(false);
     t = 1000;
     expect(limited('a')).toBe(false);
+  });
+
+  it('refund gives back the last attempt of a key, and does nothing for an unknown one', () => {
+    let t = 0;
+    const limited = createLimiter({ max: 1, windowMs: 1000 }, () => t);
+    expect(limited('a')).toBe(false);
+    limited.refund('a');
+    expect(limited('a')).toBe(false);
+    expect(limited('a')).toBe(true);
+    limited.refund('nobody');
+    t = 10;
+    expect(limited('a')).toBe(true);
   });
 });
 

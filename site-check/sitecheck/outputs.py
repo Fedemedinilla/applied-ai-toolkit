@@ -1,26 +1,32 @@
-"""Run folder, datos.json, 00-tiempo.txt and the final sweeps of the outputs.
+"""Run folder, run.json, 00-time.txt and the final sweeps of the outputs.
 
 Folder: ``<root>/<registrable>/<YYYY-MM-DD>/`` (local Buenos Aires date); if it
 exists, ``<date>-2``, ``-3``... Evidence is NEVER overwritten. The root is --out,
 else the SITE_CHECK_OUT environment variable, else ./site-check-runs
 (config.default_output_root). Files:
 
-* datos.json (schema below), informe.md (the report) and anexo-tecnico.md
+* run.json (the stored run), report.md (the report) and technical-annex.md
   (the technical annex);
-* 00-tiempo.txt: start and end, local time;
-* evidencia/: requests.log and every artifact (artifacts.py). Deleted by
+* 00-time.txt: start and end, local time;
+* evidence/: requests.log and every artifact (artifacts.py). Deleted by
   prune_old_evidence at the start of a later run once its folder's date is more
   than EVIDENCE_RETENTION_DAYS old: raw pages can carry pictures and names of
   people, and the report does not need them after the review window. Nothing
   else of the run folder is ever deleted.
 
-datos.json (schema_version 1; json.dumps(sort_keys=True, ensure_ascii=False, indent=2)).
-Keys are Spanish, like the report they feed:
+Runs written before the rename (schema_version 1) used datos.json, informe.md,
+anexo-tecnico.md, 00-tiempo.txt and evidencia/. They are still read
+(read_datos, the retention), never written.
+
+The run on disk is schema_version 2: English names, published as
+schema/run.schema.json. Inside the package the run is a dict with the names
+the rules were written with ("datos"); runformat.py translates at this
+boundary, in both directions, and lists every rename. The internal layout:
   schema_version;
   meta: version_script, version_python, version_openssl, version_expat,
         url_entrada, dominio (D), url_canonica (H), url_interna (I),
-        origen_interna, institucion, tipo, para, inicio_utc, fin_utc,
-        inicio_local, fin_local, user_agent, pedidos {por tipo y resultado},
+        origen_interna, institucion, tipo, para, idioma_informe, inicio_utc,
+        fin_utc, inicio_local, fin_local, user_agent, pedidos {por tipo y resultado},
         eventos_desafio, sitio_cortado, tope_agotado, clave ("presente"/"ausente"),
         corridas_psi {pedidas, validas, computadora_valida}, version_lighthouse,
         alcance (ScopeGuard.describe, with e-mails and long digit runs masked),
@@ -40,7 +46,7 @@ Keys are Spanish, like the report they feed:
            rehecho (only after --rerender: {fecha_local, desde})}.
 No e-mail address from the site (except the institutional role addresses VIS-21
 names), no phone number, no RDAP entity, no key ever: the pipeline masks e-mail
-addresses in every string of datos.json before writing (any found counts as a
+addresses in every string of the run before writing (any found counts as a
 text-control failure, exit 4).
 """
 
@@ -57,18 +63,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from . import SCHEMA_VERSION
+from . import runformat
 from .fmt import ART
 
 if TYPE_CHECKING:
     from .credentials import Redactor
 
-DATOS = "datos.json"
-INFORME = "informe.md"
-ANEXO = "anexo-tecnico.md"  # the technical annex, apart from the short report
-TIEMPO = "00-tiempo.txt"
-EVIDENCIA = "evidencia"
+DATOS = "run.json"  # the stored run (schema_version 2)
+INFORME = "report.md"
+ANEXO = "technical-annex.md"  # the technical annex, apart from the short report
+TIEMPO = "00-time.txt"
+EVIDENCIA = "evidence"
 REQUESTS_LOG = "requests.log"
+BACKUP_STEM = "run"  # --rerender keeps the earlier run.json as run-<n>.json
+# The names of a run written before the rename (schema_version 1): read, never written.
+LEGACY_DATOS = "datos.json"
+LEGACY_TIEMPO = "00-tiempo.txt"
+LEGACY_EVIDENCIA = "evidencia"
+EVIDENCE_DIRS = (EVIDENCIA, LEGACY_EVIDENCIA)
 
 # Evidence retention: the evidencia/ folder of a run whose folder date is more
 # than this many days before today is deleted at the start of the next run. Only
@@ -116,7 +128,7 @@ class RunPaths:
 
 
 def create_run_dir(salidas: Path, registrable: str, run_date: dt.date) -> RunPaths:
-    """Create ``salidas/<registrable>/<date>[-n]/evidencia/`` (never reusing a folder) and return its paths."""
+    """Create ``salidas/<registrable>/<date>[-n]/evidence/`` (never reusing a folder) and return its paths."""
     if not _SAFE_COMPONENT_RE.match(registrable or "") or ".." in registrable:
         raise ValueError(f"unsafe registrable domain for a folder name: {registrable!r}")
     base = Path(salidas) / registrable
@@ -138,7 +150,7 @@ def create_run_dir(salidas: Path, registrable: str, run_date: dt.date) -> RunPat
 
 @dataclass
 class PruneResult:
-    """What prune_old_evidence did: the evidencia/ folders removed and the ones that could not be."""
+    """What prune_old_evidence did: the evidence folders removed and the ones that could not be."""
 
     removed: list[Path] = dataclasses.field(default_factory=list)
     failed: list[Path] = dataclasses.field(default_factory=list)
@@ -175,12 +187,14 @@ def _run_date_of(name: str) -> dt.date | None:
 
 
 def prune_old_evidence(root: Path, today: dt.date, *, days: int = EVIDENCE_RETENTION_DAYS) -> PruneResult:
-    """Delete ``<root>/<domain>/<YYYY-MM-DD>[-n]/evidencia/`` of runs more than ``days`` days before ``today``.
+    """Delete ``<root>/<domain>/<YYYY-MM-DD>[-n]/evidence/`` of runs more than ``days`` days before ``today``.
 
+    Also ``evidencia/``, the name of that folder in runs written before the
+    rename: the retention is a privacy rule and covers every run on disk.
     Only that subfolder of a run folder, and only when the run folder looks like
-    one this tool wrote (datos.json, 00-tiempo.txt or evidencia/requests.log is
-    there). Never anything else: not informe.md or datos.json, not a file
-    outside a run folder, not the exclusion list. Links are never followed:
+    one this tool wrote (run.json, 00-time.txt or requests.log in the evidence
+    folder is there, under either set of names). Never anything else: not
+    report.md or run.json, not a file outside a run folder, not the exclusion list. Links are never followed:
     a domain folder, a run folder or an evidencia that is a symlink or a
     junction is left alone, and shutil.rmtree removes a link inside evidencia
     without entering it. A folder name that is not a domain or a date is
@@ -197,43 +211,45 @@ def prune_old_evidence(root: Path, today: dt.date, *, days: int = EVIDENCE_RETEN
             day = _run_date_of(run_dir.name)
             if day is None or (today - day).days <= days:
                 continue
-            evidence = run_dir / EVIDENCIA
-            if _is_link(evidence) or not evidence.is_dir():
-                continue
-            if not any(p.is_file() for p in (run_dir / DATOS, run_dir / TIEMPO, evidence / REQUESTS_LOG)):
-                continue
-            try:
-                shutil.rmtree(evidence)
-            except OSError:
-                result.failed.append(evidence)
-                continue
-            result.removed.append(evidence)
+            markers = [run_dir / name for name in (DATOS, TIEMPO, LEGACY_DATOS, LEGACY_TIEMPO)]
+            for dir_name in EVIDENCE_DIRS:
+                evidence = run_dir / dir_name
+                if _is_link(evidence) or not evidence.is_dir():
+                    continue
+                if not any(p.is_file() for p in (*markers, evidence / REQUESTS_LOG)):
+                    continue
+                try:
+                    shutil.rmtree(evidence)
+                except OSError:
+                    result.failed.append(evidence)
+                    continue
+                result.removed.append(evidence)
     return result
 
 
 def prune_message(result: PruneResult, days: int = EVIDENCE_RETENTION_DAYS) -> str:
-    """The console line of the retention: how many evidencia folders were removed."""
+    """The console line of the retention: how many evidence folders were removed."""
     n = len(result.removed)
     if n == 0:
         line = f"Evidence older than {days} days: nothing to delete."
     elif n == 1:
-        line = f"Evidence older than {days} days: deleted 1 evidencia folder."
+        line = f"Evidence older than {days} days: deleted 1 evidence folder."
     else:
-        line = f"Evidence older than {days} days: deleted {n} evidencia folders."
+        line = f"Evidence older than {days} days: deleted {n} evidence folders."
     if result.failed:
         line += f" {len(result.failed)} could not be deleted; the next run tries again."
     return line
 
 
 def _is_protected(path: Path) -> bool:
-    return path.name == DATOS or EVIDENCIA in path.parts[:-1]
+    return path.name in (DATOS, LEGACY_DATOS) or any(name in path.parts[:-1] for name in EVIDENCE_DIRS)
 
 
 def write_text(path: Path, text: str) -> None:
-    """UTF-8, no BOM, newline '\\n'; refuses to overwrite datos.json or evidence (ValueError)."""
+    """UTF-8, no BOM, newline '\\n'; refuses to overwrite a stored run or evidence (ValueError)."""
     path = Path(path)
     if _is_protected(path):
-        raise ValueError(f"write_text never writes datos.json or evidence: {path.name}")
+        raise ValueError(f"write_text never writes a stored run or evidence: {path.name}")
     data = text.replace("\r\n", "\n").replace("\r", "\n")
     if not data.endswith("\n"):
         data += "\n"
@@ -257,23 +273,33 @@ def _json_default(obj: Any) -> Any:
     return repr(obj)
 
 
+def dumps_json(document: Any) -> str:
+    """A JSON document as this tool writes it: sorted keys, UTF-8 text, two-space indent, final newline."""
+    return json.dumps(document, sort_keys=True, ensure_ascii=False, indent=2, default=_json_default) + "\n"
+
+
 def dumps_datos(datos: dict[str, Any]) -> str:
-    """The exact text written to datos.json."""
-    return json.dumps(datos, sort_keys=True, ensure_ascii=False, indent=2, default=_json_default) + "\n"
+    """The exact text written to run.json (or comparison.json): the public form of the internal dict."""
+    return dumps_json(runformat.to_public(datos))
+
+
+def dumps_legacy(datos: dict[str, Any]) -> str:
+    """The same run as a schema_version 1 datos.json (examples/datos.json only; see runformat.to_legacy)."""
+    return dumps_json(runformat.to_legacy(datos))
 
 
 def _next_backup(root: Path) -> Path:
     n = 1
-    while (root / f"datos-{n}.json").exists():
+    while (root / f"{BACKUP_STEM}-{n}.json").exists():
         n += 1
-    return root / f"datos-{n}.json"
+    return root / f"{BACKUP_STEM}-{n}.json"
 
 
 def write_datos(paths: RunPaths, datos: dict[str, Any], *, rerender: bool = False) -> None:
-    """Write datos.json (sorted keys, ensure_ascii False, indent 2).
+    """Write run.json (sorted keys, ensure_ascii False, indent 2) from the internal dict.
 
     A normal run writes it once. With ``rerender`` the existing file
-    is first renamed to ``datos-<n>.json`` (n = 1, 2, ...; never lost) and the
+    is first renamed to ``run-<n>.json`` (n = 1, 2, ...; never lost) and the
     new one differs only in the derived sections (colours of checks, resumen,
     salida): measurements, evidence lists and meta are copied unchanged by the
     caller (pipeline.rerender).
@@ -281,15 +307,23 @@ def write_datos(paths: RunPaths, datos: dict[str, Any], *, rerender: bool = Fals
     text = dumps_datos(datos)
     if paths.datos.exists():
         if not rerender:
-            raise ValueError("datos.json already exists in this run folder; it is written once")
+            raise ValueError("run.json already exists in this run folder; it is written once")
         paths.datos.rename(_next_backup(paths.root))
     tmp = paths.datos.with_name(DATOS + ".tmp")
     tmp.write_bytes(text.encode("utf-8"))
     os.replace(tmp, paths.datos)
 
 
-def read_datos(path: Path) -> dict[str, Any]:
-    """Load a datos.json for --rerender; ValueError (exit 2) when schema_version is unknown."""
+def run_file_of(folder: Path) -> Path:
+    """The stored run of a run folder: run.json, else the datos.json of a run written before the rename."""
+    folder = Path(folder)
+    current = folder / DATOS
+    legacy = folder / LEGACY_DATOS
+    return legacy if (not current.is_file() and legacy.is_file()) else current
+
+
+def read_document(path: Path) -> dict[str, Any]:
+    """The JSON object of a stored run as it is on disk (either version). ValueError when unreadable."""
     path = Path(path)
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -298,11 +332,23 @@ def read_datos(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError(f"cannot read {path.name}: {type(exc).__name__}") from exc
     if not isinstance(data, dict):
-        raise ValueError(f"{path.name} does not have the shape of a datos.json")
-    version = data.get("schema_version")
-    if version != SCHEMA_VERSION:
-        raise ValueError(f"{path.name} has schema_version {version!r}; this tool reads {SCHEMA_VERSION}")
+        raise ValueError(f"{path.name} does not have the shape of a stored run")
     return data
+
+
+def read_datos(path: Path) -> dict[str, Any]:
+    """Load a stored run as the internal dict, for --rerender and --compare.
+
+    Reads run.json (schema_version 2) and the datos.json of a run written
+    before the rename (schema_version 1, through runformat's migration).
+    ValueError (exit 2) when the file is unreadable or of another version.
+    """
+    path = Path(path)
+    data = read_document(path)
+    try:
+        return runformat.to_internal(data)
+    except runformat.RunFormatError as exc:
+        raise ValueError(f"{path.name} has {exc}") from exc
 
 
 def _dmy_hm(moment: dt.datetime) -> str:
@@ -313,8 +359,8 @@ def _dmy_hm(moment: dt.datetime) -> str:
 
 
 def write_tiempo(paths: RunPaths, start: dt.datetime, end: dt.datetime) -> None:
-    """00-tiempo.txt: two lines, 'inicio: 14:05' and 'fin: 14:13' (ART)."""
-    write_text(paths.tiempo, f"inicio: {_dmy_hm(start)}\nfin: {_dmy_hm(end)}\n")
+    """00-time.txt: two lines, 'start: 14/10/2026 14:05' and 'end: 14/10/2026 14:13' (ART)."""
+    write_text(paths.tiempo, f"start: {_dmy_hm(start)}\nend: {_dmy_hm(end)}\n")
 
 
 def sweep_secrets(root: Path, redactor: "Redactor") -> list[Path]:

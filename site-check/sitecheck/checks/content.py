@@ -745,7 +745,7 @@ def _is_declared_translation(loc: str, decoded: str, codes: set[str], prefixes: 
 
 
 # The grey line of EXT-24: what was not seen. The site: query to run by
-# hand is written once, in anexo-tecnico.md (render_report._manual_checks).
+# hand is written once, in technical-annex.md (render_report._manual_checks).
 GREY_NOT_SEARCHED = "Lo que Google muestra del sitio no se consultó en este chequeo"
 
 

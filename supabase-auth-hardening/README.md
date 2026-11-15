@@ -86,9 +86,9 @@ switch (data) {
 
 **Passwords are discarded, not rejected.** Raising on a password would break the sign-up by code, which also writes a random password. Emptying it keeps every Auth flow working and leaves nothing to sign in with.
 
-**Every attempt counts, including the one that succeeds.** The reservation happens before Auth is asked, so it cannot depend on the result. Counting only failures would need a second call after `verifyOtp`, and two verifications at once could both pass the cap before either was marked. The cost: a legitimate user who signs in by code more than 20 times in 24 hours is locked out until the oldest attempt ages out. With sessions that last weeks this does not happen in practice. Change `c_cap` in a new migration if your sessions are short.
+**Every attempt counts, including the one that succeeds.** The reservation happens before Auth is asked, so it cannot depend on the result. Counting only failures would need a second call after `verifyOtp`, and two verifications at once could both pass the cap before either was marked. The cost: a legitimate user who signs in by code more than 20 times in 24 hours is locked out until the oldest attempt ages out. With sessions that last weeks this does not happen in practice. Change `c_cap` in a new migration if your sessions are short. A third party can also spend an address's attempts on purpose; see Limits.
 
-**One advisory lock per address, held until the transaction ends.** Two concurrent reservations for the same address would otherwise both count 19 and both insert. The lock key is a 64-bit hash of the address hash; a collision only makes two unrelated addresses wait on each other.
+**One advisory lock per address, held until the transaction ends.** Two concurrent reservations for the same address would otherwise both count 19 and both insert. The count has to see what the other session committed while this one waited. Under REPEATABLE READ the snapshot predates the lock, so the function refuses to run at that level (SQLSTATE 25000). READ COMMITTED, the default, and SERIALIZABLE are safe. The lock key is a 64-bit hash of the address hash; a collision only makes two unrelated addresses wait on each other.
 
 **The table holds a sha256 of the address, and only for addresses that can hold a code.** The address comes from the client and can be any text. Recording every input would let anonymous requests with made-up addresses grow the table without bound, 20 rows per address. Recording only listed addresses and existing users bounds it, and a test checks that 30 made-up addresses leave no row. Listed addresses with no user yet are counted, so the first code is not an uncounted window.
 
@@ -127,19 +127,19 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 5. Load the list from the SQL editor, never from a migration: `insert into public.allowed_emails (email, role) values ('<address>', 'admin');`
 6. Call `reserve_otp_attempt` before every `verifyOtp` on the server, as above.
-7. Run `sql/audit.sql` in the SQL editor. An empty result means every object in `public` follows rules 1 to 5 of `0001_conventions.sql`. Run it again after adding tables. The audit encodes this folder's strict profile: authenticated never writes and never executes a function, and every table has a comment. If your app grants authenticated an INSERT behind a policy, or exposes an RPC to it, delete the `authenticated can write` and `anon or authenticated can execute` branches, or filter their rows by object name.
+7. Run `sql/audit.sql` in the SQL editor. An empty result means every object in `public` follows rules 1 to 5 of `0001_conventions.sql`. Run it again after adding tables. EXECUTE for `service_role` and `supabase_auth_admin` is checked only on trigger functions; a grant of any other function to those roles is not reported, since the server and Auth call functions granted back to them. It also reports a view readable by `authenticated` that runs as its owner (no `security_invoker`) and any materialized view readable by it, because either one shows rows that RLS on the underlying table would hide. The audit encodes this folder's strict profile: authenticated never writes and never executes a function, and every table has a comment. If your app grants authenticated an INSERT behind a policy, or exposes an RPC to it, delete the `authenticated can write` and `anon or authenticated can execute` branches, or filter their rows by object name.
 
 `pgtap/` holds the same checks as pgTAP files for a real Supabase database. Copy them to `supabase/tests/database/` and run `supabase test db`. They are not part of CI here; see Limits for where they have run.
 
 ## What the tests cover
 
-78 tests, all offline.
+87 tests, all offline.
 
 `test/closed-signups.test.ts`
 - The list's normalization constraint and default role.
 - The hook, called as `supabase_auth_admin`, for listed, unlisted, mixed-case, empty and missing addresses; and refusing everyone once its policy is dropped.
 - The hook closed to `anon`, `authenticated` and `service_role`.
-- The trigger: accounts created with the listed role; unlisted and address-less users refused with no row left; the message names the id, not the address.
+- The trigger: accounts created with the listed role, also from an address with another case and surrounding spaces; unlisted and address-less users refused with no row left; the message names the id, not the address.
 - A user kept after its address leaves the list.
 - RLS on `accounts` for two users and for a token without `sub`; what `service_role` may change.
 - Any user getting in on a database without the trigger.
@@ -151,7 +151,7 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 
 `test/no-email-change.test.ts`
 - One listed row becoming two admin accounts on a database without the trigger.
-- Every kind of change refused: off the list, to another listed address, another spelling, null, by a privileged role.
+- Every kind of change refused: off the list, to another listed address, another spelling, null, by a privileged role. The refusal names the id and neither address.
 - Change requests in one row and in several; the soft delete.
 - Writes that do not change the address landing as written; a real delete taking the account with it.
 
@@ -159,14 +159,14 @@ The source's pgTAP tests ran as `postgres`, which cannot take the `supabase_auth
 - 20 attempts `recorded`, then `exhausted` with nothing recorded; case and spacing; separate counts per address.
 - `no_code` for 30 made-up addresses, with no rows; a listed address with no user; a user whose address left the list, matched in lowercase.
 - The sha256 of the normalized address, its length check, and no column that could hold the address.
-- The 24-hour window, its cleanup and the exact edge; the advisory lock held until commit; 22004 for a missing address; privileges for every role.
+- The 24-hour window (rows one second past it free their slots), its cleanup and the exact edge; one advisory lock per address, held until commit; the refusal under REPEATABLE READ; 22004 for a missing address; privileges for every role.
 
 `test/conventions.test.ts`
 - The exact tables, functions, enums and triggers the migrations create.
-- `audit.sql`: no rows on the migrated schema, all nine violations on objects created the default way, and MAINTAIN left to any one role.
+- `audit.sql`: no rows on the migrated schema, all nine violations on objects created the default way, MAINTAIN left to any one role, a trigger function open to `service_role`, `supabase_auth_admin` or `PUBLIC`, a view or materialized view that reads past RLS for `authenticated`, and no search_path row for an aggregate.
 - Table and column privileges per role; EXECUTE per role and for `PUBLIC`; which functions are security definer; the RLS policies.
 
-`test/mutations.ts` is an opt-in mutation check, not part of `npm test`. It copies `sql/`, reintroduces one gap at a time, and runs the suite against the copy. The six gaps are matching `auth.users` without `lower()`, removing the hook's revoke, dropping the `email_change` clause from the trigger, firing the password trigger on insert only, `>` instead of `>=` for the cap, and a `using (true)` policy on `accounts`. An unchanged copy runs first as a control. Every mutation fails the suite. To repeat it (about two minutes):
+`test/mutations.ts` is an opt-in mutation check, not part of `npm test`. It copies `sql/`, reintroduces one gap at a time, and runs the suite against the copy. The five gaps in the triggers and policies are matching `auth.users` without `lower()`, removing the hook's revoke, dropping the `email_change` clause, firing the password trigger on insert only, and a `using (true)` policy on `accounts`. The five in the cap and the messages are `>` instead of `>=`, one lock key for every address, a 25-hour window, no `btrim` in the account trigger, and the address in the email-change refusal. An unchanged copy runs first as a control. Every mutation fails the suite. To repeat it (about three minutes):
 
 ```sh
 node supabase-auth-hardening/test/mutations.ts
@@ -194,6 +194,7 @@ test/
 - **A direct call to `/auth/v1/verify` is bounded only by the code length.** Anyone with the publishable key can verify codes against Auth without going through the server, so `reserve_otp_attempt` never sees those attempts. Against that path the defense is `otp_length` (6 to 10 digits; the source app uses 8) and Auth's per-IP limit, which an attacker spreads over as many IPs as they control.
 - **Per-IP limits are shared behind a serverless host.** Requests that do reach Auth through the server all come from the host's IPs, so `sign_in_sign_ups` and `token_verifications` are one limit for every user. Thirty anonymous code requests can stop everyone from requesting a code for five minutes. The documented fix is to send the client IP in the `Sb-Forwarded-For` header with the secret key and turn on IP address forwarding in the project. It is not part of this folder and cannot be tested locally.
 - **The cap tells whether an address can sign in.** An address with no possible code never reaches `exhausted`, and `no_code` answers without waiting for Auth. With Auth returning 429, the two branches answer differently. A per-IP limit in the application, before the reservation and with the same answer for both branches, narrows this; it is not here.
+- **Anyone can lock a listed address out for 24 hours.** The cap counts per address and does not check that a code was requested. Twenty requests to the application's verify endpoint with any code use up the address's attempts, and the owner then gets `exhausted` until they age out. Narrow it with a per-IP or per-session limit in the application before the reservation, and keep another sign-in method for admins. To lift it by hand, delete that address's rows as `postgres` with `delete from public.otp_attempts where email_hash = sha256(convert_to('<address>', 'UTF8'));` with the address lowercase and trimmed.
 - **Removing an address from the list does not lock out its user.** The list gates sign-ups. Revoking access means deleting the user or adding a check in the app.
 - **A stranger's sign-up still writes `raw_user_meta_data`.** The password is discarded, the metadata is not. Do not trust it for anything.
 - **The tests cannot race.** PGlite has one backend, so the advisory lock is checked by its presence in `pg_locks`, not by two sessions waiting on it.

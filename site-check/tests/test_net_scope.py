@@ -72,6 +72,11 @@ class ScopeGuardTest(unittest.TestCase):
         with self.assertRaises(ScopeError):
             g.check("GET", f"{BASE}/favicon.ico", Purpose.LINK_CHECK)
 
+    def test_linked_favicon_is_allowed(self) -> None:
+        g = guard()
+        self.assertEqual(g.admit_linked([f"{BASE}/favicon.ico"], purpose=Purpose.LINK_CHECK, source="home <link rel=icon>"), [f"{BASE}/favicon.ico"])
+        self.assertEqual(g.check("GET", f"{BASE}/favicon.ico", Purpose.LINK_CHECK), RequestKind.SITE)
+
     def test_standard_sitemaps_only_after_robots_declares_none(self) -> None:
         g = guard()
         for p in ("/sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml"):
@@ -158,6 +163,52 @@ class DenyPatternTest(unittest.TestCase):
             self.assertIsNotNone(matches_deny_pattern(path), path)
         for path in ("/", "/inscripciones/", "/sitemap.xml.gz", "/wp-content/uploads/2024/03/portada.png", "/feed/"):
             self.assertIsNone(matches_deny_pattern(path), path)
+
+class RulesEachHaveATestTest(unittest.TestCase):
+    """One assertion per rule that an audit mutation could delete with the suite green."""
+
+    def test_site_requests_use_the_default_ports_only(self) -> None:
+        g = guard()
+        g.admit_linked([f"{BASE}/a/"], purpose=Purpose.LINK_CHECK, source="t")
+        for url, purpose in ((f"{BASE}:8443/", Purpose.HOME_RELOAD), ("https://www.colegio.test:8443/a/", Purpose.LINK_CHECK)):
+            with self.subTest(url=url), self.assertRaises(ScopeError):
+                g.check("GET", url, purpose)
+
+    def test_an_input_url_on_another_port_is_refused(self) -> None:
+        # The port rule of check() is the only thing that stops this one: the key matches the input URL.
+        g = ScopeGuard("colegio.test", f"{BASE}:8443/", Endpoints.for_test("http://127.0.0.1:9"), test_loopback=True)
+        with self.assertRaises(ScopeError):
+            g.check("GET", f"{BASE}:8443/", Purpose.HOME)
+
+    def test_a_site_redirect_to_another_port_is_left(self) -> None:
+        g = guard()
+        self.assertIs(g.redirect_verdict(f"{BASE}/", f"{BASE}:8443/", Purpose.HOME, 1), RedirectVerdict.LEAVE)
+        self.assertIs(g.redirect_verdict(f"{BASE}/", "https://colegio.test/", Purpose.HOME, 1), RedirectVerdict.FOLLOW)
+
+    def test_tls_only_on_port_443(self) -> None:
+        g = guard()
+        self.assertEqual(g.check_tls("www.colegio.test", 443), RequestKind.TLS)
+        with self.assertRaises(ScopeError):
+            g.check_tls("www.colegio.test", 8443)
+
+    def test_percent_encoded_deny_paths_are_denied(self) -> None:
+        for path in ("/%77p-login.php", "/wp%2Dadmin/", "/%78mlrpc.php"):
+            with self.subTest(path=path):
+                self.assertIsNotNone(matches_deny_pattern(path))
+
+    def test_robots_only_on_the_canonical_origin(self) -> None:
+        g = guard()
+        for url in ("http://colegio.test/robots.txt", "https://colegio.test/robots.txt", f"{BASE}/robots.txt?x=1"):
+            with self.subTest(url=url), self.assertRaises(ScopeError):
+                g.check("GET", url, Purpose.ROBOTS)
+
+    def test_crux_is_one_post_to_one_path(self) -> None:
+        g = guard()
+        crux = "http://127.0.0.1:9/v1/records:queryRecord"
+        self.assertIs(g.check("POST", crux, Purpose.CRUX), RequestKind.API)
+        for method, url in (("GET", crux), ("POST", crux + "?x=1"), ("POST", crux + "/more"), ("POST", "http://127.0.0.1:9/v1/")):
+            with self.subTest(method=method, url=url), self.assertRaises(ScopeError):
+                g.check(method, url, Purpose.CRUX)
 
 
 if __name__ == "__main__":

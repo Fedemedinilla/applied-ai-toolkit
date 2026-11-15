@@ -19,11 +19,49 @@ export interface MarkdownView {
   blocks: Block[];
   /** Offsets of the inline code spans that were masked, as [start, end). */
   code: Array<[number, number]>;
+  /** The directives that name rule ids, and every bare enable, in document order. suppress.ts applies them. */
+  directives: Directive[];
+  /** Directives that were not applied: one that cannot be read, or a mask when masks are off. */
+  directiveIssues: DirectiveIssue[];
+}
+
+/**
+ * A directive comment. With rule ids it suppresses the findings of those rules and hides nothing
+ * from the linter; without ids, disable and disable-next-line mask their span from every rule
+ * (maskMarkdown does that itself, so those two never appear here).
+ */
+export interface Directive {
+  kind: 'disable' | 'enable' | 'disable-next-line';
+  /** Empty only for an enable, which then closes every open disable. */
+  ids: string[];
+  /** The text after a colon: `<!-- slop-lint-disable LEX-03: quoted from the posting -->`. */
+  reason?: string;
+  /** Offsets of the comment, as [start, end). */
+  start: number;
+  end: number;
+  /** For disable-next-line, the offsets of the line after the comment; absent on the last line. */
+  nextLine?: [number, number];
+}
+
+export interface DirectiveIssue {
+  kind: 'invalid' | 'mask-refused';
+  start: number;
+  end: number;
+  why: string;
+}
+
+export interface MaskOptions {
+  /** False refuses the directives without a rule id and reports each as an issue. True when left out. */
+  mask?: boolean;
 }
 
 export const DISABLE = 'slop-lint-disable';
 export const ENABLE = 'slop-lint-enable';
 export const DISABLE_NEXT_LINE = 'slop-lint-disable-next-line';
+
+const DIRECTIVE = /^(slop-lint-disable-next-line|slop-lint-disable|slop-lint-enable)(?:\s+([\s\S]*))?$/u;
+/** The form of every rule id, built-in or custom: capitals and digits in two or more hyphenated parts. */
+export const RULE_ID = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
 
 const FENCE = /^[ \t]*(`{3,}|~{3,})/u;
 const TABLE_DELIMITER = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/u;
@@ -43,16 +81,17 @@ const ESCAPE = /\\(?=[!-/:-@[-`{-~])/gu;
 
 interface Line {
   start: number;
-  /** Offset of the line's last character plus one, before the newline. */
+  /** Offset of the line's last character plus one, before the newline and a CR before it. */
   end: number;
 }
 
+/** The lines of a document. A CRLF ending is left out of the line, so the block patterns read it as with LF. */
 function splitLines(text: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
   for (let i = 0; i <= text.length; i++) {
     if (i === text.length || text[i] === '\n') {
-      lines.push({ start, end: i });
+      lines.push({ start, end: i > start && text[i - 1] === '\r' && i < text.length ? i - 1 : i });
       start = i + 1;
     }
   }
@@ -67,10 +106,14 @@ function splitLines(text: string): Line[] {
  * when the enable is missing, and the line after <!-- slop-lint-disable-next-line -->.
  * Directives inside a code block are code, not directives.
  *
+ * A directive that names rule ids (<!-- slop-lint-disable LEX-03 -->) masks nothing: the
+ * rules still read its text, and suppress.ts moves the findings of those rules aside.
+ *
  * Indented code blocks are not recognized: a four-space indent is far more often a
  * list item's continuation in these documents, and reading it as code would hide prose.
  */
-export function maskMarkdown(source: string): MarkdownView {
+export function maskMarkdown(source: string, options: MaskOptions = {}): MarkdownView {
+  const allowMask = options.mask ?? true;
   const out = source.split('');
   const mask = (start: number, end: number): void => {
     for (let i = start; i < end; i++) if (out[i] !== '\n') out[i] = ' ';
@@ -109,18 +152,57 @@ export function maskMarkdown(source: string): MarkdownView {
   };
   let disabledFrom: number | null = null;
   const regions: Array<[number, number]> = [];
-  for (const m of current().matchAll(HTML_COMMENT)) {
+  const directives: Directive[] = [];
+  const directiveIssues: DirectiveIssue[] = [];
+  // A comment written inside inline code is code: it is neither a directive nor a comment. The
+  // spans are found here without masking; the inline pass below masks them.
+  // A comment that opens inside a span is skipped, and the search goes on after that span.
+  const codeSpans = maskInlineCode(current(), () => undefined);
+  const commentSource = current();
+  const comments: RegExpExecArray[] = [];
+  const commentRe = new RegExp(HTML_COMMENT.source, HTML_COMMENT.flags);
+  for (let m = commentRe.exec(commentSource); m !== null; m = commentRe.exec(commentSource)) {
+    const at = m.index;
+    const span = codeSpans.find(([a, b]) => a < at && at < b);
+    if (span) commentRe.lastIndex = span[1];
+    else comments.push(m);
+  }
+  for (const m of comments) {
     const end = m.index + m[0].length;
     const body = m[0].replace(/^<!--|-->$/gu, '').trim();
-    if (body === DISABLE && disabledFrom === null) disabledFrom = end;
-    else if (body === ENABLE && disabledFrom !== null) {
-      regions.push([disabledFrom, m.index]);
-      disabledFrom = null;
-    } else if (body === DISABLE_NEXT_LINE) {
-      const next = lines[lineIndexAt(end) + 1];
-      if (next) regions.push([next.start, next.end]);
-    }
     regions.push([m.index, end]);
+    const parsed = DIRECTIVE.exec(body);
+    if (!parsed) continue;
+    const name = parsed[1];
+    const rest = (parsed[2] ?? '').trim();
+    const kind: Directive['kind'] = name === DISABLE ? 'disable' : name === ENABLE ? 'enable' : 'disable-next-line';
+    const next = lines[lineIndexAt(end) + 1];
+    if (rest === '') {
+      // No rule id: the mask that has always been here. An enable also closes the disables that name rules.
+      if (kind === 'enable') {
+        if (disabledFrom !== null) regions.push([disabledFrom, m.index]);
+        disabledFrom = null;
+        directives.push({ kind, ids: [], start: m.index, end });
+      } else if (!allowMask) {
+        directiveIssues.push({ kind: 'mask-refused', start: m.index, end, why: `${name} without a rule id hides its text from every rule, and the config turns that off` });
+      } else if (kind === 'disable') {
+        if (disabledFrom === null) disabledFrom = end;
+      } else if (next) regions.push([next.start, next.end]);
+      continue;
+    }
+    const colon = rest.indexOf(':');
+    const ids = (colon === -1 ? rest : rest.slice(0, colon)).split(/[\s,]+/u).filter(Boolean);
+    const reason = colon === -1 ? '' : rest.slice(colon + 1).trim();
+    const bad = ids.find((id) => !RULE_ID.test(id));
+    if (ids.length === 0 || bad !== undefined) {
+      const why = bad === undefined ? `${name} has a reason and no rule id` : `"${bad}" is not a rule id`;
+      directiveIssues.push({ kind: 'invalid', start: m.index, end, why });
+      continue;
+    }
+    const directive: Directive = { kind, ids, start: m.index, end };
+    if (reason !== '') directive.reason = reason;
+    if (kind === 'disable-next-line' && next) directive.nextLine = [next.start, next.end];
+    directives.push(directive);
   }
   if (disabledFrom !== null) regions.push([disabledFrom, source.length]);
   for (const [a, b] of regions) mask(a, b);
@@ -146,6 +228,8 @@ export function maskMarkdown(source: string): MarkdownView {
   const kinds: Array<Block['kind'] | 'blank' | null> = [];
   let previous: Block['kind'] | 'blank' = 'blank';
   let previousIndent = 0;
+  // The last kind a line started (not null, not blank), kept as it goes instead of searched for.
+  let lastStart: Block['kind'] | undefined;
   for (const line of lines) {
     let t = lineText(line);
     if (t.trim() === '') {
@@ -182,11 +266,13 @@ export function maskMarkdown(source: string): MarkdownView {
     } else if (kind === null && previous === 'blank') {
       // After a blank line, an indented line continues the list item above it.
       const indent = /^[ \t]*/u.exec(t)?.[0].length ?? 0;
-      const lastStart = [...kinds].reverse().find((k) => k !== null && k !== 'blank');
       kind = lastStart === 'list' && indent > previousIndent ? 'list' : 'paragraph';
     }
     kinds.push(kind);
-    if (kind !== null) previous = kind;
+    if (kind !== null) {
+      previous = kind;
+      lastStart = kind;
+    }
   }
 
   // Inline spans, in an order where an earlier one hides what a later one would match.
@@ -217,7 +303,7 @@ export function maskMarkdown(source: string): MarkdownView {
     // A line after a blank that is not a continuation opens a paragraph (kind null only follows a block).
     blocks.push({ kind: kind ?? 'paragraph', start: line.start, end: line.end });
   });
-  return { text, blocks: blocks.filter((b) => text.slice(b.start, b.end).trim() !== ''), code };
+  return { text, blocks: blocks.filter((b) => text.slice(b.start, b.end).trim() !== ''), code, directives, directiveIssues };
 }
 
 /** Code spans: a run of backticks up to the next run of the same length, on any line of the paragraph. */

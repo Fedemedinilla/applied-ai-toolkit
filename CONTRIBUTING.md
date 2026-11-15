@@ -6,21 +6,32 @@ To report a vulnerability, do not open an issue; follow [SECURITY.md](SECURITY.m
 
 ## Run everything
 
-Node 24 (the version is in `.node-version`), Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. From the repository root:
+Node 24.15.0 or newer within Node 24, since jsdom and the Changesets CLI need 24.15.0; CI uses the version in `.node-version`. Python 3.11 or newer for site-check, and PHP 8.1 or newer with Composer for wp-hardening. From the repository root:
 
 ```sh
 npm ci                 # exact versions from package-lock.json
 npm run check          # tsc --noEmit over every TypeScript folder (strict)
 npm test               # Vitest suites of every TypeScript folder
 node import-fences/cli.ts --config import-fences/repo.config.ts   # the import fences
+npm run build:packages # compiles the four npm packages to their dist/ folders, as npm pack does
+npm run pack:check     # packs each of the four as npm would, installs the tarball and checks it
 npm run build:apps     # production build of each app under apps/, into dist/apps/
 npm run guard:apps     # csp-build-guard over each app build, with its own config
 npm run test:python    # site-check's unittest suite
 npm run test:php       # wp-hardening: composer install from the lock, php -l, PHPUnit
 npm run lint:docs      # slop-lint in Markdown mode over every README and doc a reader opens
+npm run build:docs     # the docs site, generated from the READMEs; a broken relative link fails it
 ```
 
-One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request.
+One folder at a time: `npx vitest run <folder>`. CI runs the same commands on every pull request, with `build:packages` inside `pack:check`. The Pages workflow builds the docs again on `main` and publishes them.
+
+Two slower checks run weekly in `.github/workflows/quality.yml` and by hand when a change touches their targets:
+
+```sh
+npm run mutation       # StrykerJS over gateway, grounded-assistant and amount-parser; fails below each threshold
+npm run bench          # the benches, into reports/bench/result.json
+npm run bench:compare  # compares that result with test/bench/baseline.json; exit 1 on a regression
+```
 
 ## Rules for a change
 
@@ -31,8 +42,8 @@ CI enforces most of these, so a pull request that breaks one fails before review
 - **Library folders stay self-contained.** A library never imports another folder's files, and an app uses a library only through its public entry. The rules live in `import-fences/repo.config.ts`; add one there when a change needs a new boundary.
 - **TypeScript stays strict.** `npm run check` passes with the settings in `tsconfig.json`, among them `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `erasableSyntaxOnly` and `verbatimModuleSyntax`. No `any` to get past an error.
 - **Docs pass slop-lint.** Every Markdown file a reader opens is listed in the `lint:docs` script and passes `npm run lint:docs`. A new doc goes on that list. Code, comments and docs are in English.
-- **Dependencies use exact versions.** `.npmrc` sets `save-exact`, and `package-lock.json` and `wp-hardening/composer.lock` are committed. Say in the pull request why a new dependency is needed.
-- **Actions are pinned to a full commit SHA**, with the version tag in a comment, as in `.github/workflows/ci.yml`. Resolve the SHA from the release tag on the action's own repository; never copy one from an unverified source.
+- **Dependencies use exact versions.** `.npmrc` sets `save-exact`, and `package-lock.json` and `wp-hardening/composer.lock` are committed. Say in the pull request why a new dependency is needed. `docs-site/.npmrc` also sets `min-release-age=7`, so a re-lock of the docs site picks no version published in the last week.
+- **Actions are pinned to a full commit SHA**, with the version tag in a comment, as in `.github/workflows/ci.yml`. Resolve the SHA from the release tag on the action's own repository; never copy one from an unverified source. A composite action runs the actions it calls inside it, so pick a release whose own `action.yml` pins each of them by SHA as well.
 - **Workflows hold no secrets.** `agent-playbook/src/workflow-secrets.ts` checks every workflow for secret reads and write permissions. A workflow that needs more gets its own named policy in that module, with a test.
 - **Fixtures are fictional.** No client data, real diagnostic run, conversation log, key or account identifier. Use `.example` or `.test` hosts, `YOUR_...` placeholders and zero-filled phone numbers, as the root README describes under Fixtures and data.
 
@@ -42,7 +53,7 @@ Keep a commit to one verified step. Write the subject in the imperative. The bod
 
 ## Releasing a package
 
-Two folders are released to npm under the `@fedemedinilla` scope: `@fedemedinilla/slop-lint` from `slop-lint/` and `@fedemedinilla/claude-gateway` from `gateway/`. Their release flow uses [Changesets](https://github.com/changesets/changesets). A pull request that changes what one of these packages does adds a changeset:
+Four folders are released to npm under the `@fedemedinilla` scope: `@fedemedinilla/slop-lint` from `slop-lint/`, `@fedemedinilla/claude-gateway` from `gateway/`, `@fedemedinilla/import-fences` from `import-fences/` and `@fedemedinilla/csp-build-guard` from `csp-build-guard/`. Their release flow uses [Changesets](https://github.com/changesets/changesets). A pull request that changes what one of these packages does adds a changeset:
 
 ```sh
 npx changeset

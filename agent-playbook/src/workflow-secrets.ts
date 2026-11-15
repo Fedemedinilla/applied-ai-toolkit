@@ -82,6 +82,8 @@ export interface Finding {
 
 const CREDENTIAL_NAME = /(KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|PRIVATE)/i;
 const PINNED = /@[0-9a-f]{40}(\s|$)/;
+/** The password of a URL with credentials in it, as in scheme://user:password@host. */
+const URL_PASSWORD = /:\/\/[^/\s:@]+:([^@\s]+)@/;
 
 interface Line {
   readonly number: number;
@@ -90,12 +92,24 @@ interface Line {
   readonly code: string;
 }
 
+/** A key whose value is a block scalar (`run: |`, `body: >-`); group 1 runs up to the key. */
+const BLOCK_SCALAR = /^(\s*(?:-\s+)?)\S[^:]*:\s*[|>][-+0-9]*\s*$/;
+
 function lines(text: string): Line[] {
+  // The column of the key that opened the block scalar being read, or -1 outside one.
+  let scalarKey = -1;
   return text.split(/\r?\n/).map((raw, i) => {
+    const indent = raw.length - raw.trimStart().length;
+    if (scalarKey >= 0 && (raw.trim() === '' || indent > scalarKey)) {
+      // Inside a block scalar a # is text, and GitHub still fills in the expressions on that line.
+      return { number: i + 1, indent, code: raw.trimEnd() };
+    }
     // A # starts a comment at the line start or after a space, outside quotes. Workflow values
     // rarely quote a #, and a false cut only hides text from the checks after it.
     const code = raw.replace(/(^|\s)#.*$/, '').trimEnd();
-    return { number: i + 1, indent: raw.length - raw.trimStart().length, code };
+    const scalar = BLOCK_SCALAR.exec(code);
+    scalarKey = scalar?.[1] === undefined ? -1 : scalar[1].length;
+    return { number: i + 1, indent, code };
   });
 }
 
@@ -110,6 +124,13 @@ function blockUnder(all: readonly Line[], at: number): Line[] {
     out.push(line);
   }
   return out;
+}
+
+/** The entries of the block under line `at`: the lines at the indentation of its first one. */
+function entriesUnder(all: readonly Line[], at: number): Line[] {
+  const block = blockUnder(all, at);
+  const indent = block[0]?.indent;
+  return block.filter((line) => line.indent === indent);
 }
 
 /** Every line of the step that holds line `at`, from its dash to the next item at its level. */
@@ -128,6 +149,38 @@ const PERMISSIONS = /^\s*(['"]?)permissions\1\s*:(.*)$/;
 /** One `name: value` entry of a permissions block or flow mapping, the name quoted or not. */
 const KEY_VALUE = /^\s*(['"]?)([\w-]+)\1\s*:(.*)$/;
 
+/**
+ * The bodies of the ${{ }} expressions on a line. Each runs to the "}}" that closes it outside a
+ * string literal ('...' with '' for a quote, as GitHub writes them), so neither a '}' in
+ * format('{0}', secrets.X) nor a '}}' in format('}}', secrets.X) ends it early.
+ */
+function expressionBodies(code: string): string[] {
+  const bodies: string[] = [];
+  let at = code.indexOf('${{');
+  while (at !== -1) {
+    let i = at + 3;
+    let quoted = false;
+    while (i < code.length && (quoted || !code.startsWith('}}', i))) {
+      if (code[i] === "'") quoted = !quoted;
+      i++;
+    }
+    bodies.push(code.slice(at + 3, i));
+    at = code.indexOf('${{', i + 2);
+  }
+  return bodies;
+}
+
+/**
+ * True when a ${{ }} expression on the line reads a secret or the job token. GitHub resolves
+ * context and property names in any letter case, so SECRETS.X and GitHub.Token count too. The
+ * token is matched as github.token and as github['token'].
+ */
+function readsSecret(code: string): boolean {
+  return expressionBodies(code).some(
+    (body) => /\bsecrets\b/i.test(body) || /\bgithub\s*(?:\.\s*token\b|\[\s*(['"])token\1\s*\])/i.test(body),
+  );
+}
+
 export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_WORKFLOW_POLICY): Finding[] {
   const all = lines(text);
   const findings: Finding[] = [];
@@ -138,7 +191,7 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
   let topPermissions = false;
   all.forEach((line, i) => {
     const code = line.code;
-    if (/\$\{\{[^}]*\b(secrets|github\.token)\b/.test(code) || /^\s*secrets\s*:/.test(code)) add(line, 'secret-expression');
+    if (readsSecret(code) || /^\s*secrets\s*:/.test(code)) add(line, 'secret-expression');
     const environment = /^\s*environment\s*:(.*)$/.exec(code)?.[1];
     if (environment !== undefined) {
       // `environment: name` or a block with `name: name` under it.
@@ -181,22 +234,42 @@ export function workflowFindings(text: string, policy: WorkflowPolicy = DEFAULT_
 
     const usesRaw = /^\s*(?:-\s*)?uses\s*:\s*(.+)$/.exec(code)?.[1];
     const uses = usesRaw === undefined ? undefined : unquote(usesRaw);
-    if (uses !== undefined && !uses.startsWith('./') && !uses.startsWith('docker://') && !PINNED.test(`${uses} `)) {
+    // A container image is pinned by its digest; a tag such as :latest can be replaced upstream.
+    const pinned = uses?.startsWith('docker://') === true ? /@sha256:[0-9a-f]{64}$/.test(uses) : PINNED.test(`${uses ?? ''} `);
+    if (uses !== undefined && !uses.startsWith('./') && !pinned) {
       add(line, 'unpinned-action');
     }
     // actions/checkout keeps the job's token in .git/config unless the step says otherwise.
     // One finding per step, on its uses line, whether the option is missing or set to true.
-    if (uses?.startsWith('actions/checkout@') === true) {
-      const step = stepOf(all, i);
-      const persist = step.map((l) => /^\s*persist-credentials\s*:(.*)$/.exec(l.code)?.[1]).find((v) => v !== undefined);
+    // GitHub resolves owner and repository names in any letter case, so the match ignores it. The
+    // option counts only as an input under the step's own with: block.
+    if (uses?.toLowerCase().startsWith('actions/checkout@') === true) {
+      const [dash] = stepOf(all, i);
+      const inputs = dash === undefined ? undefined : entriesUnder(all, dash.number - 1).find((l) => /^\s*with\s*:\s*$/.test(l.code));
+      const persist =
+        inputs === undefined
+          ? undefined
+          : entriesUnder(all, inputs.number - 1)
+              .map((l) => /^\s*(['"]?)persist-credentials\1\s*:(.*)$/.exec(l.code)?.[2])
+              .find((v) => v !== undefined);
       if (persist === undefined || unquote(persist) !== 'false') add(line, 'persisted-credentials');
     }
 
-    if (/^\s*env\s*:\s*$/.test(code)) {
-      for (const entry of blockUnder(all, i)) {
-        const pair = /^\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/.exec(entry.code);
-        if (pair?.[1] === undefined || pair[2] === undefined) continue;
-        if (CREDENTIAL_NAME.test(pair[1]) && !policy.placeholder.test(unquote(pair[2]))) add(entry, 'credential-value');
+    // An env: block, or the registry login of a container or service (credentials: with username
+    // and password under it).
+    if (/^\s*(env|credentials)\s*:\s*$/.test(code)) {
+      // Each entry, the name quoted or not. An entry the check cannot read is a finding, so it
+      // fails closed as the permissions check does; the lines of a multi-line value are skipped.
+      for (const entry of entriesUnder(all, i)) {
+        const pair = KEY_VALUE.exec(entry.code);
+        const [name, value] = [pair?.[2], pair?.[3] === undefined ? undefined : unquote(pair[3])];
+        if (name === undefined || value === undefined) add(entry, 'credential-value');
+        else if (CREDENTIAL_NAME.test(name) && !policy.placeholder.test(value)) add(entry, 'credential-value');
+        else {
+          // A password inside a URL (DATABASE_URL: postgres://user:pass@host) under any name.
+          const password = URL_PASSWORD.exec(value)?.[1];
+          if (password !== undefined && !policy.placeholder.test(password)) add(entry, 'credential-value');
+        }
       }
     }
   });

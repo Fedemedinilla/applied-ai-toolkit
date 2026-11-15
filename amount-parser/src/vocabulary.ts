@@ -1,6 +1,14 @@
 // The words the parser knows. This is data, not logic: identifiers are English, the words people
 // say stay in Rioplatense Spanish, written the way `normalize` leaves them (lower case, no accents).
 
+/**
+ * A word table with no prototype. A plain object answers `table['constructor']` with Object, which
+ * is not undefined, and a figure followed by that word was multiplied by a function (NaN).
+ */
+export function wordTable(...entries: ReadonlyArray<Readonly<Record<string, number>>>): Readonly<Record<string, number>> {
+  return Object.assign(Object.create(null) as Record<string, number>, ...entries);
+}
+
 /** Words that multiply the number in front of them. Callers can add their own through `parseAmount`. */
 export const BASE_SCALES: Readonly<Record<string, number>> = {
   mil: 1_000,
@@ -33,9 +41,9 @@ export const COUNT_NOUNS: ReadonlySet<string> = new Set([
 ]);
 
 /** How many single items a pack holds, for when the price is quoted per unit. */
-export const PACK_SIZES: Readonly<Record<string, number>> = {
+export const PACK_SIZES: Readonly<Record<string, number>> = wordTable({
   docena: 12, docenas: 12, decena: 10, decenas: 10, par: 2, pares: 2,
-};
+});
 
 /** Function words. A number followed by one of these stands on its own. */
 export const CONNECTORS: ReadonlySet<string> = new Set([
@@ -95,7 +103,8 @@ export const MONTHS: ReadonlySet<string> = new Set([
 
 /**
  * "gaste veinte, no, pera, treinta mil": everything up to the marker is discarded. "no" and "para"
- * are also ordinary words, and the README lists what that costs.
+ * are also ordinary words, and the README lists what that costs. "mejor" and "digo" are too, so
+ * applyCorrections only lets them correct right before a figure.
  */
 export const CORRECTION_MARKERS: ReadonlySet<string> = new Set(['no', 'pera', 'para', 'perdon', 'perdona', 'digo', 'mejor']);
 
@@ -111,15 +120,26 @@ export const EXPENSE_VERBS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Fixed expressions that talk about money without naming an amount. Matched as substrings of the
- * normalized sentence, so "doscientos dos pesos" also matches "dos pesos" (see the README's limits).
+ * Verbs whose object is the money itself: "gaste 3500", never "gaste 3 tortas". Not "compre",
+ * "vendi", "cargue" or "recibi", whose object is the goods.
+ */
+export const MONEY_VERBS: ReadonlySet<string> = new Set([
+  'gaste', 'gasto', 'pague', 'pago', 'abone', 'abono', 'salio', 'salieron', 'inverti', 'deposite',
+  'cobre', 'cobro', 'cobraron', 'facture', 'facturo', 'ingreso', 'ingresaron', 'entro', 'entraron',
+  'deposito', 'depositaron', 'transfirieron', 'pagaron', 'recaude',
+]);
+
+/**
+ * Fixed expressions that talk about money without naming an amount. Matched as whole words of the
+ * sentence, so "doscientos dos pesos" also matches "dos pesos" (see the README's limits). They veto
+ * the sentence only when no figure outside them names an amount.
  */
 export const NON_AMOUNT_IDIOMS: readonly string[] = [
   'una fortuna', 'un platal', 'un dineral', 'una banda', 'un huevo',
   'dos mangos', 'cuatro mangos', 'dos pesos',
 ];
 
-export const NUMBER_WORDS: Readonly<Record<string, number>> = {
+export const NUMBER_WORDS: Readonly<Record<string, number>> = wordTable({
   cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
   seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12,
   trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
@@ -130,4 +150,7 @@ export const NUMBER_WORDS: Readonly<Record<string, number>> = {
   ochenta: 80, noventa: 90, cien: 100, ciento: 100, doscientos: 200,
   trescientos: 300, cuatrocientos: 400, quinientos: 500, seiscientos: 600,
   setecientos: 700, ochocientos: 800, novecientos: 900,
-};
+  // Feminine forms, said before a feminine noun: "quinientas lucas", "veintiuna lucas".
+  veintiuna: 21, doscientas: 200, trescientas: 300, cuatrocientas: 400, quinientas: 500,
+  seiscientas: 600, setecientas: 700, ochocientas: 800, novecientas: 900,
+});

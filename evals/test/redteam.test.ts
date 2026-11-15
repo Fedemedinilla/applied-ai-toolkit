@@ -64,6 +64,22 @@ describe('runAttack, the turn loop', () => {
     expect((await runAttack(handler, attack({ id: 'c', turns: ['x'], checks: { replyMustNotMatch: ['secret'] } }))).outcome).toBe('pass');
   });
 
+  it('fails a replyMustNotMatch check when a turn got no reply because the call failed', async () => {
+    const checks = { replyMustNotMatch: ['secret'] };
+    const thrown: ChatHandler = async () => {
+      throw new Error('529 overloaded');
+    };
+    const down = await runAttack(thrown, attack({ id: 'a', turns: ['x', 'y'], checks }));
+    expect(down).toMatchObject({
+      outcome: 'fail',
+      reasons: ['turn 1: no reply (status 0), so the reply checks were not run', 'turn 2: no reply (status 0), so the reply checks were not run'],
+    });
+    const broken = await runAttack(async () => ({ status: 500, error: 'internal' }), attack({ id: 'b', turns: ['x'], checks }));
+    expect(broken.outcome).toBe('fail');
+    // A refusal before the model is a defence, not a gap: it still passes.
+    expect((await runAttack(async () => ({ status: 400, error: 'history' }), attack({ id: 'c', turns: ['x'], checks }))).outcome).toBe('pass');
+  });
+
   it('records a handler that throws as status 0 and goes on with the run', async () => {
     let n = 0;
     const handler: ChatHandler = async () => {
@@ -92,6 +108,26 @@ describe('runAttack, the turn loop', () => {
     const recs = await runAttacks(handler, attacks, { concurrency: 2 });
     expect(peak).toBe(2);
     expect(summarize(recs)).toEqual({ L1: { pass: 0, fail: 0, review: 4 }, L2: { pass: 0, fail: 0, review: 2 } });
+  });
+
+  it('summarize keeps a lens named like an Object.prototype key, and leaves the prototype alone', async () => {
+    const { handler } = echoHandler();
+    const recs = await runAttacks(handler, [
+      attack({ id: 'a', lens: '__proto__', turns: ['x'], checks: { replyMustNotMatch: ['secret'] } }),
+      attack({ id: 'b', lens: 'constructor', turns: ['x'] }),
+    ]);
+    const sum = summarize(recs);
+    expect(Object.keys(sum)).toEqual(['__proto__', 'constructor']);
+    expect(sum['__proto__']).toEqual({ pass: 1, fail: 0, review: 0 });
+    expect(sum['constructor']).toEqual({ pass: 0, fail: 0, review: 1 });
+    expect(({} as Record<string, unknown>)['pass']).toBeUndefined();
+  });
+
+  it('runAttacks refuses a concurrency that is not a number instead of running nothing', async () => {
+    const { handler, calls } = echoHandler();
+    await expect(runAttacks(handler, [attack({ id: 'a', turns: ['x'] })], { concurrency: NaN })).rejects.toThrow(/concurrency must be a number/);
+    expect(calls).toHaveLength(0);
+    expect(await runAttacks(handler, [attack({ id: 'a', turns: ['x'] })], { concurrency: Infinity })).toHaveLength(1);
   });
 });
 

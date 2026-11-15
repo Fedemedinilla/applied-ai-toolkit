@@ -83,6 +83,18 @@ describe('invites', () => {
     expect((await s.app(call('invite/check', 'POST', { token: sessionToken }))).status).toBe(410);
   });
 
+  it('refuses a session token that carries the live invite nonce', async () => {
+    const s = setup();
+    await invite(s);
+    const nonce = s.store.tenants.get('vivero-nuevo')?.owner.inviteNonce ?? '';
+    expect(nonce).not.toBe('');
+    // Only the purpose tells this token apart from the invite: same key, tenant and nonce.
+    const { createAuth, INVITE_MAX_AGE_S } = await import('../server/auth.ts');
+    const forged = createAuth(SECRET, () => s.clock.now).sign('session', 'vivero-nuevo', nonce, INVITE_MAX_AGE_S);
+    expect((await s.app(call('invite/check', 'POST', { token: forged }))).status).toBe(410);
+    expect((await s.app(call('invite/accept', 'POST', { token: forged, password: 'una clave larga de prueba' }))).status).toBe(410);
+  });
+
   it('limits failed operator logins per IP, and keeps refusing the right password until the window passes', async () => {
     const s = setup({ limits: { loginAttempts: 3 } });
     const body = { tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains: ['vivero-nuevo.example'] };
@@ -122,6 +134,30 @@ describe('invites', () => {
     expect(pulled).toBeLessThan(12);
   });
 
+  it('takes an operator call with no Origin, as curl sends it, and refuses one from another site', async () => {
+    const s = setup();
+    const body = JSON.stringify({ tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains: ['vivero-nuevo.example'] });
+    const headers = { ...basic(ADMIN), 'content-type': 'application/json' };
+    const foreign = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers: { ...headers, origin: 'https://evil.example' }, body }));
+    expect(foreign.status).toBe(403);
+    expect(s.store.tenants.has('vivero-nuevo')).toBe(false);
+    const cli = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers, body }));
+    expect(cli.status).toBe(200);
+    const unauthenticated = await s.app(new Request(`${BASE}/panel/api/admin/invite`, { method: 'POST', headers: { 'content-type': 'application/json' }, body }));
+    expect(unauthenticated.status).toBe(401);
+  });
+
+  it('says whether the tenant was created, and leaves the domains of an existing one as they were', async () => {
+    const s = setup();
+    const send = (allowedDomains: string[]): Promise<Response> =>
+      s.app(call('admin/invite', 'POST', { tenantId: 'vivero-nuevo', email: 'owner@vivero-nuevo.example', allowedDomains }, basic(ADMIN)));
+    expect(((await (await send(['vivero-nuevo.example'])).json()) as { created: boolean }).created).toBe(true);
+    const again = await send(['otro-dominio.example']);
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { created: boolean }).created).toBe(false);
+    expect(s.store.tenants.get('vivero-nuevo')?.config['allowedDomains']).toEqual(['vivero-nuevo.example']);
+  });
+
   it('does not hand a tenant to a second email', async () => {
     const s = setup();
     await invite(s);
@@ -141,6 +177,15 @@ describe('login', () => {
     const unknown = await s.app(call('login', 'POST', { email: 'nobody@vivero-nuevo.example', password: 'no es esta' }));
     expect([wrong.status, unknown.status]).toEqual([401, 401]);
     expect(await wrong.json()).toEqual(await unknown.json());
+  });
+
+  it('refuses the dummy hash password for an owner who has not accepted an invite, and for an unknown email', async () => {
+    const s = setup();
+    await invite(s);
+    for (const email of ['owner@vivero-nuevo.example', 'nobody@vivero-nuevo.example']) {
+      const response = await s.app(call('login', 'POST', { email, password: 'not a password' }));
+      expect([email, response.status, await response.json()]).toEqual([email, 401, { error: 'bad_credentials' }]);
+    }
   });
 
   it('limits attempts per IP', async () => {
@@ -228,6 +273,30 @@ describe('session and content', () => {
     const form = new Request(`${BASE}/panel/api/content`, { method: 'PUT', headers: { cookie, origin: ORIGIN, 'content-type': 'text/plain' }, body: JSON.stringify(patch) });
     expect((await s.app(form)).status).toBe(400);
     expect(s.store.tenants.get('vivero-nuevo')?.config['context']).toBe('');
+  });
+
+  it('refuses every write route from another origin, and with no Origin except the operator route', async () => {
+    const s = setup();
+    const cookie = await owner(s);
+    const token = await invite(s);
+    const routes: Array<[string, string, unknown]> = [
+      ['login', 'POST', { email: 'owner@vivero-nuevo.example', password: 'una clave larga de prueba' }],
+      ['logout', 'POST', {}],
+      ['invite/check', 'POST', { token }],
+      ['invite/accept', 'POST', { token, password: 'una clave larga de prueba' }],
+      ['admin/invite', 'POST', { tenantId: 'vivero-otro', email: 'owner@vivero-otro.example', allowedDomains: ['vivero-otro.example'] }],
+      ['content', 'PUT', { context: 'x' }],
+    ];
+    for (const [path, method, body] of routes) {
+      const headers = { cookie, 'content-type': 'application/json', ...basic(ADMIN) };
+      const foreign = await s.app(new Request(`${BASE}/panel/api/${path}`, { method, headers: { ...headers, origin: 'https://evil.example' }, body: JSON.stringify(body) }));
+      expect([path, foreign.status, await foreign.json()]).toEqual([path, 403, { error: 'cross_origin' }]);
+      if (path === 'admin/invite') continue;
+      const none = await s.app(new Request(`${BASE}/panel/api/${path}`, { method, headers, body: JSON.stringify(body) }));
+      expect([path, none.status, await none.json()]).toEqual([path, 403, { error: 'cross_origin' }]);
+    }
+    expect(s.store.tenants.has('vivero-otro')).toBe(false);
+    expect((await s.app(call('invite/check', 'POST', { token }))).status).toBe(200);
   });
 
   it('answers 503 when the store fails, without leaking the error', async () => {

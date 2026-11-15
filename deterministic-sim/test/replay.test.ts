@@ -119,6 +119,15 @@ describe('sealRun and verifyRun', () => {
     expect(v.ok && v.finalStateHashMatches).toBeNull();
   });
 
+  it('a stated hash that is not 64 lowercase hex characters is a mismatch, not "states none"', () => {
+    const sealed = sealRun(RECORD);
+    for (const bad of ['tampered', '', sealed.inputsHash.toUpperCase(), sealed.inputsHash.slice(0, 63), null, 42, {}]) {
+      const v = verifyRun({ ...sealed, inputsHash: bad, finalStateHash: bad });
+      expect(v.ok && v.inputsHashMatches).toBe(false);
+      expect(v.ok && v.finalStateHashMatches).toBe(false);
+    }
+  });
+
   it('an input that is illegal at its point in the run fails with the reason', () => {
     const broke = { ...RECORD, inputs: [{ kind: 'roll', dice: 5 }, { kind: 'roll', dice: 5 }, { kind: 'roll', dice: 1 }] };
     expect(verifyRun(broke)).toEqual({ ok: false, error: 'rolling 1 dice costs 1 chips; there are 0' });

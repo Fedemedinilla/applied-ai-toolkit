@@ -1,7 +1,7 @@
 // The handler end to end: a Request in, the emails the fake Resend received and the Response out.
 
 import { describe, expect, it } from 'vitest';
-import { createContactHandler, resendTransport, type ContactConfig, type ContactEvent } from '../src/index.ts';
+import { createContactHandler, resendTransport, TEXTS, type ContactConfig, type ContactEvent } from '../src/index.ts';
 import { FAKE_KEY, fakeResend } from './helpers/fake-resend.ts';
 
 const SITE = 'https://studio.example';
@@ -111,6 +111,17 @@ describe('a valid message', () => {
     expect(s.resend.sent[0]!.html).toContain('<p style="margin:0 0 14px">one<br>two</p><p style="margin:0 0 14px">&lt;b&gt;three&lt;/b&gt;</p>');
   });
 
+  it('a native form post with CRLF line endings keeps its paragraphs in both emails', async () => {
+    const s = setup();
+    await s.handler(asForm(good(s.now, { body: 'First paragraph.\r\n\r\nSecond one.' })), ctx());
+    expect(s.resend.sent).toHaveLength(2);
+    for (const mail of s.resend.sent) {
+      expect(mail.html).toContain('<p style="margin:0 0 14px">First paragraph.</p><p style="margin:0 0 14px">Second one.</p>');
+      expect(mail.html).not.toContain('\r');
+      expect(mail.text).not.toContain('\r');
+    }
+  });
+
   it('field names are configurable', async () => {
     const s = setup({ fields: { name: 'nombre', email: 'correo', message: 'mensaje' } });
     const res = await s.handler(asJson({ nombre: 'Ana', correo: 'ana@visitor.example', mensaje: 'Hola, una consulta.' }), ctx());
@@ -164,6 +175,15 @@ describe('what the acknowledgment may quote', () => {
     const s = setup();
     await s.handler(asJson(good(s.now, { full_name: 'https://evil.example/login' })), ctx());
     expect(s.resend.sent[1]!.text.startsWith('Hi,\n\n')).toBe(true);
+  });
+
+  it('a name or message cut through an emoji reaches no email with a lone surrogate', async () => {
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    const s = setup();
+    const name = `${'a'.repeat(31)}😀${'b'.repeat(66)}😀`;
+    await s.handler(asJson(good(s.now, { full_name: name, body: `${'m'.repeat(299)}😀 and more` })), ctx());
+    expect(s.resend.sent).toHaveLength(2);
+    for (const mail of s.resend.sent) for (const part of [mail.subject, mail.html, mail.text]) expect(lone.test(part)).toBe(false);
   });
 
   it('the quote is cut at quoteMax', async () => {
@@ -246,6 +266,30 @@ describe('origin', () => {
     expect((await s.handler(req, ctx())).status).toBe(200);
   });
 
+  const behind = (url: string, headers: Record<string, string>, over: Partial<ContactConfig> = {}) => {
+    const s = setup(over);
+    const req = new Request(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(good(s.now)) });
+    return s.handler(req, ctx());
+  };
+
+  it('the Host header counts as an own origin when the URL is internal', async () => {
+    const res = await behind('http://internal:3000/api/contact', { host: 'studio.example', origin: 'http://studio.example' });
+    expect(res.status).toBe(200);
+  });
+
+  it('a TLS proxy that keeps Host and sets only X-Forwarded-Proto', async () => {
+    // nginx with `proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme`.
+    const headers = { host: 'studio.example', 'x-forwarded-proto': 'https', origin: SITE };
+    expect((await behind('http://studio.example/api/contact', headers)).status).toBe(200);
+    expect((await behind('http://studio.example/api/contact', headers, { trustForwardedHeaders: false })).status).toBe(403);
+  });
+
+  it('X-Forwarded-Host without X-Forwarded-Proto takes the scheme of the URL', async () => {
+    const headers = { 'x-forwarded-host': 'studio.example', origin: 'http://studio.example' };
+    expect((await behind('http://internal:3000/api/contact', headers)).status).toBe(200);
+    expect((await behind('http://internal:3000/api/contact', { ...headers, origin: SITE })).status).toBe(403);
+  });
+
   it('forwarded headers are ignored when the config says so', async () => {
     const s = setup({ trustForwardedHeaders: false });
     const req = new Request('http://localhost:3000/api/contact', {
@@ -285,6 +329,9 @@ describe('validation', () => {
     ['no domain dot', { reply_email: 'me@localhost' }],
     ['two @', { reply_email: 'a@b@c.example' }],
     ['a space', { reply_email: 'me @visitor.example' }],
+    ['two dots in a row in the domain', { reply_email: 'me@visitor..example' }],
+    ['a domain that starts with a dot', { reply_email: 'me@.visitor.example' }],
+    ['a trailing dot', { reply_email: 'me@visitor.example.' }],
     ['no name', { full_name: '  ' }],
     ['a one-character message', { body: 'x' }],
   ];
@@ -323,6 +370,25 @@ describe('validation', () => {
     expect(res.status).toBe(200);
     expect(s.resend.sent).toHaveLength(2);
   });
+
+  it('a multipart form with a mixed-case boundary, as Chrome sends it', async () => {
+    // undici's FormData boundary is all lowercase, so the test above cannot tell a lowercased
+    // boundary from the real one. A browser's is not.
+    const s = setup();
+    const boundary = '----WebKitFormBoundaryAbCdEfGh12345678';
+    const body =
+      Object.entries(good(s.now))
+        .map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`)
+        .join('') + `--${boundary}--\r\n`;
+    const req = new Request(`${SITE}/api/contact`, {
+      method: 'POST',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}`, origin: SITE },
+      body,
+    });
+    const res = await s.handler(req, ctx());
+    expect(res.status).toBe(200);
+    expect(s.resend.sent).toHaveLength(2);
+  });
 });
 
 describe('request shape', () => {
@@ -349,6 +415,34 @@ describe('request shape', () => {
     });
     const req = new Request(`${SITE}/api/contact`, { method: 'POST', headers: { 'content-type': 'application/json', origin: SITE }, body: stream, duplex: 'half' } as RequestInit);
     expect((await s.handler(req, ctx())).status).toBe(413);
+  });
+});
+
+describe('the body limit fits what the form allows', () => {
+  it('a native post of 5000 CJK characters, within the textarea maxlength, gets through', async () => {
+    // Each 3-byte character is 9 bytes once percent-encoded: about 45 KB for the message alone.
+    const s = setup();
+    const req = asForm(good(s.now, { lang: 'es', full_name: '例'.repeat(100), topic: '例'.repeat(90), body: '例'.repeat(5000) }));
+    const res = await s.handler(req, ctx());
+    expect(res.status).toBe(200);
+    expect(s.resend.sent).toHaveLength(2);
+  });
+
+  it('a body over the limit gets a page that says it is too long, not that details are missing', async () => {
+    const s = setup({ maxBodyBytes: 1024 });
+    const res = await s.handler(asForm(good(s.now, { body: 'x'.repeat(2000) })), ctx());
+    expect(res.status).toBe(413);
+    const html = await res.text();
+    expect(html).toContain('The message is too long.');
+    expect(html).not.toContain('Some details are missing.');
+  });
+
+  it('custom texts without a too-long page fall back to the invalid page', async () => {
+    const { tooLarge: _dropped, ...pages } = TEXTS.en.pages;
+    const s = setup({ maxBodyBytes: 1024, texts: { en: { ...TEXTS.en, pages } } });
+    const res = await s.handler(asForm(good(s.now, { body: 'x'.repeat(2000) })), ctx());
+    expect(res.status).toBe(413);
+    expect(await res.text()).toContain('Some details are missing.');
   });
 });
 
@@ -416,6 +510,23 @@ describe('the per-IP limit', () => {
     expect(refused).toBe(9);
     s.advance(61_000);
     expect((await s.handler(asJson(good(s.now)), at)).status).toBe(200);
+  });
+
+  it('a provider failure does not spend a send, so retries after an outage get through', async () => {
+    const s = setup({ rateLimit: { max: 5, windowMs: 15 * 60_000 } });
+    const at = { clientAddress: '203.0.113.11' };
+    for (let n = 1; n <= 5; n++) s.resend.failCall(n, 'network');
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) statuses.push((await s.handler(asJson(good(s.now)), at)).status);
+    expect(statuses).toEqual([502, 502, 502, 502, 502, 200]);
+  });
+
+  it('without a transport the answer is 503 every time, never 429', async () => {
+    const s = setup({ transport: null, rateLimit: { max: 1, windowMs: 60_000 } });
+    const at = { clientAddress: '203.0.113.12' };
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) statuses.push((await s.handler(asJson(good(s.now)), at)).status);
+    expect(statuses).toEqual([503, 503, 503]);
   });
 
   it('an invalid submit does not spend a send', async () => {

@@ -2,7 +2,7 @@
 // process Claude Code starts: JSON on stdin, exit code 2 to block.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -50,6 +50,50 @@ describe('guard-protected-paths', () => {
     }
   });
 
+  it('lets an agent create and work on a new ruleset file, and keeps the committed ones protected', () => {
+    for (const tool of ['Write', 'Edit']) {
+      expect(decide(edit('src/tournament/rules-v2.ts', tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit(join(ROOT, 'src/tournament/rules-v2.ts'), tool), ROOT, config, {})).toEqual({ block: false });
+      expect(decide(edit('src/tournament/rules-v1.ts', tool), ROOT, config, {}).block).toBe(true);
+    }
+    expect(bashTargets('echo x > src/tournament/rules-v2.ts', ROOT, config)).toEqual([]);
+    expect(bashTargets('echo x > src/tournament/rules-v1.ts', ROOT, config)).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bashTargets('rm -rf src', ROOT, config)).toEqual(['src']);
+  });
+
+  it('protects every ruleset file when it cannot tell which ones are committed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
+    try {
+      expect(decide(edit('src/tournament/rules-v2.ts', 'Write'), dir, config, {}).block).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a ruleset protected once committed, even after HEAD is moved back past it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
+    const git = (...args: string[]) => spawnSync('git', ['-C', dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
+    const hook = (input: unknown) => spawnSync(process.execPath, [GUARD], { input: JSON.stringify(input), encoding: 'utf8', env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: dir } });
+    try {
+      mkdirSync(join(dir, '.claude'), { recursive: true });
+      mkdirSync(join(dir, 'src/t'), { recursive: true });
+      writeFileSync(join(dir, '.claude/protected-paths.json'), readFileSync(join(ROOT, '.claude/protected-paths.json')));
+      writeFileSync(join(dir, 'README.md'), 'x\n');
+      expect(git('init', '-q').status).toBe(0);
+      git('add', '.');
+      git('commit', '-q', '-m', 'start');
+      writeFileSync(join(dir, 'src/t/rules-v1.ts'), 'export const v = 1;\n');
+      git('add', '.');
+      expect(git('commit', '-q', '-m', 'ruleset').status).toBe(0);
+      writeFileSync(join(dir, 'src/t/rules-v2.ts'), 'export const v = 2;\n');
+      expect(git('reset', '-q', '--soft', 'HEAD~1').status).toBe(0);
+      expect(hook(edit(join(dir, 'src/t/rules-v1.ts'))).status).toBe(2);
+      expect(hook(edit(join(dir, 'src/t/rules-v2.ts'))).status).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('blocks a JSON file marked "handwritten": true', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsim-guard-'));
     try {
@@ -83,6 +127,39 @@ describe('guard-protected-paths', () => {
     expect(bash('echo x >> ./src/tournament/rules-v1.ts')).toEqual(['src/tournament/rules-v1.ts']);
     expect(bash(`sed -i s/a/b/ ${join(ROOT, 'test/purity.test.ts')}`)).toEqual(['test/purity.test.ts']);
     expect(bash(`cd /tmp && echo x > ${join(ROOT, '../elsewhere/rules-v1.ts')}`)).toEqual([]);
+  });
+
+  it('counts the words of a writing command only in its own part of a command list', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('cat test/purity.test.ts; rm /tmp/x')).toEqual([]);
+    expect(bash('cat test/golden/runs.json && rm -f /tmp/scratch.json')).toEqual([]);
+    expect(bash('grep -n x src/tournament/rules-v1.ts | tee /tmp/out.txt')).toEqual([]);
+    expect(bash('cat /tmp/x\nrm -f /tmp/y || cat test/purity.test.ts')).toEqual([]);
+    expect(bash('npm test; rm test/golden/runs.json')).toEqual(['test/golden/runs.json']);
+    expect(bash("sed -i 's/a;b/c/' src/tournament/rules-v1.ts")).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash('sed -i "s/a|b/c/" src/tournament/rules-v1.ts')).toEqual(['src/tournament/rules-v1.ts']);
+    // After a cd the words of every part may name the same file, so the whole command counts as before.
+    expect(bash('cd src/tournament && rm rules-v1.ts')).toEqual(['src/tournament']);
+  });
+
+  it('counts every word of a pipeline that feeds names to a writing command through xargs or read', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('echo test/purity.test.ts | xargs rm')).toEqual(['test/purity.test.ts']);
+    expect(bash('echo src/tournament/rules-v1.ts | xargs rm')).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash("ls src/tournament/rules-v1.ts | xargs sed -i 's/a/b/'")).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash('git ls-files test/golden | xargs -n1 truncate -s 0')).toEqual(['test/golden']);
+    expect(bash('echo test/purity.test.ts | while read f; do rm "$f"; done')).toEqual(['test/purity.test.ts']);
+    // A pipeline that only reads still passes.
+    expect(bash('grep -l x src/tournament/rules-v1.ts | xargs wc -l')).toEqual([]);
+  });
+
+  it('unquotes the target of a redirect, in both quote styles', () => {
+    const bash = (command: string) => bashTargets(command, ROOT, config);
+    expect(bash('echo x > "src/tournament/rules-v1.ts"')).toEqual(['src/tournament/rules-v1.ts']);
+    expect(bash("echo x > 'test/golden/runs.json'")).toEqual(['test/golden/runs.json']);
+    expect(bash('cat >"test/golden/runs.json" <<EOF\n{}\nEOF')).toEqual(['test/golden/runs.json']);
+    expect(bash(`printf x >> "${join(ROOT, 'test/purity.test.ts')}"`)).toEqual(['test/purity.test.ts']);
+    expect(bash('echo x > "out file.txt"')).toEqual([]);
   });
 
   it('does not treat the rest of src/ as protected, or fd duplication as a write', () => {

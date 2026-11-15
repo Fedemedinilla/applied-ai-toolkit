@@ -1,0 +1,4 @@
+# The catalogue is built from these sources and compared byte for byte, so they keep LF in every
+# checkout, Windows included.
+data/source/*.md text eol=lf
+public/catalogue.json text eol=lf

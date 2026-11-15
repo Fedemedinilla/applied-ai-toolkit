@@ -34,9 +34,9 @@ const handler = createContactHandler({
 
 // Node accepts TRACE, CONNECT and others that `new Request` throws on; they never reach the handler.
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
-// Above the handler's own 32 KiB limit, so the handler still answers its 413 first; this one only
+// Above the handler's own 64 KiB limit, so the handler still answers its 413 first; this one only
 // stops the server from buffering an unbounded body.
-const LIMIT = 64 * 1024;
+const LIMIT = 128 * 1024;
 
 function failed(res: ServerResponse, status: number): void {
   if (!res.headersSent) res.writeHead(status, { connection: 'close' });
@@ -48,7 +48,7 @@ const server = createServer((req, res) => {
   if (url.pathname === '/api/contact') {
     const method = req.method ?? 'GET';
     if (!METHODS.has(method)) {
-      res.writeHead(405, { allow: 'GET, POST' }).end();
+      res.writeHead(405, { allow: 'POST' }).end();
       return;
     }
     const chunks: Buffer[] = [];

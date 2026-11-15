@@ -1,13 +1,15 @@
 # Runs the same commands as the root README: type check, the Vitest suites, the import fences,
 # the pack check of the npm packages, the app builds and their CSP guard, the site-check unittest
-# suite, slop-lint over the repository's own docs, and the wp-hardening PHPUnit suite in a job of
-# its own. A third job runs the repository's two composite actions (./slop-lint and
-# ./csp-build-guard) as a user's workflow would, and checks the SARIF each one writes. It does not
-# upload SARIF: that needs security-events: write, which no job here has. Tests make no network
-# call; the only downloads are the locked npm and Composer packages, and zod for the guard action.
+# suite and slop-lint over the repository's own docs. The docs site build with its link check and
+# the wp-hardening PHPUnit suite each have a job of their own. Another job runs the repository's
+# three composite actions (./slop-lint, ./csp-build-guard and ./import-fences) as a user's
+# workflow would, and checks the SARIF each one writes. It does not upload SARIF: that needs
+# security-events: write, which no job here has. Tests make no network call; the only downloads
+# are the locked npm packages (root and docs-site) and Composer packages, plus, at exact versions
+# but outside any lockfile, zod for the guard action and typescript and zod for the fences action.
 # No job has secrets. Actions are pinned to the commit SHA of their release tag, with the version
-# in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml and
-# csp-build-guard/action.yml, and their tests fail until the three SHAs match.
+# in a comment. To upgrade one, change both. setup-node is pinned again in slop-lint/action.yml,
+# csp-build-guard/action.yml and import-fences/action.yml, and their tests fail until the SHAs match.
 name: CI
 
 # Pushes to main, and pull requests. A push to a PR branch runs once, through pull_request.
@@ -55,8 +57,9 @@ jobs:
       - name: Import fences
         run: node import-fences/cli.ts --config import-fences/repo.config.ts
 
-      # Packs the npm packages (gateway, slop-lint) as a publish would, installs each tarball in a
-      # project outside the repository and checks its exports, its types and the slop-lint bin.
+      # Packs the four npm packages (gateway, slop-lint, import-fences, csp-build-guard) as a publish
+      # would, installs each tarball in a project outside the repository and checks its exports, its
+      # types and its bin.
       # Offline. Kept out of npm test because it builds and packs, about 12 s.
       - name: Pack the npm packages
         run: npm run pack:check
@@ -97,6 +100,31 @@ jobs:
       - name: Lint the docs
         run: npm run lint:docs
 
+  # The docs site, built as the Pages workflow builds it on main. Its link check over the result is
+  # the only check of heading anchors (other/README.md#a-heading), so a pull request that renames
+  # a heading another README links to fails here, not in the next deploy.
+  docs:
+    name: Docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            docs-site/package-lock.json
+
+      # build:docs installs docs-site from its own lockfile; sync.ts reads the READMEs, not the
+      # root node_modules, so the root npm ci is not needed.
+      - name: Build the docs
+        run: npm run build:docs
+
   # The local actions, used the way the README of each one shows, from this checkout. fail: true,
   # so a finding fails the job; then each SARIF file must parse as JSON with version 2.1.0 and at
   # least one run whose tool is the action's own.
@@ -126,6 +154,7 @@ jobs:
             */README.md apps/*/README.md */CASE-STUDY.md agent-playbook/templates/*.md
             agent-playbook/claude/agents/*.md deterministic-sim/.claude/agents/*.md
             apps/checklist/data/source/*.md slop-lint/research/*.md .changeset/README.md
+            test/bench/README.md docs-site/pages/*.md n8n-templates/diagrams/*.md
           lang: en
           format: markdown
           sarif-file: ${{ runner.temp }}/sarif/slop-lint.sarif
@@ -148,14 +177,24 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
 
+      # This repository's own fences, the same config as the Import fences step of the test job.
+      - id: fences
+        name: import-fences action over the repository
+        uses: ./import-fences
+        with:
+          config: import-fences/repo.config.ts
+          sarif-file: ${{ runner.temp }}/sarif/import-fences.sarif
+          fail: true
+
       - name: Check the SARIF files
         env:
           SLOP_SARIF: ${{ steps.slop.outputs.sarif-file }}
           GUARD_SARIF: ${{ steps.guard.outputs.sarif-file }}
+          FENCES_SARIF: ${{ steps.fences.outputs.sarif-file }}
         run: |
           node -e '
             const { readFileSync } = require("node:fs");
-            for (const [file, tool] of [[process.env.SLOP_SARIF, "slop-lint"], [process.env.GUARD_SARIF, "csp-build-guard"]]) {
+            for (const [file, tool] of [[process.env.SLOP_SARIF, "slop-lint"], [process.env.GUARD_SARIF, "csp-build-guard"], [process.env.FENCES_SARIF, "import-fences"]]) {
               if (!file) throw new Error(`${tool}: the action reported no SARIF file`);
               const log = JSON.parse(readFileSync(file, "utf8"));
               if (log.version !== "2.1.0") throw new Error(`${file}: version is ${log.version}, not 2.1.0`);

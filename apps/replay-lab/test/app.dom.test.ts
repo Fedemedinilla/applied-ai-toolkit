@@ -187,19 +187,25 @@ describe('run file', () => {
   });
 
   it('import replays the file, reports both hashes as matching and loads the run', async () => {
-    const { urls, app } = mount();
+    const { urls } = mount();
     startSeed('lab-2');
     click('[data-dice="4"]');
     click('#rest');
     click('#export');
     const exported = urls.get($<HTMLAnchorElement>('#download').getAttribute('href') ?? '') ?? '';
-    mount();
+    // A fresh page, so the session checked below can only come from the import.
+    const { app } = mount();
+    expect(app.session()).toBeNull();
     chooseFile('run.json', exported);
     await vi.waitFor(() => expect(text('#import-result')).toContain('Final state hash'));
     expect([...document.querySelectorAll('#import-result li')].map((li) => li.className)).toEqual(['good', 'good']);
     expect(text('#import-result')).toContain('run.json: seed "lab-2", 2 inputs, ruleset dice-1.');
     expect($<HTMLInputElement>('#seed').value).toBe('lab-2');
     expect(app.session()).not.toBeNull();
+    expect(app.session()?.state).toEqual(replay('lab-2', [{ kind: 'roll', dice: 4 }, { kind: 'rest' }]));
+    expect(app.session()?.inputs).toEqual([{ kind: 'roll', dice: 4 }, { kind: 'rest' }]);
+    expect($('#play').hidden).toBe(false);
+    expect(text('#st-round')).toBe('2 of 20');
   });
 
   it('an edited file still replays, and the inputs hash is reported as not matching', async () => {
@@ -219,6 +225,58 @@ describe('run file', () => {
     chooseFile('bad.json', JSON.stringify({ format: 'dsim-run/1', rulesetVersion: 'dice-1', seed: 's', inputs: [{ kind: 'roll', dice: 5 }, { kind: 'roll', dice: 5 }, { kind: 'roll', dice: 5 }] }));
     await vi.waitFor(() => expect(text('#import-result')).toContain('could not be replayed'));
     expect(text('#import-result')).toBe('bad.json could not be replayed: rolling 5 dice costs 5 chips; there are 0.');
+  });
+
+  it('a file that cannot be read is reported and the input is cleared, so the same file can be chosen again', async () => {
+    mount();
+    const input = $<HTMLInputElement>('#import-file');
+    const cleared: string[] = [];
+    Object.defineProperty(input, 'value', { configurable: true, get: () => '', set: (v: string) => cleared.push(v) });
+    const file = new File(['{}'], 'c.json', { type: 'application/json' });
+    vi.spyOn(file, 'text').mockRejectedValue(new DOMException('gone', 'NotReadableError'));
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(text('#import-result')).toBe('c.json could not be read.'));
+    expect(cleared).toEqual(['']);
+  });
+
+  it('a slow read that finishes after a newer import or a new run changes nothing', async () => {
+    const { app } = mount();
+    const record = (seed: string): string => JSON.stringify({ format: 'dsim-run/1', rulesetVersion: 'dice-1', seed, inputs: [{ kind: 'roll', dice: 3 }] });
+    const slow = (name: string, content: string): ((value: string) => void) => {
+      let resolve: (value: string) => void = () => undefined;
+      const file = new File([content], name, { type: 'application/json' });
+      vi.spyOn(file, 'text').mockReturnValue(new Promise<string>((r) => (resolve = r)));
+      const input = $<HTMLInputElement>('#import-file');
+      Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+      input.dispatchEvent(new Event('change'));
+      return resolve;
+    };
+    const finishA = slow('a.json', record('alpha'));
+    chooseFile('b.json', record('beta'));
+    await vi.waitFor(() => expect(app.session()?.state.seed).toBe('beta'));
+    finishA(record('alpha'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.session()?.state.seed).toBe('beta');
+    expect(text('#import-result')).toContain('b.json: seed "beta"');
+    expect($<HTMLInputElement>('#seed').value).toBe('beta');
+
+    const finishC = slow('c.json', record('gamma'));
+    startSeed('delta');
+    finishC(record('gamma'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.session()?.state.seed).toBe('delta');
+    expect($<HTMLInputElement>('#seed').value).toBe('delta');
+    expect(text('#import-result')).toBe('c.json was not loaded: a run changed while it was read.');
+  });
+
+  it('an imported seed with spaces at its ends loads as is, with a note that Start would trim it', async () => {
+    const { app } = mount();
+    chooseFile('x.json', JSON.stringify({ format: 'dsim-run/1', rulesetVersion: 'dice-1', seed: ' lab-1 ', inputs: [{ kind: 'roll', dice: 3 }] }));
+    await vi.waitFor(() => expect(text('#import-result')).toContain('Final state hash'));
+    expect(app.session()?.state).toEqual(replay(' lab-1 ', [{ kind: 'roll', dice: 3 }]));
+    expect($<HTMLInputElement>('#seed').value).toBe(' lab-1 ');
+    expect(text('#import-result .note')).toBe('This seed has spaces at its start or end. Start trims the seed field, so Start would not replay this run.');
   });
 
   it('refuses a file over 64 KB without reading it', () => {
@@ -250,11 +308,20 @@ describe('batch', () => {
   });
 
   it('the same form gives the same report hash twice', () => {
-    mount();
+    const harness = mount();
     $<HTMLFormElement>('#batch-form').requestSubmit();
     const first = $('#batch-result code').getAttribute('title');
+    $('#batch-result').replaceChildren();
     $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(harness.batches).toBe(2);
     expect($('#batch-result code').getAttribute('title')).toBe(first);
+  });
+
+  it('a runner that answers before start() returns leaves the form ready for the next batch', () => {
+    const harness = mount();
+    for (let i = 0; i < 3; i++) $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(harness.batches).toBe(3);
+    expect($('#cancel-batch').hidden).toBe(true);
   });
 
   it('refuses an out-of-range run count without starting', () => {
@@ -303,6 +370,41 @@ describe('batch', () => {
     $<HTMLFormElement>('#batch-form').requestSubmit();
     expect(text('#batch-status')).toBe('The batch failed: the worker stopped.');
     expect($<HTMLButtonElement>('#run-batch').disabled).toBe(false);
+  });
+
+  it('a new batch clears the previous report, so a cancel or an error shows none', () => {
+    let calls = 0;
+    mount({
+      start(request, onMessage) {
+        calls += 1;
+        if (calls === 1) runBatchJob(request, onMessage);
+        else if (calls === 3) onMessage({ type: 'error', message: 'the worker stopped' });
+        return () => undefined;
+      },
+    });
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect($('#batch-result').children.length).toBeGreaterThan(0);
+    $<HTMLInputElement>('#prefix').value = 'other';
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    click('#cancel-batch');
+    expect(text('#batch-status')).toBe('Cancelled. No report.');
+    expect($('#batch-result').children).toHaveLength(0);
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(text('#batch-status')).toBe('The batch failed: the worker stopped.');
+    expect($('#batch-result').children).toHaveLength(0);
+  });
+
+  it('a runner that throws on start is reported and the form is usable again', () => {
+    mount({
+      start() {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    });
+    $<HTMLFormElement>('#batch-form').requestSubmit();
+    expect(text('#batch-status')).toBe('The batch failed: blocked.');
+    expect($<HTMLButtonElement>('#run-batch').disabled).toBe(false);
+    expect($('#cancel-batch').hidden).toBe(true);
+    expect($('#batch-progress').hidden).toBe(true);
   });
 });
 

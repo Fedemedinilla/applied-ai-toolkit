@@ -110,12 +110,26 @@ _SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):(.*)$", re.DOTALL)
 _TAB_NEWLINE_RE = re.compile(r"[\t\n\r]")
 
 
+# Characters that IDNA 2003 (Python's "idna" codec) maps to something else
+# while browsers (UTS 46 non-transitional, IDNA 2008) keep them: ß becomes ss,
+# ς becomes σ, ZWJ and ZWNJ vanish. faß.de would be read as fass.de, another
+# registrable domain, so such a name is refused and its xn-- form asked for.
+IDNA_DEVIATIONS = frozenset("\u00df\u03c2\u200c\u200d")
+DEVIATION_PROBLEM = "the name has ß, ς or an invisible joiner, which this tool cannot convert as a browser does; give its xn-- form"
+
+
+def idna_deviation(host: str) -> bool:
+    """True when ``host`` (already lowercased) holds a character IDNA 2003 and browsers convert differently."""
+    return any(c in IDNA_DEVIATIONS for c in host)
+
+
 def normalize_host(host: str) -> str:
     """Return the comparable ASCII form of a host name.
 
     Lowercases, strips surrounding whitespace, a trailing dot and any ``:port``,
     and converts Unicode labels with ``str.encode("idna")`` (IDNA 2003, enough
-    for names with ñ or accents). IPv6 literals in brackets are returned without
+    for names with ñ or accents; a name with an IDNA_DEVIATIONS character is
+    refused, because a browser converts it differently). IPv6 literals in brackets are returned without
     the brackets. Raises ValueError for an empty host or one that IDNA rejects.
     """
     if not isinstance(host, str):
@@ -140,6 +154,8 @@ def normalize_host(host: str) -> str:
     if not h:
         raise ValueError("empty host")
     if not h.isascii():
+        if idna_deviation(h):
+            raise ValueError(DEVIATION_PROBLEM)
         try:
             h = h.encode("idna").decode("ascii")
         except UnicodeError as exc:

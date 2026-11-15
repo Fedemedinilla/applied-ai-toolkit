@@ -11,7 +11,7 @@ export type InlineKind = 'script-elem' | 'script-attr' | 'style-elem' | 'style-a
 
 export interface InlineItem {
   readonly kind: InlineKind;
-  /** The text the browser hashes: element content with CRLF normalized, or the attribute value. */
+  /** The text the browser hashes: element content or the attribute value, with CRLF normalized. */
   readonly text: string;
   /** A short label for reports: the element, or the element and attribute name. */
   readonly label: string;
@@ -21,16 +21,30 @@ export interface InlineItem {
 
 export interface PageParts {
   readonly inline: readonly InlineItem[];
-  /** `src` of external scripts, in document order. */
+  /**
+   * `src` of external scripts a browser with module support loads, in document order. A classic
+   * script with `nomodule` is skipped there ("prepare the script element"), so it is listed in
+   * `nomoduleSrcs` instead.
+   */
   readonly scriptSrcs: readonly string[];
+  /** `src` of classic scripts with `nomodule`, the legacy bundles only old browsers load. */
+  readonly nomoduleSrcs: readonly string[];
   /** `href` of `<link rel="modulepreload">`. */
   readonly modulePreloads: readonly string[];
   /** `component-url`, `renderer-url` and `before-hydration-url` of `<astro-island>` elements. */
   readonly islandUrls: readonly string[];
-  /** Content of each `<meta http-equiv="Content-Security-Policy">`, entities decoded. */
+  /** Content of each `<meta http-equiv="Content-Security-Policy">` in `<head>`, entities decoded. */
   readonly metaPolicies: readonly string[];
+  /**
+   * `<meta>` policies the browser ignores: outside `<head>` (CSP3 applies a meta policy only when
+   * the element is a child of head), inside `<noscript>` (raw text when scripts run) or inside
+   * `<template>` (inert content). They are not in `metaPolicies`.
+   */
+  readonly ignoredMetaPolicies: ReadonlyArray<{ readonly content: string; readonly where: string }>;
   /** Text of inline scripts that run as JavaScript (classic or module), for import and syntax scans. */
   readonly inlineJs: readonly string[];
+  /** `inlineJs` without classic `nomodule` scripts: what a browser with module support runs on load. */
+  readonly inlineJsOnLoad: readonly string[];
   /**
    * True when a `<meta>` policy comes after a script, style or stylesheet link. A meta policy only
    * applies to what the parser meets after it, so anything earlier runs unrestricted.
@@ -92,50 +106,88 @@ export function hashSources(text: string): InlineItem['hashes'] {
   return { sha256: digest('sha256'), sha384: digest('sha384'), sha512: digest('sha512') };
 }
 
-// One pass over the document, in order: comments, raw-text elements with their content, other start tags.
-const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+// Elements the parser keeps in <head>. Any other start tag (and <body>) begins the body.
+const HEAD_ELEMENTS = new Set(['base', 'basefont', 'bgsound', 'link', 'meta', 'noframes', 'noscript', 'script', 'style', 'template', 'title']);
+
+// One pass over the document, in order: comments, raw-text and text-only elements with their
+// content, other start tags, end tags. The parser reads the content of <title>, <textarea>, <xmp>,
+// <iframe>, <noembed>, <noframes> and <plaintext> as text, so a <meta> or <script> written inside
+// one is not an element and must not be counted (only script and style content is used).
+// The raw-text tag name must end at whitespace, "/" or ">", so a custom element such as
+// <style-switcher> or <script-loader> is an ordinary tag (a \b would match before the "-").
+const TOKENS = /<!--[\s\S]*?(?:-->|$)|<(script|style|title|textarea|xmp|iframe|noembed|noframes|plaintext)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?:<\/\1\s*>|$)|<([a-zA-Z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|<\/([a-zA-Z][\w:-]*)[^>]*>/gi;
 
 export function parsePage(html: string): PageParts {
   const inline: InlineItem[] = [];
   const scriptSrcs: string[] = [];
+  const nomoduleSrcs: string[] = [];
+  const inlineJsOnLoad: string[] = [];
   const modulePreloads: string[] = [];
   const islandUrls: string[] = [];
   const metaPolicies: string[] = [];
+  const ignoredMetaPolicies: Array<{ content: string; where: string }> = [];
   const inlineJs: string[] = [];
+  // Where the tree builder is, reduced to what decides whether a <meta> lands in <head>: before or
+  // in head, after </head> (a head element there still goes into head), or in the body. Text is not
+  // tracked, so non-whitespace text before the first body tag does not end the head here.
+  let where: 'head' | 'after-head' | 'body' = 'head';
+  let noscript = 0;
+  let template = 0;
   let contentSeen = false;
   let metaAfterContent = false;
   const add = (kind: InlineKind, text: string, label: string) => inline.push({ kind, text, label, hashes: hashSources(text) });
 
-  for (const m of html.matchAll(TOKENS)) {
+  // The HTML parser turns CRLF and lone CR into LF before tokenizing, so element content and
+  // attribute values alike are hashed with LF. A CR written as &#13; is decoded later and stays.
+  for (const m of html.replace(/\r\n?/g, '\n').matchAll(TOKENS)) {
     const whole = m[0];
     if (whole.startsWith('<!--')) continue;
+    const endTag = m[5]?.toLowerCase();
+    if (endTag !== undefined) {
+      if (endTag === 'template') template = Math.max(0, template - 1);
+      else if (endTag === 'noscript') noscript = Math.max(0, noscript - 1);
+      else if (endTag === 'head' && where === 'head' && template === 0) where = 'after-head';
+      continue;
+    }
     const rawElement = m[1]?.toLowerCase();
     const tagName = rawElement ?? m[4]?.toLowerCase() ?? '';
+    // Inside a template nothing joins the document, so the head does not end there.
+    const metaPlace = template ? 'inside <template>' : noscript ? 'inside <noscript>' : where === 'body' ? 'outside <head>' : undefined;
+    if (template === 0 && tagName !== 'html' && tagName !== 'head' && !HEAD_ELEMENTS.has(tagName)) where = 'body';
+    if (tagName === 'template') template++;
+    else if (tagName === 'noscript') noscript++;
     const attrs = parseAttributes(rawElement === undefined ? whole : `<${rawElement}${m[2] ?? ''}>`);
 
     for (const [name, value] of attrs) {
       if (/^on[a-z]+$/.test(name)) add('script-attr', value, `<${tagName} ${name}>`);
     }
     if (attrs.has('style')) add('style-attr', attrs.get('style') ?? '', `<${tagName} style>`);
+    // <plaintext> has no end tag: everything after it is text.
+    if (rawElement === 'plaintext') break;
     const isStylesheet = tagName === 'link' && (attrs.get('rel') ?? '').toLowerCase().split(/\s+/).includes('stylesheet');
     if (rawElement === 'style' || isStylesheet || (rawElement === 'script' && scriptKind(attrs.get('type')) !== 'data')) contentSeen = true;
     if (rawElement === 'script') {
       const src = attrs.get('src');
       const kind = scriptKind(attrs.get('type'));
+      // nomodule only applies to classic scripts; a module script with it still runs.
+      const legacy = kind === 'js' && attrs.has('nomodule');
       if (src !== undefined) {
-        if (kind === 'js' || kind === 'module') scriptSrcs.push(src);
+        if (legacy) nomoduleSrcs.push(src);
+        else if (kind === 'js' || kind === 'module') scriptSrcs.push(src);
         continue;
       }
       if (kind === 'data') continue;
-      // The HTML parser turns CRLF and lone CR into LF before the browser hashes the text.
-      const text = (m[3] ?? '').replace(/\r\n?/g, '\n');
+      const text = m[3] ?? '';
       // "Prepare the script element" stops before any CSP check when there is no src and the text
       // is empty, so an empty <script></script> needs no hash. Whitespace-only text is still checked.
       if (text === '') continue;
       add('script-elem', text, `<script${kind === 'module' ? ' type="module"' : kind === 'checked' ? ` type="${attrs.get('type')}"` : ''}>`);
-      if (kind !== 'checked') inlineJs.push(text);
+      if (kind !== 'checked') {
+        inlineJs.push(text);
+        if (!legacy) inlineJsOnLoad.push(text);
+      }
     } else if (rawElement === 'style') {
-      add('style-elem', (m[3] ?? '').replace(/\r\n?/g, '\n'), '<style>');
+      add('style-elem', m[3] ?? '', '<style>');
     } else if (tagName === 'link') {
       const rel = (attrs.get('rel') ?? '').toLowerCase().split(/\s+/);
       const href = attrs.get('href');
@@ -146,9 +198,13 @@ export function parsePage(html: string): PageParts {
         if (url) islandUrls.push(url);
       }
     } else if (tagName === 'meta' && (attrs.get('http-equiv') ?? '').toLowerCase() === 'content-security-policy') {
-      metaPolicies.push(attrs.get('content') ?? '');
-      if (contentSeen) metaAfterContent = true;
+      const content = attrs.get('content') ?? '';
+      if (metaPlace !== undefined) ignoredMetaPolicies.push({ content, where: metaPlace });
+      else {
+        metaPolicies.push(content);
+        if (contentSeen) metaAfterContent = true;
+      }
     }
   }
-  return { inline, scriptSrcs, modulePreloads, islandUrls, metaPolicies, inlineJs, metaAfterContent };
+  return { inline, scriptSrcs, nomoduleSrcs, modulePreloads, islandUrls, metaPolicies, ignoredMetaPolicies, inlineJs, inlineJsOnLoad, metaAfterContent };
 }

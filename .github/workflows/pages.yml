@@ -1,6 +1,7 @@
 # Builds the apps that work as static files and deploys them to GitHub Pages, at
 # https://fedemedinilla.github.io/applied-ai-toolkit/ (Caja, Receipt, Replay Lab, Site checklist,
 # and a landing page that lists them). The apps that need a server are not published.
+# The docs site (docs-site/, generated from the READMEs) is built into docs/ of the same artifact.
 # Pages has to be enabled once in the repository: Settings > Pages > Source: GitHub Actions.
 #
 # No secret is read. The build job can only read the repository. The deploy job holds the two
@@ -8,6 +9,8 @@
 # artifact the build job uploaded. agent-playbook/test/workflow-secrets.test.ts checks this file
 # with that policy and every other workflow with none.
 # Actions are pinned to the commit SHA of their release tag, with the version in a comment.
+# upload-pages-artifact is a composite action: v5.0.0 pins the upload-artifact it calls by SHA too
+# (v3 called it by the movable v4 tag). Since v4 it leaves dotfiles out; dist/pages has none.
 name: Pages
 
 on:
@@ -30,7 +33,7 @@ defaults:
 
 jobs:
   build:
-    name: Build the static demos
+    name: Build the static demos and the docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,6 +45,9 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            docs-site/package-lock.json
 
       - run: npm ci
 
@@ -54,13 +60,21 @@ jobs:
           ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
 
       # The same guard CI runs, over the builds that are about to be published, with the same
-      # placeholder: the secrets check searches Caja's build for it.
+      # placeholder: the secrets check searches every published build for it.
       - name: Guard the published builds
         run: npm run guard:pages
         env:
           ANTHROPIC_API_KEY: ci-placeholder-anthropic-0001
 
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+      # The docs site has its own lockfile, so the root npm ci above installs nothing for it. Its
+      # build writes the pages from the READMEs, fails on a broken relative link, and checks every
+      # internal link of the result. It is copied in after build:pages, which empties dist/pages/.
+      - name: Build the docs into docs/
+        run: |
+          npm run build:docs
+          cp -R docs-site/dist dist/pages/docs
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist/pages
 
@@ -77,4 +91,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

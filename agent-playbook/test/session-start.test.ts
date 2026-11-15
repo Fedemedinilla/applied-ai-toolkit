@@ -100,6 +100,27 @@ describe('session-start.sh', () => {
     expect(read(join(project, '.cache/session-env.sh'))).toContain(line);
   });
 
+  it('reads .node-version with a leading v or any whitespace around it', () => {
+    write(join(fakeBin, 'node'), fakeNode(WANTED), 0o755);
+    for (const text of [`v${WANTED}\n`, `${WANTED}\t\n`, ` v${WANTED}\r\n`]) {
+      write(join(project, '.node-version'), text);
+      expect(run(), JSON.stringify(text)).toMatchObject({ code: 0, stderr: '' });
+    }
+    expect(read(join(tmp, 'curl.log'))).toBe('');
+  });
+
+  it('stops with a clear message when .node-version is not an exact version', () => {
+    write(join(fakeBin, 'node'), fakeNode('22.0.0'), 0o755);
+    for (const text of ['lts/*\n', '24\n', 'vv24.1.0\n']) {
+      write(join(project, '.node-version'), text);
+      const result = run();
+      expect(result.code, text).not.toBe(0);
+      expect(result.stderr).toContain('.node-version');
+    }
+    expect(read(join(tmp, 'curl.log'))).toBe('');
+    expect(npmCalls()).toEqual([]);
+  });
+
   it('downloads the pinned Node, checks it against SHASUMS256.txt and puts it first on PATH', () => {
     write(join(fakeBin, 'node'), fakeNode('22.0.0'), 0o755);
     const result = run();

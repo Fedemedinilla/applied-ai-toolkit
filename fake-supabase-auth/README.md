@@ -38,14 +38,14 @@ it('verifies the session locally with ES256', async () => {
 
 supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one option covers both. Code that builds its own client from the global fetch can use `vi.stubGlobal('fetch', fake.fetch)` instead.
 
-`createFakeSupabase(options)` takes an optional `url` (default `http://supabase.test`), `publishableKey`, seed `users` and `otpCode`. It returns:
+`createFakeSupabase(options)` takes an optional `url`, an origin with no path (default `http://supabase.test`; a path throws), `publishableKey`, seed `users` and `otpCode`. It returns:
 
 | Field | What it is |
 |---|---|
 | `fetch` | The fake. It throws for any origin other than `url`, so a test cannot reach the network through it. |
 | `calls`, `requests` | Every request in order: `"GET /auth/v1/user"` strings, and the method, path, query, headers and parsed body. |
 | `user`, `users`, `otherUserId` | The seeded user, all users by id, and the sub a tampered token claims. |
-| `authorize(url)` | Plays the OAuth provider: takes the authorize URL from `signInWithOAuth` and returns the code for `exchangeCodeForSession`, bound to the PKCE challenge in that URL. |
+| `authorize(url, userId?)` | Plays the OAuth provider: takes the authorize URL from `signInWithOAuth` and returns the code for `exchangeCodeForSession`, bound to the PKCE challenge in that URL. The code signs in `userId`, which defaults to `user`. An id with no user is accepted here, and the exchange then answers 404 `user_not_found`. |
 | `deleteUser(id)` | Like `auth.admin.deleteUser`: the user and its refresh tokens are gone. |
 | `knobs` | Mutable fields read on every request (below). |
 
@@ -57,7 +57,7 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 | `tamper` | Issued tokens carry another user's sub with the original signature. |
 | `symmetric` | New tokens are HS256 with no `kid`, and the JWKS is empty, as on a project with the shared JWT secret. |
 | `failWith` | Every Auth request answers this status with a body that is not JSON. PostgREST is not affected. |
-| `hang` | Every request waits until its `AbortSignal` fires, then fails the way Node's fetch does. A request with no signal fails at once with an error that says so, instead of stalling until the test timeout. |
+| `hang` | Every request waits until its `AbortSignal` fires, then fails the way Node's fetch does. A string or URL input with no signal fails at once with an error that says so, instead of stalling until the test timeout. A `Request` passed as the input always has a signal, even one built without it, and the fake cannot tell the two apart, so give such a `Request` a timeout. |
 | `delays` | Milliseconds of delay per path, for example `{ '/auth/v1/verify': 300 }`, also abortable. The signal can come in `init` or on a `Request` passed as the input. |
 | `override` | Answers any request before the fake does: a 429 on `/otp`, a hook rejection, a single 500. |
 | `rest` | The PostgREST handler. `restTables({ notes: [...] })` in `src/rest.ts` serves GET reads with `select`, `eq`, `limit` and `.single()`. |
@@ -72,11 +72,11 @@ supabase-js hands `global.fetch` to both the Auth client and PostgREST, so one o
 
 **Outage bodies that are not JSON.** `failWith` answers plain text, as a gateway in front of a dead Auth does. auth-js has a separate branch for an unparseable 5xx body, and a JSON body would skip it.
 
-**State where Auth keeps state.** Codes from `/otp` are single use. Refresh tokens rotate, and reusing a spent one gets 400 `refresh_token_already_used`. `/logout` honors `scope` (`global`, `local`, `others`), so a test can sign out one device and check another still refreshes. PKCE codes check the verifier against the S256 challenge. A stateless fake would accept a replayed code or a stolen refresh token, and the test of the code that should reject them would pass anyway.
+**State where Auth keeps state.** Codes from `/otp` are single use. Refresh tokens rotate, and reusing a spent one gets 400 `refresh_token_already_used` and revokes every refresh token of that session, as Auth's reuse detection does. `/logout` honors `scope` (`global`, `local`, `others`), so a test can sign out one device and check another still refreshes. PKCE codes check the verifier against the S256 challenge. A stateless fake would accept a replayed code or a stolen refresh token, and the test of the code that should reject them would pass anyway.
 
 **A gateway check on the key.** A request whose `apikey` header is not the publishable key gets the gateway's 401 before Auth or PostgREST sees it. A client built with the wrong key fails in the test instead of only in production.
 
-**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404, and a PostgREST feature that `restTables` does not implement (a count, `order`, a filter other than `eq`, a `limit` that is not a whole number) answers 501. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
+**Unsupported is an error, not a plausible answer.** A route the fake does not know answers 404. On a known Auth route, a feature the fake lacks gets the same 404 in Auth's error shape. That covers a phone number on `/otp` or `/verify`, a `token_hash` on `/verify`, and any `/token` grant other than `pkce` and `refresh_token`, password sign-in included. A PostgREST feature that `restTables` does not implement answers 501. That covers a count, `order`, a filter other than `eq` and a `limit` that is not a whole number. It also covers a response format such as `.csv()`, a schema other than `public`, a JSON path and a `*` inside a column list. A column that no row of the table has gets PostgREST's 400 `42703`, so a typo in a column name fails as it would in production; an empty table cannot tell and answers `[]`. Both carry code `not_in_fake` and name what was asked, so a test that needs more fails loudly and gets its own `rest` or `override`. Without this, `select('*', { count: 'exact' })` would come back with `count: null` and no error.
 
 ## What the installed client does
 
@@ -93,15 +93,15 @@ The tests pin these behaviors of `@supabase/supabase-js` 2.118.0. Some differ fr
 
 ## What the tests cover
 
-`test/fake-auth.test.ts` runs 31 tests, all through the real `createClient`. `test/readme-example.test.ts` runs the example above as written.
+`test/fake-auth.test.ts` runs 44 tests, all through the real `createClient`. `test/readme-example.test.ts` runs the example above as written.
 
-- Email code sign-in with a wrong code, the right code, a reused code, `shouldCreateUser: false`, a 429 through `override` and a wrong API key.
-- The OAuth PKCE exchange, a reused code and a verifier that does not match.
-- `getClaims` with ES256 (JWKS only, then cached), with HS256 (`/user` each call), a tampered token on both, Auth answering 503 to the JWKS.
-- An expired token is refreshed and rotated, a spent refresh token is rejected, a 5xx is retried for 30 seconds under fake timers, and a 400 removes the session. The 60 second cooldown after a failed refresh, then recovery.
-- A deleted user on the ES256 and HS256 paths and on sign-out. Logout with scope `local` and `others`, checking both the revoked and the surviving refresh token.
-- Auth hanging past an `AbortSignal.timeout`, a per-route delay on either side of the deadline, a signal aborted before the call, a signal carried on a `Request`, and `hang` with no signal.
-- PostgREST headers and bearer token on a select, filtering and projection, `limit`, `.single()`, an unknown table, an unsupported filter, a count and a bad `limit` rejected, the 503 retry and a 500.
+- Email code sign-in with a wrong code, the right code, a reused code, an email in another case, `shouldCreateUser: false`, a 429 through `override` and a wrong API key. Phone codes, `token_hash` links, password and id_token sign-in get `not_in_fake`.
+- The OAuth PKCE exchange, a reused code, a verifier that does not match, and `authorize` for a second user or an unknown one.
+- `getClaims` with ES256 (JWKS only, then cached), with HS256 (`/user` each call), a tampered token on both, a signature with characters outside base64url, Auth answering 503 to the JWKS. An expired token passed to `/user` and `/logout`.
+- An expired token is refreshed and rotated. A spent refresh token is rejected and revokes the rest of its session. A 5xx is retried for 30 seconds under fake timers, and a 400 removes the session. The 60 second cooldown after a failed refresh, then recovery.
+- A deleted user on the ES256 and HS256 paths and on sign-out. Logout with the default scope `global`, with `local` and with `others`, checking both the revoked and the surviving refresh token.
+- Auth hanging past an `AbortSignal.timeout`, a per-route delay on either side of the deadline, a signal aborted before the call, a signal carried on a `Request`, a signal that aborts during the body read, and `hang` with no signal.
+- PostgREST headers and bearer token on a select, filtering and projection, `limit`, `.single()`, an unknown table, an unsupported filter, a count and a bad `limit` rejected, the 503 retry and a 500. Also `eq.null` against NULL, another `Accept` or schema, a JSON path, a `*` in a list and an unknown column.
 
 ## Layout
 

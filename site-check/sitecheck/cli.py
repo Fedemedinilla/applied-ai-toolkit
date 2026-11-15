@@ -2,12 +2,18 @@
 
 Options:
   URL                     the home of the site, http(s), root path ("/" or empty);
-                          required, except with --rerender (then it is read from datos.json)
+                          required, except with --rerender (then it is read from run.json)
   --name NAME             the organisation's name (VIS-04 title test; report header)
   --kind KIND             kind of organisation, for the wording of the report:
-                          colegio, escuela, instituto, jardín, empresa or institución
-                          (default; kinds.py; anything else is exit 2)
-  --to TEXT               the "Para:" line of the report (default "Dirección")
+                          school, institute, kindergarten, company or organisation
+                          (default), or the Spanish noun the report uses: colegio,
+                          escuela, instituto, jardín, empresa, institución
+                          (kinds.py; anything else is exit 2)
+  --to TEXT               who the report is addressed to (default "Dirección";
+                          "Management" with --lang en)
+  --lang LANG             report language: es (default) or en. The sentences of the
+                          rules exist in Spanish only, so the English report states
+                          each rule with a fixed text (i18n.py)
   --inner-page URL        an inner page to read (measured only if the home links it)
   --form-page URL         a page with a form for VIS-13 (measured only if the home links it)
   --psi-runs N            mobile PageSpeed runs, 1..5 (default 3; the median is used)
@@ -15,10 +21,13 @@ Options:
   --observatory           also ask MDN Observatory for its header grade (off by default)
   --pause SECONDS         pause between site requests, 3 (default) to 60; never below 3
   --max-requests N        site request budget, 1 to 90 (default 90); never above 90
-  --overrides FILE        colour overrides {ID: {"color", "motivo"}}, each with its reason
-  --rerender DATOS_JSON   rebuild the report of an earlier run from its datos.json, no requests
-  --compare BEFORE AFTER  compare two stored runs (folders or datos.json files), no requests;
-                          writes comparacion.md and comparacion.json into the AFTER folder
+  --json                  print the stored run (the text of run.json) on stdout; the
+                          console summary goes to stderr
+  --sarif FILE            also write the rules that did not pass as SARIF 2.1.0 (sarif.py)
+  --overrides FILE        colour overrides {ID: {"colour", "reason"}}, each with its reason
+  --rerender RUN_JSON   rebuild the report of an earlier run from its run.json, no requests
+  --compare BEFORE AFTER  compare two stored runs (folders or run.json files), no requests;
+                          writes comparison.md and comparison.json into the AFTER folder
   --out DIR               output root (default $SITE_CHECK_OUT, else ./site-check-runs)
   --exclude FILE          an exclusion list (default $SITE_CHECK_EXCLUDE); <out>/exclude.txt is read too
   --version               print the version
@@ -53,7 +62,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import __version__
+from . import __version__, domains
 from .config import (
     DEFAULT_KIND,
     DEFAULT_PACE_SECONDS,
@@ -69,7 +78,8 @@ from .config import (
 )
 from .endpoints import CONTROL_ENV_VAR, control_domain_from_env
 from .exclusions import ENV_VAR as EXCLUDE_ENV_VAR
-from .kinds import KINDS, normalize_kind
+from .i18n import DEFAULT_LANG, LANGS, catalog
+from .kinds import CLI_NAMES, KINDS, normalize_kind
 
 # Top-level module names already loaded when the CLI was imported (the
 # interpreter's own startup, or the test runner). Only modules loaded AFTER
@@ -98,19 +108,29 @@ def build_parser() -> argparse.ArgumentParser:
         prog="site-check",
         description=(
             "Passive, outside-in website check: reads only what the site serves to any visitor, plus public "
-            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes datos.json, informe.md and anexo-tecnico.md."
+            "DNS, RDAP, Spamhaus and PageSpeed answers, and writes run.json, report.md and technical-annex.md. "
+            "The report is written in Spanish, or by rule in English with --lang en."
         ),
         epilog=(
             "Example: SITE_CHECK_CONTROL_DOMAIN=your-own-site.example "
-            "python3 -m sitecheck https://www.example.org/ --name \"Example School\" --kind colegio"
+            "python3 -m sitecheck https://www.example.org/ --name \"Example School\" --kind school"
         ),
         allow_abbrev=False,
     )
     p.add_argument("url", nargs="?", metavar="URL", help="home page of the site (http or https, no path)")
     p.add_argument("--name", metavar="NAME", help="the organisation's name, for the title check and the report")
-    p.add_argument("--kind", metavar="KIND", default=None, help=f"kind of organisation: {', '.join(KINDS)} (default: {DEFAULT_KIND})")
-    p.add_argument("--to", dest="para", metavar="TEXT", default=None, help=f'the "Para:" line of the report (default: {DEFAULT_PARA})')
-    p.add_argument("--inner-page", dest="interna", metavar="URL", help="inner page; read only if the home links it")
+    p.add_argument(
+        "--kind", metavar="KIND", default=None,
+        help=f"kind of organisation: {', '.join(CLI_NAMES)} (default: organisation); "
+        f"the Spanish nouns of the report are accepted too ({', '.join(KINDS)})",
+    )
+    p.add_argument("--to", dest="to", metavar="TEXT", default=None, help=f"who the report is addressed to (default: {DEFAULT_PARA})")
+    p.add_argument(
+        "--lang", metavar="LANG", default=None, choices=LANGS,
+        help=f"report language: {' or '.join(LANGS)} (default: {DEFAULT_LANG}, or with --rerender the language the run "
+        "was written in). The en report states each rule with a fixed text; the detailed sentences are Spanish only",
+    )
+    p.add_argument("--inner-page", dest="inner_page", metavar="URL", help="inner page; read only if the home links it")
     p.add_argument("--form-page", dest="form_page", metavar="URL", help="page with a form; read only if the home links it")
     p.add_argument(
         "--psi-runs", dest="psi_runs", type=int, default=DEFAULT_PSI_RUNS, metavar="N",
@@ -126,11 +146,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-requests", dest="max_requests", type=int, default=DEFAULT_SITE_BUDGET, metavar="N",
         help=f"site request budget, 1 to {DEFAULT_SITE_BUDGET} (default: {DEFAULT_SITE_BUDGET})",
     )
-    p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"color", "motivo"}}')
-    p.add_argument("--rerender", metavar="DATOS_JSON", help="rebuild the report from a datos.json, without requests")
+    p.add_argument("--json", dest="json_out", action="store_true", help="print the stored run (run.json) on stdout; the summary goes to stderr")
+    p.add_argument("--sarif", metavar="FILE", help="also write the rules that did not pass as SARIF 2.1.0 (red: error, yellow: warning, blue: note)")
+    p.add_argument("--overrides", metavar="FILE", help='colour overrides with a reason: {ID: {"colour", "reason"}}')
+    p.add_argument("--rerender", metavar="RUN_JSON", help="rebuild the report from a stored run (run.json, or a datos.json of an earlier version), without requests")
     p.add_argument(
         "--compare", nargs=2, metavar=("BEFORE", "AFTER"),
-        help="compare two stored runs (folders or datos.json files) without requests; writes into the AFTER folder",
+        help="compare two stored runs (folders or run.json files) without requests; writes comparison.md and "
+        "comparison.json into the AFTER folder",
     )
     p.add_argument("--out", metavar="DIR", help="output root (default: $SITE_CHECK_OUT, else ./site-check-runs)")
     p.add_argument("--exclude", metavar="FILE", help=f"exclusion list, one domain per line (default: ${EXCLUDE_ENV_VAR})")
@@ -207,6 +230,8 @@ def _check_home_url(url: str, *, test_hooks: bool) -> str | None:
         pass
     if "." not in host.strip("."):
         return "the domain of the URL is not valid"
+    if domains.idna_deviation(host.lower()):
+        return f"the domain of the URL is not valid: {domains.DEVIATION_PROBLEM}"
     is_test_host = host.rstrip(".").lower().endswith(TEST_SUFFIX)
     if test_hooks and not is_test_host:
         return "the test options only work with a .test domain"
@@ -257,7 +282,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
     SystemExit(2) through argparse.error.
 
     With --rerender, no URL is accepted, and --to and --kind stay empty unless
-    given (the values recorded in datos.json are used then).
+    given (the values recorded in run.json are used then).
     """
     parser = build_parser()
     args = parser.parse_args(list(argv))
@@ -268,7 +293,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         parser.error(f"--pause must be between {DEFAULT_PACE_SECONDS:g} and {MAX_PACE_SECONDS:g} seconds")
     if not 1 <= args.max_requests <= DEFAULT_SITE_BUDGET:
         parser.error(f"--max-requests must be between 1 and {DEFAULT_SITE_BUDGET}")
-    for name, option in (("name", "--name"), ("kind", "--kind"), ("para", "--to")):
+    for name, option in (("name", "--name"), ("kind", "--kind"), ("to", "--to")):
         value = getattr(args, name)
         if value is not None and not value.strip():
             parser.error(f"{option} cannot be empty")
@@ -276,10 +301,13 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
     if args.kind is not None:
         kind_key = normalize_kind(args.kind)
         if kind_key is None:
-            parser.error(f"--kind must be one of: {', '.join(KINDS)}")
+            parser.error(f"--kind must be one of: {', '.join((*CLI_NAMES, *KINDS))}")
         args.kind = kind_key
 
     out_root = Path(args.out).absolute() if args.out else default_output_root()
+    sarif = Path(args.sarif).absolute() if args.sarif else None
+    if sarif is not None and (sarif.is_dir() or not sarif.parent.is_dir()):
+        parser.error(f"--sarif needs a file path in a folder that exists: {sarif}")
     overrides = Path(args.overrides).absolute() if args.overrides else None
     if overrides is not None and not overrides.is_file():
         parser.error(f"the --overrides file does not exist: {overrides}")
@@ -304,7 +332,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             option
             for option, value in (
                 ("a URL", args.url), ("--rerender", args.rerender), ("--overrides", args.overrides),
-                ("--name", args.name), ("--kind", args.kind), ("--to", args.para), ("--out", args.out),
+                ("--name", args.name), ("--kind", args.kind), ("--to", args.to), ("--lang", args.lang), ("--json", args.json_out), ("--sarif", args.sarif), ("--out", args.out),
                 ("--exclude", args.exclude),
             )
             if value
@@ -327,7 +355,7 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
 
     if args.rerender:
         if args.url:
-            parser.error("--rerender takes no URL: it is read from datos.json")
+            parser.error("--rerender takes no URL: it is read from run.json")
         if test_hooks:
             parser.error("--rerender makes no requests: no test options")
         rerender_from = Path(args.rerender).absolute()
@@ -338,7 +366,10 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
             institution=args.name.strip() if args.name else None,
             kind=args.kind.strip() if args.kind else DEFAULT_KIND,
             kind_explicit=args.kind is not None,
-            para=args.para.strip() if args.para else "",
+            para=args.to.strip() if args.to else "",
+            lang=args.lang,
+            json_out=args.json_out,
+            sarif=sarif,
             overrides=overrides,
             rerender_from=rerender_from,
             out_root=out_root,
@@ -346,12 +377,12 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         )
 
     if not args.url:
-        parser.error("missing the URL of the home page (or --rerender DATOS_JSON)")
+        parser.error("missing the URL of the home page (or --rerender RUN_JSON)")
     url = args.url.strip()
     problem = _check_home_url(url, test_hooks=test_hooks)
     if problem:
         parser.error(problem)
-    for option, value in (("--inner-page", args.interna), ("--form-page", args.form_page)):
+    for option, value in (("--inner-page", args.inner_page), ("--form-page", args.form_page)):
         if value:
             problem = _check_page_url(option, value)
             if problem:
@@ -366,8 +397,11 @@ def parse_args(argv: Sequence[str]) -> RunConfig:
         institution=args.name.strip() if args.name else None,
         kind=args.kind.strip() if args.kind else DEFAULT_KIND,
         kind_explicit=args.kind is not None,
-        para=args.para.strip() if args.para else DEFAULT_PARA,
-        interna=args.interna.strip() if args.interna else None,
+        para=args.to.strip() if args.to else catalog(args.lang or DEFAULT_LANG)["default_to"],
+        lang=args.lang,
+        json_out=args.json_out,
+        sarif=sarif,
+        interna=args.inner_page.strip() if args.inner_page else None,
         form_page=args.form_page.strip() if args.form_page else None,
         psi_runs=args.psi_runs,
         observatory=args.observatory,
@@ -409,16 +443,21 @@ def assert_stdlib_only() -> list[str]:
     Modules that were already loaded when the CLI was imported (interpreter
     startup hooks, the test runner) and modules that live inside the site-check
     folder (the test harness) are not counted: the check is about what sitecheck pulls in.
+
+    The folder exemption is for a source checkout only (site_check.py next to
+    the package). Installed, the folder that holds the package is
+    site-packages, where every third-party module lives: nothing there is exempt.
     """
     stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names)
     own = (__package__ or "sitecheck").partition(".")[0]
     root = package_root().resolve()
+    checkout = (root / "site_check.py").is_file()
     bad: set[str] = set()
     for name, module in list(sys.modules.items()):
         top = name.partition(".")[0]
         if top in stdlib or top in (own, "__main__") or top in _BASELINE_MODULES:
             continue
-        if _under(getattr(module, "__file__", None), root):
+        if checkout and _under(getattr(module, "__file__", None), root):
             continue
         bad.add(top)
     return sorted(bad)
@@ -457,9 +496,38 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from . import pipeline
 
+    # With --json stdout carries the run and nothing else: the summary moves to stderr.
+    summary_out = sys.stderr if config.json_out else sys.stdout
     try:
-        outcome = pipeline.rerender(config) if config.rerender_from is not None else pipeline.run(config)
+        if config.rerender_from is not None:
+            outcome = pipeline.rerender(config, stdout=summary_out)
+        else:
+            outcome = pipeline.run(config, stdout=summary_out)
     except KeyboardInterrupt:
         print("Run interrupted by hand.", file=sys.stderr)
         return int(ExitCode.UNEXPECTED)
+    _machine_outputs(config, outcome.datos_path)
     return int(outcome.exit_code)
+
+
+def _machine_outputs(config: RunConfig, run_path: Path | None) -> None:
+    """--json and --sarif: both are the stored run, read back from the file the run just wrote."""
+    if not (config.json_out or config.sarif is not None):
+        return
+    if run_path is None or not run_path.is_file():
+        print("Note: no run was stored, so --json and --sarif have nothing to write.", file=sys.stderr)
+        return
+    text = run_path.read_text(encoding="utf-8")
+    if config.sarif is not None:
+        import json
+
+        from .i18n import normalize_lang
+        from .outputs import dumps_json
+        from .sarif import to_sarif
+
+        run = json.loads(text)
+        lang = normalize_lang(config.lang or (run.get("meta") or {}).get("report_language"))
+        config.sarif.write_bytes(dumps_json(to_sarif(run, catalog(lang))).encode("utf-8"))
+        print(f"SARIF: {config.sarif}", file=sys.stderr)
+    if config.json_out:
+        sys.stdout.write(text)

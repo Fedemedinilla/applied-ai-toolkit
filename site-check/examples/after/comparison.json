@@ -1,0 +1,487 @@
+{
+  "after": {
+    "by_module": {
+      "EXT": {
+        "applicable": 16,
+        "not_verified": 2,
+        "passed": 12,
+        "with_note": 2
+      },
+      "TOTAL": {
+        "applicable": 36,
+        "not_verified": 4,
+        "passed": 25,
+        "with_note": 5
+      },
+      "VIS": {
+        "applicable": 20,
+        "not_verified": 2,
+        "passed": 13,
+        "with_note": 3
+      }
+    },
+    "canonical_url": "https://www.colegio.test/",
+    "conditions": "celular, tres corridas con el valor del medio, y computadora, una corrida; tiempo del servidor medido tres veces, con un sitio de control en el mismo momento",
+    "domain": "colegio.test",
+    "lighthouse_version": "13.5.0",
+    "psi_runs": {
+      "desktop_valid": true,
+      "requested": 3,
+      "status": "ok",
+      "valid": 3
+    },
+    "started_utc": "2026-11-18T13:00:00+00:00",
+    "tool_version": "1.0.0",
+    "tools": [
+      "la herramienta de velocidad de Google (PageSpeed)",
+      "la lectura de las respuestas del servidor",
+      "la consulta del DNS del dominio",
+      "la consulta pública del registro del dominio",
+      "la lista de bloqueo de Spamhaus"
+    ]
+  },
+  "before": {
+    "by_module": {
+      "EXT": {
+        "applicable": 16,
+        "not_verified": 2,
+        "passed": 7,
+        "with_note": 1
+      },
+      "TOTAL": {
+        "applicable": 36,
+        "not_verified": 4,
+        "passed": 19,
+        "with_note": 3
+      },
+      "VIS": {
+        "applicable": 20,
+        "not_verified": 2,
+        "passed": 12,
+        "with_note": 2
+      }
+    },
+    "canonical_url": "https://www.colegio.test/",
+    "conditions": "celular, tres corridas con el valor del medio, y computadora, una corrida; tiempo del servidor medido tres veces, con un sitio de control en el mismo momento",
+    "domain": "colegio.test",
+    "lighthouse_version": "13.5.0",
+    "psi_runs": {
+      "desktop_valid": true,
+      "requested": 3,
+      "status": "ok",
+      "valid": 3
+    },
+    "started_utc": "2026-10-14T13:00:00+00:00",
+    "tool_version": "1.0.0",
+    "tools": [
+      "la herramienta de velocidad de Google (PageSpeed)",
+      "la lectura de las respuestas del servidor",
+      "la consulta del DNS del dominio",
+      "la consulta pública del registro del dominio",
+      "la lista de bloqueo de Spamhaus",
+      "la lista pública de versiones de WordPress"
+    ]
+  },
+  "days_between": 35,
+  "output": {
+    "code": 0,
+    "name": "OK",
+    "text_control": []
+  },
+  "rows": [
+    {
+      "after": {
+        "text": "2,3 segundos",
+        "trace": "checks[EXT-08].measured.lcp_ms",
+        "value": 2300
+      },
+      "before": {
+        "text": "4,8 segundos",
+        "trace": "checks[EXT-08].measured.lcp_ms",
+        "value": 4830
+      },
+      "change": "2,5 segundos menos",
+      "compared": true,
+      "group": "field",
+      "key": "field_lcp",
+      "meaning": "Google considera bien hasta 2,5 segundos",
+      "reason": null,
+      "what": "Cuánto tarda en aparecer lo principal de la página"
+    },
+    {
+      "after": {
+        "text": "0,15 segundos",
+        "trace": "checks[EXT-08].measured.inp_ms",
+        "value": 150
+      },
+      "before": {
+        "text": "0,18 segundos",
+        "trace": "checks[EXT-08].measured.inp_ms",
+        "value": 180
+      },
+      "change": "0,03 segundos menos",
+      "compared": true,
+      "group": "field",
+      "key": "field_inp",
+      "meaning": "Bien hasta 0,2 segundos",
+      "reason": null,
+      "what": "Cuánto tarda en responder cuando se toca algo"
+    },
+    {
+      "after": {
+        "text": "0,03",
+        "trace": "checks[EXT-08].measured.cls",
+        "value": 0.03
+      },
+      "before": {
+        "text": "0,05",
+        "trace": "checks[EXT-08].measured.cls",
+        "value": 0.05
+      },
+      "change": "0,02 menos",
+      "compared": true,
+      "group": "field",
+      "key": "field_cls",
+      "meaning": "Bien hasta 0,1",
+      "reason": null,
+      "what": "Cuánto se mueve la página mientras carga"
+    },
+    {
+      "after": {
+        "text": "■ 86 (A mejorar)",
+        "trace": "header.mobile.performance.score",
+        "value": 86
+      },
+      "before": {
+        "text": "▲ 45 (Bajo)",
+        "trace": "header.mobile.performance.score",
+        "value": 45
+      },
+      "change": "41 puntos más",
+      "compared": true,
+      "group": "lab",
+      "key": "lab_score_mobile",
+      "meaning": "De 0 a 100; Google considera bien desde 90",
+      "reason": null,
+      "what": "Puntaje de rendimiento en celular (corrida del medio de tres)"
+    },
+    {
+      "after": {
+        "text": "2,2 segundos",
+        "trace": "checks[EXT-08].measured.lab_lcp_ms_median",
+        "value": 2210
+      },
+      "before": {
+        "text": "4,8 segundos",
+        "trace": "checks[EXT-08].measured.lab_lcp_ms_median",
+        "value": 4830
+      },
+      "change": "2,6 segundos menos",
+      "compared": true,
+      "group": "lab",
+      "key": "lab_lcp_mobile",
+      "meaning": "Google considera bien hasta 2,5 segundos",
+      "reason": null,
+      "what": "Cuánto tarda en aparecer lo principal, en celular (valor del medio de tres)"
+    },
+    {
+      "after": {
+        "text": "● 96 (Bien)",
+        "trace": "header.desktop.performance.score",
+        "value": 96
+      },
+      "before": {
+        "text": "■ 78 (A mejorar)",
+        "trace": "header.desktop.performance.score",
+        "value": 78
+      },
+      "change": "18 puntos más",
+      "compared": true,
+      "group": "lab",
+      "key": "lab_score_desktop",
+      "meaning": "De 0 a 100; Google considera bien desde 90",
+      "reason": null,
+      "what": "Puntaje de rendimiento en computadora (una corrida)"
+    },
+    {
+      "after": {
+        "text": "1,2 MB",
+        "trace": "checks[EXT-21].measured.total_bytes",
+        "value": 1250000
+      },
+      "before": {
+        "text": "2,9 MB",
+        "trace": "checks[EXT-21].measured.total_bytes",
+        "value": 3000000
+      },
+      "change": "1,7 MB menos",
+      "compared": true,
+      "group": "lab",
+      "key": "weight_total",
+      "meaning": "Google aconseja no pasar de 1,6 MB",
+      "reason": null,
+      "what": "Cuánto pesa la página principal"
+    },
+    {
+      "after": {
+        "text": "0,3 MB",
+        "trace": "checks[EXT-21].measured.third_party_bytes",
+        "value": 300000
+      },
+      "before": {
+        "text": "0,3 MB",
+        "trace": "checks[EXT-21].measured.third_party_bytes",
+        "value": 300000
+      },
+      "change": "sin cambio",
+      "compared": true,
+      "group": "lab",
+      "key": "weight_third_party",
+      "meaning": "Lo que cargan videos, mapas, chats y estadísticas de otras empresas",
+      "reason": null,
+      "what": "Cuánto de ese peso llega de servicios externos"
+    },
+    {
+      "after": {
+        "text": "menos de una décima de segundo",
+        "trace": "checks[EXT-20].measured.ttfb_ms_median",
+        "value": 1
+      },
+      "before": {
+        "text": "menos de una décima de segundo",
+        "trace": "checks[EXT-20].measured.ttfb_ms_median",
+        "value": 1
+      },
+      "change": "sin cambio",
+      "compared": true,
+      "group": "server",
+      "key": "ttfb",
+      "meaning": "Bien hasta 0,8 segundos",
+      "reason": null,
+      "what": "Cuánto tarda el servidor en empezar a responder (valor del medio de tres)"
+    },
+    {
+      "after": {
+        "text": "menos de una décima de segundo",
+        "trace": "checks[EXT-20].measured.control_ms_median",
+        "value": 1
+      },
+      "before": {
+        "text": "menos de una décima de segundo",
+        "trace": "checks[EXT-20].measured.control_ms_median",
+        "value": 1
+      },
+      "change": "sin cambio",
+      "compared": true,
+      "group": "server",
+      "key": "ttfb_control",
+      "meaning": "Si cambia mucho, cambió la conexión y no el sitio",
+      "reason": null,
+      "what": "Sitio de control medido en el mismo momento (valor del medio de tres)"
+    },
+    {
+      "after": {
+        "text": "6 de 6",
+        "trace": "checks[EXT-01].measured.n_protections",
+        "value": 6
+      },
+      "before": {
+        "text": "2 de 6",
+        "trace": "checks[EXT-01].measured.n_protections",
+        "value": 2
+      },
+      "change": "4 más",
+      "compared": true,
+      "group": "security",
+      "key": "protections",
+      "meaning": "Seis protecciones que ofrecen los navegadores",
+      "reason": null,
+      "what": "Protecciones que el servidor le pide al navegador"
+    },
+    {
+      "after": {
+        "text": "configurada",
+        "trace": "tables.mail.rows[0].value",
+        "value": "configurada"
+      },
+      "before": {
+        "text": "configurada",
+        "trace": "tables.mail.rows[0].value",
+        "value": "configurada"
+      },
+      "change": "sin cambio",
+      "compared": true,
+      "group": "mail",
+      "key": "mail_0",
+      "meaning": "",
+      "reason": null,
+      "what": "Quién puede enviar en nombre del dominio"
+    },
+    {
+      "after": {
+        "text": "no se pudo confirmar desde afuera",
+        "trace": "tables.mail.rows[1].value",
+        "value": "no se pudo confirmar desde afuera"
+      },
+      "before": {
+        "text": "no se pudo confirmar desde afuera",
+        "trace": "tables.mail.rows[1].value",
+        "value": "no se pudo confirmar desde afuera"
+      },
+      "change": "sin cambio",
+      "compared": true,
+      "group": "mail",
+      "key": "mail_1",
+      "meaning": "",
+      "reason": null,
+      "what": "Firma de los mensajes"
+    },
+    {
+      "after": {
+        "text": "configurada: los manda a spam",
+        "trace": "tables.mail.rows[2].value",
+        "value": "configurada: los manda a spam"
+      },
+      "before": {
+        "text": "falta",
+        "trace": "tables.mail.rows[2].value",
+        "value": "falta"
+      },
+      "change": "se agregó",
+      "compared": true,
+      "group": "mail",
+      "key": "mail_2",
+      "meaning": "",
+      "reason": null,
+      "what": "Qué hacer con los mensajes falsos"
+    }
+  ],
+  "schema_version": 1,
+  "still_open": [
+    {
+      "colour": "yellow",
+      "found": "El correo del dominio tiene la lista de quién puede enviar y la regla para los mails falsos; la firma de los mensajes no se pudo confirmar desde afuera",
+      "id": "EXT-05",
+      "name": "¿Pueden mandar mails falsos con el nombre del dominio?"
+    },
+    {
+      "colour": "blue",
+      "found": "El título tiene 48 caracteres y la descripción 153; lo recomendado es 50 a 60 y 120 a 160",
+      "id": "VIS-04",
+      "name": "¿El título y la descripción dicen qué es el sitio?"
+    },
+    {
+      "colour": "blue",
+      "found": "Los datos del colegio están escritos una sola vez en el formato que lee Google; falta comprobar que Google los acepte",
+      "id": "VIS-07",
+      "name": "¿El sitio le da a Google sus datos de contacto y ubicación en el formato que Google lee?"
+    },
+    {
+      "colour": "blue",
+      "found": "Uno de los 8 enlaces revisados de la página principal da más de una vuelta antes de llegar",
+      "id": "VIS-09",
+      "name": "¿Hay links rotos o que dan vueltas antes de llegar?"
+    },
+    {
+      "colour": "blue",
+      "found": "2 textos de la página principal tienen poco contraste con su fondo",
+      "id": "VIS-10",
+      "name": "¿Se lee bien y se ve dónde está el foco al navegar con teclado?"
+    },
+    {
+      "colour": "blue",
+      "found": "1 de las 3 imágenes de la página principal no tiene descripción",
+      "id": "VIS-11",
+      "name": "¿Las imágenes tienen descripción para quien no las ve?"
+    },
+    {
+      "colour": "blue",
+      "found": "El servidor muestra un número de versión en su identificación (FakeSite/1.0)",
+      "id": "EXT-09",
+      "name": "¿El servidor cuenta qué software y versión corre?"
+    },
+    {
+      "colour": "grey",
+      "found": "el ajuste a 320 píxeles y el zoom al 200 % requieren una prueba en navegador",
+      "id": "VIS-12",
+      "name": "¿Se puede usar en un celular angosto y con zoom al 200 %?"
+    },
+    {
+      "colour": "grey",
+      "found": "la página principal no tiene formularios para revisar; los de otras páginas se revisan en navegador",
+      "id": "VIS-13",
+      "name": "¿Los formularios se entienden y los botones se pueden tocar?"
+    },
+    {
+      "colour": "grey",
+      "found": "la consulta de Google se revisa a mano; la lista de Spamhaus no marca el dominio",
+      "id": "EXT-23",
+      "name": "¿Google o las listas de correo marcan al sitio como peligroso?"
+    },
+    {
+      "colour": "grey",
+      "found": "la búsqueda en Google se corre a mano: site:colegio.test viagra OR casino OR replica",
+      "id": "EXT-24",
+      "name": "¿Google muestra páginas ajenas dentro del sitio?"
+    }
+  ],
+  "tool_version": "1.0.0",
+  "transitions": [
+    {
+      "after": "yellow",
+      "before": "red",
+      "id": "EXT-05",
+      "kind": "improved",
+      "name": "¿Pueden mandar mails falsos con el nombre del dominio?"
+    },
+    {
+      "after": "green",
+      "before": "yellow",
+      "id": "EXT-08",
+      "kind": "improved",
+      "name": "¿Qué tan rápido lo ven los usuarios reales en el celular?"
+    },
+    {
+      "after": "green",
+      "before": "yellow",
+      "id": "EXT-21",
+      "kind": "improved",
+      "name": "¿Cuánto pesa la página y cuánto es de terceros?"
+    },
+    {
+      "after": "green",
+      "before": "yellow",
+      "id": "EXT-19",
+      "kind": "improved",
+      "name": "¿Hay una capa de caché o CDN funcionando?"
+    },
+    {
+      "after": "green",
+      "before": "yellow",
+      "id": "EXT-01",
+      "kind": "improved",
+      "name": "¿El sitio le dice al navegador cómo protegerse?"
+    },
+    {
+      "after": "green",
+      "before": "yellow",
+      "id": "EXT-02",
+      "kind": "improved",
+      "name": "¿Se ve qué versión de WordPress usa?"
+    },
+    {
+      "after": "blue",
+      "before": "yellow",
+      "id": "EXT-09",
+      "kind": "improved",
+      "name": "¿El servidor cuenta qué software y versión corre?"
+    },
+    {
+      "after": "green",
+      "before": "blue",
+      "id": "VIS-16",
+      "kind": "improved",
+      "name": "Señales de desactualización"
+    }
+  ]
+}

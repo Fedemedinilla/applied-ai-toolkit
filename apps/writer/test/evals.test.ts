@@ -113,6 +113,23 @@ describe('specifics', () => {
     expect(supported({ kind: 'email', text: 'secretaria@montelirio.example' }, config.school.facts.join('\n'))).toBe(true);
   });
 
+  it('reads a time with a suffix touching it as one time, and a 12-hour time as its 24-hour form', () => {
+    const sheet = 'Atiende de 8:00 a 15:00. Clase a las 8:30.';
+    const unsupported = (text: string) => specifics(text).filter((s) => !supported(s, sheet));
+    expect(specifics('de 8:00hs a 15:00h.')).toEqual([
+      { kind: 'time', text: '8:00' },
+      { kind: 'time', text: '15:00' },
+    ]);
+    expect(unsupported('de 8:00 a 15:00hs, a las 8:30hs.')).toEqual([]);
+    expect(unsupported('from 8:00am to 3:00pm, or 3:00 p.m.')).toEqual([]);
+    expect(unsupported('from 8:00 AM to 3:00 PM.')).toEqual([]);
+    expect(unsupported('at 4:00pm and 3:00am.')).toEqual([
+      { kind: 'time', text: '4:00pm' },
+      { kind: 'time', text: '3:00am' },
+    ]);
+    expect(specifics('a las 3:00 amigas')).toEqual([{ kind: 'time', text: '3:00' }]);
+  });
+
   it('scores a draft: protocol, gaps and each unsupported specific once', () => {
     const sheet = factSheet(config, byId('reunion-campamento'), NOW);
     const invented = '[[COMUNICADO]]\nEstimadas familias:\n\nLas esperamos el **jueves 12 de noviembre a las 18:30** en el aula de 2.º grado. Duración: 45 minutos. El jueves 12 hablamos del campamento.\n\nEquipo docente de 2.º grado\n[[/COMUNICADO]]';

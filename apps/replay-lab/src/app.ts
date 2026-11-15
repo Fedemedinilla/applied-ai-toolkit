@@ -43,6 +43,12 @@ export interface App {
 }
 
 const short = (hash: string): string => hash.slice(0, 16);
+
+/** The message of a thrown value (an Error or a DOMException), or the fallback. */
+function errorText(error: unknown, fallback: string): string {
+  const message: unknown = typeof error === 'object' && error !== null ? (error as { message?: unknown }).message : undefined;
+  return typeof message === 'string' && message.length > 0 ? message : fallback;
+}
 const permille = (p: number): string => `x${(p / 1000).toFixed(p % 100 === 0 ? 1 : 2)}`;
 const mean = (d: Distribution): string => (d.mean100 / 100).toFixed(2);
 
@@ -84,6 +90,10 @@ function formula(entry: LogEntry): string {
 export function mountApp(doc: Document, deps: Deps): App {
   let session: Session | null = null;
   let downloadUrl: string | null = null;
+  // Bumped by every file choice, so a slow read that a newer one replaced is dropped.
+  let importCount = 0;
+  // The running batch: a token that its messages must still match, and its cancel function.
+  let activeBatch: object | null = null;
   let cancelBatch: (() => void) | null = null;
 
   const seedForm = byId<HTMLFormElement>(doc, 'seed-form');
@@ -255,6 +265,7 @@ export function mountApp(doc: Document, deps: Deps): App {
   importInput.addEventListener('change', () => {
     const file = importInput.files?.[0];
     if (!file) return;
+    const thisImport = ++importCount;
     // Refused before the file is read, so a huge file never reaches memory. importRun checks again
     // for direct callers.
     if (file.size > MAX_FILE_BYTES) {
@@ -262,11 +273,20 @@ export function mountApp(doc: Document, deps: Deps): App {
       importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be replayed: ${tooLarge(file.size)}.`));
       return;
     }
+    // Cleared before reading, whatever the outcome: the browser fires no change event when the same
+    // file is chosen again, so a failed read could not be retried otherwise.
+    importInput.value = '';
     importResult.replaceChildren(h(doc, 'p', {}, `Replaying ${file.name}...`));
+    // The session when the read started: a run started or played meanwhile is not replaced.
+    const sessionAtStart = session;
     file.text().then(
       (text) => {
+        if (thisImport !== importCount) return;
+        if (session !== sessionAtStart) {
+          importResult.replaceChildren(h(doc, 'p', {}, `${file.name} was not loaded: a run changed while it was read.`));
+          return;
+        }
         const v = importRun(text, file.size);
-        importInput.value = '';
         if (!v.ok) {
           importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be replayed: ${v.error}.`));
           return;
@@ -284,10 +304,16 @@ export function mountApp(doc: Document, deps: Deps): App {
           h(doc, 'p', {}, `${file.name}: seed "${v.record.seed}", ${v.record.inputs.length} ${v.record.inputs.length === 1 ? 'input' : 'inputs'}, ruleset ${v.record.rulesetVersion}. Replayed to round ${v.state.round}, score ${v.state.score}.`),
           h(doc, 'ul', { class: 'checks' }, line('Inputs hash', v.inputsHashMatches, v.inputsHash), line('Final state hash', v.finalStateHashMatches, v.finalStateHash)),
         );
+        // The core accepts any seed, but startRun trims the field: say so rather than let Start
+        // quietly play another game from the seed shown.
+        if (v.record.seed !== v.record.seed.trim()) {
+          importResult.append(h(doc, 'p', { class: 'note' }, 'This seed has spaces at its start or end. Start trims the seed field, so Start would not replay this run.'));
+        }
         seedInput.value = v.record.seed;
         render(fromReplay(v.record, v.state));
       },
       () => {
+        if (thisImport !== importCount) return;
         importResult.replaceChildren(h(doc, 'p', { class: 'bad' }, `${file.name} could not be read.`));
       },
     );
@@ -307,6 +333,7 @@ export function mountApp(doc: Document, deps: Deps): App {
   runsInput.max = String(MAX_RUNS);
 
   function finishBatch(): void {
+    activeBatch = null;
     cancelBatch = null;
     runButton.disabled = false;
     cancelButton.hidden = true;
@@ -341,7 +368,7 @@ export function mountApp(doc: Document, deps: Deps): App {
 
   batchForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (cancelBatch) return;
+    if (activeBatch) return;
     const request = checkRequest({ runs: Number(runsInput.value), dice: Number(diceSelect.value), seedPrefix: prefixInput.value.trim() });
     if (typeof request === 'string') {
       batchStatus.textContent = `Not started: ${request}.`;
@@ -353,9 +380,25 @@ export function mountApp(doc: Document, deps: Deps): App {
     progress.hidden = false;
     progress.max = request.runs;
     progress.value = 0;
+    // The previous report goes, so a cancelled or failed batch never sits above an old hash.
+    result.replaceChildren();
     batchStatus.textContent = `Running ${request.runs.toLocaleString('en-US')} runs in a worker...`;
     let announcedQuarter = 0;
-    cancelBatch = deps.batch.start(request, (message) => {
+    // A runner may answer before start() returns, so the batch is identified by a token set first,
+    // and the cancel function is kept only while that batch is still the running one.
+    const token = {};
+    activeBatch = token;
+    try {
+      const stop = deps.batch.start(request, onBatchMessage);
+      if (activeBatch === token) cancelBatch = stop;
+    } catch (error) {
+      // new Worker() can throw at once (a SecurityError, no module workers): reset the form.
+      finishBatch();
+      batchStatus.textContent = `The batch failed: ${errorText(error, 'the worker could not start')}.`;
+    }
+
+    function onBatchMessage(message: BatchMessage): void {
+      if (activeBatch !== token) return;
       if (message.type === 'progress') {
         progress.value = message.done;
         // The status line changes once per quarter, so a screen reader is not read every update.
@@ -374,7 +417,7 @@ export function mountApp(doc: Document, deps: Deps): App {
       const ms = deps.now() - started;
       renderReport(message.report, message.hash, ms);
       batchStatus.textContent = `Done: ${message.report.runs.toLocaleString('en-US')} runs, mean score ${mean(message.report.score)}, median ${message.report.score.p50}.`;
-    });
+    }
   });
 
   cancelButton.addEventListener('click', () => {

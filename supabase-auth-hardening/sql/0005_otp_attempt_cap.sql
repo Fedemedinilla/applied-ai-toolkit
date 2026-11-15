@@ -20,7 +20,9 @@
 --
 -- Every attempt counts, including the one that succeeds. The reservation happens before Auth is
 -- asked, under a lock per address, so two verifications of the same address at once cannot both
--- slip under the cap, and nothing has to be deleted on success.
+-- slip under the cap, and nothing has to be deleted on success. The lock holds only if the count
+-- sees what the other session committed, which REPEATABLE READ prevents, so the function refuses to
+-- run at that isolation level.
 --
 -- The table stores a sha256 of the normalized address, never the address. The address comes from
 -- the client, so it can be any text. That is why only addresses that can hold a code are recorded:
@@ -75,6 +77,14 @@ declare
 begin
   if p_email is null or pg_catalog.btrim(p_email) = '' then
     raise exception 'reserve_otp_attempt: the email address is missing' using errcode = 'null_value_not_allowed';
+  end if;
+  -- Under REPEATABLE READ the snapshot is taken before the advisory lock below is granted, so the
+  -- count misses an attempt another session committed while this one waited, and both insert.
+  -- READ COMMITTED counts with a snapshot taken after the lock; under SERIALIZABLE one of two racing
+  -- reservations fails with a serialization error.
+  if pg_catalog.current_setting('transaction_isolation') = 'repeatable read' then
+    raise exception 'reserve_otp_attempt: run it in READ COMMITTED (the default) or SERIALIZABLE, not REPEATABLE READ'
+      using errcode = 'invalid_transaction_state';
   end if;
   v_email := pg_catalog.lower(pg_catalog.btrim(p_email));
 

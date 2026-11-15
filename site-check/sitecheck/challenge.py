@@ -110,7 +110,7 @@ class ChallengeVerdict:
 
 @dataclass(frozen=True)
 class ChallengeEvent:
-    """One detection, as stored in datos.json meta.challenge_events."""
+    """One detection, as stored in run.json meta.challenge_events."""
 
     seq: int  # RequestLog sequence number of the challenged response
     url: str

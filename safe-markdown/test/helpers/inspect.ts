@@ -30,7 +30,11 @@ export function problems(html: string, policy: Policy): string[] {
       const href = el.getAttribute('href') ?? '';
       // Resolved against an origin that is not on any list, as a page on another site would.
       const url = new URL(href, 'https://page.invalid/dir/');
-      if (/^mailto:/i.test(href)) continue;
+      if (/^mailto:/i.test(href)) {
+        // The renderer's shape: one address, one "@", no headers and no percent-encoding.
+        if (!/^mailto:[^\s@?%]+@[^\s@?%]+$/i.test(href)) out.push(`mailto with another shape: ${href}`);
+        continue;
+      }
       if (!['http:', 'https:'].includes(url.protocol)) out.push(`scheme ${url.protocol}`);
       const relative = href.startsWith('/') || href.startsWith('#');
       if (relative && url.host !== 'page.invalid') out.push(`relative href leaves the page: ${href}`);

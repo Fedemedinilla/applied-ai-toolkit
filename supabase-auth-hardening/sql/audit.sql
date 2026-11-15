@@ -7,12 +7,16 @@
 -- RPC, gets rows here that break no rule of its own. Delete the branches it does not follow, or
 -- filter their rows by object name.
 --
+-- Rule 4's revoke from service_role is checked only on trigger functions, which nobody may execute.
+-- Any other function may be granted back to service_role or supabase_auth_admin, as
+-- reserve_otp_attempt and before_user_created_hook are, so a grant to those roles is not reported.
+--
 -- MAINTAIN (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH MATERIALIZED VIEW, LOCK TABLE) exists from
 -- PostgreSQL 17, and Supabase's default grant all includes it there. It is checked only on 17 and later, so the query also runs on 16.
 --
 -- The checks cover every object in public, not only the ones in this folder: a table added later
--- without RLS, or a function left executable by anon, shows up here even if nobody wrote a test
--- for it.
+-- without RLS, a function left executable by anon, or a view that reads past RLS for authenticated
+-- (rule 1 applied to what the view exposes) shows up here even if nobody wrote a test for it.
 
 with
 relations as (
@@ -32,7 +36,7 @@ maintain as (
              else false end
 ),
 functions as (
-  select p.oid, p.oid::regprocedure::text as name, p.prosecdef, p.proconfig
+  select p.oid, p.oid::regprocedure::text as name, p.prokind, p.prorettype, p.prosecdef, p.proconfig
   from pg_catalog.pg_proc as p
   where p.pronamespace = 'public'::regnamespace
     -- Functions that belong to an installed extension follow the extension's own rules.
@@ -77,9 +81,39 @@ where pg_catalog.has_function_privilege('anon', f.oid, 'EXECUTE')
    or pg_catalog.has_function_privilege('authenticated', f.oid, 'EXECUTE')
 
 union all
+-- Rule 4: a trigger function runs as a trigger and is granted to nobody. anon and authenticated are
+-- already reported above. Other functions may be granted back to service_role or
+-- supabase_auth_admin when the server or Auth calls them, so this check is not made for them.
+select 'trigger function executable by service_role or supabase_auth_admin', f.name
+from functions as f
+where f.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype
+  and (pg_catalog.has_function_privilege('service_role', f.oid, 'EXECUTE')
+       or pg_catalog.has_function_privilege('supabase_auth_admin', f.oid, 'EXECUTE'))
+
+union all
+-- Only functions and procedures: Postgres refuses SET on an aggregate or a window function, so a
+-- row for one could never be cleared.
 select 'function without an empty search_path', f.name
 from functions as f
-where not coalesce(f.proconfig @> array['search_path=""'], false)
+where f.prokind in ('f', 'p')
+  and not coalesce(f.proconfig @> array['search_path=""'], false)
+
+union all
+-- A view runs as its owner unless it sets security_invoker, and a materialized view has no RLS at
+-- all, so either one readable by authenticated can show every row of a table whose RLS would hide
+-- them. anon is already reported above. Postgres keeps the option as written, so every spelling of
+-- true counts.
+select 'view readable by authenticated that bypasses RLS', r.name
+from relations as r
+join pg_catalog.pg_class as c on c.oid = r.oid
+where r.relkind in ('v', 'm')
+  and pg_catalog.has_any_column_privilege('authenticated', r.oid, 'SELECT')
+  and (r.relkind = 'm'
+       or not exists (
+         select 1 from pg_catalog.pg_options_to_table(c.reloptions) as o
+         where o.option_name = 'security_invoker'
+           and pg_catalog.lower(o.option_value) in ('t', 'tr', 'tru', 'true', 'y', 'ye', 'yes', 'on', '1')
+       ))
 
 union all
 select 'table without a comment', r.name

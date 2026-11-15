@@ -50,7 +50,7 @@ class OnlySlowTest(unittest.TestCase):
         r = run_e2e(scenario_slow_old_footer(), default_apis("ejemplonorte.test"), url="https://www.ejemplonorte.test/",
                     nombre="Colegio Ejemplo Norte", extra=("--kind", "colegio"))
         self.assertEqual(r.code, 0, r.err)
-        self.assertIn(SPEED_ROW, r.files["informe.md"])
+        self.assertIn(SPEED_ROW, r.files["report.md"])
 
 
 if __name__ == "__main__":

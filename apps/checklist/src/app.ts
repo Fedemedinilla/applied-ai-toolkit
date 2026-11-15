@@ -12,6 +12,7 @@ import {
   ackPreChange,
   applies,
   closeRun,
+  fixedBlockingText,
   matrixApplies,
   newRun,
   parseRun,
@@ -414,12 +415,20 @@ export async function startApp(options: AppOptions): Promise<App> {
     const result = t.dataset.kind === 'pre' ? ackPreChange(catalogue, run, t.dataset.row, t.checked, now()) : ackPostChange(catalogue, run, t.dataset.row, t.checked, now());
     if (!result.ok) {
       t.checked = !t.checked;
-      $(t.dataset.kind === 'pre' ? 'pre-status' : 'post-status').textContent = REFUSALS[result.reason];
+      const blocking = result.reason === 'fixed_items_exist' ? ` ${fixedBlockingText(catalogue, run)}` : '';
+      $(t.dataset.kind === 'pre' ? 'pre-status' : 'post-status').textContent = `${REFUSALS[result.reason]}${blocking}`;
       return;
     }
     apply(result, { focus: t.id });
   });
-  $('record-baseline').addEventListener('click', () => apply(recordBaseline(run, now()), { message: '"Before" recorded.' }));
+  $('record-baseline').addEventListener('click', () => {
+    const result = recordBaseline(run, now());
+    if (!result.ok && result.reason === 'fixed_before_baseline') {
+      say(`${REFUSALS[result.reason]} ${fixedBlockingText(catalogue, run)}`);
+      return;
+    }
+    apply(result, { message: '"Before" recorded.' });
+  });
   $('close-run').addEventListener('click', () => {
     const result = closeRun(catalogue, run, now());
     if (!result.ok) {

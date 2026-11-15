@@ -14,7 +14,7 @@ from enum import IntEnum
 
 
 class ExitCode(IntEnum):
-    OK = 0  # run complete: datos.json, informe.md and anexo-tecnico.md written
+    OK = 0  # run complete: run.json, report.md and technical-annex.md written
     UNEXPECTED = 1  # uncaught error (traceback on stderr, key redacted)
     USAGE = 2  # invalid arguments or configuration (argparse uses 2 too)
     HOME_UNREACHABLE = 3  # home did not answer or was challenged from the first request
@@ -63,7 +63,7 @@ DESCRIPTION: dict[ExitCode, str] = {
     ExitCode.UNEXPECTED: "unexpected error",
     ExitCode.USAGE: "invalid options or configuration",
     ExitCode.HOME_UNREACHABLE: "the home page did not answer or stayed behind an anti-bot check",
-    ExitCode.TEXT_CONTROL: "the text control found a problem in the report; see datos.json salida.control_texto",
+    ExitCode.TEXT_CONTROL: "the text control found a problem in the report; see run.json output.text_control",
     ExitCode.NOT_COMPARABLE: "the two runs were taken with different tools or conditions; nothing was compared",
     ExitCode.EXCLUDED: "the domain is on the exclusion list",
     ExitCode.HACK_GATE: "signs that the site was compromised; the report leads with them",

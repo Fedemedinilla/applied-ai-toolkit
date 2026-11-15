@@ -18,10 +18,22 @@ export interface Site {
   readonly pages: readonly string[];
 }
 
-/** Every file under a folder, as forward-slash paths relative to it, sorted. */
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    // A dangling symlink (ENOENT) or a symlink loop (ELOOP).
+    return false;
+  }
+}
+
+/**
+ * Every file under a folder, as forward-slash paths relative to it, sorted. A symlink counts as
+ * what it points to; a dangling one points to nothing a host could serve, so it is skipped, and so is a symlink loop.
+ */
 export function listFiles(root: string): string[] {
   return readdirSync(root, { recursive: true, encoding: 'utf8' })
-    .filter((p) => statSync(join(root, p)).isFile())
+    .filter((p) => isFile(join(root, p)))
     .map((p) => p.split(sep).join('/'))
     .sort();
 }
@@ -44,7 +56,14 @@ export function openSite(dir: string, basePath: string, exclude: readonly string
     }
   }
   const staticRoot = buildOutput ? join(root, 'static') : root;
-  const pages = listFiles(staticRoot).filter((p) => p.endsWith('.html') && !matchesAny(p, exclude));
+  const html = listFiles(staticRoot).filter((p) => p.endsWith('.html'));
+  const pages = html.filter((p) => !matchesAny(p, exclude));
+  // With no page, every page-based check would pass over nothing: a wrong --dir or a build that
+  // wrote elsewhere would turn CI green.
+  if (pages.length === 0) {
+    const where = buildOutput ? `${dir}/static` : dir;
+    throw new InputError(`--dir ${where} holds no .html page${html.length ? ' outside exclude' : ''}, so there is nothing to check`);
+  }
   return { dir: root, staticRoot, buildOutput, basePath: basePath.replace(/\/+$/, ''), pages };
 }
 
@@ -65,7 +84,7 @@ export function urlPathsForPage(site: Site, page: string): string[] {
 
 export type Resolved =
   | { readonly kind: 'file'; readonly url: string; readonly file: string }
-  | { readonly kind: 'external' | 'missing' | 'bare'; readonly url: string };
+  | { readonly kind: 'external' | 'missing' | 'bare' | 'invalid'; readonly url: string };
 
 /**
  * Maps a script URL found in a page or a module to a file in the static root. `from` is the URL
@@ -75,7 +94,10 @@ export type Resolved =
  */
 export function resolveUrl(site: Site, from: string, url: string, specifier = false): Resolved {
   if (specifier && !/^(?:[a-z][a-z0-9+.-]*:|\/|\.\.?\/)/i.test(url)) return { kind: 'bare', url };
-  const parsed = new URL(url, new URL(from, 'http://site.invalid'));
+  // A URL the browser cannot parse (`https://bad host/a.js`) loads nothing; it is reported, not thrown.
+  const base = new URL(from, 'http://site.invalid').href;
+  if (!URL.canParse(url, base)) return { kind: 'invalid', url };
+  const parsed = new URL(url, base);
   if (parsed.origin !== 'http://site.invalid') return { kind: 'external', url };
   let path: string;
   try {

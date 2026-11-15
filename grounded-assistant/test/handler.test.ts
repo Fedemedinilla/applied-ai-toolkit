@@ -6,11 +6,15 @@ import {
   createAssistantHandler,
   createHistorySigner,
   ModelUnavailable,
+  SALON,
+  SALON_STAFF,
+  SYSTEM_RULES,
   type ModelReply,
   type ProposeInput,
   type Turn,
   type TurnResponse,
 } from '../src/index.ts';
+import { CONTEXT_HEADINGS } from '../src/salon.ts';
 
 const SECRET = 'test-only-history-secret-0123456789abcdef';
 // Wednesday 2026-11-04, 15:00 in Buenos Aires (UTC-3).
@@ -89,11 +93,49 @@ describe('a turn', () => {
     expect(body).toMatchObject({ booking: null, bookingWithdrawn: true, reply: expect.stringContaining('Prefiero no tirarte un número') });
   });
 
+  it('a zero-width space after the sign does not let an invented figure out', async () => {
+    const s = setup([say('El corte de hombre sale $\u200B99.999.'), say("The men's cut is $\u200B99,999.")]);
+    expect((await turn(s.handler, [{ role: 'user', content: 'cuánto sale' }])).body.reply).toContain('Prefiero no tirarte un número');
+    expect((await turn(s.handler, [{ role: 'user', content: 'how much' }], 'en')).body.reply).toContain("I'd rather not give you a figure");
+  });
+
   it('a wrong price on the card’s own service: the card is kept and said in words', async () => {
     const s = setup([say('Balayage: $65.000. Te lo paso.', { service: 'Balayage', stylist: null, date: '2026-11-07', time: '10:00' })]);
     const { body } = await turn(s.handler, [{ role: 'user', content: 'balayage' }]);
     expect(body.booking).not.toBeNull();
     expect(body.reply).toBe('Balayage: $78.000. Te lo paso como pedido para el sábado, 7 de noviembre a las 10:00 con Carla, y del local te confirman el horario.');
+  });
+
+  it('a reply with decomposed accents gets the same money check as a composed one', async () => {
+    const booking = { service: 'Color de raíz, un solo tono', stylist: null, date: '2026-11-07', time: '10:00' };
+    const s = setup([say('Listo, el color de raíz sale $52.000. Te lo paso al local.'.normalize('NFD'), booking)]);
+    const { body } = await turn(s.handler, [{ role: 'user', content: 'color de raíz' }]);
+    expect(body.booking).toMatchObject({ price: 38000 });
+    expect(body.reply).toContain('$38.000');
+    expect(body.reply).not.toContain('$52.000');
+  });
+
+  it('a refusal that quotes the model’s service gets the same link and control cleaning as prose', async () => {
+    const booking = (service: string) => ({ service, stylist: null, date: '2026-11-07', time: null });
+    const s = setup([
+      say('Dale.', booking('visitá https://evil.example/pago ya')),
+      say('Dale.', booking('mirá www.evil.example')),
+      say('Dale.', booking('[clic](https://evil.example)')),
+      say('Dale.', booking('tin\u0007te')),
+      say('Dale.', booking(`servicio ${'x'.repeat(3000)}`)),
+    ]);
+    const replies: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const { status, body } = await turn(s.handler, [{ role: 'user', content: 'hola' }]);
+      expect(status).toBe(200);
+      expect(body.bookingRejected).toBe('service_not_loaded');
+      replies.push(body.reply);
+    }
+    for (const r of replies) {
+      expect(r).not.toMatch(/https?:\/\/|www\.|\]\(|[\u0000-\u0009\u000B-\u001F\u007F]/);
+      expect(r.length).toBeLessThan(250);
+    }
+    expect(replies[2]).toContain('"clic"');
   });
 
   it('links and addresses never go out', async () => {
@@ -174,12 +216,37 @@ describe('the history', () => {
     expect(() => createAssistantHandler({ historySecret: 'short', propose: async () => say('x') })).toThrow(/32 bytes/);
   });
 
+  it('a padded, over-long history goes back exactly as received, and a trimmed copy is refused', async () => {
+    const s = setup([say('  Hola.  '), say('Dale.')]);
+    const long = `  hola  ${'a'.repeat(700)}`;
+    const first = await turn(s.handler, [{ role: 'user', content: long }]);
+    expect(first.body.reply).toBe('  Hola.  ');
+    const history: Msg[] = [
+      { role: 'user', content: long },
+      { role: 'assistant', content: first.body.reply, signature: first.body.signature },
+    ];
+    expect((await turn(s.handler, [...history, { role: 'user', content: 'gracias' }])).status).toBe(200);
+    const trimmed = history.map((m) => ({ ...m, content: m.content.slice(0, 600).trim() }));
+    expect(await turn(s.handler, [...trimmed, { role: 'user', content: 'gracias' }])).toEqual({ status: 400, body: { error: 'history' } });
+  });
+
   it('signatures are checked on the text exactly as signed, before any trimming', async () => {
     const s = setup([say('  Hola.  ')]);
     // plainText and withoutControls do not trim; the reply as sent is what was signed.
     const first = await turn(s.handler, [{ role: 'user', content: 'hola' }]);
     const signer = createHistorySigner(SECRET);
     expect(signer.verify([{ role: 'user', content: 'hola' }, { role: 'assistant', content: first.body.reply }], first.body.signature)).toBe(true);
+  });
+});
+
+describe('the rules quote the salon tables', () => {
+  it.each(['es', 'en'] as const)('%s: the name, every person and both context headings come from salon.ts', (lang) => {
+    const rules = SYSTEM_RULES[lang];
+    expect(rules).toContain(`"${SALON.name}"`);
+    expect(rules).toContain(`context section "${CONTEXT_HEADINGS[lang].notDone}"`);
+    expect(rules).toContain(`context section "${CONTEXT_HEADINGS[lang].notLoaded}"`);
+    for (const { name } of SALON_STAFF) expect(rules).toContain(name);
+    expect(rules).toContain('There are exactly four people: Rubén, Damián, Carla and Vanina.');
   });
 });
 
@@ -195,6 +262,21 @@ describe('request shape and limits', () => {
     const many: Msg[] = Array.from({ length: 9 }, () => ({ role: 'user', content: 'hola' }));
     expect((await turn(s.handler, many)).body).toEqual({ error: 'turn_limit' });
     expect(s.seen).toHaveLength(0);
+  });
+
+  it('405 carries the method error and the Allow header, like every other failure', async () => {
+    const s = setup([]);
+    const res = await s.handler(new Request('https://salon.example/api/assistant'));
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST');
+    expect(await res.json()).toEqual({ error: 'method' });
+  });
+
+  it('the eighth user turn is answered; the ninth is the turn limit', async () => {
+    const s = setup([say('Dale.')]);
+    const eight: Msg[] = Array.from({ length: 8 }, () => ({ role: 'user', content: 'hola' }));
+    expect((await turn(s.handler, eight)).status).toBe(200);
+    expect((await turn(s.handler, [...eight, { role: 'user', content: 'hola' }])).body).toEqual({ error: 'turn_limit' });
   });
 
   it('each turn reaches the model cut to maxChars and trimmed', async () => {
@@ -214,5 +296,25 @@ describe('request shape and limits', () => {
     const handler = createAssistantHandler({ historySecret: SECRET, propose: async () => say('x'), limited: (ip) => ip === '192.0.2.1' });
     const res = await handler(post({ messages: [{ role: 'user', content: 'hola' }] }), { clientAddress: '192.0.2.1' });
     expect(res.status).toBe(429);
+    // A body that records every read: a throttled client's upload is never pulled.
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify({ messages: [{ role: 'user', content: 'hola' }] })));
+        controller.close();
+      },
+    }, { highWaterMark: 0 });
+    const streamed = new Request('https://salon.example/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as RequestInit);
+    expect((await handler(streamed, { clientAddress: '192.0.2.1' })).status).toBe(429);
+    expect(pulls).toBe(0);
+  });
+
+  it('a declared Content-Length above the limit is 413 before the body is read', async () => {
+    const s = setup([say('x')]);
+    const res = await s.handler(post({ messages: [{ role: 'user', content: 'hola' }] }, { 'content-length': '999999' }));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'too_large' });
+    expect(s.seen).toHaveLength(0);
   });
 });

@@ -7,11 +7,11 @@ test can reach a real site.
 Pinned here:
   1. scope guard: a request outside the passive scope raises, is logged and is never sent;
   2. anti-bot challenge: after the host is cut, no further request reaches it;
-  3. the key (a fake one) never appears in datos.json, requests.log or any evidence file;
+  3. the key (a fake one) never appears in run.json, requests.log or any evidence file;
   4. the exclusion list: exit 10 with zero requests and no folder;
   5. report text has no em/en dash and never "certificado";
   6. determinism: the same observations and the same clock give byte-identical
-     datos.json, informe.md and anexo-tecnico.md; every number a sentence prints
+     run.json, report.md and technical-annex.md; every number a sentence prints
      is traced to its measurement; examples/ matches a fresh build.
 Expected phrases are written by hand, case by case.
 """
@@ -29,7 +29,7 @@ from pathlib import Path
 from unittest import mock
 
 import support  # noqa: F401
-from support import TEST_KEY, patched_env, run_cli, temp_dir
+from support import TEST_KEY, patched_env, run_cli, temp_dir, read_run
 
 from sitecheck.challenge import ChallengeDetector, Expect
 from sitecheck.config import RunConfig
@@ -72,7 +72,7 @@ def run_dir(salidas: Path) -> Path:
 
 
 def datos(rd: Path) -> dict:
-    return json.loads((rd / "datos.json").read_text(encoding="utf-8"))
+    return read_run(rd / "run.json")
 
 
 class ScopeGuardEndToEndTest(unittest.TestCase):
@@ -108,7 +108,7 @@ class ScopeGuardEndToEndTest(unittest.TestCase):
             self.assertEqual(code, int(ExitCode.SCOPE_VIOLATION))
             self.assertNotIn(f"{BASE}/wp-json/", site.requested_urls())
             rd = run_dir(salidas)
-            lines = [json.loads(l) for l in (rd / "evidencia" / "requests.log").read_text(encoding="utf-8").splitlines() if l.strip()]
+            lines = [json.loads(l) for l in (rd / "evidence" / "requests.log").read_text(encoding="utf-8").splitlines() if l.strip()]
             refused = [l for l in lines if l["outcome"] == "refused-scope"]
             self.assertEqual(len(refused), 1)
             self.assertTrue(refused[0]["url"].endswith("/wp-json/"))
@@ -165,7 +165,7 @@ class KeyNeverLeaksTest(unittest.TestCase):
                     checked += 1
                     self.assertNotIn(OTHER_FAKE_KEY.encode(), f.read_bytes(), str(f))
             self.assertGreater(checked, 10)
-            for name in ("datos.json", "evidencia/requests.log", "evidencia/psi-mobile-1.json", "evidencia/psi-desktop.json"):
+            for name in ("run.json", "evidence/requests.log", "evidence/psi-mobile-1.json", "evidence/psi-desktop.json"):
                 self.assertTrue((rd / name).exists(), name)
             self.assertNotIn(OTHER_FAKE_KEY, out + err)
             self.assertEqual(datos(rd)["meta"]["clave"], "presente")
@@ -192,7 +192,7 @@ class _FixedLog:
 
 
 class DeterministicOutputTest(unittest.TestCase):
-    """Same observations and same clock: datos.json, informe.md and anexo-tecnico.md are byte-identical."""
+    """Same observations and same clock: run.json, report.md and technical-annex.md are byte-identical."""
 
     def collect_once(self):  # type: ignore[no-untyped-def]
         from sitecheck.collect import collect
@@ -204,7 +204,7 @@ class DeterministicOutputTest(unittest.TestCase):
                 test_loopback=site.loopback, test_services=apis.base,
             )
             with patched_env(SITE_CHECK_TEST_API_KEY=TEST_KEY):
-                services = build_services(config, tmp / "evidencia", sleeper=lambda s: None)
+                services = build_services(config, tmp / "evidence", sleeper=lambda s: None)
                 obs = collect(config, services)
             return obs, dict(services.artifacts.written_map())
 
@@ -240,19 +240,19 @@ class DeterministicOutputTest(unittest.TestCase):
             second = self.run_once(obs, written, b)
             self.assertEqual(first.exit_code, ExitCode.OK)
             self.assertEqual(second.exit_code, first.exit_code)
-            for name in ("datos.json", "informe.md", "anexo-tecnico.md"):
+            for name in ("run.json", "report.md", "technical-annex.md"):
                 self.assertEqual((first.run_dir / name).read_bytes(), (second.run_dir / name).read_bytes(), name)
-            d = json.loads((first.run_dir / "datos.json").read_text(encoding="utf-8"))
+            d = read_run(first.run_dir / "run.json")
             self.assertEqual(len(d["checks"]), 37)
 
     def test_every_number_in_a_sentence_is_traced_to_its_measurement(self) -> None:
         """On the full fake-school run, every number a report sentence prints is either a
         fixed threshold of its rule (listed by hand below) or the rendering of a traced
-        value, and every trace entry resolves to a stored value in datos.json."""
+        value, and every trace entry resolves to a stored value in run.json."""
         obs, written = self.collect_once()
         with temp_dir() as a:
             res = self.run_once(obs, written, a)
-            d = json.loads((res.run_dir / "datos.json").read_text(encoding="utf-8"))
+            d = read_run(res.run_dir / "run.json")
         by_id = {c["id"]: c for c in d["checks"]}
         with_numbers = 0
         for c in d["checks"]:
@@ -344,9 +344,9 @@ class ExampleIsReproducibleTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         with temp_dir() as fresh:
-            code, _, err = module.build(fresh)
+            code, _, err = module.build(fresh, legacy=True)
             self.assertEqual(code, 0, err)
-            for name in module.FILES:
+            for name in (*module.FILES, module.LEGACY):
                 self.assertEqual(
                     (fresh / name).read_bytes(), (examples / name).read_bytes(),
                     f"examples/{name} is stale: run python3 examples/make_example.py",

@@ -11,6 +11,14 @@ type SchemaNode = { readonly [key: string]: unknown };
 /** String formats the structured outputs API accepts. */
 const ACCEPTED_FORMATS: ReadonlySet<string> = new Set(['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'uri', 'ipv4', 'ipv6', 'uuid']);
 
+/**
+ * Formats whose zod pattern says exactly what the format says, so the pattern is left out. zod's
+ * z.iso.date() pattern is RFC 3339 full-date. The others are narrower (z.iso.datetime() accepts
+ * only Z, z.uuid() only versions 1 to 8, z.email() no IP-literal domains), and their pattern goes
+ * to the description, since zod checks it on return.
+ */
+const PATTERN_EQUALS_FORMAT: ReadonlySet<string> = new Set(['date']);
+
 /** Kept as they are. */
 const KEPT: ReadonlySet<string> = new Set(['type', 'enum', 'const', 'description', 'title', 'default', 'required', '$ref']);
 
@@ -65,9 +73,11 @@ function node(value: unknown, path: string): SchemaNode {
  *   accepted formats, and minItems 0 or 1;
  * - turns oneOf into anyOf (zod uses oneOf for discriminated unions; zod checks the discriminator);
  * - sets additionalProperties false on every object, which the API requires;
- * - moves TO_DESCRIPTION constraints into the description, except those that say nothing: the
- *   safe-integer bounds zod puts on every z.int(), and the pattern that duplicates an accepted
- *   format (z.email(), z.uuid());
+ * - moves TO_DESCRIPTION constraints into the description, except the safe-integer bounds zod
+ *   puts on every z.int(), which say nothing. The pattern zod adds to an accepted format
+ *   (z.email(), z.uuid(), z.iso.datetime()) goes there too, because it is narrower than the
+ *   format and zod checks it on return; only a pattern equal to its format is left out
+ *   (PATTERN_EQUALS_FORMAT);
  * - rejects anything else (z.record, z.tuple, not, if/then) with RequestError, because moving it
  *   into the description would change the output's shape silently;
  * - rejects recursive schemas and schemas over MAX_OPTIONAL_PROPERTIES or MAX_UNIONS, which the
@@ -136,7 +146,7 @@ function cleanNode(input: SchemaNode, path: string): Record<string, unknown> {
   }
   if (constraints['minimum'] === Number.MIN_SAFE_INTEGER) delete constraints['minimum'];
   if (constraints['maximum'] === Number.MAX_SAFE_INTEGER) delete constraints['maximum'];
-  if ('format' in out) delete constraints['pattern'];
+  if (typeof out['format'] === 'string' && PATTERN_EQUALS_FORMAT.has(out['format'])) delete constraints['pattern'];
 
   const type = out['type'];
   if (type === 'object' || (Array.isArray(type) && type.includes('object'))) out['additionalProperties'] = false;

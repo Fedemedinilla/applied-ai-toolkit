@@ -80,7 +80,7 @@
             {
               "id": "c4974a45-9fde-473b-8e48-201b4feb3db5",
               "leftValue": "={{ $json.email }}",
-              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "rightValue": "^(?=.{1,254}$)[^\\s@,;<>\"]+@[^\\s@,;<>\"]+\\.[^\\s@,;<>\"]+$",
               "operator": {
                 "type": "string",
                 "operation": "regex"
@@ -119,9 +119,9 @@
     {
       "parameters": {
         "sendTo": "={{ $json.email }}",
-        "subject": "=Could you leave us a review, {{ $json.name }}?",
+        "subject": "Could you leave us a review?",
         "emailType": "text",
-        "message": "=Hi {{ $json.name }},\n\nThanks for trusting us. If you had a good experience, a short Google review would help us a lot. It takes 30 seconds:\n\nYOUR_GOOGLE_REVIEW_LINK\n\nThank you. If anything went wrong, reply to this email and we will sort it out.",
+        "message": "=Hi {{ String($json.name || '').replace(/[^A-Za-z\\u00C0-\\u024F' -]/g, '').trim().slice(0, 40) || 'there' }},\n\nThanks for trusting us. If you had a good experience, a short Google review would help us a lot. It takes 30 seconds:\n\nYOUR_GOOGLE_REVIEW_LINK\n\nThank you. If anything went wrong, reply to this email and we will sort it out.",
         "options": {
           "appendAttribution": false
         }
@@ -198,7 +198,7 @@
     },
     {
       "parameters": {
-        "content": "## 1. Trigger\n\nPoint whatever marks a sale as closed at this webhook: your store, your CRM, MercadoPago, or a button in your system (**POST** with `name` and `email` in the body).\n\n*Tip:* chain it after the MercadoPago or Tiendanube template.\n\nThe webhook has no authentication and sends email. Add Header Auth before going live.",
+        "content": "## 1. Trigger\n\nPoint whatever marks a sale as closed at this webhook: your store, your CRM, MercadoPago, or a button in your system (**POST** with `name` and `email` in the body).\n\n*Tip:* chain it after the MercadoPago or Tiendanube template.\n\nThe webhook has no authentication and sends email. Add Header Auth before going live. Until then anyone with the URL chooses the recipient, so the subject carries no submitted text and the greeting keeps only the letters of the name, 40 at most.",
         "height": 354,
         "width": 320,
         "color": 4

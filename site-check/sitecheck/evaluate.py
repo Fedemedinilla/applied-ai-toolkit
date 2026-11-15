@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from .model import EvalContext, Finding
     from .observations import Observations, PageFetch
 
-# Error texts kept in datos.json are cut so a long exception message (which
+# Error texts kept in run.json are cut so a long exception message (which
 # could quote site text) never floods the file.
 _MAX_ERROR_LEN = 300
 
@@ -137,7 +137,7 @@ def evaluate_all(
 
 
 def recolour(findings: list["Finding"], overrides: dict[str, "ColourOverride"] | None) -> list["Finding"]:
-    """--rerender: recompute colours of findings loaded from datos.json (no gate, no evaluation)."""
+    """--rerender: recompute colours of findings loaded from run.json (no gate, no evaluation)."""
     from . import colours
 
     for f in findings:

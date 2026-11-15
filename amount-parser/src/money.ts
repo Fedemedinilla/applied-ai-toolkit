@@ -6,7 +6,8 @@
 //
 // The work runs as named steps, in this order. The first step that recognises its shape returns:
 //
-//   1. readSentence        normalize, spell commas out, split, fold numbers ("dos lucas" -> 2000)
+//   1. readSentence        normalize, spell commas out, split, fold numbers ("dos lucas" -> 2000,
+//                          "un millon 200 mil" -> 1200000)
 //   2. excludedPhrases     idioms with no amount ("dos mangos"), foreign currency
 //   3. applyCorrections    "gaste veinte, no, treinta mil" keeps what follows the correction
 //   4. sentenceAmbiguity   ranges, tax added on, net or gross, mixed directions, discounts by %,
@@ -31,6 +32,7 @@
 import {
   buildOffsetMap,
   foldLooseScales,
+  foldLowerGroups,
   foldNumbers,
   isNumber,
   splitWords,
@@ -50,6 +52,7 @@ import {
   INCOME_VERBS,
   INSTALMENT_NOUNS,
   JOINERS,
+  MONEY_VERBS,
   MONTHS,
   NEUTRAL_UNITS,
   NON_AMOUNT_IDIOMS,
@@ -58,6 +61,7 @@ import {
   PART_OF_THE_WHOLE,
   PRICE_MARKERS,
   REFERENCE_MARKERS,
+  wordTable,
 } from './vocabulary.ts';
 
 // ── Public shape ─────────────────────────────────────────────────────────────────────────────
@@ -207,7 +211,7 @@ function computed(
 function readSentence(text: string, clean: string, scales: Readonly<Record<string, number>>): Sentence {
   const listed = spellOutCommas(clean);
   const raw = splitWords(listed);
-  const tokens = foldLooseScales(foldNumbers(raw.map((w) => w.text), scales), scales);
+  const tokens = foldLowerGroups(foldLooseScales(foldNumbers(raw.map((w) => w.text), scales), scales));
   const offsets = buildOffsetMap(text, clean, listed);
   return withTokens({ text, clean, scales, tokens, words: [], numeric: [], raw, offsets }, tokens);
 }
@@ -219,9 +223,19 @@ function readSentence(text: string, clean: string, scales: Readonly<Record<strin
  * excluded, keep reading. A result: the sentence must be asked about (foreign currency).
  */
 function excludedPhrases(s: Sentence): ParsedAmount | null | undefined {
-  // "dos mangos" is "next to nothing", not two pesos, and no native speaker reads it literally.
+  // "dos mangos" is "next to nothing", not two pesos, and no native speaker reads it literally when
+  // it stands for the amount. The same words are also a band, an egg or mangoes: when a figure
+  // outside the idiom names the amount ("pague 80 mil a una banda"), the idiom does not veto it.
+  // Matched on whole words, so "doscientos dos pesos" still matches (see the README's limits).
+  const rawWords = s.raw.map((w) => w.text);
   for (const idiom of NON_AMOUNT_IDIOMS) {
-    if (s.clean.includes(idiom)) return null;
+    const parts = idiom.split(' ');
+    for (let at = 0; at + parts.length <= rawWords.length; at++) {
+      if (!parts.every((p, k) => rawWords[at + k] === p)) continue;
+      const end = at + parts.length;
+      const figureOutside = s.numeric.some((t) => t.to <= at || t.from >= end);
+      if (!figureOutside) return null;
+    }
   }
   // Checked on the text and not on the tokens, because the tokenizer splits "u$s" into three pieces.
   if (FOREIGN_CURRENCY.test(s.clean)) return undetermined(s, 'foreign_currency', s.clean);
@@ -230,11 +244,23 @@ function excludedPhrases(s: Sentence): ParsedAmount | null | undefined {
 
 // ── 3. Self-corrections ──────────────────────────────────────────────────────────────────────
 
-/** "gaste veinte no pera treinta mil": a marker with a figure on each side wipes what came before. */
+const ONLY_BEFORE_A_FIGURE: ReadonlySet<string> = new Set(['mejor', 'digo']);
+
+/**
+ * "gaste veinte no pera treinta mil": a marker with a figure on each side wipes what came before.
+ * "mejor" and "digo" are also an adjective and a verb ("al mejor gasista"), so they correct only
+ * right before the new figure ("mejor treinta", "mejor dicho treinta", "digo treinta").
+ */
 function applyCorrections(s: Sentence): Sentence {
   const { tokens } = s;
+  const correctsHere = (i: number) => {
+    const w = tokens[i]!.text;
+    if (!CORRECTION_MARKERS.has(w)) return false;
+    if (!ONLY_BEFORE_A_FIGURE.has(w)) return true;
+    return isNumber(tokens[i + 1]) || (w === 'mejor' && tokens[i + 1]?.text === 'dicho' && isNumber(tokens[i + 2]));
+  };
   const at = tokens.findIndex(
-    (t, i) => CORRECTION_MARKERS.has(t.text) && tokens.slice(0, i).some(isNumber) && tokens.slice(i).some(isNumber),
+    (_t, i) => correctsHere(i) && tokens.slice(0, i).some(isNumber) && tokens.slice(i).some(isNumber),
   );
   return at > 0 ? withTokens(s, tokens.slice(at + 1)) : s;
 }
@@ -261,9 +287,11 @@ function sentenceAmbiguity(s: Sentence): ParsedAmount | undefined {
   );
   if (fromTo) return undetermined(s, 'range', clean);
 
-  // "40 o 50 mil"
-  if (numeric.length >= 2 && (has(s, 'o') || has(s, 'u'))) {
-    const orIndex = words.findIndex((w) => w === 'o' || w === 'u');
+  // "40 o 50 mil", "7 u 8 mil". Spanish writes "u" for "o" only before an o sound ("u ocho", "u
+  // once", "u 8"); anywhere else "u" is the shop abbreviation of "unidades" ("10 u a 500 c/u").
+  const isOr = (w: string, i: number) => w === 'o' || (w === 'u' && /^(h?o|8|11$)/u.test(words[i + 1] ?? ''));
+  const orIndex = words.findIndex(isOr);
+  if (numeric.length >= 2 && orIndex >= 0) {
     const before = tokens.slice(0, orIndex).some(isNumber);
     const after = tokens.slice(orIndex).some(isNumber);
     if (before && after) return undetermined(s, 'range', clean);
@@ -320,6 +348,8 @@ interface Quantity {
   index: number;
   value: number;
   noun: string;
+  /** Counted only because an ordinary word followed it: "5 tortas", and also "3500 ayer". */
+  plainNoun: boolean;
 }
 
 interface Reading {
@@ -421,7 +451,8 @@ function classifyNumbers(s: Sentence): Reading | null {
         (countsBeforePrice && Number.isInteger(t.value)));
 
     if (countsSomething) {
-      quantities.push({ index: i, value: t.value, noun: countsBeforePrice ? '' : next });
+      const plainNoun = !COUNT_NOUNS.has(next) && !countsBeforePrice;
+      quantities.push({ index: i, value: t.value, noun: countsBeforePrice ? '' : next, plainNoun });
       continue;
     }
 
@@ -442,6 +473,17 @@ function classifyNumbers(s: Sentence): Reading | null {
 
   // A lone "un"/"una" is not an amount: "vendi una mesa" has no money in it.
   const pool = candidates.filter((c) => !(c.token.fromWords && c.token.value === 1 && !c.token.scaled));
+
+  // "gaste 3500 ayer", "pague 8000 efectivo": the word after the figure made it look like a count,
+  // and it was the only figure. Right after a verb whose object is money, it is the amount. Not
+  // after "compre" or "vendi", whose object is the goods ("compre 3 tortas" names no price), and not
+  // under 100, where "pague 3 entradas" is a count with its price left unsaid.
+  const lone = quantities.length === 1 ? quantities[0]! : undefined;
+  if (!pool.length && lone?.plainNoun && lone.value >= 100 && MONEY_VERBS.has(tokens[lone.index - 1]?.text ?? '')) {
+    const t = tokens[lone.index]!;
+    quantities.splice(0, 1);
+    pool.push({ index: lone.index, token: t, previousWord: tokens[lone.index - 1]!.text, perUnit: false, isTotalMarked: false, score: 0 });
+  }
   if (!pool.length) return null;
 
   pool.sort((a, b) => b.score - a.score || a.index - b.index);
@@ -709,6 +751,18 @@ function singleAmount({ s, best }: Reading): ParsedAmount {
   };
 }
 
+/** Keys the way `normalize` leaves the words they must match; values that can scale an amount. */
+function normalizeSlang(slang: Readonly<Record<string, number>>): Record<string, number> {
+  const out = wordTable() as Record<string, number>;
+  for (const [key, value] of Object.entries(slang)) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      throw new RangeError(`slang "${key}" must be a finite number above zero, got ${String(value)}`);
+    }
+    out[normalize(key)] = value;
+  }
+  return out;
+}
+
 const READING_STEPS = [openRemainder, quantityTimesUnitPrice, instalments, countWithoutMarker, discounts, half, sums];
 
 /**
@@ -716,10 +770,12 @@ const READING_STEPS = [openRemainder, quantityTimesUnitPrice, instalments, count
  * with `ambiguous: true` and a `reason` when the app should ask, and otherwise the value.
  *
  * `slang` adds scale words on top of the built-in ones and overrides them, for example
- * `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key.
+ * `{ quina: 500, quinas: 500 }`. Each form, singular and plural, is its own key. Keys are normalized
+ * like the sentence ("Quinás" matches "quinas"), and a value that is not a finite number above zero
+ * throws a RangeError.
  */
 export function parseAmount(text: string, slang: Readonly<Record<string, number>> = {}): ParsedAmount | null {
-  const scales: Record<string, number> = { ...BASE_SCALES, ...slang };
+  const scales = wordTable(BASE_SCALES, normalizeSlang(slang));
   const clean = normalize(text);
   if (!clean) return null;
 

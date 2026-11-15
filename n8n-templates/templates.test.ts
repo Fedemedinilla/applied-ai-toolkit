@@ -89,6 +89,9 @@ function referencedNodes(text: string): string[] {
   return patterns.flatMap((re) => [...text.matchAll(re)].map((m) => m[2] ?? ''));
 }
 
+/** A prompt block that is one value cut at the end: no +, ?: or template literal before the final .slice. */
+const CUT_BLOCK = /^[^+?`]*\.slice\(0, \d+\)\s*$/;
+
 /** Inner text of each {{ ... }} block in an n8n expression string. */
 function expressionBlocks(text: string): string[] {
   if (!text.startsWith('=')) return [];
@@ -366,7 +369,7 @@ describe.each(templates)('$file', ({ file, raw, workflow }) => {
     for (const chain of working.filter((n) => n.type === '@n8n/n8n-nodes-langchain.chainLlm')) {
       const blocks = expressionBlocks(String(chain.parameters.text));
       expect(blocks.length, chain.name).toBeGreaterThan(0);
-      for (const block of blocks) expect(block, `${chain.name}: ${block}`).toMatch(/\.slice\(0, \d+\)/);
+      for (const block of blocks) expect(block, `${chain.name}: ${block}`).toMatch(CUT_BLOCK);
     }
   });
 
@@ -620,6 +623,26 @@ describe('email triage', () => {
   it('labels with placeholder label ids', () => {
     const labels = String(nodeByName(workflow, 'Label by category and urgency')?.parameters.labelIds);
     expect(labels.match(/'[^']+_LABEL_ID'/g)).toHaveLength(5);
+  });
+});
+
+describe('prompt cut check', () => {
+  it('accepts one value cut at the end', () => {
+    for (const block of [" String($json.body.name || '').slice(0, 100) ", ' JSON.stringify($json.data).slice(0, 50000) ']) {
+      expect(block).toMatch(CUT_BLOCK);
+    }
+  });
+
+  it('rejects a block where a second value goes in uncut', () => {
+    for (const block of [
+      ' String($json.a).slice(0, 100) + $json.b ',
+      ' $json.b + String($json.a).slice(0, 100) ',
+      ' $json.ok ? $json.b : String($json.a).slice(0, 100) ',
+      ' `${$json.b}${String($json.a)}`.slice(0, 100) + $json.c ',
+      ' $json.b ',
+    ]) {
+      expect(block).not.toMatch(CUT_BLOCK);
+    }
   });
 });
 

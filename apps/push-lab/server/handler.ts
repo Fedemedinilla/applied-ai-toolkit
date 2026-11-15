@@ -74,11 +74,18 @@ const base64url = (bytes: number) =>
 // The endpoint is issued by the browser's push service and is always https. 2000 characters, not
 // less: some services issue long endpoints, and a legitimate device refused as "invalid" sends
 // whoever debugs it to look in the wrong place.
+//
+// Kept in its parsed form (lower-case host, no default port), and the store, the rate limit and
+// the sender all use that form: otherwise each spelling of one endpoint would be its own device
+// with its own limit. A fragment is refused, since no push service issues one and the sender drops
+// it, so it would be another spelling too.
 const endpoint = z
   .string()
   .trim()
   .max(2000)
-  .refine((s) => URL.canParse(s) && new URL(s).protocol === 'https:');
+  .refine((s) => URL.canParse(s) && new URL(s).protocol === 'https:')
+  .transform((s) => new URL(s).href)
+  .refine((s) => !s.includes('#'));
 
 const Keys = z.object({ p256dh: base64url(65).refine((s) => Buffer.from(s, 'base64url')[0] === 0x04), auth: base64url(16) });
 const Kind = z.enum(Object.keys(MESSAGE_KINDS) as [keyof typeof MESSAGE_KINDS]);
@@ -243,13 +250,16 @@ export function createHandler(deps: HandlerDeps): (request: Request) => Promise<
         const delivery = await deliver(deps.store, deps.send, subscription, payload);
         const ttl = MESSAGE_KINDS[kind].ttl;
         if (delivery.status === 'delivered') return json({ status: 'delivered', kind, ttl });
-        if (delivery.status === 'gone') {
-          lastSent.delete(subscription.endpoint);
-          return fail('gone', 410, { statusCode: delivery.statusCode, removed: delivery.removed });
-        }
+        // The limit stays after a 404 or 410 too: deliver() has removed the row, so clearing the
+        // entry here would let subscribe and test loop with no limit at all.
+        if (delivery.status === 'gone') return fail('gone', 410, { statusCode: delivery.statusCode, removed: delivery.removed });
         // The endpoint is on a known push service (refuseHost), so its status says something about
         // that service and nothing about any other host.
-        return fail('push_failed', 502, { statusCode: delivery.statusCode });
+        if (delivery.statusCode !== null) return fail('push_failed', 502, { statusCode: delivery.statusCode });
+        // No answer at all. A timeout is worth retrying; a DNS, connection or TLS failure usually
+        // means this server has no way out, and retrying never helps, so the page says which.
+        const reason = /timeout|ETIMEDOUT/iu.test(delivery.message) ? 'timeout' : 'unreachable';
+        return fail('push_failed', 502, { statusCode: null, reason });
       },
     },
 
@@ -288,7 +298,9 @@ export function createHandler(deps: HandlerDeps): (request: Request) => Promise<
 
   return async (request) => {
     const match = /\/api\/([a-z-]+)$/u.exec(new URL(request.url).pathname);
-    const route = match?.[1] === undefined ? undefined : routes[match[1]];
+    // Own keys only: the route pattern also matches `constructor`, which a plain object inherits.
+    const name = match?.[1];
+    const route = name !== undefined && Object.hasOwn(routes, name) ? routes[name] : undefined;
     if (!route) return fail('not_found', 404);
     if (request.method !== route.method) return fail('method_not_allowed', 405, {}, { allow: route.method });
     return route.run(request);

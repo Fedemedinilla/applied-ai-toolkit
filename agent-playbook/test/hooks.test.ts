@@ -96,6 +96,37 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     }
   });
 
+  it('refuses an outside settings file reached through a link inside the project', () => {
+    const home = mkdtempSync(join(tmpdir(), 'agent-playbook-home-'));
+    try {
+      mkdirSync(join(home, '.claude'));
+      writeFileSync(join(home, '.claude/settings.json'), '{}');
+      mkdirSync(join(root, 'notes'));
+      symlinkSync(join(home, '.claude/settings.json'), join(root, 'notes/x.json'));
+      const result = hook(edit('notes/x.json'));
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('Claude Code settings file outside the project');
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an outside settings file with no config or a broken one, and a broken config blocks outside edits too', () => {
+    const home = mkdtempSync(join(tmpdir(), 'agent-playbook-home-'));
+    try {
+      writeFileSync(join(root, '.claude/protected.json'), '{ "paths": "x" }');
+      expect(hook(edit(join(home, '.claude/settings.json'))).code).toBe(2);
+      const outside = hook(edit(join(home, 'notes.md')));
+      expect(outside.code).toBe(2);
+      expect(outside.stderr).toContain('protected.json cannot be read');
+      rmSync(join(root, '.claude/protected.json'));
+      expect(hook(edit(join(home, '.claude/settings.json'))).code).toBe(2);
+      expect(hook(edit(join(home, 'notes.md')))).toEqual({ code: 0, stderr: '' });
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('resolves symbolic links before matching, so a link cannot hide a protected target', () => {
     mkdirSync(join(root, 'test/golden'), { recursive: true });
     writeFileSync(join(root, 'test/golden/race.json'), '{}');
@@ -115,6 +146,22 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(bad.stderr).toMatch(/^Blocked: guard error/);
     expect(hook({ tool_name: 'Edit', tool_input: { file_path: 123 } }).code).toBe(2);
     expect(hook('"a string"').code).toBe(2);
+  });
+
+  it('blocks a tool call whose input has no path it can read: null, missing, an array, not an object', () => {
+    for (const input of [
+      { tool_name: 'Edit', tool_input: { file_path: null } },
+      { tool_name: 'Edit', tool_input: { path: 'src/a.ts' } },
+      { tool_name: 'Edit', tool_input: 'src/a.ts' },
+      { tool_name: 'Edit', tool_input: ['src/a.ts'] },
+      { tool_name: 'Edit' },
+      [],
+      '',
+    ]) {
+      const result = hook(input);
+      expect(result.code, JSON.stringify(input)).toBe(2);
+      expect(result.stderr).toMatch(/^Blocked: guard error/);
+    }
   });
 
   it('blocks through the settings command when Node cannot run the hook at all', () => {
@@ -141,6 +188,14 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(hook(edit('src/a.ts'))).toEqual({ code: 0, stderr: '' });
   });
 
+  it('reads a hand-written JSON file and the config saved with a byte order mark', () => {
+    writeFileSync(join(root, 'content/bom.json'), '\uFEFF{ "handwritten": true }');
+    expect(hook(edit('content/bom.json')).code).toBe(2);
+    writeFileSync(join(root, '.claude/protected.json'), `\uFEFF${readFileSync(join(FOLDER, 'claude/protected.json'), 'utf8')}`);
+    expect(hook(edit('src/a.ts'))).toEqual({ code: 0, stderr: '' });
+    expect(hook(edit('test/golden/a.json')).code).toBe(2);
+  });
+
   it('reads the notebook path of NotebookEdit', () => {
     expect(hook({ tool_name: 'NotebookEdit', tool_input: { notebook_path: 'test/golden/n.ipynb' } }).code).toBe(2);
   });
@@ -156,6 +211,15 @@ describe('guard-protected-paths, run as Claude Code runs it', () => {
     expect(result.stderr).toContain('protected.json cannot be read');
   });
 
+  it('blocks every edit when a glob uses syntax it does not read, instead of protecting nothing', () => {
+    for (const glob of ['content/**/*.{json,md}', 'db/migrations/', 'rulesets/[v]1/**']) {
+      writeFileSync(join(root, '.claude/protected.json'), JSON.stringify({ paths: [glob] }));
+      const result = hook(edit('src/a.ts'));
+      expect(result.code, glob).toBe(2);
+      expect(result.stderr).toContain(glob);
+    }
+  });
+
   it('allows everything when the project has no config', () => {
     rmSync(join(root, '.claude/protected.json'));
     expect(decide(edit('test/golden/a.json'), root, {})).toEqual({ code: 0, message: '' });
@@ -168,6 +232,11 @@ describe('related-tests', () => {
     expect(relatedTestArgs('README.md')).toBeNull();
     expect(relatedTestArgs('node_modules/x/index.ts')).toBeNull();
     expect(relatedTestArgs('../other/src/a.ts')).toBeNull();
+  });
+
+  it('passes a file named like an option as a path, never as an option', () => {
+    expect(relatedTestArgs('--config=evil.ts')).toEqual(['vitest', 'related', './--config=evil.ts', '--run', '--passWithNoTests', '--reporter=dot']);
+    expect(relatedTestArgs('-t.ts')?.[2]).toBe('./-t.ts');
   });
 
   it('hands the agent the tail of the output, where the failure summary is', () => {
@@ -212,6 +281,12 @@ describe('related-tests, run as Claude Code runs it', () => {
     expect(result.stderr).toContain('line 11\n');
     expect(result.stderr).not.toContain('line 10\n');
     expect(readFileSync(join(root, 'npx.log'), 'utf8')).toBe('vitest related src/race.ts --run --passWithNoTests --reporter=dot\n');
+  });
+
+  it('hands vitest a dash-prefixed file name as a path', () => {
+    fakeNpx(0);
+    expect(hook('--config=alt.ts')).toEqual({ code: 0, stderr: '' });
+    expect(readFileSync(join(root, 'npx.log'), 'utf8')).toBe('vitest related ./--config=alt.ts --run --passWithNoTests --reporter=dot\n');
   });
 
   it('exits 0 and prints nothing when they pass, and runs nothing for a file without tests', () => {

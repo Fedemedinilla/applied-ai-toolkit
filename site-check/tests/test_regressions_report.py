@@ -98,8 +98,8 @@ class SchoolRunTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.r = run_e2e(school_scenario(), default_apis())
-        cls.informe = cls.r.files["informe.md"]
-        cls.anexo = cls.r.files["anexo-tecnico.md"]
+        cls.informe = cls.r.files["report.md"]
+        cls.anexo = cls.r.files["technical-annex.md"]
 
     def test_manual_checks_only_in_the_annex(self) -> None:
         for manual in ("se revisa a mano", "se hace a mano", "se mira a mano", "se busca a mano", ", a mano", "site:", "transparencyreport", "check.spamhaus.org"):
@@ -416,7 +416,7 @@ class ThrottledServerErrorsTest(unittest.TestCase):
         vis09 = r.check("VIS-09")
         self.assertEqual(vis09["mediciones"]["n5xx"], 0)
         self.assertNotEqual(vis09["estado"], "FALLA")
-        self.assertNotIn("error del servidor", r.files["informe.md"])
+        self.assertNotIn("error del servidor", r.files["report.md"])
 
     def test_first_503_is_flagged_when_the_second_confirms(self) -> None:
         sc = school_scenario()

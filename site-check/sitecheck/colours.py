@@ -21,8 +21,10 @@ Documented exceptions (Finding.colour_exception, set by the evaluator):
   published address whose domain cannot receive mail) -> Amarillo ("Revisar"):
   a contact path that does not work must not read as "Mejora opcional".
 
-Then the --overrides file ({ID: {"color": "...", "motivo": "..."}}), whose motivo
-is mandatory. datos.json keeps color_derivado (table), color_final and the
+Then the --overrides file ({ID: {"colour": "...", "reason": "..."}}), whose reason
+is mandatory. The colour is one of red, yellow, blue, green or grey. A file
+written for an earlier version ({"color": "amarillo", "motivo": "..."}) is
+read the same way: the Spanish keys and colour names stay accepted. run.json keeps color_derivado (table), color_final and the
 motivo. New IDs follow the same table: VIS-16..19 FALLA -> Azul; EXT-25 (Media)
 FALLA -> Amarillo.
 """
@@ -114,37 +116,52 @@ def exception_colour(finding: Finding) -> tuple[Colour, str] | None:
     return colour, motivo
 
 
+def _override_field(check_id: str, entry: dict, names: tuple[str, ...]) -> object:
+    """The value of an override field under its English name or an earlier spelling; both at once is an error."""
+    given = [name for name in names if name in entry]
+    if len(given) > 1:
+        raise ValueError(f"{check_id}: {' and '.join(repr(n) for n in given)} are the same field; give one")
+    return entry[given[0]] if given else None
+
+
 def load_overrides(path: Path) -> dict[str, ColourOverride]:
-    """Read the --overrides JSON. ValueError (-> exit 2) on unknown colour, unknown ID or missing motivo."""
+    """Read the --overrides JSON. ValueError (-> exit 2) on unknown colour, unknown ID or missing reason.
+
+    {ID: {"colour": "yellow", "reason": "..."}}. The earlier spelling is read
+    too: the keys "color" and "motivo", and the Spanish colour names.
+    """
     import json
 
     from . import registry  # local import: registry imports the checks package
+    from .runformat import COLOURS
 
+    by_english = {english: spanish for spanish, english in COLOURS.items()}
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except OSError as exc:
-        raise ValueError(f"cannot read the adjustments file: {exc.strerror or exc}") from None
+        raise ValueError(f"cannot read the overrides file: {exc.strerror or exc}") from None
     except json.JSONDecodeError as exc:
-        raise ValueError(f"the adjustments file is not valid JSON: {exc.msg} (line {exc.lineno})") from None
+        raise ValueError(f"the overrides file is not valid JSON: {exc.msg} (line {exc.lineno})") from None
     if not isinstance(data, dict):
-        raise ValueError("the adjustments file must be a JSON object {ID: {color, motivo}}")
+        raise ValueError("the overrides file must be a JSON object {ID: {colour, reason}}")
     known = registry.by_id()
     out: dict[str, ColourOverride] = {}
     for check_id, entry in data.items():
         if check_id not in known:
-            raise ValueError(f"unknown check ID in adjustments: {check_id!r}")
+            raise ValueError(f"unknown check ID in overrides: {check_id!r}")
         if not isinstance(entry, dict):
-            raise ValueError(f"{check_id}: expected an object with 'color' and 'motivo'")
-        colour_name = str(entry.get("color") or "").strip().lower()
+            raise ValueError(f"{check_id}: expected an object with 'colour' and 'reason'")
+        given = _override_field(check_id, entry, ("colour", "color"))
+        colour_name = str(given or "").strip().lower()
         try:
-            colour = Colour(colour_name)
+            colour = Colour(by_english.get(colour_name, colour_name))
         except ValueError:
-            raise ValueError(f"{check_id}: unknown colour {entry.get('color')!r}") from None
+            raise ValueError(f"{check_id}: unknown colour {given!r}") from None
         if colour not in OVERRIDE_COLOURS:
             raise ValueError(f"{check_id}: colour {colour_name!r} cannot be set by hand")
-        motivo = entry.get("motivo")
+        motivo = _override_field(check_id, entry, ("reason", "motivo"))
         if not isinstance(motivo, str) or not motivo.strip():
-            raise ValueError(f"{check_id}: the 'motivo' is mandatory")
+            raise ValueError(f"{check_id}: the 'reason' is mandatory")
         out[check_id] = ColourOverride(colour, motivo.strip())
     return out
 

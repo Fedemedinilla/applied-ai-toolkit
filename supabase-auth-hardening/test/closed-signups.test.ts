@@ -98,8 +98,12 @@ describe('create_account trigger', () => {
     const adminId = await signUp(db, admin);
     // auth.users does not require a normalized address; the trigger normalizes it.
     const memberId = await signUp(db, member.toUpperCase());
+    const spaced = address('spaced');
+    await allow(db, spaced);
+    const spacedId = await signUp(db, `  ${spaced.toUpperCase()} `);
     expect(await accountOf(adminId)).toEqual([{ role: 'admin' }]);
     expect(await accountOf(memberId)).toEqual([{ role: 'member' }]);
+    expect(await accountOf(spacedId)).toEqual([{ role: 'member' }]);
   });
 
   it('refuses a user off the list, as auth.admin.createUser would insert it without calling the hook', async () => {

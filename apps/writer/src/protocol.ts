@@ -24,6 +24,8 @@ export const EN_SPLIT = '[[EN]]';
 /**
  * brief, titles, pick, draft, then three rounds of changes (each a request and a new draft):
  * a request is at most 9 messages long, ending on the third change. The server refuses longer ones.
+ * The cap counts messages, not rounds: a model that drafts on the first turn leaves brief, draft,
+ * and room for four changes.
  */
 export const MAX_MESSAGES = 9;
 
@@ -49,17 +51,32 @@ function between(text: string, open: string, close: string): string | null {
   return text.slice(start + open.length, end);
 }
 
-/** One title per line: "A: ...", "1. ...", "- ..." or bare. Quotes and bold markers are dropped. */
+/** A label such as "A:", "1." or "c)", or a list bullet. A star counts only alone, not as bold. */
+const TITLE_PREFIX = /^(?:[A-Ea-e][:.)]|\d[.)]|[-•]|\*(?!\*))\s*/u;
+/** A whole-line bold or quote wrapper with no other bold or quote inside it. */
+const BOLD_WRAPPER = /^\*\*((?:(?!\*\*).)*)\*\*$/u;
+const QUOTE_WRAPPER = /^["“«]([^"“”«»]*)["”»]$/u;
+
+/** Bold and quote wrappers off, in any order and nesting, until none is left. */
+function unwrap(text: string): string {
+  let line = text.trim();
+  for (;;) {
+    const next = line.replace(BOLD_WRAPPER, '$1').trim().replace(QUOTE_WRAPPER, '$1').trim();
+    if (next === line) return line;
+    line = next;
+  }
+}
+
+/**
+ * One title per line: "A: ...", "1. ...", "- ..." or bare. Quotes and bold markers are dropped,
+ * around the label as well as after it. The label comes off once, so the result is a fixed point:
+ * the canonical "A: title" line parses back to the same title.
+ */
 export function parseTitles(block: string): string[] {
   const seen = new Set<string>();
   const titles: string[] = [];
   for (const raw of block.split('\n')) {
-    const line = raw
-      .trim()
-      .replace(/^(?:[A-Ea-e][:.)]|\d[.)]|[-*•])\s*/u, '')
-      .replace(/^\*\*(.*)\*\*$/u, '$1')
-      .replace(/^["“«](.*)["”»]$/u, '$1')
-      .trim();
+    const line = unwrap(unwrap(raw).replace(TITLE_PREFIX, ''));
     if (line === '' || line.length > MAX_TITLE_CHARS) continue;
     const key = line.toLocaleLowerCase('es');
     if (seen.has(key)) continue;

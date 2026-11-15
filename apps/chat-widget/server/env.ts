@@ -19,13 +19,15 @@ const nonEmpty = (value: string | undefined): string | null => {
 };
 
 export function readEnv(env: Readonly<Record<string, string | undefined>> = process.env): ServerEnv {
-  const port = Number(env['PORT'] ?? '4331');
+  const raw = Number(env['PORT'] ?? '4331');
+  // The default public URL names the port the server listens on, so it uses the checked value.
+  const port = Number.isInteger(raw) && raw > 0 && raw < 65536 ? raw : 4331;
   return {
     apiKey: nonEmpty(env['ANTHROPIC_API_KEY']),
     sessionSecret: nonEmpty(env['CHAT_WIDGET_SESSION_SECRET']),
     adminPassword: nonEmpty(env['CHAT_WIDGET_ADMIN_PASSWORD']),
     publicBaseUrl: nonEmpty(env['CHAT_WIDGET_PUBLIC_URL']) ?? `http://localhost:${port}`,
-    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 4331,
+    port,
     host: nonEmpty(env['HOST']) ?? '127.0.0.1',
   };
 }

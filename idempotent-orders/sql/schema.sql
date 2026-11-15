@@ -145,7 +145,7 @@ stable
 set search_path = public
 as $$
 begin
-  if p_order.customer_id <> p_customer then
+  if p_order.customer_id is distinct from p_customer then
     return jsonb_build_object('outcome', 'key_taken');
   end if;
   if not in_resend_window(p_order.created_at) then
@@ -265,11 +265,16 @@ declare
   v_order orders;
 begin
   perform validate_key(p_key);
+  -- The same check as place_order. A NULL customer would make the comparison below NULL and
+  -- skip key_taken, returning another customer's order.
+  if p_customer is null or char_length(p_customer) not between 1 and 64 then
+    raise exception 'invalid customer' using errcode = '22023';
+  end if;
   select * into v_order from orders where idempotency_key = p_key;
   if not found then
     return jsonb_build_object('outcome', 'not_found');
   end if;
-  if v_order.customer_id <> p_customer then
+  if v_order.customer_id is distinct from p_customer then
     return jsonb_build_object('outcome', 'key_taken');
   end if;
   return jsonb_build_object('outcome', 'found', 'within_window', in_resend_window(v_order.created_at),

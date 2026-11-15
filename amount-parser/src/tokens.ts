@@ -301,3 +301,40 @@ export function foldLooseScales(tokens: readonly Token[], scales: Readonly<Recor
 
   return out;
 }
+
+/**
+ * "un millon 200 mil", "1 millon 200 mil": a transcriber writes the thousands group in digits, and
+ * the two groups of one figure come out as two tokens with no joiner between them. The second one
+ * was dropped. A round number of millions followed directly by a group scaled by a thousand is one
+ * figure. A bare group with no scale ("un millon 200") is left alone: it is not clear what it is.
+ */
+export function foldLowerGroups(tokens: readonly Token[]): Token[] {
+  const out: Token[] = [];
+  for (const t of tokens) {
+    const head = out[out.length - 1];
+    const joins =
+      head !== undefined &&
+      head.scaled === true &&
+      (head.scaleUsed ?? 0) >= 1_000_000 &&
+      head.value! % 1_000_000 === 0 &&
+      !head.approximate &&
+      t.from === head.to &&
+      t.scaled === true &&
+      t.scaleUsed === 1000 &&
+      t.value! < 1_000_000;
+    if (!joins) {
+      out.push(t);
+      continue;
+    }
+    out[out.length - 1] = {
+      ...head,
+      to: t.to,
+      value: head.value! + t.value!,
+      literal: `${head.literal ?? head.text} ${t.literal ?? t.text}`,
+      fromWords: head.fromWords === true && t.fromWords === true,
+      scaleUsed: t.scaleUsed,
+      approximate: t.approximate,
+    };
+  }
+  return out;
+}

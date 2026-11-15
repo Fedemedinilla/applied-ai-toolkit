@@ -7,7 +7,7 @@ import { checkJsBudget } from './checks/js-budget.ts';
 import { checkLookbehind } from './checks/lookbehind.ts';
 import { checkPolicy } from './checks/policy.ts';
 import { checkSecrets } from './checks/secrets.ts';
-import { ConfigError, type GuardConfig } from './config.ts';
+import { ConfigError, type GuardConfig, readTextFile } from './config.ts';
 import { parseCsp, parseSerializedCsp } from './csp.ts';
 import { parsePage } from './html.ts';
 import { buildOutputRules, type HeaderRule, headerValues, netlifyHeadersRules, vercelJsonRules } from './routes.ts';
@@ -23,7 +23,7 @@ function readRules(config: GuardConfig, site: Site): HeaderRule[] | null {
   else file = csp.file === undefined ? join(site.staticRoot, '_headers') : resolve(config.configDir, csp.file);
   if (!existsSync(file)) throw new ConfigError(`csp source ${csp.from}: ${file} does not exist`);
   const label = relative(process.cwd(), file) || file;
-  const text = readFileSync(file, 'utf8');
+  const text = readTextFile(file);
   try {
     if (csp.from === 'netlify-headers') return netlifyHeadersRules(text, label);
     const json: unknown = JSON.parse(text);
@@ -48,15 +48,14 @@ export function runGuard({ dir, config, env = process.env }: RunOptions): GuardR
     const parts = parsePage(readFileSync(join(site.staticRoot, path), 'utf8'));
     const urlPaths = urlPathsForPage(site, path);
     const csp = config.csp;
-    let delivered: Page['csp'] = [];
-    if (csp?.from === 'literal') delivered = [{ origin: 'literal', value: csp.value }];
-    else if (csp?.from === 'meta') delivered = parts.metaPolicies.map((value, i) => ({ origin: `<meta> ${i + 1}`, value }));
-    else if (headerRules !== null) delivered = headerValues(headerRules, urlPaths, 'content-security-policy');
-    const policies =
-      csp?.from === 'meta'
-        ? delivered.flatMap((d) => parseSerializedCsp(d.value) ?? [])
-        : parseCsp(delivered.map((d) => d.value).join(', '));
-    return { path, display: `${prefix}${path}`, urlPaths, parts, csp: delivered, policies };
+    let headers: Page['csp'] = [];
+    if (csp?.from === 'literal') headers = [{ origin: 'literal', value: csp.value }];
+    else if (headerRules !== null) headers = headerValues(headerRules, urlPaths, 'content-security-policy');
+    // The browser enforces every <meta> policy in <head> next to the header ones, whatever the
+    // configured source, so they are delivered too.
+    const metas = csp === undefined ? [] : parts.metaPolicies.map((value, i) => ({ origin: `<meta> ${i + 1}`, value, meta: true }));
+    const policies = [...parseCsp(headers.map((d) => d.value).join(', ')), ...metas.flatMap((d) => parseSerializedCsp(d.value) ?? [])];
+    return { path, display: `${prefix}${path}`, urlPaths, parts, csp: [...headers, ...metas], policies };
   });
   const ctx: Context = { site, config, pages, headerRules, env };
   const checks = [checkInlineHashes, checkPolicy, checkHeaders, checkSecrets, checkLookbehind, checkJsBudget].map((check) => check(ctx));

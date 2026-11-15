@@ -8,7 +8,7 @@
  * address under the site's name.
  */
 import { createLimiter, type RateLimit } from './rate-limit.ts';
-import { escapeHtml, greeting, htmlDocument, oneLine, paragraphs, quote } from './sanitize.ts';
+import { cut, escapeHtml, greeting, htmlDocument, lf, oneLine, paragraphs, quote } from './sanitize.ts';
 import { fill, TEXTS, type Lang, type PageText, type Texts } from './texts.ts';
 import type { MailTransport } from './transport.ts';
 
@@ -70,7 +70,11 @@ export interface ContactConfig {
   readonly allowedOrigins?: readonly string[];
   /** Read X-Forwarded-Host and X-Forwarded-Proto to rebuild the public origin. Default true. */
   readonly trustForwardedHeaders?: boolean;
-  /** Request bodies above this many bytes get 413. Default 32 KiB. */
+  /**
+   * Request bodies above this many bytes get 413. Default 64 KiB: a native urlencoded post
+   * percent-encodes each CJK character as 9 bytes, so the example form's caps (5,350 characters)
+   * can reach about 48 KB.
+   */
   readonly maxBodyBytes?: number;
   readonly sendAcknowledgment?: boolean;
   readonly texts?: Partial<Record<Lang, Texts>>;
@@ -98,11 +102,12 @@ export type ContactHandler = (request: Request, context?: RequestContext) => Pro
  * One address, nothing else. No comma or semicolon: providers read `to` as a list, so
  * `me@mine.example,victim@other.example` would pass a classic pattern and turn the
  * acknowledgment into a relay. No angle brackets, quotes or parentheses either, which a
- * provider could read as a display name.
+ * provider could read as a display name. Domain labels are non-empty, so `a@b..example` and a
+ * trailing dot are a typo the visitor can fix (400), not a refusal from the provider (502).
  */
-export const EMAIL = /^[^@\s,;<>"'()\\]+@[^@\s,;<>"'()\\]+\.[^@\s,;<>"'()\\]+$/;
+export const EMAIL = /^[^@\s,;<>"'()\\]+@(?:[^@\s,;<>"'()\\.]+\.)+[^@\s,;<>"'()\\.]+$/;
 
-type ErrorCode = 'origin' | 'invalid' | 'limited' | 'not_configured' | 'send_failed' | 'too_large' | 'media_type' | 'method';
+type ErrorCode = 'origin' | 'invalid' | 'limited' | 'not_configured' | 'send_failed' | 'too_large' | 'media_type';
 
 class BodyTooLarge extends Error {}
 
@@ -141,8 +146,11 @@ export function ownOrigins(request: Request, trustForwarded: boolean, extra: rea
   if (trustForwarded) {
     // A proxy chain can append: "public.example, internal:8080". The first one is the client's.
     const fHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-    const fProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || url.protocol.replace(':', '');
+    const sentProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const fProto = sentProto || url.protocol.replace(':', '');
     if (fHost) own.add(`${fProto}://${fHost}`);
+    // A TLS proxy that keeps Host and only says the scheme (nginx's common setup).
+    if (host && sentProto) own.add(`${sentProto}://${host}`);
   }
   return own;
 }
@@ -157,7 +165,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
   const minFill = config.minFillMs ?? 2_500;
   const quoteMax = config.quoteMax ?? 300;
   const greetingMax = config.greetingMax ?? 32;
-  const maxBody = config.maxBodyBytes ?? 32 * 1024;
+  const maxBody = config.maxBodyBytes ?? 64 * 1024;
   const log = config.log ?? (() => {});
   const textsFor = (lang: Lang): Texts => config.texts?.[lang] ?? TEXTS[lang];
 
@@ -167,7 +175,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
   /** The page a browser without JavaScript lands on. Same template for success and errors. */
   const page = (lang: Lang, key: keyof Texts['pages'], status: number) => {
     const t = textsFor(lang);
-    const p: PageText = t.pages[key];
+    const p: PageText = t.pages[key] ?? t.pages.invalid;
     const body = fill(p.body, { address: config.publicAddress });
     const html =
       `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">` +
@@ -190,15 +198,17 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
     limited: 'limited',
     not_configured: 'unavailable',
     send_failed: 'unavailable',
-    too_large: 'invalid',
+    too_large: 'tooLarge',
     media_type: 'invalid',
-    method: 'invalid',
   };
 
   return async (request, context = {}) => {
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
 
-    const type = (request.headers.get('content-type') ?? '').toLowerCase();
+    // Lowercased only for the type checks: the multipart boundary is case-sensitive, so the parser
+    // gets the header as it came.
+    const rawType = request.headers.get('content-type') ?? '';
+    const type = rawType.toLowerCase();
     const isJson = type.startsWith('application/json');
     const isForm = type.startsWith('application/x-www-form-urlencoded') || type.startsWith('multipart/form-data');
     let lang: Lang = config.defaultLang ?? 'en';
@@ -225,7 +235,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
           for (const [k, v] of Object.entries(parsed)) if (typeof v === 'string' || typeof v === 'number') data.set(k, String(v));
         }
       } else {
-        const form = await new Response(raw, { headers: { 'content-type': type } }).formData().catch(() => null);
+        const form = await new Response(raw, { headers: { 'content-type': rawType } }).formData().catch(() => null);
         form?.forEach((v, k) => {
           if (typeof v === 'string' && !data.has(k)) data.set(k, v);
         });
@@ -235,7 +245,7 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
       log({ kind: 'rejected', reason: 'too_large' });
       return fail('too_large', 413);
     }
-    const g = (key: keyof FieldNames, max = 5000) => (data.get(fields[key]) ?? '').trim().slice(0, max);
+    const g = (key: keyof FieldNames, max = 5000) => cut((data.get(fields[key]) ?? '').trim(), max);
     const requested = g('lang', 5);
     if (requested === 'en' || requested === 'es') lang = requested;
 
@@ -264,29 +274,30 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
       return success(true);
     }
 
-    const name = oneLine(g('name')).slice(0, 100);
+    const name = cut(oneLine(g('name')), 100);
     const email = g('email', 200);
-    const phone = oneLine(g('phone')).slice(0, 40);
-    const message = g('message');
-    const source = oneLine(g('source')).slice(0, 60);
-    const subject = oneLine(g('subject')).slice(0, 90);
+    const phone = cut(oneLine(g('phone')), 40);
+    const message = lf(g('message'));
+    const source = cut(oneLine(g('source')), 60);
+    const subject = cut(oneLine(g('subject')), 90);
     if (!name || email.length > 160 || !EMAIL.test(email) || message.length < 2) {
       log({ kind: 'rejected', reason: 'invalid' });
       return fail('invalid', 400);
     }
 
-    // After validation, so a typo does not spend one of the visitor's sends.
-    if (limited(context.clientAddress || 'unknown')) {
-      log({ kind: 'rejected', reason: 'limited' });
-      return fail('limited', 429);
-    }
-
     // No key, no fake success. A visitor told "received" waits for a reply that never comes; an
-    // error shows them the address that does work.
+    // error shows them the address that does work. Before the limit, so it spends no send.
     const transport = config.transport;
     if (!transport) {
       log({ kind: 'not_configured' });
       return fail('not_configured', 503);
+    }
+
+    // After validation, so a typo does not spend one of the visitor's sends.
+    const limitKey = context.clientAddress || 'unknown';
+    if (limited(limitKey)) {
+      log({ kind: 'rejected', reason: 'limited' });
+      return fail('limited', 429);
     }
 
     // 1) The message, to the owner, whole. Replying from the mail client answers the visitor.
@@ -305,6 +316,8 @@ export function createContactHandler(config: ContactConfig): ContactHandler {
         text: `${name} <${email}>${phone ? ` · ${phone}` : ''}\n${source || 'no page'} · ${lang}\n\n${message}\n`,
       });
     } catch {
+      // Nothing was delivered, so the retry the error page invites must not be counted against them.
+      limited.refund(limitKey);
       log({ kind: 'send_failed' });
       return fail('send_failed', 502);
     }

@@ -6,7 +6,8 @@ export type TestAnswer =
   | { readonly kind: 'not_subscribed' }
   | { readonly kind: 'store_failed' }
   | { readonly kind: 'gone' }
-  | { readonly kind: 'push_failed'; readonly statusCode: number | null }
+  /** `reason` only when there was no status: `timeout`, or `unreachable` for a DNS, connection or TLS failure. */
+  | { readonly kind: 'push_failed'; readonly statusCode: number | null; readonly reason?: 'timeout' | 'unreachable' }
   | { readonly kind: 'too_soon'; readonly seconds: number }
   | { readonly kind: 'not_configured' }
   | { readonly kind: 'other'; readonly status: number };
@@ -24,8 +25,10 @@ export function readTestAnswer(status: number, body: unknown): TestAnswer {
       return { kind: 'store_failed' };
     case 'gone':
       return { kind: 'gone' };
-    case 'push_failed':
-      return { kind: 'push_failed', statusCode: num(b['statusCode']) };
+    case 'push_failed': {
+      const reason = b['reason'] === 'timeout' || b['reason'] === 'unreachable' ? b['reason'] : null;
+      return { kind: 'push_failed', statusCode: num(b['statusCode']), ...(reason === null ? {} : { reason }) };
+    }
     case 'too_soon':
       return { kind: 'too_soon', seconds: num(b['retryAfterSeconds']) ?? 1 };
     case 'not_configured':
@@ -52,15 +55,40 @@ export function testMessage(answer: TestAnswer): string {
     case 'gone':
       return 'El servicio de push dice que esta suscripción ya no existe, y el servidor la borró. Toca Activar para crear una nueva.';
     case 'push_failed':
-      return answer.statusCode === null
-        ? 'El servicio de push no respondió a tiempo. Intenta de nuevo.'
-        : `El servicio de push rechazó el envío (código ${answer.statusCode}). Revisa el diagnóstico del servidor.`;
+      if (answer.statusCode !== null) return `El servicio de push rechazó el envío (código ${answer.statusCode}). Revisa el diagnóstico del servidor.`;
+      // "Try again" is the advice only for a timeout: a server with no way out fails every retry.
+      if (answer.reason === 'unreachable') {
+        return 'El servidor no pudo conectarse con el servicio de push (falla de DNS, conexión o certificado). Reintentar no lo arregla: revisa la red del servidor y su salida a internet.';
+      }
+      return 'El servicio de push no respondió a tiempo. Intenta de nuevo.';
     case 'too_soon':
       return `Espera ${answer.seconds} ${answer.seconds === 1 ? 'segundo' : 'segundos'} entre pruebas.`;
     case 'not_configured':
       return 'El servidor no tiene claves VAPID válidas. Revisa el diagnóstico del servidor.';
     case 'other':
       return `El servidor respondió ${answer.status}.`;
+  }
+}
+
+/** What registering the subscription with the server again came to (src/app.ts, register). */
+export type RegisterResult = 'ok' | 'store_failed' | 'unknown_service' | 'rejected' | 'network';
+
+/**
+ * The answer to a test the server refused as not_subscribed, once the page has tried to register
+ * the device again. "Registered again" only when it was: otherwise the next test fails the same
+ * way and the page has hidden why.
+ */
+export function reRegisterMessage(result: RegisterResult): string {
+  switch (result) {
+    case 'ok':
+      return testMessage({ kind: 'not_subscribed' });
+    case 'store_failed':
+      return 'El servidor no tenía este dispositivo y no pudo volver a guardarlo (su lista de suscripciones falló o está llena). No desactives los avisos: tu suscripción puede estar bien. Intenta de nuevo en un minuto.';
+    case 'network':
+      return 'El servidor no tenía este dispositivo, y no se pudo conectar con él para registrarlo de nuevo. Recarga la página cuando haya conexión.';
+    case 'unknown_service':
+    case 'rejected':
+      return 'El servidor no tenía este dispositivo y no aceptó registrarlo de nuevo. Revisa el diagnóstico del servidor.';
   }
 }
 

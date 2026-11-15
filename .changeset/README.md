@@ -1,6 +1,6 @@
 # Changesets
 
-Two folders of this repository are published to npm: `gateway/` as `@fedemedinilla/claude-gateway` and `slop-lint/` as `@fedemedinilla/slop-lint`. Their versions and changelogs are managed with [Changesets](https://changesets.dev). The rest of the repository is not published, and the root package is private.
+Four folders of this repository are published to npm: `gateway/` as `@fedemedinilla/claude-gateway`, `slop-lint/` as `@fedemedinilla/slop-lint`, `import-fences/` as `@fedemedinilla/import-fences` and `csp-build-guard/` as `@fedemedinilla/csp-build-guard`. Their versions and changelogs are managed with [Changesets](https://changesets.dev). The rest of the repository is not published, and the root package is private.
 
 ## Record a change
 
@@ -12,6 +12,8 @@ git add .changeset/*.md    # commit it with the change
 ```
 
 A change that needs no release (a test, a README typo) needs no changeset.
+
+No package has been published yet. The first release of each is 0.1.0, the version in its `package.json`, and it carries everything the folder does today, so no changeset describes a change against it. Changesets start with the first change after 0.1.0 is on npm.
 
 ## What happens on main
 

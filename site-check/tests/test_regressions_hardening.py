@@ -19,7 +19,7 @@ from fakesite import FakeSite, Route
 from fixhelp import HTML, run_e2e
 from obsfactory import BASE, HOME, html_page, make_ctx, make_obs, response
 from sitefixtures import SchoolOptions, default_apis, school_scenario
-from support import TEST_KEY, patched_env, run_cli, temp_dir
+from support import TEST_KEY, patched_env, run_cli, temp_dir, read_run
 from test_checks_core import finding
 
 from sitecheck import exclusions, gate, pipeline, registry
@@ -333,7 +333,7 @@ class WrapperReasonTest(unittest.TestCase):
 
 
 class WrapperRunTest(unittest.TestCase):
-    """The whole run on a wrapper home: the reason reaches the console and datos.json."""
+    """The whole run on a wrapper home: the reason reaches the console and run.json."""
 
     def test_control_normal_home_measures(self) -> None:
         r = run_e2e(school_scenario(), default_apis())
@@ -350,11 +350,11 @@ class WrapperRunTest(unittest.TestCase):
                 code, _, _ = run_cli(argv)
             self.assertEqual(code, 0)
             rd = next(p for p in (salidas / "colegio.test").iterdir() if p.is_dir())
-            before = json.loads((rd / "datos.json").read_text(encoding="utf-8"))["meta"]["portada_envoltorio"]
+            before = read_run(rd / "run.json")["meta"]["portada_envoltorio"]
             self.assertEqual(before["tipo"], "meta-refresh")
-            code2, _, err = run_cli(["--rerender", str(rd / "datos.json"), "--out", str(salidas)])
+            code2, _, err = run_cli(["--rerender", str(rd / "run.json"), "--out", str(salidas)])
             self.assertEqual(code2, 0, err)
-            after = json.loads((rd / "datos.json").read_text(encoding="utf-8"))["meta"]["portada_envoltorio"]
+            after = read_run(rd / "run.json")["meta"]["portada_envoltorio"]
             self.assertEqual(after, before)
 
 
@@ -745,11 +745,11 @@ class TlsChainTest(unittest.TestCase):
         self.assertNotEqual(r.code, 3)
         ext07 = r.check("EXT-07")
         self.assertEqual(ext07["estado"], "FALLA")
-        self.assertNotIn("El navegador no acepta la conexión segura", r.files["informe.md"])
+        self.assertNotIn("El navegador no acepta la conexión segura", r.files["report.md"])
         self.assertIn(
             "A la conexión segura del sitio le falta una parte de la cadena de confianza; muchos navegadores la "
             "completan solos y otros muestran una advertencia",
-            r.files["informe.md"],
+            r.files["report.md"],
         )
         # The site phase ran: the home was read and the HTML checks measured it.
         self.assertNotEqual(r.check("VIS-04")["estado"], "NO_VERIFICADO")
@@ -763,7 +763,7 @@ class TlsChainTest(unittest.TestCase):
     def test_control_a_wrong_name_still_greys_the_site_phase(self) -> None:
         r = run_tls_failure(62)
         self.assertEqual(r.check("EXT-07")["estado"], "FALLA")
-        self.assertIn("El navegador no acepta la conexión segura del sitio (no corresponde al nombre del sitio)", r.files["informe.md"])
+        self.assertIn("El navegador no acepta la conexión segura del sitio (no corresponde al nombre del sitio)", r.files["report.md"])
         self.assertEqual(
             r.check("VIS-04")["motivo"], "el navegador no acepta la conexión segura de la página principal, así que no se leyó"
         )
@@ -885,7 +885,7 @@ class SoftNotFoundTest(unittest.TestCase):
         r = run_e2e(sc, clean_apis())
         self.assertFalse(r.datos["meta"]["sitio_cortado"])
         self.assertEqual(r.datos["meta"]["eventos_desafio"], [])
-        self.assertNotIn("anti-bot", r.files["informe.md"])
+        self.assertNotIn("anti-bot", r.files["report.md"])
         self.assertEqual(r.check("VIS-02")["motivo"], "el sitio no publica el archivo robots.txt, y el mapa del sitio se busca a mano")
 
     def test_e2e_spa_shell_is_said_as_such_not_as_anti_bot(self) -> None:
@@ -928,7 +928,7 @@ class ForbiddenThrottleTest(unittest.TestCase):
         r = run_e2e(sc, clean_apis())
         self.assertFalse(r.datos["meta"]["sitio_cortado"])
         self.assertNotEqual(r.check("VIS-09")["motivo"], "el sitio pidió bajar el ritmo")
-        self.assertNotIn("bajar el ritmo", r.files["informe.md"])
+        self.assertNotIn("bajar el ritmo", r.files["report.md"])
 
     def scenario(self, routes: dict[str, Route]):
         sc = school_scenario()
@@ -1012,7 +1012,7 @@ class CharsetCrashTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# IPv4 evidence is not a phone; /author/<user>/ never reaches datos.json or requests.log
+# IPv4 evidence is not a phone; /author/<user>/ never reaches run.json or requests.log
 # ---------------------------------------------------------------------------
 
 

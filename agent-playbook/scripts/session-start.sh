@@ -31,7 +31,14 @@ persist() {
 }
 
 # --- 1. Node -----------------------------------------------------------------
-want="v$(tr -d ' \n\r' < .node-version)"
+# Accepts 24.22.1 or v24.22.1 with any whitespace around it; anything else stops here, before a
+# download from a URL that does not exist.
+raw="$(tr -d '[:space:]' < .node-version)"
+want="v${raw#v}"
+if [[ ! "$want" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "session-start: .node-version must hold an exact version such as 24.22.1, not '${raw}'" >&2
+  exit 1
+fi
 if [[ "$(node --version 2>/dev/null || true)" != "$want" ]]; then
   case "$(uname -m)" in
     x86_64) arch="linux-x64" ;;

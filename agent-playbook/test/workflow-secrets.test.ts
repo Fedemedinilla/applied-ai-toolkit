@@ -84,10 +84,49 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test\n', '      - uses: ./.github/actions/release\n        with:\n          token: ${{ github.token }}\n'))).toEqual(['19:secret-expression']);
   });
 
+  it('reads the whole expression, so a format string or the index form cannot hide a secret', () => {
+    const step = (expr: string) => CLEAN.replace('      - run: npm test', `      - run: echo "\${{ ${expr} }}"`);
+    expect(rules(step("format('{0}', secrets.DEPLOY_TOKEN)"))).toEqual(['17:secret-expression']);
+    expect(rules(step("github['token']"))).toEqual(['17:secret-expression']);
+    expect(rules(step('github[ "token" ]'))).toEqual(['17:secret-expression']);
+    expect(rules(step("format('{0}', github.token)"))).toEqual(['17:secret-expression']);
+    expect(rules(step("format('{0}', github.sha)"))).toEqual([]);
+    expect(rules(CLEAN.replace('      - run: npm test', '      - run: echo "${{ github.sha }}" "${{ secrets.X }}"'))).toEqual(['17:secret-expression']);
+  });
+
+  it('matches the contexts in any letter case and reads past "}}" inside a string literal', () => {
+    const step = (expr: string) => CLEAN.replace('      - run: npm test', `      - run: echo "\${{ ${expr} }}"`);
+    for (const expr of ['SECRETS.DEPLOY', 'Secrets.DEPLOY', 'GITHUB.TOKEN', 'GitHub.Token', "github['TOKEN']", "format('}}', secrets.DEPLOY)", "format('it''s }}', SECRETS.X)"]) {
+      expect(rules(step(expr)), expr).toEqual(['17:secret-expression']);
+    }
+    expect(rules(step("format('}}', github.sha)"))).toEqual([]);
+    expect(rules(step('GITHUB.SHA'))).toEqual([]);
+  });
+
   it('reports a real-looking value in a credential-shaped variable, and leaves other variables alone', () => {
     const found = workflowFindings(CLEAN.replace('ci-placeholder-app-0001', 'sk-live-0000'));
     expect(found).toEqual([{ line: 10, rule: 'credential-value', text: 'APP_API_KEY: sk-live-0000' }]);
     expect(rules(CLEAN.replace('NODE_ENV: test', 'NODE_ENV: production'))).toEqual([]);
+  });
+
+  it('reads a quoted or dashed variable name, and reports an env entry it cannot read', () => {
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', '"APP_API_KEY": sk-live-0000'))).toEqual(['10:credential-value']);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', "'APP_API_KEY': ci-placeholder-app-0001"))).toEqual([]);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', 'MY-TOKEN: sk-live-0000'))).toEqual(['10:credential-value']);
+    expect(rules(CLEAN.replace('APP_API_KEY: ci-placeholder-app-0001', '- APP_API_KEY=sk-live-0000'))).toEqual(['10:credential-value']);
+    // A multi-line value belongs to its entry and is not read as entries of its own.
+    expect(rules(CLEAN.replace('NODE_ENV: test', 'NOTES: |\n        API_KEY: some text'))).toEqual([]);
+  });
+
+  it('reports literal container credentials and a password inside a URL', () => {
+    const container = (password: string) =>
+      CLEAN.replace('    runs-on: ubuntu-latest\n', `    runs-on: ubuntu-latest\n    container:\n      image: ghcr.io/example/app\n      credentials:\n        username: ci\n        password: ${password}\n`);
+    expect(rules(container('hunter2-real-password'))).toEqual(['13:credential-value']);
+    expect(rules(container('ci-placeholder-registry'))).toEqual([]);
+    const url = (value: string) => CLEAN.replace('NODE_ENV: test', `DATABASE_URL: ${value}`);
+    expect(rules(url('postgres://admin:realpass@db.example.test/app'))).toEqual(['11:credential-value']);
+    expect(rules(url("'postgres://admin:ci-placeholder-db@localhost/app'"))).toEqual([]);
+    expect(rules(url('postgres://localhost/app'))).toEqual([]);
   });
 
   it('accepts a quoted placeholder', () => {
@@ -149,6 +188,15 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('persist-credentials: false', "persist-credentials: 'false'"))).toEqual([]);
   });
 
+  it('matches checkout in any letter case, and reads persist-credentials only from with:', () => {
+    expect(rules(CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: Actions/Checkout@${SHA}`))).toEqual([]);
+    const noOption = CLEAN.replace('        with:\n          persist-credentials: false\n', '');
+    expect(rules(noOption.replace(`uses: actions/checkout@${SHA}`, `uses: Actions/Checkout@${SHA}`))).toEqual(['14:persisted-credentials']);
+    // Under env: the setting is not a checkout input and changes nothing. Its name also looks like
+    // a credential, so the env check reports the entry as well.
+    expect(rules(CLEAN.replace('        with:\n', '        env:\n'))).toEqual(['14:persisted-credentials', '16:credential-value']);
+  });
+
   it('reads a quoted uses value, so a quoted checkout is still checked', () => {
     expect(rules(CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: "actions/checkout@${SHA}"`))).toEqual([]);
     const quotedNoOption = CLEAN.replace(`uses: actions/checkout@${SHA}`, `uses: 'actions/checkout@${SHA}'`).replace(
@@ -164,11 +212,28 @@ describe('workflowFindings', () => {
     expect(rules(CLEAN.replace('      - run: npm test', '      - uses: ./.github/actions/setup'))).toEqual([]);
   });
 
+  it('reports a container action by tag, and accepts one pinned to a digest', () => {
+    expect(rules(CLEAN.replace('      - run: npm test', '      - uses: docker://alpine:latest'))).toEqual(['17:unpinned-action']);
+    expect(rules(CLEAN.replace('      - run: npm test', '      - uses: docker://alpine'))).toEqual(['17:unpinned-action']);
+    expect(rules(CLEAN.replace('      - run: npm test', `      - uses: docker://alpine@sha256:${'a'.repeat(64)}`))).toEqual([]);
+    expect(rules(CLEAN.replace('      - run: npm test', `      - uses: docker://alpine:3.20@sha256:${'a'.repeat(64)}`))).toEqual([]);
+  });
+
   it('ignores what a comment says, at the end of a line or on a line of its own', () => {
     // Without the comment stripping, each of these lines would produce a finding.
     expect(rules(CLEAN.replace('      - run: npm test', '      - run: npm test # ${{ secrets.APP_API_KEY }}'))).toEqual([]);
     expect(rules(CLEAN.replace('    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    # environment: production\n'))).toEqual([]);
     expect(rules(CLEAN.replace('  contents: read', '  contents: read\n  # packages: write'))).toEqual([]);
+  });
+
+  it('keeps a # inside a block scalar, where it is text and GitHub still fills in expressions', () => {
+    const heredoc = '      - run: |\n          cat <<EOF\n          # ${{ secrets.TOKEN }}\n          EOF\n';
+    expect(rules(CLEAN.replace('      - run: npm test\n', heredoc))).toEqual(['19:secret-expression']);
+    const body = `      - uses: ./.github/actions/comment\n        with:\n          body: >-\n            # Report \${{ secrets.API_KEY }}\n`;
+    expect(rules(CLEAN.replace('      - run: npm test\n', body))).toEqual(['20:secret-expression']);
+    // The scalar ends at a line indented no deeper than its key, and comments count again there.
+    const after = '      - run: |\n          echo hi\n      # ${{ secrets.TOKEN }}\n';
+    expect(rules(CLEAN.replace('      - run: npm test\n', after))).toEqual([]);
   });
 });
 
