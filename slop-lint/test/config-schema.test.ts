@@ -41,6 +41,14 @@ describe('the config schema and the hand validator', () => {
     expect(fixtures('invalid-meaning').length).toBeGreaterThanOrEqual(6);
   });
 
+  it('has as many fixtures as the README says', () => {
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    const total = fixtures('valid').length + fixtures('invalid').length + fixtures('invalid-meaning').length;
+    const stated = [...readme.matchAll(/over the same (\d+) fixtures/gu)].map((m) => Number(m[1]));
+    expect(stated.length).toBeGreaterThan(0);
+    expect(stated.every((n) => n === total), `README states ${stated.join(', ')}; there are ${total}`).toBe(true);
+  });
+
   it.each(fixtures('valid'))('both accept valid/%s', (_name, value) => {
     expect(schema.safeParse(value).success).toBe(true);
     expect(accepts(() => validateConfig(value))).toBe(true);
