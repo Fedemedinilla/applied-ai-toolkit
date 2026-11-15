@@ -98,7 +98,16 @@ export interface NodeServerOptions {
 
 export function createNodeServer({ handler, dir }: NodeServerOptions): Server {
   return createServer((req, res) => {
-    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    // node:http accepts request targets that WHATWG URL refuses (`//[`). Thrown here, outside the
+    // guarded chain below, that would be an uncaught exception and the end of the process.
+    let pathname: string;
+    try {
+      pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Bad request');
+      return;
+    }
     // A fixed origin: the handler reads only the path, and a Host header is whatever the client sent.
     const work = pathname.startsWith('/api/')
       ? Promise.resolve()

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
+import { connect, type AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createHandler } from '../server/handler.ts';
 import { createNodeServer, CSP, resolveStatic } from '../server/node-server.ts';
@@ -15,6 +15,22 @@ import { fakeDevice } from './helpers/fake-push-service.ts';
 let dir = '';
 let server: Server;
 let base = '';
+
+/** One raw request over a socket, for request targets fetch would refuse to send. */
+function rawRequest(target: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = connect((server.address() as AddressInfo).port, '127.0.0.1');
+    let answer = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk: string) => (answer += chunk));
+    socket.on('end', () => resolve(answer));
+    socket.on('error', reject);
+    // A server that never answers fails the test instead of hanging it.
+    socket.setTimeout(2000, () => socket.destroy());
+    socket.on('close', () => resolve(answer));
+    socket.write(`GET ${target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+  });
+}
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'push-lab-serve-'));
@@ -117,5 +133,14 @@ describe('the API through node:http', () => {
     const response = await fetch(`${base}/api/redirect-check`, { redirect: 'manual' });
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('../?redirected=1');
+  });
+});
+
+describe('a request target the URL parser refuses', () => {
+  // node:http accepts these, WHATWG URL throws on them. Thrown in the request listener, that was
+  // an uncaught exception and the end of the process.
+  it.each(['//[', '//a:99999/'])('answers 400 to %s and keeps serving', async (target) => {
+    expect(await rawRequest(target)).toMatch(/^HTTP\/1\.1 400 /u);
+    expect((await fetch(`${base}/`)).status).toBe(200);
   });
 });
