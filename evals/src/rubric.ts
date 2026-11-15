@@ -108,8 +108,20 @@ export function parseJudgeReply<V extends object>(rubric: JudgeRubric<V>, raw: s
   return parsed.data;
 }
 
-/** A verdict as stored in a verdicts file: the piece it is about and which judge gave it. */
+/**
+ * A verdict as stored in a verdicts file: the piece it is about and which
+ * judge gave it. `id` and `judge` are therefore reserved: a verdict schema
+ * must not produce either key.
+ */
 export type Judged<V extends object> = { id: string; judge: number } & V;
+
+/** Refuses a verdict that would overwrite the piece id or the judge number. */
+function withoutReserved<V extends object>(rubric: JudgeRubric<V>, verdict: V): V {
+  if ('id' in verdict || 'judge' in verdict) {
+    throw new RubricError(`rubric ${rubric.name}: its verdict has an "id" or "judge" field; "id" and "judge" are reserved for the piece id and the judge number`);
+  }
+  return verdict;
+}
 
 /**
  * One judge call for one blind piece. A cut reply or a refusal is an error,
@@ -128,7 +140,7 @@ export async function judgeWith<V extends object>(
   if (reply.stopReason === 'max_tokens' || reply.stopReason === 'refusal') {
     throw new JudgeError(`judge stopped with ${reply.stopReason} on ${piece.id}`);
   }
-  return { id: piece.id, judge, ...parseJudgeReply(rubric, reply.text, piece) };
+  return { id: piece.id, judge, ...withoutReserved(rubric, parseJudgeReply(rubric, reply.text, piece)) };
 }
 
 /**
@@ -144,5 +156,5 @@ export function readJudged<V extends object>(rubric: JudgeRubric<V>, raw: unknow
   if (!parsed.success) throw new RubricError(String(parsed.error.issues[0]?.message));
   if (typeof id !== 'string' || id === '') throw new RubricError('id must be a non-empty string');
   if (typeof judge !== 'number' || !Number.isInteger(judge) || judge < 1) throw new RubricError('judge must be a positive integer');
-  return { id, judge, ...parsed.data };
+  return { id, judge, ...withoutReserved(rubric, parsed.data) };
 }

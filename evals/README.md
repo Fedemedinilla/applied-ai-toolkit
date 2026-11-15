@@ -79,7 +79,7 @@ A rubric says what a verdict looks like and how one verdict becomes pass or fail
 | field | what |
 |---|---|
 | `name`, `version` | The identity of the rubric. The gate compares two runs only when both match. Change the version whenever the instructions, the labels or the scoring change. |
-| `verdict` | The zod schema of one verdict. Checked when a verdict is produced and again when it is read back from a file. |
+| `verdict` | The zod schema of one verdict. Checked when a verdict is produced and again when it is read back from a file. A judge verdict must not have an `id` or `judge` field: the verdicts file uses both names for the piece and the judge number. |
 | `reduce(verdict)` | Returns `{ pass, metrics }`. `pass` feeds the pass rate. `metrics` are named numbers, averaged in the report. |
 | `complete(verdict, ...)` | Optional. Throws when the verdict does not account for every unit of what it judged: every line of a piece, every field of a record. |
 | `describe(verdict)` | Optional. One line a person reads next to a failing case. |

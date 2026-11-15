@@ -9,7 +9,7 @@ import { VARIANTS } from '../example/variants.ts';
 import { aggregate } from '../src/aggregate.ts';
 import { blind, type BlindKey, type BlindPiece } from '../src/blind.ts';
 import { groundedness, judgePiece, JudgeError, type JudgedPiece } from '../src/judge.ts';
-import { judgeWith, rubricRequest, type JudgeRubric } from '../src/rubric.ts';
+import { judgeWith, rubricRequest, RubricError, type JudgeRubric } from '../src/rubric.ts';
 import { judgedRuns, summarize } from '../src/run.ts';
 import { planJobs, runEval } from '../src/runner.ts';
 
@@ -145,6 +145,26 @@ describe('a rubric written outside the folder (plain language)', () => {
     await expect(answer(all, 'max_tokens')).rejects.toThrow(/max_tokens on p1/);
     await expect(answer(all, 'refusal')).rejects.toThrow(/refusal on p1/);
     await expect(answer('{"sentences": []}')).rejects.toThrow(/wrong shape/);
+  });
+});
+
+describe('the reserved verdict fields', () => {
+  const claims: JudgeRubric<{ id: string; ok: boolean }> = {
+    kind: 'judge',
+    name: 'claims',
+    version: '1',
+    instructions: 'x',
+    call: plainLanguage.call,
+    verdict: z.strictObject({ id: z.string(), ok: z.boolean() }),
+    prompt: (p) => p.text,
+    reduce: (v) => ({ pass: v.ok, metrics: {} }),
+  };
+  const piece: BlindPiece = { id: 'piece-abc', case: 'c', lang: 'en', now: '2026-03-04T12:00:00.000Z', brief: 'b', text: 't' };
+
+  it('refuses a verdict whose own fields would replace the piece id or the judge number', async () => {
+    const client = recordingClient(() => reply(JSON.stringify({ id: 'claim-3', ok: true })));
+    await expect(judgeWith(claims, client, piece, '')).rejects.toThrow(/"id" and "judge" are reserved/);
+    await expect(judgeWith(claims, client, piece, '')).rejects.toThrow(RubricError);
   });
 });
 
