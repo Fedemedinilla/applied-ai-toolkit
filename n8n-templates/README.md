@@ -164,7 +164,7 @@ The harness does not emulate the mode that runs a Code node once per item, `$exe
 
 **Docs (`test/docs.test.ts`).** The two generated tables and the diagrams match the files, every workflow has a test file and a diagram, and no test file or diagram is left over.
 
-`templates.test.ts` is the older suite and is unchanged. It loads every file in `templates/` and checks, per template:
+`templates.test.ts` is the older suite. It loads every file in `templates/` and checks, per template:
 
 - The file parses, has the expected top-level shape (zod schema), at least one trigger, unique node names and ids, and every working node is connected.
 - Every connection starts and ends at an existing node, and its type matches its slot (`main`, `ai_languageModel`, `ai_outputParser`).
@@ -173,7 +173,7 @@ The harness does not emulate the mode that runs a Code node once per item, `$exe
 - No string looks like a secret: `sk-` keys, Slack tokens and webhook ids, GitHub, Google and AWS keys, JWTs, Telegram bot tokens, long hex or base64 runs, phone numbers. Email addresses must be `@example.com`. URLs must point to the provider APIs the templates use or to an `.example` host, with no numeric ids in the path.
 - Sheet document and tab, Telegram chat id and fixed recipients are placeholders.
 - Each Claude model node holds only a `claude-` model id and options, so the key can only come from the n8n credential. No string mentions the Anthropic API host or an API key header.
-- Every chain has a model, and an output parser when it expects one. Every parser schema is valid JSON Schema with all properties required. Every value inserted into a prompt is cut with `.slice`.
+- Every chain has a model, and an output parser when it expects one. Every parser schema is valid JSON Schema with all properties required. Every `{{ }}` block of a prompt is one value cut with `.slice` at its end, with no `+`, `?:` or template literal that could add an uncut one.
 - JSON bodies use `JSON.stringify`, Sheets appends use RAW, nodes that send to customers or create records elsewhere have no automatic retry, and no accented Spanish characters or common Spanish words are left.
 
 Across the set, there are 13 files with distinct webhook paths, and each one is listed in this README. It also executes two Code nodes with a minimal `$input`, `require` and `Buffer`:
