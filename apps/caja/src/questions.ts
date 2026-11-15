@@ -126,7 +126,19 @@ function range(parsed: ParsedAmount): Question {
   return typedOnly('range', 'La frase da un rango. ¿Cuánto fue al final?');
 }
 
+/** A whole word, without lookbehind (the build guard forbids it). */
+const word = (pattern: string): RegExp => new RegExp(`(^|[^\\p{L}])(${pattern})([^\\p{L}]|$)`, 'u');
+const NAMES_DISCOUNT = word('descuentos?|desc|off|menos|rebaja|bonificaci[oó]n');
+const NAMES_VAT = word('iva');
+
 function discount(text: string, parsed: ParsedAmount): Question {
+  // The parser also gives this reason for a surcharge ("20 mil + 21% de iva"). Subtracting that
+  // rate would put a button on screen with a figure the sentence never stated, so the code only
+  // builds the discount buttons when the sentence names a discount, asks the IVA question when it
+  // names IVA, and otherwise asks for the amount.
+  const lower = text.toLowerCase();
+  const namesDiscount = NAMES_DISCOUNT.test(lower);
+  if (!namesDiscount && NAMES_VAT.test(lower)) return { ...tax(text, parsed), reason: 'discount_unclear' };
   const figs = figures(parsed);
   const rate = figs.find(
     (f) => f.value < 100 && /^\s*(%|por\s*ciento|puntos|de\s+descuento)/u.test(after(text, f.span)),
@@ -136,6 +148,8 @@ function discount(text: string, parsed: ParsedAmount): Question {
     ? `¿Los ${base.span.text} son antes o después del ${percent(rate.value)} de descuento?`
     : '¿Cuánto pagaste, ya con el descuento?';
   if (!rate || !base) return typedOnly('discount_unclear', prompt);
+  const minusBefore = /[-−]\s*$/u.test(text.slice(0, rate.span.start));
+  if (!namesDiscount && !minusBefore) return typedOnly('discount_unclear', '¿Cuánto pagaste en total?');
   const net = cents(base.value * (1 - rate.value / 100));
   return {
     reason: 'discount_unclear',

@@ -58,6 +58,27 @@ describe('one question per ambiguity reason', () => {
     expect(t.options[1]).toEqual({ label: 'No, va aparte (10,5%): $22.100', amount: 22100, literal: '20 mil + 10,5%' });
   });
 
+  it('discount_unclear on a surcharge never offers the discount buttons', () => {
+    // The parser reads "+ 21%" as a discount reason; the words after the rate say IVA.
+    for (const [text, rate, gross] of [
+      ['pagué 20 mil + 21% de iva', '21%', 24200],
+      ['pagué 20 mil + 10,5% de iva', '10,5%', 22100],
+    ] as const) {
+      const q = ask(text);
+      expect(q.reason).toBe('discount_unclear');
+      expect(q.prompt).toBe('¿El IVA ya está incluido en los 20 mil?');
+      expect(amounts(q)).toEqual([20000, gross]);
+      expect(q.options[1]?.literal).toBe(`20 mil + ${rate}`);
+    }
+    // No word for a discount and none for IVA: no figure is computed, the owner types it.
+    expect(ask('pagué 20 mil más el 21%')).toMatchObject({ reason: 'discount_unclear', options: [], typed: true });
+  });
+
+  it('discount_unclear keeps its buttons when the sentence names the discount', () => {
+    expect(amounts(ask('pagué 20 mil con 10% off'))).toEqual([18000, 20000]);
+    expect(amounts(ask('pagué 20 mil - 10%'))).toEqual([18000, 20000]);
+  });
+
   it('instalments: the whole purchase or this payment', () => {
     const q = ask('compré la heladera en 6 cuotas sin interés de 25 lucas');
     expect(q.reason).toBe('instalments');
