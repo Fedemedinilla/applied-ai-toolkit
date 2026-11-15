@@ -115,6 +115,14 @@ describe('an unused suppression', () => {
     expect(problems(twice)).toEqual([['SUP-01', 2, 'no LEX-03 finding in its range']]);
   });
 
+  it('credits the innermost of two open disables of one rule, so its reason is kept', () => {
+    const nested = md(`<!-- slop-lint-disable LEX-03 -->\nIntro line.\n\n<!-- slop-lint-disable LEX-03: quoted -->\n${BANNED}\n<!-- slop-lint-enable LEX-03 -->\n`);
+    expect(nested.suppressed?.map((f) => [f.ruleId, f.suppressedBy])).toEqual([['LEX-03', { line: 4, column: 1, reason: 'quoted' }]]);
+    expect(problems(nested)).toEqual([['SUP-01', 1, 'no LEX-03 finding in its range']]);
+    const line = md(`<!-- slop-lint-disable LEX-03 -->\nIntro line.\n<!-- slop-lint-disable-next-line LEX-03: quoted -->\n${BANNED}\n`);
+    expect(line.suppressed?.map((f) => f.suppressedBy)).toEqual([{ line: 3, column: 1, reason: 'quoted' }]);
+  });
+
   it('costs no points and does not change the verdict or the counts', () => {
     const result = md('<!-- slop-lint-disable-next-line LEX-03 -->\nI built it in 2023.');
     expect(result).toMatchObject({ findings: [], passesTier1: true, score: { points: 15 } });
