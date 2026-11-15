@@ -1288,6 +1288,21 @@ const mail: Rule[] = [
       },
     ],
   },
+  {
+    kind: 'pattern',
+    id: 'MAIL-02',
+    name: '"Estimado/a" with a slash',
+    lang: 'es',
+    level: 2,
+    severity: 'medium',
+    patterns: { es: String.raw`${B}estimad[oa]s?[ \t]*\/[ \t]*[oa]s?${E}` },
+    flags: 'giu',
+    message: 'A greeting with both genders says the mail was written for nobody in particular.',
+    suggestion: 'Greet the person by name, or the team: "Hola, Laura" or "Hola, equipo de datos".',
+    source: { evidence: ['SÍNTESIS'], ref: 'Section 11, item 3 (slop of generated Spanish)', section: '11' },
+    deviation: 'The report gives no tier, so it is level 2 at medium severity, like the other calques of section 11 (REG-02). It also matches the plural and spaces around the slash.',
+    examples: [{ lang: 'es', fire: 'Estimado/a equipo:', pass: 'Estimada Laura:' }],
+  },
 ];
 
 export const GENRE_RULES: readonly Rule[] = [...mail];
