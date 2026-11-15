@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WpHardening\Audit;
 
-use WpHardening\Controls\ServerRules;
 use WpHardening\Env\Constants;
 use WpHardening\Env\Paths;
 
@@ -38,6 +37,9 @@ final class Audit
     private const DROPINS = ['advanced-cache.php', 'object-cache.php', 'db.php', 'db-error.php', 'sunrise.php', 'maintenance.php', 'install.php', 'php-error.php', 'fatal-error-handler.php'];
 
     private const PHP_EXTENSION = '/\.(?:php\d?|phtml|pht|phps|phar)$/i';
+
+    /** In uploads/ a PHP extension anywhere in the chain counts, as in ServerRules::uploadsBlock(). */
+    private const PHP_IN_EXTENSIONS = '/\.(?:php\d?|phtml|pht|phps|phar)(?:\.|$)/i';
 
     private const IMAGE_EXTENSION = '/\.(?:ico|png|jpe?g|gif|webp|bmp|svg)$/i';
 
@@ -120,6 +122,15 @@ final class Audit
     public function registration(): Finding
     {
         $title = 'Open registration';
+        if (is_multisite()) {
+            // wp-signup.php follows the network setting; each site's users_can_register is unused.
+            $network = get_site_option('registration', 'none');
+            $network = \is_string($network) && $network !== '' ? $network : 'none';
+            if ($network === 'none') {
+                return new Finding('INT-11', $title, Verdict::Pass, 'Signup is closed for the network.', ['registration=none']);
+            }
+            return new Finding('INT-11', $title, Verdict::Warn, "Anyone can sign up on this network ({$network}). Confirm the network needs it.", ["registration={$network}"]);
+        }
         if (!self::truthy(get_option('users_can_register'))) {
             return new Finding('INT-11', $title, Verdict::Pass, 'Registration is closed.');
         }
@@ -136,16 +147,32 @@ final class Audit
         if ($this->constants->value('WP_DEBUG') !== true) {
             return new Finding('INT-11', $title, Verdict::Pass, 'WP_DEBUG is off.');
         }
-        $display = $this->constants->defined('WP_DEBUG_DISPLAY') ? $this->constants->value('WP_DEBUG_DISPLAY') : true;
-        if ($display !== false) {
+        if ($this->displaysErrors()) {
             return new Finding('INT-11', $title, Verdict::Fail, 'WP_DEBUG is on and errors are printed into pages, with file paths in them.', ['WP_DEBUG=true', 'WP_DEBUG_DISPLAY not false']);
         }
         $log = $this->constants->value('WP_DEBUG_LOG');
         $file = \is_string($log) && $log !== '' && !\in_array(strtolower($log), ['1', 'true'], true) ? $log : $this->paths()->content . '/debug.log';
-        if ($log !== false && $log !== null && is_file($file) && str_starts_with($file, $this->paths()->root)) {
+        if ($log !== false && $log !== null && is_file($file) && str_starts_with($file, rtrim($this->paths()->root, '/') . '/')) {
             return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on and the log is inside the web root. Check from outside that it is not served.', [self::relative($file, $this->paths()->root)]);
         }
         return new Finding('INT-11', $title, Verdict::Warn, 'WP_DEBUG is on, with display off. Turn it off once the problem it was on for is fixed.', ['WP_DEBUG=true']);
+    }
+
+    /**
+     * Whether wp_debug_mode() leaves errors printed into pages. WordPress defines WP_DEBUG_DISPLAY
+     * as true when wp-config.php does not, turns display off for any other falsy value, and leaves
+     * php.ini in charge when it is null.
+     */
+    private function displaysErrors(): bool
+    {
+        if (!$this->constants->defined('WP_DEBUG_DISPLAY')) {
+            return true;
+        }
+        $display = $this->constants->value('WP_DEBUG_DISPLAY');
+        if ($display === null) {
+            return \in_array(strtolower(trim((string) ini_get('display_errors'))), ['1', 'on', 'true', 'yes', 'stdout'], true);
+        }
+        return (bool) $display;
     }
 
     public function salts(): Finding
@@ -358,7 +385,7 @@ final class Audit
         $hits = [];
         $walk = self::walk($this->paths()->uploads, function (\SplFileInfo $file) use (&$hits): void {
             $name = $file->getFilename();
-            if (preg_match(self::PHP_EXTENSION, $name) === 1) {
+            if (preg_match(self::PHP_IN_EXTENSIONS, $name) === 1) {
                 $hits[] = self::relative($file->getPathname(), $this->paths()->uploads);
             } elseif (preg_match(self::IMAGE_EXTENSION, $name) === 1 && self::containsPhp($file->getPathname())) {
                 $hits[] = self::relative($file->getPathname(), $this->paths()->uploads) . ' (image with PHP inside)';
@@ -410,7 +437,7 @@ final class Audit
         $since = $this->now() - $days * 86400;
         $recent = [];
         $walk = self::walk($this->paths()->content, function (\SplFileInfo $file) use (&$recent, $since): void {
-            if (preg_match('/\.php$/i', $file->getFilename()) === 1 && $file->getMTime() >= $since) {
+            if (preg_match(self::PHP_EXTENSION, $file->getFilename()) === 1 && $file->getMTime() >= $since) {
                 $recent[] = self::relative($file->getPathname(), $this->paths()->content);
             }
         });
@@ -445,22 +472,16 @@ final class Audit
     }
 
     /**
-     * Lines outside this plugin's own block that match a known injection pattern.
+     * Lines that match a known injection pattern. This plugin's own block is scanned too: the
+     * generated blocks hold none of these patterns, and the marker comment proves nothing about who
+     * wrote the lines after it, so skipping it would let injected rules hide behind one comment.
      *
      * @return list<array{0: int, 1: string}>
      */
     public static function suspiciousLines(string $text, bool $inUploads): array
     {
         $out = [];
-        $inside = false;
         foreach (preg_split('/\r\n|\r|\n/', $text) ?: [] as $index => $line) {
-            if (str_starts_with(trim($line), ServerRules::BEGIN)) {
-                $inside = true;
-            }
-            if ($inside) {
-                $inside = !str_starts_with(trim($line), ServerRules::END);
-                continue;
-            }
             $kind = match (true) {
                 preg_match('#^\s*RewriteRule\s+\S+\s+https?://#i', $line) === 1 => 'rewrite to another host',
                 preg_match('/HTTP_USER_AGENT/i', $line) === 1 => 'condition on the user agent',
@@ -483,8 +504,9 @@ final class Audit
             return new Finding('INT-04', 'Options holding code', Verdict::Skip, 'No database connection.');
         }
         $sql = $wpdb->prepare(
-            "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s LIMIT 20",
+            "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s OR option_value LIKE %s LIMIT 20",
             '%<?php%',
+            '%<?=%',
             '%base64_decode(%',
             '%eval(%',
         );
@@ -572,10 +594,15 @@ final class Audit
         return ['files' => $files, 'truncated' => false];
     }
 
+    /**
+     * `<?php`, or a `<?=` short echo (always on since PHP 5.4) followed by code: a variable, a
+     * space and a name, or a function call. A bare `<?=` turns up by chance in about one in twenty
+     * 1 MB images, so it is not enough on its own.
+     */
     private static function containsPhp(string $path): bool
     {
         $head = @file_get_contents($path, false, null, 0, self::MAX_READ);
-        return \is_string($head) && stripos($head, '<?php') !== false;
+        return \is_string($head) && preg_match('/<\?(?:php|=(?:\s*\$|\s+[a-z_]|[a-z_]\w*\s*\())/i', $head) === 1;
     }
 
     private static function relative(string $path, string $base): string

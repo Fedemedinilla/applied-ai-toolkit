@@ -122,6 +122,26 @@ final class SecurityHeadersTest extends TestCase
         self::assertStringContainsString('X-Frame-Options', implode(' ', $control->plan()));
     }
 
+    /** Only the names this plugin sends can come out twice: never an enforcing CSP, and no HSTS at max-age 0. */
+    public function testServerHeadersThePluginDoesNotSendAreNotReportedAsDuplicates(): void
+    {
+        $root = $this->tempDir();
+        $paths = new Paths($root, $root, $root . '/uploads', $root . '/mu');
+        file_put_contents($root . '/.htaccess', "Header always set Content-Security-Policy \"default-src 'self'\"\nHeader always set Strict-Transport-Security \"max-age=31536000\"\n");
+        $s = Settings::fromArray(['hsts_max_age' => 0]);
+        $integrations = new Integrations(new FakeConstants(), $s);
+        $control = new SecurityHeaders($s, new FakeHeaders(), $integrations, new ServerRules($paths, $integrations, []));
+        self::assertSame(State::Good, $control->report(true)->state);
+        self::assertStringNotContainsString('Found in the root .htaccess', implode(' ', $control->plan()));
+
+        file_put_contents($root . '/.htaccess', "Header always set Content-Security-Policy \"default-src 'self'\"\nHeader always set X-Frame-Options \"SAMEORIGIN\"\n", FILE_APPEND);
+        $report = $control->report(true);
+        self::assertSame(State::Recommended, $report->state);
+        self::assertStringContainsString('sets X-Frame-Options,', $report->summary);
+        self::assertStringNotContainsString('Content-Security-Policy,', $report->summary);
+        self::assertStringNotContainsString('Strict-Transport-Security', $report->summary);
+    }
+
     public function testNothingIsSentAfterOutputStarted(): void
     {
         $sink = new FakeHeaders([], false);

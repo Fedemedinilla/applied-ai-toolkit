@@ -56,6 +56,18 @@ final class LoginLimiterTest extends TestCase
         self::assertStringContainsString('15 minutes', $result->message);
     }
 
+    /** Without an object cache the lock is a wp_options row and comes back as a numeric string. */
+    public function testTheLockHoldsWhenTheTransientComesBackAsAString(): void
+    {
+        $limiter = $this->limiter();
+        $this->failTimes($limiter, 3);
+        $locks = array_filter($this->store->getArrayCopy(), static fn ($v, $k): bool => str_starts_with((string) $k, 'wph_lock_'), ARRAY_FILTER_USE_BOTH);
+        self::assertSame([(string) ($this->now + 15 * 60)], array_values($locks));
+        self::assertSame($this->now + 15 * 60, $limiter->lockedUntil('203.0.113.7'));
+        $this->failTimes($limiter, 25);
+        self::assertInstanceOf(\WP_Error::class, $limiter->gate(null));
+    }
+
     public function testLockoutExpires(): void
     {
         $limiter = $this->limiter();
@@ -178,6 +190,15 @@ final class LoginLimiterTest extends TestCase
         self::assertSame('203.0.113.9', $limiter->clientIp());
         $_SERVER['REMOTE_ADDR'] = '::ffff:192.0.2.10';
         self::assertTrue($limiter->allowlisted((string) $limiter->clientIp()));
+    }
+
+    public function testGuardAMappedAllowlistEntryIsNeverLocked(): void
+    {
+        $limiter = $this->limiter(['login_allowlist' => ['::ffff:203.0.113.9']]);
+        $_SERVER['REMOTE_ADDR'] = '::ffff:203.0.113.9';
+        self::assertTrue($limiter->allowlisted((string) $limiter->clientIp()));
+        $this->failTimes($limiter, 5);
+        self::assertNull($limiter->gate(null));
     }
 
     public function testKeysDoNotHoldTheAddress(): void

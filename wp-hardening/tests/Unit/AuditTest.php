@@ -64,12 +64,29 @@ final class AuditTest extends TestCase
 
     public function testRegistration(): void
     {
+        Functions\when('is_multisite')->justReturn(false);
         $this->options(['users_can_register' => '0']);
         self::assertSame(Verdict::Pass, $this->audit()->registration()->verdict);
         $this->options(['users_can_register' => '1', 'default_role' => 'subscriber']);
         self::assertSame(Verdict::Warn, $this->audit()->registration()->verdict);
         $this->options(['users_can_register' => '1', 'default_role' => 'administrator']);
         self::assertSame(Verdict::Fail, $this->audit()->registration()->verdict);
+    }
+
+    /** Multisite signup is governed by the network option `registration`, not users_can_register. */
+    public function testRegistrationOnMultisiteReadsTheNetworkOption(): void
+    {
+        Functions\when('is_multisite')->justReturn(true);
+        $this->options(['users_can_register' => '0', 'default_role' => 'subscriber']);
+        $network = 'all';
+        Functions\when('get_site_option')->alias(static function (string $name, mixed $default = false) use (&$network): mixed {
+            return $name === 'registration' ? $network : $default;
+        });
+        $finding = $this->audit()->registration();
+        self::assertSame(Verdict::Warn, $finding->verdict);
+        self::assertSame(['registration=all'], $finding->evidence);
+        $network = 'none';
+        self::assertSame(Verdict::Pass, $this->audit()->registration()->verdict);
     }
 
     public function testDebug(): void
@@ -82,6 +99,34 @@ final class AuditTest extends TestCase
         $log = $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => false, 'WP_DEBUG_LOG' => true])->debug();
         self::assertSame(['wp-content/debug.log'], $log->evidence);
         self::assertStringContainsString('web root', $log->detail);
+    }
+
+    /** wp_debug_mode() turns display off for any falsy value but null, and leaves php.ini alone for null. */
+    public function testDebugDisplayFollowsWordPress(): void
+    {
+        foreach ([0, '0', ''] as $off) {
+            self::assertSame(Verdict::Warn, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => $off])->debug()->verdict);
+        }
+        self::assertSame(Verdict::Fail, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => 1])->debug()->verdict);
+        $before = ini_get('display_errors');
+        try {
+            ini_set('display_errors', '0');
+            self::assertSame(Verdict::Warn, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => null])->debug()->verdict);
+            ini_set('display_errors', '1');
+            self::assertSame(Verdict::Fail, $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => null])->debug()->verdict);
+        } finally {
+            ini_set('display_errors', (string) $before);
+        }
+    }
+
+    public function testADebugLogInASiblingFolderIsNotInTheWebRoot(): void
+    {
+        mkdir($this->root . '-logs');
+        $file = $this->root . '-logs/debug.log';
+        file_put_contents($file, 'x');
+        $log = $this->audit(['WP_DEBUG' => true, 'WP_DEBUG_DISPLAY' => false, 'WP_DEBUG_LOG' => $file])->debug();
+        self::assertStringNotContainsString('web root', $log->detail);
+        self::assertSame(['WP_DEBUG=true'], $log->evidence);
     }
 
     public function testSaltsReportNamesNeverValues(): void
@@ -221,6 +266,53 @@ final class AuditTest extends TestCase
         self::assertCount(2, $finding->evidence);
     }
 
+    /** `<?=` is always on since PHP 5.4; a bare `<?=` in image bytes is not enough on its own. */
+    public function testShortEchoTagsInImagesCountAsPhp(): void
+    {
+        $uploads = $this->root . '/wp-content/uploads/2026/10';
+        file_put_contents($uploads . '/noise.jpg', "\xFF\xD8\xFF<?=\x01\x9C<?=7\xFF");
+        self::assertSame(Verdict::Pass, $this->audit()->uploadsPhp()->verdict);
+        file_put_contents($uploads . '/x.jpg', "\xFF\xD8\xFF<?= system(\$_GET['c']); ?>");
+        file_put_contents($uploads . '/y.gif', "GIF89a<?=\$_GET[0](\$_GET[1]);");
+        file_put_contents($uploads . '/z.png', "\x89PNG<?=passthru(\$x)?>");
+        $finding = $this->audit()->uploadsPhp();
+        self::assertSame(Verdict::Fail, $finding->verdict);
+        self::assertEqualsCanonicalizing(['2026/10/x.jpg (image with PHP inside)', '2026/10/y.gif (image with PHP inside)', '2026/10/z.png (image with PHP inside)'], $finding->evidence);
+    }
+
+    public function testOptionsWithCodeLooksForShortEchoTags(): void
+    {
+        $wpdb = new class () {
+            public string $options = 'wp_options';
+            public string $sql = '';
+
+            public function prepare(string $sql, string ...$args): string
+            {
+                return vsprintf(str_replace('%s', "'%s'", $sql), $args);
+            }
+
+            /** @return list<string> */
+            public function get_col(string $sql): array
+            {
+                $this->sql = $sql;
+                return [];
+            }
+        };
+        $GLOBALS['wpdb'] = $wpdb;
+        $this->audit()->optionsWithCode();
+        self::assertStringContainsString("'%<?=%'", $wpdb->sql);
+    }
+
+    public function testDoubleExtensionsInUploadsCountAsPhp(): void
+    {
+        $uploads = $this->root . '/wp-content/uploads/2026/10';
+        file_put_contents($uploads . '/avatar.php.jpg', "\xFF\xD8\xFF");
+        file_put_contents($uploads . '/a.phpx.jpg', "\xFF\xD8\xFF");
+        $finding = $this->audit()->uploadsPhp();
+        self::assertSame(Verdict::Fail, $finding->verdict);
+        self::assertSame(['2026/10/avatar.php.jpg'], $finding->evidence);
+    }
+
     public function testMuPluginsAndDropins(): void
     {
         self::assertSame(Verdict::Pass, $this->audit()->muPlugins()->verdict);
@@ -246,6 +338,15 @@ final class AuditTest extends TestCase
         self::assertSame(['mu-plugins/new.php'], $finding->evidence);
     }
 
+    public function testRecentPhpCoversEveryPhpExtension(): void
+    {
+        foreach (['shell.phtml', 'x.php7', 'readme.txt'] as $name) {
+            file_put_contents($this->root . '/wp-content/mu-plugins/' . $name, '<?php');
+            touch($this->root . '/wp-content/mu-plugins/' . $name, $this->now - 86400);
+        }
+        self::assertSame(['mu-plugins/shell.phtml', 'mu-plugins/x.php7'], $this->audit()->recentPhp()->evidence);
+    }
+
     public function testSuspiciousHtaccessLines(): void
     {
         $text = implode("\n", [
@@ -264,6 +365,19 @@ final class AuditTest extends TestCase
         $hits = Audit::suspiciousLines($text, false);
         self::assertSame([[4, 'condition on the user agent'], [5, 'rewrite to another host'], [6, 'PHP prepend or append file'], [7, 'PHP handler for an image or text extension']], $hits);
         self::assertSame([[1, 'PHP handler inside uploads']], Audit::suspiciousLines('AddHandler application/x-httpd-php .php', true));
+    }
+
+    /** The marker comment is no proof of authorship: anyone who can write .htaccess can type it. */
+    public function testRulesBetweenThePluginMarkersAreStillScanned(): void
+    {
+        $injected = [
+            'RewriteCond %{HTTP_USER_AGENT} googlebot [NC]',
+            'RewriteRule ^(.*)$ https://spam.example/ [R=302,L]',
+            'php_value auto_prepend_file /tmp/x.php',
+        ];
+        $expected = [[2, 'condition on the user agent'], [3, 'rewrite to another host'], [4, 'PHP prepend or append file']];
+        self::assertSame($expected, Audit::suspiciousLines(implode("\n", [ServerRules::BEGIN, ...$injected, ServerRules::END]), false));
+        self::assertSame($expected, Audit::suspiciousLines(implode("\n", [ServerRules::BEGIN, ...$injected]), false));
     }
 
     public function testHtaccessFinding(): void

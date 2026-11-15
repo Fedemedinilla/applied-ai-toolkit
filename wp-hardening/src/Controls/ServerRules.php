@@ -96,12 +96,16 @@ final class ServerRules implements Control
         return implode("\n", $lines) . "\n";
     }
 
-    /** php, php3 to php8, phtml, pht, phps and phar, in any case: `shell.PHP` is matched too. */
+    /**
+     * php, php3 to php8, phtml, pht, phps and phar, in any case: `shell.PHP` is matched too. The
+     * extension may sit anywhere in the chain (`avatar.php.jpg`), because mod_mime applies a
+     * handler mapped with `AddHandler ... .php` to every name that carries .php among its extensions.
+     */
     public function uploadsBlock(): string
     {
         return implode("\n", [
             self::BEGIN,
-            '<FilesMatch "\.(?i:php\d?|phtml|pht|phps|phar)$">',
+            '<FilesMatch "\.(?i:php\d?|phtml|pht|phps|phar)(?:\.|$)">',
             self::DENY,
             '</FilesMatch>',
             '<IfModule mod_headers.c>',
@@ -122,16 +126,18 @@ final class ServerRules implements Control
     public function nginxBlock(): string
     {
         $uploads = $this->paths()->uploadsUri;
+        // Exact locations, so they follow siteurl: with core in /wp/ the files are at /wp/readme.html.
+        $site = $this->paths()->siteUri;
         $lines = [
             '# WP Hardening: add inside server { }, then run nginx -t before reloading.',
             '# The uploads location uses ^~, so it wins over regex locations such as `location ~ \.php$`',
             '# wherever it sits. Regex locations elsewhere (cache headers for images, for example) no longer',
             '# apply under ' . $uploads . '/: copy those directives inside it if the site relies on them.',
             'autoindex off;',
-            'location = /readme.html { deny all; }',
+            'location = ' . $site . '/readme.html { deny all; }',
         ];
         if ($this->integrations->xmlrpcUsers() === []) {
-            $lines[] = 'location = /xmlrpc.php { deny all; }';
+            $lines[] = 'location = ' . $site . '/xmlrpc.php { deny all; }';
         }
         $lines[] = 'location ^~ ' . $uploads . '/ {';
         $lines[] = '    location ~* \.(?:php\d?|phtml|pht|phps|phar)$ { deny all; }';
@@ -166,10 +172,28 @@ final class ServerRules implements Control
      * Whether the root .htaccess refuses xmlrpc.php, in this plugin's block or anywhere else. A
      * block pasted before Jetpack was installed still carries the rule, and the server keeps
      * refusing XML-RPC whatever the PHP side decides.
+     *
+     * Read line by line, skipping comments, so a deny that was commented out does not count. The
+     * forms security plugins and guides write are covered: `<Files xmlrpc.php>` with any quotes,
+     * `<Files ~ ...>` and `<FilesMatch ...>` naming xmlrpc, and a RewriteRule on xmlrpc.php that
+     * answers 403 or 410 ([F], [G], [R=403]).
      */
     public function deniesXmlrpc(): bool
     {
-        return preg_match('/<Files\s+"?xmlrpc\.php"?\s*>/i', $this->rootHtaccess()) === 1;
+        foreach (preg_split('/\r\n|\r|\n/', $this->rootHtaccess()) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (
+                preg_match('/^<Files\s+["\']?xmlrpc\.php["\']?\s*>/i', $line) === 1
+                || preg_match('/^<Files(?:Match\s|\s+~)[^>]*xmlrpc/i', $line) === 1
+                || preg_match('/^RewriteRule\s+\S*xmlrpc\S*\s+\S+\s+\[[^\]]*\b(?:F|G|R=403)\b[^\]]*\]/i', $line) === 1
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -210,7 +234,7 @@ final class ServerRules implements Control
             return new Report(
                 State::Critical,
                 \sprintf(__('The root .htaccess denies xmlrpc.php, but %s uses it.', 'wp-hardening'), implode(', ', $users)),
-                [__('Remove the <Files xmlrpc.php> section. `wp harden htaccess` prints the block without it while the integration is detected.', 'wp-hardening')],
+                [__('Remove the rule that denies xmlrpc.php (a <Files>, <FilesMatch> or RewriteRule line). `wp harden htaccess` prints the block without it while the integration is detected.', 'wp-hardening')],
             );
         }
         if (!$enabled) {
