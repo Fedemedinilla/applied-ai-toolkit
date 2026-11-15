@@ -168,6 +168,17 @@ describe('the run JSON', () => {
     for (const value of broken) expect(parseRun(JSON.stringify(value)), JSON.stringify(value).slice(0, 80)).toEqual({ ok: false, reason: 'not_a_run' });
   });
 
+  it('refuses a time that does not exist, such as 30 February or hour 24', () => {
+    const base = runWith(catalogue, 'wordpress');
+    for (const bad of ['2026-02-30T00:00:00Z', '2026-02-29T24:00:00Z', '2026-04-31T10:00:00.000Z', '2026-01-01T10:60:00Z']) {
+      expect(parseRun(serialiseRun({ ...base, createdAt: bad })), bad).toEqual({ ok: false, reason: 'not_a_run' });
+      expect(parseRun(serialiseRun({ ...base, incident: { 'site-isolated': { at: bad, note: '' } } })), bad).toEqual({ ok: false, reason: 'not_a_run' });
+    }
+    for (const good of ['2028-02-29T23:59:59Z', '2026-11-04T13:00:00.5Z', '2026-11-04T13:00:00.123456Z']) {
+      expect(parseRun(serialiseRun({ ...base, createdAt: good })).ok, good).toBe(true);
+    }
+  });
+
   it('names files after the host, without www', () => {
     const run = runWith(catalogue, 'wordpress');
     expect(siteSlug({ ...run, site: { name: 'Example Workshop', url: 'https://www.workshop.test/contact' } })).toBe('workshop-test');

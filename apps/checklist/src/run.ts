@@ -265,7 +265,13 @@ export function setSite(run: Run, site: { name: string; url: string }): Result {
 const PLATFORM_IDS: readonly string[] = PLATFORMS.map((p) => p.id);
 const FEATURE_IDS: readonly string[] = FEATURES.map((f) => f.id);
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isIso = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/u.test(v) && !Number.isNaN(Date.parse(v));
+// Date.parse rolls 30 February or hour 24 over to a real time, so the date and time are compared
+// with the time they parse to: a value that does not exist does not come back as itself.
+const isIso = (v: unknown): v is string => {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/u.test(v)) return false;
+  const t = Date.parse(v);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 19) === v.slice(0, 19);
+};
 const isState = (v: unknown): v is State => (STATES as readonly unknown[]).includes(v);
 const allValues = (v: unknown, test: (x: unknown) => boolean): boolean => isRecord(v) && Object.values(v).every(test);
 
