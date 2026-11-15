@@ -19,6 +19,9 @@
  *    dependencies, so `npm install --offline` installs it and links its bin. The dependencies of
  *    the other packages would need the registry, so each tarball is extracted into node_modules
  *    and its dependencies are linked to the repository's copies, the versions the lockfile pins.
+ *    The linked set is what package.json declares in dependencies and peerDependencies. It must
+ *    equal the spec's linkDependencies, cover every bare import of a shipped .js file, and each
+ *    repository copy must satisfy the declared range.
  *    The bin of such a package is linked into node_modules/.bin and made executable by hand, the
  *    two things npm does on install.
  * 4. In a child process started in that project, imports each entry by package name and compares
@@ -40,6 +43,7 @@
  * Set PACK_CHECK_KEEP=1 to keep the temporary folder and print its path.
  */
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
+import { builtinModules } from 'node:module';
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative } from 'node:path';
@@ -63,7 +67,10 @@ interface PackageSpec {
   readonly entries: readonly Entry[];
   /** JSON files exported by subpath, each imported by package name and compared with its source file. */
   readonly jsonEntries?: readonly Entry[];
-  /** Dependencies linked from the repository's node_modules when the tarball is extracted. */
+  /**
+   * The dependencies and peer dependencies package.json must declare. They are linked from the
+   * repository's node_modules when the tarball is extracted; without any, npm installs the tarball.
+   */
   readonly linkDependencies?: readonly string[];
   /** A consumer typechecked against the installed package. */
   readonly consumer: string;
@@ -335,6 +342,40 @@ function checkSourceMaps(unpacked: string, paths: readonly string[]): number {
   return count;
 }
 
+/** The package name of a bare import specifier: @scope/name or name, without a subpath. */
+function packageOf(specifier: string): string {
+  const parts = specifier.split('/');
+  return (specifier.startsWith('@') ? parts.slice(0, 2) : parts.slice(0, 1)).join('/');
+}
+
+/**
+ * Every bare specifier a shipped .js file imports, requires or loads with import(), read by the
+ * TypeScript preprocessor so comments and strings do not count.
+ */
+function bareImports(unpacked: string, paths: readonly string[]): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const path of paths.filter((p) => /\.(js|mjs|cjs)$/.test(p))) {
+    for (const { fileName: specifier } of ts.preProcessFile(readFileSync(join(unpacked, path), 'utf8'), true, true).importedFiles) {
+      if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || builtinModules.includes(packageOf(specifier))) continue;
+      if (!found.has(packageOf(specifier))) found.set(packageOf(specifier), path);
+    }
+  }
+  return found;
+}
+
+/** An exact version or a caret range, the two forms the manifests use; anything else fails. */
+function satisfies(version: string, range: string): boolean {
+  const parse = (v: string): number[] => {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v) ?? fail(`${v} is not a plain x.y.z version`);
+    return [Number(m[1]), Number(m[2]), Number(m[3])];
+  };
+  if (!range.startsWith('^')) return version === range;
+  const [major = 0, minor = 0, patch = 0] = parse(range.slice(1));
+  const [vMajor = 0, vMinor = 0, vPatch = 0] = parse(version);
+  if (major === 0) return vMajor === 0 && vMinor === minor && vPatch >= patch;
+  return vMajor === major && (vMinor > minor || (vMinor === minor && vPatch >= patch));
+}
+
 async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
   const say = (message: string): void => console.log(`${spec.name}: ${message}`);
   const packageDir = join(ROOT, spec.folder);
@@ -389,17 +430,31 @@ async function checkPackage(spec: PackageSpec, work: string): Promise<void> {
   const maps = checkSourceMaps(unpacked, paths);
   say(`${maps} source maps, each with the text of every source the tarball leaves out`);
 
+  // The dependencies to link come from package.json, and must match the spec and what dist imports.
+  const declaredRanges: Record<string, string> = {
+    ...((manifest['dependencies'] ?? {}) as Record<string, string>),
+    ...((manifest['peerDependencies'] ?? {}) as Record<string, string>),
+  };
+  sameList(`the dependencies and peer dependencies of ${spec.folder}/package.json and the spec's linkDependencies`, Object.keys(declaredRanges), spec.linkDependencies ?? []);
+  for (const [name, path] of bareImports(unpacked, paths)) {
+    if (name !== spec.name && !(name in declaredRanges)) fail(`${path} imports ${name}, which ${spec.folder}/package.json declares in neither dependencies nor peerDependencies`);
+  }
+  for (const [name, range] of Object.entries(declaredRanges)) {
+    const version = (JSON.parse(readFileSync(join(NODE_MODULES, ...name.split('/'), 'package.json'), 'utf8')) as { version: string }).version;
+    if (!satisfies(version, range)) fail(`the repository's ${name} is ${version}, outside the range ${range} that ${spec.folder}/package.json declares`);
+  }
+
   // 3. Install it in a fresh project outside the repository.
   const consumer = join(work, 'consumer', spec.folder);
   mkdirSync(consumer, { recursive: true });
   writeFileSync(join(consumer, 'package.json'), `${JSON.stringify({ name: 'pack-check-consumer', private: true, type: 'module' }, null, 2)}\n`);
   const installed = join(consumer, 'node_modules', ...spec.name.split('/'));
-  if (spec.linkDependencies === undefined) {
+  if (Object.keys(declaredRanges).length === 0) {
     mustRun('npm', ['install', '--no-save', '--no-package-lock', tarball], { cwd: consumer, env: npmEnv(work) });
   } else {
     mkdirSync(installed, { recursive: true });
     mustRun('tar', ['-xzf', tarball, '--strip-components=1', '-C', installed], { cwd: work });
-    for (const dependency of spec.linkDependencies) {
+    for (const dependency of Object.keys(declaredRanges)) {
       const link = join(consumer, 'node_modules', ...dependency.split('/'));
       mkdirSync(dirname(link), { recursive: true });
       symlinkSync(join(NODE_MODULES, ...dependency.split('/')), link, 'junction');
