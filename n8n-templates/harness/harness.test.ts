@@ -93,6 +93,11 @@ describe('runCodeNode', () => {
     await expect(runCodeNode(`return [{ json: [1] }];`, { items: [] })).rejects.toThrow(/\{ json/);
   });
 
+  it('stops a loop that runs after an await, instead of hanging the test run', async () => {
+    await expect(runCodeNode(`await null; for (;;) {}`, { items: [], timeoutMs: 50 })).rejects.toThrow(/timed out/);
+    await expect(runCodeNode(`await Promise.resolve(); throw new Error('late boom');`, { items: [] })).rejects.toThrow('late boom');
+  });
+
   it('awaits asynchronous code', async () => {
     await expect(runCodeNode(`const v = await Promise.resolve(3); return [{ json: { v } }];`, { items: [] })).resolves.toEqual([
       { json: { v: 3 } },

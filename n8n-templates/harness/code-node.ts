@@ -41,7 +41,7 @@ export interface CodeNodeOptions {
   env?: Record<string, string>;
   /** Modules `require` may return, by name without the `node:` prefix. Default: crypto. */
   modules?: Record<string, unknown>;
-  /** Milliseconds before a synchronous loop is stopped. */
+  /** Milliseconds before the code is stopped, including what runs after an await. */
   timeoutMs?: number;
 }
 
@@ -104,10 +104,23 @@ export async function runCodeNode(code: string, options: CodeNodeOptions): Promi
     console: Object.freeze({ log() {}, info() {}, warn() {}, error() {}, debug() {} }),
   });
 
-  const script = new vm.Script(`(async () => {\n${code}\n})()`, { filename: 'code-node.js' });
-  const result: unknown = await script.runInContext(vm.createContext(context), {
+  // The context gets its own microtask queue ('afterEvaluate'), drained inside runInContext,
+  // so the timeout also covers code that runs after an await. The promise settles into
+  // `settled` from inside the context; a host-side await would run that code unbounded.
+  const settled: { done: boolean; ok?: boolean; value?: unknown } = { done: false };
+  const settle = (ok: boolean, value: unknown) => {
+    Object.assign(settled, { done: true, ok, value });
+  };
+  const script = new vm.Script(
+    `(async () => {\n${code}\n})().then((v) => __settle(true, v), (e) => __settle(false, e));`,
+    { filename: 'code-node.js' },
+  );
+  script.runInContext(vm.createContext(Object.freeze({ ...context, __settle: settle }), { microtaskMode: 'afterEvaluate' }), {
     timeout: options.timeoutMs ?? 1000,
   });
+  if (!settled.done) throw new Error('Code node did not finish: it awaits something the harness does not provide');
+  if (settled.ok !== true) throw settled.value;
+  const result = settled.value;
 
   if (!Array.isArray(result)) throw new Error('Code node must return an array of items');
   const out = JSON.parse(JSON.stringify(result)) as unknown[];
