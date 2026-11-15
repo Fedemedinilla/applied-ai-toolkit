@@ -225,7 +225,8 @@ export function createAssistantHandler(config: AssistantConfig): (request: Reque
       return fail('model_failed', 502);
     }
 
-    let reply = withoutControls(plainText(out.reply));
+    // Composed accents, so the guard's folding and the staff-name mending read the reply as written.
+    let reply = withoutControls(plainText(out.reply.normalize('NFC')));
     let card: Card | null = null;
     let rejected: string | undefined;
     if (out.booking) {

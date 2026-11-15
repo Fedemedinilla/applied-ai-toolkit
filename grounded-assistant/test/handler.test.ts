@@ -102,6 +102,15 @@ describe('a turn', () => {
     expect(body.reply).toBe('Balayage: $78.000. Te lo paso como pedido para el sábado, 7 de noviembre a las 10:00 con Carla, y del local te confirman el horario.');
   });
 
+  it('a reply with decomposed accents gets the same money check as a composed one', async () => {
+    const booking = { service: 'Color de raíz, un solo tono', stylist: null, date: '2026-11-07', time: '10:00' };
+    const s = setup([say('Listo, el color de raíz sale $52.000. Te lo paso al local.'.normalize('NFD'), booking)]);
+    const { body } = await turn(s.handler, [{ role: 'user', content: 'color de raíz' }]);
+    expect(body.booking).toMatchObject({ price: 38000 });
+    expect(body.reply).toContain('$38.000');
+    expect(body.reply).not.toContain('$52.000');
+  });
+
   it('links and addresses never go out', async () => {
     const s = setup([say('Mirá [la lista](https://www.peluqueria-los-pelados.example/precios).'), say('Escribinos a turnos@peluqueria-los-pelados.example')]);
     expect((await turn(s.handler, [{ role: 'user', content: 'lista' }])).body.reply).toBe('Mirá la lista.');

@@ -108,6 +108,18 @@ describe('misstated rows and the verdict', () => {
   });
 });
 
+describe('decomposed accents (NFD)', () => {
+  const nfd = (t: string) => t.normalize('NFD');
+  it('a service name with a decomposed accent is still named', () => {
+    expect(misstatedRows(nfd('El color de raíz sale $52.000.')).map((r) => r.id)).toEqual(['color-raiz']);
+  });
+  it('the verdict is the same as on composed text', () => {
+    const reply = 'Listo, el color de raíz sale $52.000. Te lo paso al local.';
+    expect(moneyVerdict(nfd(reply), { service: 'Color de raíz, un solo tono' })).toBe(moneyVerdict(reply, { service: 'Color de raíz, un solo tono' }));
+    expect(moneyVerdict(nfd(reply), { service: 'Color de raíz, un solo tono' })).toBe('card');
+  });
+});
+
 describe('reachable', () => {
   it('prunes above the cap and stays small with every row', () => {
     const all = SALON_SERVICES.map((s) => s.price);

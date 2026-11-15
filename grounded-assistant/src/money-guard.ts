@@ -73,7 +73,7 @@ const HOUR_AFTER_ARTICLE = /^(a|de|desde|hasta|entre|y)$/;
 
 /** The largest quantity the reply writes, from 1 (none) to MAX_QUANTITY. */
 export function quantityMentioned(reply: string, lang: Lang = 'es'): number {
-  const folded = foldKeepingLength(reply);
+  const folded = foldKeepingLength(reply.normalize('NFC'));
   const words = folded.match(/\p{L}+(?:'s)?|\d+/gu) ?? [];
   let max = 1;
   for (const [i, w] of words.entries()) {
@@ -144,7 +144,8 @@ export function reachable(uses: readonly number[], cap: number): Set<number> {
   return sums;
 }
 
-export function moneyIsOurs(reply: string, lang: Lang = 'es'): boolean {
+export function moneyIsOurs(text: string, lang: Lang = 'es'): boolean {
+  const reply = text.normalize('NFC');
   const figures = figuresIn(reply, lang);
   if (!figures.length) return true;
   // No published price is negative, and this salon publishes no discounts.
@@ -169,7 +170,10 @@ const JOINER = /^\s*(?:,|y|e|con|mas|\+|and|with|plus|&)\s*(?:el|la|los|las|un|u
  * $12,000 card; $16,000 is a real row, so moneyIsOurs passed it. Only these two shapes are judged:
  * judging any figure after a name read corrections and alternatives as contradictions.
  */
-export function misstatedRows(reply: string, lang: Lang = 'es'): Service[] {
+export function misstatedRows(text: string, lang: Lang = 'es'): Service[] {
+  // Composed first: foldKeepingLength folds one unit at a time, so in decomposed text the accent
+  // stays behind as its own character and "rai\u0301z" no longer names the root colour.
+  const reply = text.normalize('NFC');
   const figures = figuresIn(reply, lang);
   if (!figures.length) return [];
   const folded = foldKeepingLength(reply);
