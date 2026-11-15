@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
@@ -9,6 +9,7 @@ import { findLookbehind } from '../src/checks/lookbehind.ts';
 import { needlesFor } from '../src/checks/secrets.ts';
 import { ConfigError, parseConfig } from '../src/config.ts';
 import { normalizeHash } from '../src/csp.ts';
+import { listFiles } from '../src/site.ts';
 import { runGuard } from '../src/run.ts';
 import type { CheckId, GuardReport } from '../src/types.ts';
 
@@ -119,6 +120,18 @@ describe('js-budget globs', () => {
     expect(messages(typo, 'js-budget')).toEqual(['the budget for "index.htm" matches no page, so it measures nothing']);
     const partly = guard(files, { budgets: [{ pages: 'index.html', gzipKb: 1 }, { pages: 'blog/**', gzipKb: 1 }] });
     expect(messages(partly, 'js-budget')).toEqual(['the budget for "blog/**" matches no page, so it measures nothing']);
+  });
+});
+
+describe('build folder walk', () => {
+  it('skips a dangling symlink instead of crashing the run', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'csp-guard-'));
+    writeFileSync(join(dir, 'index.html'), '<p></p>');
+    writeFileSync(join(dir, 'a.js'), 'run()');
+    symlinkSync('nowhere', join(dir, 'dangling'));
+    expect(listFiles(dir)).toEqual(['a.js', 'index.html']);
+    const report = runGuard({ dir, config: parseConfig({ secrets: { env: ['S'] } }, dir), env: { S: 'fixture-secret-value-0001' } });
+    expect(check(report, 'secrets')).toMatchObject({ status: 'pass', summary: '2 files searched, no value of S' });
   });
 });
 

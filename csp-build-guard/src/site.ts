@@ -18,10 +18,22 @@ export interface Site {
   readonly pages: readonly string[];
 }
 
-/** Every file under a folder, as forward-slash paths relative to it, sorted. */
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    // A dangling symlink (ENOENT) or a symlink loop (ELOOP).
+    return false;
+  }
+}
+
+/**
+ * Every file under a folder, as forward-slash paths relative to it, sorted. A symlink counts as
+ * what it points to; a dangling one points to nothing a host could serve, so it is skipped, and so is a symlink loop.
+ */
 export function listFiles(root: string): string[] {
   return readdirSync(root, { recursive: true, encoding: 'utf8' })
-    .filter((p) => statSync(join(root, p)).isFile())
+    .filter((p) => isFile(join(root, p)))
     .map((p) => p.split(sep).join('/'))
     .sort();
 }
