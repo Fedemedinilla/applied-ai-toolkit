@@ -516,9 +516,9 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
         take('number', start, term + (u?.text ?? ''), numberKey(String(n), u?.unit));
       } else if (extraKeys.has(wordKey(term))) take('anchor', start, term, wordKey(term));
       else if (/^\p{Lu}{2,}/u.test(term)) take('acronym', start, term, wordKey(term));
-      else if (/^\p{Lu}/u.test(term)) {
-        if (!(lang === 'en' && (WEEKDAYS_EN.includes(term) || MONTHS_EN.includes(term)))) take('proper-noun', start, term, wordKey(term));
-      } else take('tool', start, term, wordKey(term));
+      // Weekdays and months were read as dates above, so a capital here is a name.
+      else if (/^\p{Lu}/u.test(term)) take('proper-noun', start, term, wordKey(term));
+      else take('tool', start, term, wordKey(term));
     }
   }
 

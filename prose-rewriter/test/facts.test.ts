@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkEdit, extract, factInvariant, factReport, inventory, placeholders, type FactSources } from '../src/facts.ts';
+import { canonicalNumber, checkEdit, extract, factInvariant, factReport, inventory, placeholders, type FactSources } from '../src/facts.ts';
 import { specifics } from '../src/specifics.ts';
 import { FactReport } from '../src/types.ts';
 
@@ -142,6 +142,44 @@ describe('phones, lists and fractions', () => {
   it('reads 24/7 and a fraction as numbers, and a day and month as a date', () => {
     expect(keys('Atención 24/7 y 1/2 kilo de pan.')).toEqual(['24/7', '1/2']);
     expect(keys('Lo entrego el 3/4 y el 3/11.')).toEqual(['--04-03', '--11-03']);
+  });
+});
+
+describe('canonicalNumber and the language-dependent readings', () => {
+  it('reads separators by language, as its docstring says', () => {
+    expect(canonicalNumber('1.200', 'es')).toBe('1200');
+    expect(canonicalNumber('1,200', 'en')).toBe('1200');
+    expect(canonicalNumber('1,200', 'es')).toBe('1.2');
+    expect(canonicalNumber('1.200', 'en')).toBe('1.2');
+    expect(canonicalNumber('4,1', 'es')).toBe('4.1');
+    expect(canonicalNumber('4.1', 'en')).toBe('4.1');
+    expect(canonicalNumber('1.234.567,5', 'es')).toBe('1234567.5');
+  });
+
+  it('drops leading and trailing zeros', () => {
+    expect(canonicalNumber('007', 'es')).toBe('7');
+    expect(canonicalNumber('4,10', 'es')).toBe('4.1');
+    expect(canonicalNumber('2.50', 'en')).toBe('2.5');
+  });
+
+  it('reads a numeric date day first in Spanish and month first in English', () => {
+    expect(keys('Nos vemos el 3/11/2026.')).toEqual(['2026-11-03']);
+    expect(keys('We meet on 11/3/2026.', EN)).toEqual(['2026-11-03']);
+  });
+
+  it('needs 9 digits for a phone and an hour of 23 or less for "hs"', () => {
+    expect(keys('Not a phone: 1234 5678.', EN)).toEqual(['1234', '5678']);
+    expect(keys('Llego a las 18 hs; son 25 hs de viaje.')).toEqual(['18:00', '25']);
+  });
+});
+
+describe('checkEdit fromCv', () => {
+  it('leaves out a fact the original already states in another sentence', () => {
+    const sentences = ['Migré los mails de 12 personas.', 'Armé un formulario que recibe muchos pedidos.'];
+    const ctx = { O: sentences.join(' '), C: C_ES, sentences, lang: 'es' } as const;
+    const r = checkEdit({ sentenceId: 1, before: 'muchos pedidos', after: 'pedidos de 12 personas y unos 40 por semana', reason: 'test' }, ctx);
+    expect(r.status).toBe('accepted');
+    expect(r.status === 'accepted' && r.fromCv.map((f) => f.key)).toEqual(['40']);
   });
 });
 
