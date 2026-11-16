@@ -337,9 +337,7 @@
         {
           "text": "No se trata solo de diseño, se trata de resultados.",
           "slop": true,
-          "rules": [
-            "EST-01"
-          ]
+          "rules": []
         },
         {
           "text": "Estoy convencido que puedo aportar un gran valor a su organización.",

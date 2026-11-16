@@ -326,7 +326,6 @@
           "slop": true,
           "rules": [
             "EST-04",
-            "LEX-03",
             "LEX-04"
           ]
         },

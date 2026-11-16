@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluate, formatRatio, guessGrid, LABELED_GENRES, LANGS, loadSets, locate, report, toMarkdown, validateSet, type LabeledSet } from '../scripts/genre-eval.ts';
-import { GUESS_CUTS } from '../src/genres.ts';
+import { GUESS_CUTS, resolveRules } from '../src/genres.ts';
+import { rawMatches } from '../src/lint.ts';
+import { RULES } from '../src/rules.ts';
 
 // Fictional: the names, the branch and the file are invented for this test.
 const TINY: LabeledSet = {
@@ -176,6 +178,21 @@ describe('the labelled set', () => {
     const chats = of('whatsapp');
     expect(chats.some((i) => words(i.text) >= GUESS_CUTS.shortWords)).toBe(true);
     expect(chats.some((i) => words(i.text) < GUESS_CUTS.shortWords)).toBe(true);
+  });
+
+  it('names a pattern rule only on a sentence its pattern matches, budgets aside, so a miss is the budget and not the wording', () => {
+    const unmatched = sets.flatMap((set) => {
+      const rules = resolveRules(RULES, set.genre);
+      return set.items.flatMap((item) =>
+        item.sentences.flatMap((s) =>
+          s.rules.flatMap((id) => {
+            const rule = rules.find((r) => r.id === id);
+            return rule?.kind === 'pattern' && rawMatches(rule, s.text, set.lang).length === 0 ? [`${item.id} ${id}: ${s.text}`] : [];
+          }),
+        ),
+      );
+    });
+    expect(unmatched).toEqual([]);
   });
 
   it('matches the saved report, so slop-lint/research/genre-eval-report.md is never stale', () => {

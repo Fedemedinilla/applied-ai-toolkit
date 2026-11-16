@@ -17,7 +17,7 @@ The same hand wrote the texts and knows the catalog, so the slop texts lean on p
 
 | genre | lang | texts | human | slop | sentences | slop sentences | slop with no rule named, reported anyway |
 |---|---|---|---|---|---|---|---|
-| email | es | 12 | 7 | 5 | 92 | 21 | 0.00 (0/6) |
+| email | es | 12 | 7 | 5 | 92 | 21 | 0.14 (1/7) |
 | email | en | 12 | 7 | 5 | 92 | 18 | 0.00 (0/5) |
 | follow-up | es | 10 | 6 | 4 | 72 | 12 | 0.00 (0/4) |
 | follow-up | en | 10 | 6 | 4 | 72 | 12 | 0.00 (0/4) |
@@ -38,10 +38,10 @@ The criterion for whatsapp to leave experimental is zero here (design 3.6).
 
 | genre | level | precision | recall | false-positive rate |
 |---|---|---|---|---|
-| email | 1 | 1.00 (20/20) | 0.95 (20/21) | 0.00 (0/145) |
+| email | 1 | 1.00 (20/20) | 1.00 (20/20) | 0.00 (0/145) |
 | email | 2 | 0.68 (13/19) | 0.81 (13/16) | 0.04 (6/145) |
 | email | 3 | 1.00 (2/2) | n/a | 0.00 (0/145) |
-| email | any | 0.82 (27/33) | 0.96 (27/28) | 0.04 (6/145) |
+| email | any | 0.82 (27/33) | 0.96 (26/27) | 0.04 (6/145) |
 | follow-up | 1 | 1.00 (9/9) | 1.00 (9/9) | 0.00 (0/120) |
 | follow-up | 2 | 1.00 (7/7) | 0.88 (7/8) | 0.00 (0/120) |
 | follow-up | 3 | n/a | n/a | 0.00 (0/120) |
@@ -59,7 +59,7 @@ Only the rules that fired or that a label names, per genre.
 |---|---|---|---|---|---|---|---|---|---|
 | email | ESP-02 | 2 | text | 5 | 0 | 0 | 1.00 (5/5) | 1.00 (5/5) | 0.00 (0/19) |
 | email | ESP-04 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
-| email | EST-01 | 1 | sentence | 1 | 0 | 1 | 1.00 (1/1) | 0.50 (1/2) | 0.00 (0/182) |
+| email | EST-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | EST-04 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | EST-05 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/182) |
 | email | EST-09 | 2 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/182) |
@@ -68,7 +68,7 @@ Only the rules that fired or that a label names, per genre.
 | email | FMT-04 | 1 | sentence | 4 | 0 | 0 | 1.00 (4/4) | 1.00 (4/4) | 0.00 (0/180) |
 | email | LEX-01 | 1 | sentence | 7 | 0 | 0 | 1.00 (7/7) | 1.00 (7/7) | 0.00 (0/177) |
 | email | LEX-02 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
-| email | LEX-03 | 1 | sentence | 3 | 0 | 1 | 1.00 (3/3) | 0.75 (3/4) | 0.00 (0/180) |
+| email | LEX-03 | 1 | sentence | 3 | 0 | 0 | 1.00 (3/3) | 1.00 (3/3) | 0.00 (0/181) |
 | email | LEX-04 | 2 | sentence | 2 | 0 | 2 | 1.00 (2/2) | 0.50 (2/4) | 0.00 (0/180) |
 | email | LEX-05 | 2 | sentence | 0 | 0 | 1 | n/a | 0.00 (0/1) | 0.00 (0/183) |
 | email | LEX-06 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
