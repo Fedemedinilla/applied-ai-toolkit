@@ -6,8 +6,10 @@
  * caps (tasks.ts), evals' ModelClient over the gateway (model-client.ts), which the fact judge
  * calls through, the judge's own rubric with its revert plan and the D10 switch (rubric.ts), the
  * output schemas of the plan, edit and style stages (outputs.ts) and their prompt (prompt.ts).
- * rewrite(), with the stages S0 to S7 that put these together, and the CLI come in F5b.
+ * F5b adds rewrite() (rewrite.ts), the stages S0 to S7 that put these together; the CLI comes
+ * next, in prose-rewriter/cli.ts.
  */
+export { rewrite } from './rewrite.ts';
 export {
   Change,
   defaultMode,
