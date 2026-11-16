@@ -364,3 +364,21 @@ describe('a style edit widened to place it once in the original', () => {
     expectSound(i, result);
   });
 });
+
+describe('an edit refused as an overlap', () => {
+  it('names the edit it overlaps by its id, not by its place in the placement list', async () => {
+    const i = input('en-follow-up-light');
+    const lost = { sentenceId: 1, before: 'a quote the text does not have', after: 'x', reason: 'Not there.', ruleId: 'LEX-03' };
+    const close = { sentenceId: 2, before: 'Please let me know if you have any questions.', after: 'Do you have any questions about it?', reason: 'Stock closing.', ruleId: 'LEX-03' };
+    const late = { sentenceId: 2, before: 'let me know if you have', after: 'tell me if you have', reason: 'Plainer.', ruleId: 'LEX-03' };
+    const expected = i.text.replace(close.before, close.after);
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(4)],
+      'rewrite.edit': [{ data: { edits: [lost, close] } }, { data: { edits: [late] } }],
+      'rewrite.judge': [verdict(expected, 'en')],
+    });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    expect(result.changes.find((c) => c.after === late.after)).toMatchObject({ status: 'reverted', revertReason: 'the edit overlaps e2, accepted before it' });
+  });
+});
