@@ -275,3 +275,26 @@ export function stylePrompt(c: PromptContext): StagePrompt<ReturnType<typeof sty
     principleIds,
   };
 }
+
+const SINGLE_TASK = [
+  'TASK: plan and edit in one step',
+  'Read the findings and each sentence, decide what to fix, and for each sentence worth fixing propose the smallest edit that solves it: the sentenceId, "before" quoted exactly from that sentence (without its number), "after", the reason and the ruleId of the finding it answers.',
+  'An edit stays inside one sentence. Set "drop" only when the edit removes a fact on purpose and the fact stays in another sentence. If no edit is worth making, reply with no edits.',
+].join('\n');
+
+/**
+ * The single-call baseline of design 4.10 (an eval target, not a stage): S2 and S3 in one call,
+ * with the same system blocks, text, keep phrases and findings as the plan prompt and the edit
+ * output of S3. It runs on rewrite.edit, so it costs one call of the edit model.
+ */
+export function singleCallPrompt(c: PromptContext, findings: readonly Finding[]): StagePrompt<typeof EditOutput> {
+  const sentences = splitSentences(c.input.text, c.input.lang);
+  const mode = c.input.mode ?? defaultMode(c.input.genre);
+  return {
+    task: 'rewrite.edit',
+    promptVersion: `rewrite-single@${PROMPT_VERSION}`,
+    system: systemBlocks(c),
+    messages: conversation(mode === 'reescritura' ? `${SINGLE_TASK}\n${PARAGRAPH_EDITS}` : SINGLE_TASK, [textBlock(sentences), ...keepBlock(c.input), '', findingLines(sentences, findings)]),
+    schema: EditOutput,
+  };
+}
