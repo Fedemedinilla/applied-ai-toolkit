@@ -1362,7 +1362,7 @@ const whatsapp: Rule[] = [
   {
     kind: 'structural',
     id: 'WA-03',
-    threshold: '0; a list is 2 lines in a row that open with an emoji',
+    threshold: '0; a list is 2 lines in a row that open with an emoji, one emoji opening two of them',
     name: 'Emoji used as bullets',
     lang: 'both',
     level: 2,
@@ -1371,8 +1371,10 @@ const whatsapp: Rule[] = [
     suggestion: 'Write the items in a sentence, or use a plain "-" list, which WhatsApp formats.',
     source: { evidence: ['REPORTADO'], ref: 'Section 4.4 (emoji as bullets among the format signs)', section: '4.4' },
     deviation:
-      'The report names emoji as bullets and gives no test. Here a bullet is an emoji, or a keycap number such as 1️⃣, that opens a line ' +
-      'and is followed by a space and text, on two non-blank lines in a row or more; one such line alone is not a list. FMT-02 reports ' +
+      'The report names emoji as bullets and gives no test. Here a bullet is an emoji, a keycap number such as 1️⃣ or a flag, that opens a line ' +
+      'and is followed by a space and text, on two non-blank lines in a row or more; one such line alone is not a list. A run of such lines ' +
+      'is a list only when one emoji opens two of its lines or every opener is a keycap number, so a wave and then a smile, which read as ' +
+      'chat, are left alone, and so is a list whose every item has its own emoji. FMT-02 reports ' +
       'every emoji in the other genres, so this rule runs in whatsapp, where FMT-02 is off.',
     falsePositives: 'A status list a team agreed on, such as one check mark per finished task.',
     examples: [{ lang: 'es', fire: 'Te paso lo que falta\n✅ el tablero\n✅ la carga de marzo', pass: 'Te paso lo que falta\n- el tablero\n- la carga de marzo' }],

@@ -96,8 +96,10 @@ const COPIED_RUN = 8;
  */
 const COPY_WORD = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
 
-/** WA-03: a line that opens with an emoji (or a keycap number) and goes on after a space. */
-const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
+/** WA-03: a line that opens with an emoji (a keycap number or a flag too) and goes on after a space. */
+const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3|\p{Regional_Indicator}{2})(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
+
+const KEYCAP = /\u20E3/u;
 
 /** MAIL-01: the thanks formula as a whole sentence, or as the sign-off line itself (a comma, an ellipsis or no mark). */
 const SOLE_THANKS = /^(?:thank[ \t]+you|thanks)(?:[ \t]+(?:so|very)[ \t]+much)?[ \t]+for[ \t]+your[ \t]+time[ \t]+and[ \t]+consideration(?:[.!,…]|\.\.\.)?$/iu;
@@ -296,18 +298,32 @@ const checks: Record<string, Check> = {
 
   'WA-03': (ctx) => {
     // The emoji that opens each non-blank line, or null; a blank line does not break a list.
-    const markers: Array<{ start: number; end: number } | null> = [];
+    const markers: Array<{ start: number; end: number; emoji: string } | null> = [];
     let offset = 0;
     for (const line of ctx.text.split('\n')) {
       if (line.trim() !== '') {
         const emoji = EMOJI_BULLET.exec(line)?.[1];
         const start = emoji === undefined ? -1 : offset + line.indexOf(emoji);
-        markers.push(emoji === undefined ? null : { start, end: start + emoji.length });
+        markers.push(emoji === undefined ? null : { start, end: start + emoji.length, emoji });
       }
       offset += line.length + 1;
     }
-    // A bullet is an item of a list, so it takes two such lines in a row.
-    return markers.flatMap((m, i) => (m !== null && (markers[i - 1] || markers[i + 1]) ? [{ ruleId: 'WA-03', ...m }] : []));
+    // A bullet is an item of a list, so it takes two such lines in a row. Lines that open with
+    // different emoji, such as a wave and then a smile, read as chat, so a run is a list only when
+    // one emoji opens two of its lines or its openers are keycap numbers.
+    const hits: StructuralHit[] = [];
+    for (let i = 0; i < markers.length; ) {
+      if (markers[i] === null) {
+        i++;
+        continue;
+      }
+      const run: Array<{ start: number; end: number; emoji: string }> = [];
+      for (let m = markers[i]; m !== null && m !== undefined; m = markers[++i]) run.push(m);
+      const repeated = new Set(run.map((m) => m.emoji)).size < run.length;
+      const keycaps = run.every((m) => KEYCAP.test(m.emoji));
+      if (run.length > 1 && (repeated || keycaps)) hits.push(...run.map(({ start, end }) => ({ ruleId: 'WA-03', start, end })));
+    }
+    return hits;
   },
 
   'MED-01': (ctx) => {

@@ -576,6 +576,11 @@ describe('WA-03, emoji used as bullets', () => {
     expect(lint(numbered, { lang: 'es', genre: 'whatsapp' }).findings.filter((f) => f.ruleId === 'WA-03').map((f) => f.match)).toEqual(['1️⃣', '2️⃣']);
   });
 
+  it('counts flags as bullets, and leaves two lines that open with different emoji, such as a greeting, alone', () => {
+    expect(lint('🇦🇷 el tablero\n🇦🇷 la carga', { lang: 'es', genre: 'whatsapp' }).findings.filter((f) => f.ruleId === 'WA-03').map((f) => f.match)).toEqual(['🇦🇷', '🇦🇷']);
+    expect(ids('👋 Hola, Laura\n😊 Te escribo por lo del tablero', { lang: 'es', genre: 'whatsapp' })).not.toContain('WA-03');
+  });
+
   it('leaves one emoji line, an emoji at the end of a line and a dash list alone', () => {
     for (const text of ['✅ Listo el tablero\nLo vemos el jueves', 'Listo el tablero ✅\nLo vemos el jueves 📅', '- el tablero\n- la carga']) {
       expect(ids(text, { lang: 'es', genre: 'whatsapp' }), text).not.toContain('WA-03');
