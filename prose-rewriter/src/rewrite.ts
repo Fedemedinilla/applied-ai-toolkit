@@ -47,7 +47,7 @@ import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, recheckDrops, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
-import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
+import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, STAGE_ATTEMPTS, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
 const EMPTY_REFS = { principles: [], sources: [], examples: [] } as const;
@@ -86,7 +86,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
         return await stage();
       } catch (error) {
         if (!(error instanceof ResponseError && error.code === 'invalid_output')) throw error;
-        if (attempt === 2) {
+        if (attempt === STAGE_ATTEMPTS) {
           unread = true;
           return null;
         }

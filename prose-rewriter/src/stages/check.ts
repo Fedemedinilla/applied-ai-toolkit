@@ -265,6 +265,11 @@ const UNREAD = {
  * cleared stay. Either way the result asks for a review. Any other error (a cap, the API) still
  * fails the rewrite.
  */
+/** How many times one verdict is asked for: once, and once more when the reply cannot be read. */
+export const VERDICT_ATTEMPTS = 2;
+/** The verdicts judgeStage asks for at most: the first, and the second when the first reverted something. */
+export const MAX_VERDICTS = 2;
+
 export async function judgeStage(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], client: JudgeClient): Promise<JudgeOutcome> {
   const sheet = factSheet({ ...a.input.profile, recipient: a.input.recipient });
   const order = proposals.map((p) => p.id);
@@ -284,17 +289,17 @@ export async function judgeStage(a: Analysis, units: readonly Sentence[], propos
       const verdict = await judgeWith(rewriteRubric, reader, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
       return planReverts({ original: a.text, rewritten, lang: a.input.lang, verdict, edits, order: order.filter((id) => edits.some((e) => e.id === id)), round: kind });
     };
-    let made: RevertPlan;
-    try {
-      made = await plan().catch((error: unknown) => {
-        if (error instanceof JudgeError) return plan();
-        throw error;
-      });
-    } catch (error) {
-      if (!(error instanceof JudgeError)) throw error;
-      // On the first verdict nothing was cleared; on the second, what is live the first one cleared.
-      if (kind === 'first') revert(edits.map((e) => e.id), UNREAD_REASON);
-      return null;
+    let made: RevertPlan | null = null;
+    for (let attempt = 1; made === null; attempt++) {
+      try {
+        made = await plan();
+      } catch (error) {
+        if (!(error instanceof JudgeError)) throw error;
+        if (attempt < VERDICT_ATTEMPTS) continue;
+        // On the first verdict nothing was cleared; on the second, what is live the first one cleared.
+        if (kind === 'first') revert(edits.map((e) => e.id), UNREAD_REASON);
+        return null;
+      }
     }
     revert(made.revert, kind === 'first' ? 'judge: the sentence claimed something the CV and the text do not back' : 'judge: still invented on the second verdict; back to the original');
     // A drop that stood on a line the judge just took back no longer stands.

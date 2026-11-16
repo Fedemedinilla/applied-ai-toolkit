@@ -32,6 +32,9 @@ import type { Edit } from '../types.ts';
  */
 export const STAGE_MAX_TOKENS = { 'rewrite.plan': 4000, 'rewrite.edit': 6000, 'rewrite.style': 4000 } as const;
 
+/** How many times rewrite() makes a stage's call: once, and once more when the reply cannot be read. */
+export const STAGE_ATTEMPTS = 2;
+
 /** What RewriteResult.usage reports: costUsd turns null once any call has no price. */
 export interface Usage {
   calls: number;
