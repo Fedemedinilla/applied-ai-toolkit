@@ -93,7 +93,6 @@ Only the rules that fired or that a label names, per genre.
 | follow-up | SEG-03 | 2 | sentence | 6 | 0 | 0 | 1.00 (6/6) | 1.00 (6/6) | 0.00 (0/138) |
 | follow-up | SIN-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/143) |
 | whatsapp | EST-04 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/64) |
-| whatsapp | EST-05 | off | sentence | 0 | 0 | 2 | n/a | 0.00 (0/2) | 0.00 (0/64) |
 | whatsapp | LEX-01 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/64) |
 | whatsapp | LEX-02 | 2 | sentence | 0 | 0 | 1 | n/a | 0.00 (0/1) | 0.00 (0/65) |
 | whatsapp | LEX-03 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/65) |

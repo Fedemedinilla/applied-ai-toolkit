@@ -218,7 +218,6 @@
           "text": "In summary, optimizing it is crucial to boost your sales.",
           "slop": true,
           "rules": [
-            "EST-05",
             "LEX-04"
           ]
         }
