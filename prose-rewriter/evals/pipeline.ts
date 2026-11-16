@@ -45,7 +45,7 @@ import type { PromptRefs } from '../src/prompt.ts';
 import { rewrite } from '../src/rewrite.ts';
 import { analyse, earlyExit, prepare } from '../src/stages/analyse.ts';
 import { paragraphUnits } from '../src/stages/check.ts';
-import { metered, singleStage, type Usage } from '../src/stages/model.ts';
+import { EXTRA_SUFFIX, metered, singleStage, type Usage } from '../src/stages/model.ts';
 import { defaultMode, RewriteInput, type Edit, type Genre, type Lang, type Mode, type RewriteResult, type Strategy } from '../src/types.ts';
 
 /** The writing tasks a variant may move to another model. The judge stays put (see pipelineVariant). */
@@ -152,7 +152,7 @@ export interface PieceUsage {
   readonly costUsd: number | null;
   /** Summed over the calls that returned; a reply the schema refused reports its cost but not its tokens. */
   readonly tokens: TokenTotals;
-  /** S3 ran its second round (design 4.4 S6). Always false for the single-call target and the 'single' strategy. */
+  /** S3 ran its second round (design 4.4 S6); a retry of a stage reply is not one. Always false for the single-call target and the 'single' strategy. */
   readonly extraRound: boolean;
 }
 
@@ -175,10 +175,11 @@ export interface Meter {
   calls: number;
   costUsd: number | null;
   tokens: { input: number; output: number; cacheRead: number; cacheWrite5m: number; cacheWrite1h: number };
-  editCalls: number;
+  /** Requests of S3's extra round, told apart by its promptVersion: a stage retry is not one. */
+  extraRounds: number;
 }
 
-export const newMeter = (): Meter => ({ calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, editCalls: 0 });
+export const newMeter = (): Meter => ({ calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, extraRounds: 0 });
 
 /**
  * The gateway with every call measured into `meter`, and the given task overrides sent in the
@@ -186,7 +187,7 @@ export const newMeter = (): Meter => ({ calls: 0, costUsd: 0, tokens: { input: 0
  */
 export function measuredGateway(gateway: Gateway<string>, meter: Meter, tasks: PipelineVariant['tasks'] = {}): Gateway<string> {
   const configured = <R extends GatewayRequest<string>>(request: R): R => {
-    if (request.task === 'rewrite.edit') meter.editCalls += 1;
+    if (request.task === 'rewrite.edit' && request.promptVersion.endsWith(EXTRA_SUFFIX)) meter.extraRounds += 1;
     const override = tasks[request.task as OverridableTask];
     return override === undefined ? request : { ...request, config: override };
   };
@@ -247,8 +248,9 @@ export async function runPipelines(cases: readonly EvalCase[], variants: readonl
         calls: meter.calls,
         costUsd: meter.costUsd,
         tokens: { ...meter.tokens },
-        // S3 is one call; a second one on rewrite.edit is its extra round. The single strategy makes one.
-        extraRound: v.kind === 'pipeline' && meter.editCalls > 1,
+        // A second rewrite.edit call may be a retry of an unreadable reply (rewrite.ts readable()):
+        // only the extra round's own promptVersion counts. The single strategy has no extra round.
+        extraRound: meter.extraRounds > 0,
       });
       let record: PieceRecord;
       let stop: unknown = null;

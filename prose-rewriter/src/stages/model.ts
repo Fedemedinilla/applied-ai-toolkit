@@ -128,7 +128,7 @@ export async function editStage(m: ModelStages, plan: PlanOutput): Promise<EditR
 }
 
 /** The extra round's promptVersion: a fixed constant, like every other. */
-const EXTRA_SUFFIX = '+extra';
+export const EXTRA_SUFFIX = '+extra';
 
 const EXTRA_TASK = [
   'TASK: edit, second round',

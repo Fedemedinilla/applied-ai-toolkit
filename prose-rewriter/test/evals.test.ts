@@ -209,6 +209,24 @@ describe('runPipelines', () => {
     expect(r?.usage).toMatchObject({ calls: 4, extraRound: true });
   });
 
+  it('does not mark the extra round when a stage reply is asked for again', async () => {
+    // F6b review: a retry of an unreadable reply is a second rewrite.edit call, not S3's extra round.
+    const expected = MAIL.replace(SINERGIAS, FIXED);
+    const unreadable = { data: { edits: [{ sentenceId: 1 }] } };
+    const fixed = edits({ sentenceId: 2, before: SINERGIAS, after: FIXED });
+    const guarded = scriptedGateway({ 'rewrite.edit': [unreadable, fixed], 'rewrite.judge': [factVerdict(expected)] });
+    const [g] = await runPipelines(CASES, [byId('single-guarded')], { gateway: guarded.gateway, refs: REFS });
+    guarded.assertDone();
+    expect(tasksOf(guarded)).toEqual(['rewrite.edit', 'rewrite.edit', 'rewrite.judge']);
+    expect(g?.status === 'done' ? g.rewritten : g?.error).toBe(expected);
+    expect(g?.usage).toMatchObject({ calls: 3, extraRound: false });
+    const staged = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [unreadable, fixed], 'rewrite.judge': [factVerdict(expected)] });
+    const [s] = await runPipelines(CASES, [byId('no-style')], { gateway: staged.gateway, refs: REFS });
+    staged.assertDone();
+    expect(tasksOf(staged)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.edit', 'rewrite.judge']);
+    expect(s?.usage).toMatchObject({ calls: 4, extraRound: false });
+  });
+
   it('records a failed piece and goes on; a cap stops the run after recording it', async () => {
     // A plan the model refuses fails the piece; the run goes on to the next variant. (A reply the
     // schema refuses does not fail it: rewrite() asks once more and then asks for a review.)
