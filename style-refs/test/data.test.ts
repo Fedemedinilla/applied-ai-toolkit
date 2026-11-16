@@ -22,10 +22,15 @@ const source = {
   work: 'An invented plain-language guide',
   published: 2020,
   authorDied: null,
+  lang: 'en',
+  originalLang: 'en',
+  nationality: ['gb'],
   status: { ar: 'open-licence', us: 'open-licence', eu: 'open-licence', es: 'open-licence' },
   licence: 'CC BY 4.0',
   url: 'https://guide.example/plain',
   verified: '2026-11-15',
+  evidence: 'REPORTADO',
+  use: 'principles',
 };
 const principle = {
   id: 'subject-first',
@@ -67,7 +72,7 @@ describe('validateRefs', () => {
   });
 
   it('refuses an excerpt of an unknown source and a repeated id', () => {
-    const excerpt = { id: 'plain-guide', source: 'nowhere', lang: 'en', text: 'Short.', teaches: 'brevity', avoid: 'nothing' };
+    const excerpt = { id: 'plain-guide', source: 'nowhere', lang: 'en', text: 'Short.', teaches: 'brevity', avoid: 'nothing', url: 'https://www.gutenberg.org/cache/epub/1/pg1.txt', fetched: '2026-11-16' };
     const problems = validateRefs({ ...empty, sources: [source], excerpts: { 'excerpts/en.json': [excerpt] } });
     expect(problems.map((p) => p.message)).toEqual([
       'id plain-guide is already used in sources.json',

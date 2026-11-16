@@ -4,8 +4,12 @@
  * README. Nothing here reads a file: the caller loads the JSON and passes it in, so the module has
  * no I/O at runtime and runs anywhere.
  *
- * Phase F0 of the design ships the shapes and empty data. Phase F3 fills the data and adds
- * test/licensing.test.ts, which checks each source's legal status and the excerpt length cap.
+ * Phase F0 of the design shipped the shapes and empty data. Phase F3 adds the licensing rules of
+ * design section 4.8 to validateRefs (test/licensing.test.ts tries each one): an excerpt only from a
+ * work in the public domain in the United States, where GitHub serves the repository; no excerpt
+ * of an Argentine author while the paid public domain of Decreto-ley 1224/58 is unresolved; a cap
+ * of two sentences and a word count; text only from Gutenberg or Wikisource, never naming Project
+ * Gutenberg; a translation only with its translator's year of death.
  */
 import { z } from 'zod';
 
@@ -24,9 +28,33 @@ export type Register = (typeof REGISTERS)[number];
 export const LegalStatus = z.enum(['public-domain', 'open-licence', 'protected', 'unverified']);
 export type LegalStatus = z.infer<typeof LegalStatus>;
 
+/** The jurisdictions every source declares: Argentina, the United States, the European Union, Spain. */
+export const JURISDICTIONS = ['ar', 'us', 'eu', 'es'] as const;
+export type Jurisdiction = (typeof JURISDICTIONS)[number];
+
+/** The evidence tags of the reports this data comes from. A legal status from research is REPORTADO. */
+export const EVIDENCE = ['MEDIDO', 'REPORTADO', 'CONSENSO', 'SÍNTESIS'] as const;
+
+/**
+ * What a source may give. `excerpts` also allows principles; `principles` means our own words only;
+ * `link-only` is a pointer for the reader, never copied or paraphrased into a principle; `excluded`
+ * is recorded so nothing can cite it.
+ */
+export const USES = ['excerpts', 'principles', 'link-only', 'excluded'] as const;
+export type Use = (typeof USES)[number];
+
+/** Design decision D11: an excerpt is at most two sentences and this many words. */
+export const EXCERPT_MAX_SENTENCES = 2;
+export const EXCERPT_MAX_WORDS = 45;
+
+/** Excerpt text comes only from these hosts (and their subdomains), without what they add to it. */
+export const TEXT_HOSTS = ['gutenberg.org', 'wikisource.org'] as const;
+
 const Id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a kebab-case id');
 const Year = z.number().int().min(1500).max(2100);
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a YYYY-MM-DD date');
+/** An ISO 639-1 language or ISO 3166-1 country code, lower case; `eu` stands for the European Union. */
+const Code = z.string().regex(/^[a-z]{2}$/, 'a two-letter lower-case code');
 
 /** One entry of sources.json: a work, or a style guide under an open licence. */
 export const Source = z.strictObject({
@@ -34,16 +62,36 @@ export const Source = z.strictObject({
   kind: z.enum(['literary', 'guide']),
   author: z.string().min(1),
   work: z.string().min(1),
-  published: Year,
+  /** Null when the year of publication is unverified. */
+  published: Year.nullable(),
   /** Null for a guide written by an institution. */
   authorDied: Year.nullable(),
+  /** The language of the text we read, and the language it was written in. They differ for a translation. */
+  lang: z.enum(LANGS),
+  originalLang: Code,
   /** A translation counts only with the translator's year of death, which sets its own term. */
   translator: z.strictObject({ name: z.string().min(1), died: Year }).optional(),
+  /** The author's countries, or the issuing country of a guide. `ar` brings in Decreto-ley 1224/58. */
+  nationality: z.array(Code).min(1),
   status: z.strictObject({ ar: LegalStatus, us: LegalStatus, eu: LegalStatus, es: LegalStatus }),
+  /** The day a jurisdiction that is not free yet becomes free, e.g. Spain on 2027-01-01. */
+  freeFrom: z.partialRecord(z.enum(JURISDICTIONS), IsoDate).optional(),
+  /**
+   * Whether the paid public domain of Decreto-ley 1224/58 reaches this repository. Required for an
+   * Argentine author; while it is `unresolved` the author gives no excerpts (design decision D12).
+   */
+  paidPublicDomain: z.enum(['unresolved', 'cleared']).optional(),
   licence: z.string().min(1),
   url: z.url({ protocol: /^https$/ }),
   /** When the status was last checked against the law or the licence. */
   verified: IsoDate,
+  /** How the status is known. Nothing here was checked against each law, so it is REPORTADO. */
+  evidence: z.enum(EVIDENCE),
+  use: z.enum(USES),
+  /** Limits the principles that cite this source, as a casual register source never reaches a formal prompt. */
+  scope: z.strictObject({ genres: z.array(z.enum(GENRES)).min(1), registers: z.array(z.enum(REGISTERS)).min(1) }).optional(),
+  /** What the source is for and what stays unverified, in plain words. */
+  note: z.string().min(1).optional(),
 });
 export type Source = z.infer<typeof Source>;
 
@@ -68,7 +116,11 @@ export const Excerpt = z.strictObject({
   lang: z.enum(LANGS),
   text: z.string().min(1),
   teaches: z.string().min(1),
+  /** What not to imitate: the archaism, the dialect, the tone. */
   avoid: z.string().min(1),
+  /** The plain text the excerpt was checked against, word for word, and the day it was fetched. */
+  url: z.url({ protocol: /^https$/ }),
+  fetched: IsoDate,
 });
 export type Excerpt = z.infer<typeof Excerpt>;
 
@@ -129,9 +181,12 @@ export function validateRefs(data: RefsData): RefsProblem[] {
 
   const sources = parse(Source, 'sources.json', data.sources);
   unique('sources.json', sources);
-  const sourceIds = new Set(sources.map((s) => s.id));
-  const cites = (file: string, path: string, id: string) => {
-    if (!sourceIds.has(id)) problems.push({ file, path, message: `cites source ${id}, which is not in sources.json` });
+  sources.forEach((s, i) => problems.push(...sourceProblems(s).map((p) => ({ file: 'sources.json', path: `${i}.${p.path}`, message: p.message }))));
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const cites = (file: string, path: string, id: string): Source | undefined => {
+    const source = byId.get(id);
+    if (source === undefined) problems.push({ file, path, message: `cites source ${id}, which is not in sources.json` });
+    return source;
   };
 
   for (const [file, value] of Object.entries(data.principles)) {
@@ -144,7 +199,16 @@ export function validateRefs(data: RefsData): RefsProblem[] {
     unique(file, entries);
     entries.forEach((p, i) => {
       if (p.lang !== lang) problems.push({ file, path: `${i}.lang`, message: `lang ${p.lang} in the ${lang} file` });
-      p.sources.forEach((id, j) => cites(file, `${i}.sources.${j}`, id));
+      p.sources.forEach((id, j) => {
+        const source = cites(file, `${i}.sources.${j}`, id);
+        if (source === undefined) return;
+        if (source.use === 'link-only' || source.use === 'excluded') problems.push({ file, path: `${i}.sources.${j}`, message: `${id} is ${source.use}` });
+        if (source.scope === undefined) return;
+        const genres = p.genres.filter((g) => !source.scope?.genres.includes(g));
+        const registers = p.registers.filter((r) => !source.scope?.registers.includes(r));
+        if (genres.length > 0) problems.push({ file, path: `${i}.genres`, message: `${id} is limited to ${source.scope.genres.join(', ')}, and this principle also covers ${genres.join(', ')}` });
+        if (registers.length > 0) problems.push({ file, path: `${i}.registers`, message: `${id} is limited to ${source.scope.registers.join(', ')}, and this principle also covers ${registers.join(', ')}` });
+      });
     });
   }
   for (const [file, value] of Object.entries(data.excerpts)) {
@@ -157,7 +221,8 @@ export function validateRefs(data: RefsData): RefsProblem[] {
     unique(file, entries);
     entries.forEach((e, i) => {
       if (e.lang !== lang) problems.push({ file, path: `${i}.lang`, message: `lang ${e.lang} in the ${lang} file` });
-      cites(file, `${i}.source`, e.source);
+      const source = cites(file, `${i}.source`, e.source);
+      for (const p of excerptProblems(e, source)) problems.push({ file, path: `${i}.${p.path}`, message: p.message });
     });
   }
   for (const [file, value] of Object.entries(data.examples)) {
@@ -174,4 +239,71 @@ export function validateRefs(data: RefsData): RefsProblem[] {
     });
   }
   return problems;
+}
+
+type Local = { path: string; message: string };
+
+const FREE: ReadonlySet<LegalStatus> = new Set(['public-domain', 'open-licence']);
+
+/** The host of a URL the schema already parsed, and whether it is one of TEXT_HOSTS. */
+function textHost(url: string): { host: string; allowed: boolean } {
+  const host = new URL(url).hostname.toLowerCase();
+  return { host, allowed: TEXT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`)) };
+}
+
+/** The rules of one source on its own: translation, Argentine authors, dates of freedom, text host. */
+function sourceProblems(s: Source): Local[] {
+  const out: Local[] = [];
+  const translated = s.originalLang !== s.lang;
+  if (translated && s.translator === undefined) out.push({ path: 'translator', message: `a translation from ${s.originalLang} needs its translator and the year they died` });
+  if (!translated && s.translator !== undefined) out.push({ path: 'translator', message: 'the work is read in its original language, so it has no translator' });
+  if (s.nationality.includes('ar') && s.paidPublicDomain === undefined) out.push({ path: 'paidPublicDomain', message: 'an Argentine author needs paidPublicDomain (Decreto-ley 1224/58)' });
+  for (const place of JURISDICTIONS) {
+    const from = s.freeFrom?.[place];
+    if (from !== undefined && FREE.has(s.status[place])) out.push({ path: `freeFrom.${place}`, message: `free from ${from}, so ${place} cannot be ${s.status[place]} yet` });
+  }
+  if (s.use === 'excerpts' && s.status.us !== 'public-domain') out.push({ path: 'use', message: `a source for excerpts must be public-domain in the US, and it is ${s.status.us}` });
+  if (s.kind === 'literary' && s.use !== 'excluded') {
+    const { host, allowed } = textHost(s.url);
+    if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
+  }
+  return out;
+}
+
+/** Sentences end at . ! ? or an ellipsis, before a space or the end; a closing quote may follow. */
+const SENTENCE_END = /[.!?\u2026]+["'\u201d\u2019\u00bb)\]]*(?=\s|$)/g;
+
+/** Counts sentences the way the cap reads them. An abbreviation counts as an end: the cap errs short. */
+export function countSentences(text: string): number {
+  const trimmed = text.trim();
+  if (trimmed === '') return 0;
+  const ends = [...trimmed.matchAll(SENTENCE_END)];
+  const last = ends.at(-1);
+  const closed = last !== undefined && (last.index ?? 0) + last[0].length === trimmed.length;
+  return ends.length + (closed ? 0 : 1);
+}
+
+export function countWords(text: string): number {
+  return text.split(/\s+/).filter((w) => w !== '').length;
+}
+
+/** The rules of one excerpt against the source it cites (undefined when the source is missing). */
+function excerptProblems(e: Excerpt, source: Source | undefined): Local[] {
+  const out: Local[] = [];
+  if (source !== undefined) {
+    if (source.use !== 'excerpts') out.push({ path: 'source', message: source.use === 'principles' ? `${source.id} is for principles only` : `${source.id} is ${source.use}` });
+    if (source.use !== 'excluded' && source.status.us !== 'public-domain') out.push({ path: 'source', message: `${source.id} is ${source.status.us} in the US; an excerpt needs public-domain there` });
+    if (source.nationality.includes('ar') && source.paidPublicDomain !== 'cleared') {
+      out.push({ path: 'source', message: `${source.id} is by an Argentine author and the paid public domain (Decreto-ley 1224/58) is unresolved` });
+    }
+    if (source.lang !== e.lang) out.push({ path: 'lang', message: `the source ${source.id} is read in ${source.lang}` });
+  }
+  const sentences = countSentences(e.text);
+  if (sentences > EXCERPT_MAX_SENTENCES) out.push({ path: 'text', message: `${sentences} sentences; the cap is ${EXCERPT_MAX_SENTENCES}` });
+  const words = countWords(e.text);
+  if (words > EXCERPT_MAX_WORDS) out.push({ path: 'text', message: `${words} words; the cap is ${EXCERPT_MAX_WORDS}` });
+  if (/gutenberg/i.test(e.text)) out.push({ path: 'text', message: 'names Project Gutenberg; its licence lets the text go only without that name' });
+  const { host, allowed } = textHost(e.url);
+  if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
+  return out;
 }
