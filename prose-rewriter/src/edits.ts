@@ -191,16 +191,17 @@ export interface AppliedEdit {
   readonly span: TextRange;
   /** Where `after` sits in the text the accepted edits produce, so a finding there names its edit. */
   readonly newSpan: TextRange;
+  /** The edit's quote and replacement, in NFC. */
   readonly before: string;
   readonly after: string;
 }
 
 /**
  * Why code refused an edit: its quote is not in its sentence (or there is no such sentence), it is
- * there more than once, it overlaps an edit accepted before it, it touches a keep[] phrase, or it
- * changes nothing.
+ * there more than once, it starts or ends inside a character (half an emoji, a letter without its
+ * accent), it overlaps an edit accepted before it, it touches a keep[] phrase, or it changes nothing.
  */
-export type RejectReason = 'not-found' | 'ambiguous' | 'overlap' | 'keep' | 'no-op';
+export type RejectReason = 'not-found' | 'ambiguous' | 'boundary' | 'overlap' | 'keep' | 'no-op';
 
 export interface RejectedEdit {
   readonly id: string;
@@ -229,6 +230,16 @@ export interface ApplyResult {
 }
 
 const intersects = (a: TextRange, b: TextRange): boolean => a.start < b.end && b.start < a.end;
+
+/** Where each character the reader sees (a grapheme: an emoji, a flag, a letter and its accents) starts, and the end. */
+function graphemeBoundaries(text: string): Set<number> {
+  const out = new Set<number>([text.length]);
+  for (const g of new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text)) out.add(g.index);
+  return out;
+}
+
+/** A replacement that would join the character before it: a combining mark, a joiner or a variation selector. */
+const JOINS_PREVIOUS = /^[\p{M}\u200D\uFE0E\uFE0F]/u;
 
 /** Every place `needle` starts in `haystack`, overlapping places included ("aa" twice in "aaa"). */
 function occurrences(haystack: string, needle: string): number[] {
@@ -269,14 +280,21 @@ function render(original: string, edits: readonly AppliedEdit[]): { text: string
  * Places each edit by its exact quote inside its sentence, refuses what it cannot place, and
  * applies the rest. In the order given: an edit whose `before` is not in its sentence, exactly as
  * written, is 'not-found'; one whose `before` is there more than once is 'ambiguous', since code
- * would have to guess which; one that changes nothing is 'no-op'; one that overlaps a keep[]
+ * would have to guess which; one that starts or ends inside a character is 'boundary'; one that
+ * changes nothing is 'no-op'; one that overlaps a keep[]
  * phrase is 'keep'; one that overlaps an edit accepted before it is 'overlap' (the first stands).
  * Edits that only touch at an edge do not overlap.
  *
+ * The text must be in NFC (S0
+ * normalizes it); each edit's quote and replacement are normalized to NFC before they are placed,
+ * so a quote matches the same way whatever form the model wrote it in.
+ *
  * `sentences` must be the ones splitSentences cut from `text`; a sentence that does not slice the
- * text exactly is a caller's mistake and throws.
+ * text exactly is a caller's mistake and throws, and so does a text that is not in NFC.
  */
 export function applyEdits(text: string, sentences: readonly Sentence[], edits: readonly Edit[], options: ApplyOptions = {}): ApplyResult {
+  if (text !== text.normalize('NFC')) throw new Error('the text is not in NFC: normalize it in S0, before splitting it');
+  const boundaries = graphemeBoundaries(text);
   for (const s of sentences) {
     if (text.slice(s.start, s.end) !== s.text) throw new Error(`sentence ${s.id} was not cut from this text`);
   }
@@ -290,17 +308,22 @@ export function applyEdits(text: string, sentences: readonly Sentence[], edits: 
       rejected.push({ id, edit, reason, message, ...extra });
     const sentence = sentences.find((s) => s.id === edit.sentenceId);
     if (sentence === undefined) return reject('not-found', `there is no sentence ${edit.sentenceId}`);
-    const places = occurrences(sentence.text, edit.before);
+    const before = edit.before.normalize('NFC');
+    const after = edit.after.normalize('NFC');
+    const places = occurrences(sentence.text, before);
     if (places.length === 0) return reject('not-found', `"${edit.before}" is not in sentence ${edit.sentenceId}`);
     if (places.length > 1) return reject('ambiguous', `"${edit.before}" appears ${places.length} times in sentence ${edit.sentenceId}`);
     const start = sentence.start + (places[0] as number);
-    const span = { start, end: start + edit.before.length };
-    if (edit.after === edit.before) return reject('no-op', 'the edit changes nothing', { span });
+    const span = { start, end: start + before.length };
+    if (!boundaries.has(span.start) || !boundaries.has(span.end) || JOINS_PREVIOUS.test(after)) {
+      return reject('boundary', 'the edit starts or ends inside a character', { span });
+    }
+    if (after === before) return reject('no-op', 'the edit changes nothing', { span });
     const kept = keep.find((k) => intersects(k, span));
     if (kept !== undefined) return reject('keep', `the edit touches "${kept.phrase}", which is kept as written`, { span });
     const other = accepted.find((a) => intersects(a.span, span));
     if (other !== undefined) return reject('overlap', `the edit overlaps ${other.id}, accepted before it`, { span, conflictsWith: other.id });
-    accepted.push({ id, edit, span, newSpan: span, before: edit.before, after: edit.after });
+    accepted.push({ id, edit, span, newSpan: span, before, after });
   });
   return { ...render(text, accepted), rejected };
 }

@@ -99,6 +99,30 @@ describe('applyEdits', () => {
   });
 });
 
+describe('applyEdits on characters made of several code units', () => {
+  const apply = (text: string, edits: Edit[], options = {}) => applyEdits(text, splitSentences(text, 'es'), edits, options);
+
+  it('rejects a quote that splits an emoji, a flag or a letter with its accent', () => {
+    const emoji = apply('Hola 😀 mundo.', [edit(0, '\uD83D', 'X')]);
+    expect(emoji.rejected.map((r) => r.reason)).toEqual(['boundary']);
+    expect(emoji.text).toBe('Hola 😀 mundo.');
+    expect(apply('Vamos 🇦🇷 hoy.', [edit(0, '\uD83C\uDDE6', 'X')]).rejected.map((r) => r.reason)).toEqual(['boundary']);
+    // A letter with a combining mark that has no precomposed form stays one character.
+    expect(apply('Uso la ñ\u0301 rara.', [edit(0, 'ñ', 'n')]).rejected.map((r) => r.reason)).toEqual(['boundary']);
+    for (const r of [emoji]) expect(r.text.isWellFormed()).toBe(true);
+  });
+
+  it('places a quote the same way whatever its normalization, and refuses a text that is not NFC', () => {
+    const nfc = 'Vamos al café hoy.';
+    const result = apply(nfc, [edit(0, 'café'.normalize('NFD'), 'bar'.normalize('NFD'))]);
+    expect(result.rejected).toEqual([]);
+    expect(result.text).toBe('Vamos al bar hoy.');
+    expect(result.accepted[0]?.before).toBe('café');
+    const nfd = nfc.normalize('NFD');
+    expect(() => applyEdits(nfd, splitSentences(nfd, 'es'), [edit(0, 'cafe', 'bar')])).toThrow(/NFC/);
+  });
+});
+
 describe('revertEdit and renderEdits', () => {
   it('reverts one edit alone and re-derives the text from the original', () => {
     const { accepted } = applyEdits(TEXT, SENTENCES, [
