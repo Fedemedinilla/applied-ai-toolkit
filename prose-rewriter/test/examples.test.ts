@@ -22,6 +22,20 @@ const lintOf = (e: Example, text: string) =>
   });
 /** Every run of digits, so a number in an example can be traced to the CV or the earlier message. */
 const numbers = (text: string): string[] => [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => m[0]);
+/**
+ * The named facts of a text: capitalised words that do not open a sentence or a line (a person, a
+ * company, a tool, a month), and every day of the week in either language, written in lower case in Spanish.
+ */
+const names = (text: string): string[] => {
+  const capitalised = [...text.matchAll(/\p{Lu}\p{L}+/gu)]
+    .filter((m) => !/(?:^|[.!?:\n])[\s¿¡]*$/u.test(text.slice(0, m.index)))
+    .map((m) => m[0]);
+  const days = [...text.matchAll(/(?<!\p{L})(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|lunes|martes|miércoles|jueves|viernes|sábado|domingo)(?!\p{L})/giu)].map((m) => m[0]);
+  return [...capitalised, ...days];
+};
+const mentions = (text: string, name: string): boolean => new RegExp(`(?<!\\p{L})${name}(?!\\p{L})`, 'iu').test(text);
+/** The last line of a message, where it is signed. */
+const signature = (text: string): string | undefined => text.trim().split('\n').at(-1)?.trim();
 
 describe('the examples on disk', () => {
   it('cover every genre in both languages, one or two pairs each', () => {
@@ -58,6 +72,19 @@ describe('the examples on disk', () => {
     for (const e of examples) {
       const known = new Set([...numbers(CV[e.lang]), ...numbers(e.previousMessage ?? '')]);
       expect(numbers(`${e.before}\n${e.after}`).filter((n) => !known.has(n)), e.id).toEqual([]);
+    }
+  });
+
+  it('name no person, company, tool or day in the after that the before, the earlier message or the CV does not', () => {
+    for (const e of examples) {
+      const known = [e.before, e.previousMessage ?? '', CV[e.lang]].join('\n');
+      expect(names(e.after).filter((n) => !mentions(known, n)), e.id).toEqual([]);
+    }
+  });
+
+  it('sign a follow-up the way its earlier message is signed', () => {
+    for (const e of examples.filter((x) => x.previousMessage !== undefined)) {
+      expect(signature(e.after), e.id).toBe(signature(e.previousMessage ?? ''));
     }
   });
 

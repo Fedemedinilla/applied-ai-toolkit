@@ -14,9 +14,9 @@
     "genre": "email",
     "lang": "en",
     "register": "neutral",
-    "before": "Hi there,\n\nI hope this email finds you well! I wanted to reach out because I came across your amazing company and I'm truly passionate about what you do. I'd love to pick your brain and explore potential synergies. Please let me know if you have some time to connect at your earliest convenience.\n\nLooking forward to hearing from you!\n\nBest,\nDaniel",
+    "before": "Hi Priya,\n\nI hope this email finds you well! I came across the amazing support engineer opening at Larkspur Freight and I'm truly passionate about what you do. Before I apply, I'd love to pick your brain about whether the role is on call and which help desk you use, and to explore potential synergies. Please let me know if you have some time to connect at your earliest convenience. Any afternoon next week works for me!\n\nLooking forward to hearing from you!\n\nBest,\nDaniel",
     "after": "Hi Priya,\n\nI saw the support engineer opening at Larkspur Freight and have two questions before I apply: is the role on call, and which help desk do you use? I have been a support engineer at Brightwell Parcels since June 2022, I work with Zendesk, and I am on call one week in five for our tracking API.\n\nIf a short call is easier, any afternoon next week works for me.\n\nDaniel Okoro",
-    "notes": "The before asks for nothing a reader can answer. The after opens with the reason, puts the two questions in the first paragraph and gives only the CV facts that make them relevant.",
+    "notes": "The before buries its two questions under greetings and a request to connect. The after opens with the reason, puts the same two questions in the first paragraph and gives only the CV facts that make them relevant.",
     "fictional": true
   },
   {
@@ -35,9 +35,9 @@
     "genre": "whatsapp",
     "lang": "en",
     "register": "casual",
-    "before": "Hey Sam!! 😊 I hope this message finds you well!!! I'm truly passionate about support and I'm on an exciting journey to find my next big opportunity. Could you possibly leverage your network to help me out? 🚀🚀",
+    "before": "Hey Sam!! 😊 I hope this message finds you well!!! I'm truly passionate about support and I'm on an exciting journey to find my next big opportunity. I heard Larkspur Freight might still be hiring support engineers?? Could you possibly leverage your network and tell me what their on-call is like before I apply? 🚀🚀",
     "after": "Hi Sam, quick one: is Larkspur Freight still hiring support engineers? I'd like to apply and wanted to ask you first what their on-call is like.",
-    "notes": "The before talks about a journey and a network. The after asks one question a friend can answer from the phone, in the writer's casual register, with no emoji added.",
+    "notes": "The before wraps its question in a journey and a network. The after asks the same question a friend can answer from the phone, in the writer's casual register, with no emoji added.",
     "fictional": true
   }
 ]
