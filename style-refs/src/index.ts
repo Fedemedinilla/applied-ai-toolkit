@@ -357,6 +357,10 @@ function sourceProblems(s: Source): Local[] {
     const year = s.published === null ? 'its year is unverified' : `it is ${s.published}`;
     out.push({ path: 'published', message: `a source for excerpts must be published in ${US_FREE_THROUGH} or earlier to be free in the US, and ${year}` });
   }
+  // D12 on the source itself, so code that trusts `use` never sees an Argentine work cleared for excerpts.
+  if (s.use === 'excerpts' && s.nationality.includes('ar') && s.paidPublicDomain !== 'cleared') {
+    out.push({ path: 'use', message: 'an Argentine author gives no excerpts while the paid public domain (Decreto-ley 1224/58) is unresolved' });
+  }
   if (s.use === 'excerpts' && s.status.us !== 'public-domain') out.push({ path: 'use', message: `a source for excerpts must be public-domain in the US, and it is ${s.status.us}` });
   if (s.kind === 'literary' && s.use !== 'excluded') {
     const { host, allowed } = textHost(s.url);

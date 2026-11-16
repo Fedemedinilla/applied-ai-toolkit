@@ -148,8 +148,15 @@ describe('an excerpt comes only from a work in the public domain in the United S
 describe('the Argentine authors give no excerpts while the paid public domain is unresolved', () => {
   const argentine = { ...work, nationality: ['ar'], lang: 'es', originalLang: 'es', paidPublicDomain: 'unresolved' };
   const spanish = { ...excerpt, lang: 'es', text: 'Escribía corto. Funcionaba.' };
+  const sourceRule = 'sources.json 0.use: an Argentine author gives no excerpts while the paid public domain (Decreto-ley 1224/58) is unresolved';
+  it('refuses an Argentine source declared for excerpts, with or without an excerpt citing it', () => {
+    expect(messages({ ...empty, sources: [argentine] })).toEqual([sourceRule]);
+    expect(messages({ ...empty, sources: [{ ...argentine, use: 'principles' }] })).toEqual([]);
+    expect(messages({ ...empty, sources: [{ ...argentine, paidPublicDomain: 'cleared' }] })).toEqual([]);
+  });
   it('refuses an Argentine excerpt, even from a work free in the United States', () => {
     expect(messages(withExcerpt(argentine, spanish))).toEqual([
+      sourceRule,
       'excerpts/es.json 0.source: plain-work is by an Argentine author and the paid public domain (Decreto-ley 1224/58) is unresolved',
     ]);
   });
@@ -157,13 +164,14 @@ describe('the Argentine authors give no excerpts while the paid public domain is
     const { paidPublicDomain: _gone, ...silent } = argentine;
     expect(messages({ ...empty, sources: [silent] })).toEqual([
       'sources.json 0.paidPublicDomain: an Argentine author needs paidPublicDomain (Decreto-ley 1224/58)',
+      sourceRule,
     ]);
   });
   it('lets the excerpt through once the flag is cleared, as the README says a reading of the decree may do', () => {
     expect(messages(withExcerpt({ ...argentine, paidPublicDomain: 'cleared' }, spanish))).toEqual([]);
   });
   it('counts an author of two nationalities, one of them Argentine', () => {
-    expect(messages(withExcerpt({ ...argentine, nationality: ['uy', 'ar'] }, spanish))).toHaveLength(1);
+    expect(messages(withExcerpt({ ...argentine, nationality: ['uy', 'ar'] }, spanish))).toHaveLength(2);
   });
   it('keeps a principle of a scoped source inside its genres and registers', () => {
     const casual = { ...argentine, use: 'principles', scope: { genres: ['whatsapp'], registers: ['casual'] } };
