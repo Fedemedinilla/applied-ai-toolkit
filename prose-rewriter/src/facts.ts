@@ -154,11 +154,14 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'may', 'might', 'must', 'let', 'one', 'just', 'only', 'even', 'again', 'yours', 'sure', 'happy', 'glad', 'looking', 'attached',
   ]),
 };
+/** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
+const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
 /**
- * Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Hablamos",
- * "Pudiste", "Built", "Leading", "Quickly".
+ * Endings of a finite verb that surnames share ("Hablamos" and "Ramos", "Pudiste" and "Batiste"),
+ * so they count only on the first word of a question or exclamation, which opens with a verb far
+ * more often than with a name: "¿Pudiste ver el presupuesto?", "¿Hablamos el martes?".
  */
-const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente|[aei]mos|[ai]ste)$/iu, en: /(?:ed|ing|ly)$/iu };
+const VERB_AFTER_MARK: Readonly<Record<Lang, RegExp | undefined>> = { es: /(?:[aei]mos|[ai]ste)$/iu, en: undefined };
 const FIRST_PERSON_EN = new Set(['I', "I'm", "I've", "I'd", "I'll", 'I’m', 'I’ve', 'I’d', 'I’ll']);
 /** The first word of a sentence, as slop-lint's words() reads words. */
 const FIRST_WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/u;
@@ -549,7 +552,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
     const key = wordKey(word);
     if (known.has(key)) take('proper-noun', start, word, key);
-    else if (options.openings === true && isPossibleName(word, lang)) {
+    else if (options.openings === true && isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)))) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
       claimed.push([start, start + word.length]);
     }
@@ -557,9 +560,10 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   return facts.sort((a, b) => a.start - b.start);
 }
 
-function isPossibleName(word: string, lang: Lang): boolean {
+function isPossibleName(word: string, lang: Lang, afterMark: boolean): boolean {
   const lower = word.toLocaleLowerCase('und');
   if ([...word].length < 2 || OPENERS[lang].has(lower) || NOT_A_NAME[lang].test(word) || NUMBER_WORDS[lower] !== undefined) return false;
+  if (afterMark && VERB_AFTER_MARK[lang]?.test(word) === true) return false;
   if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;
   if (lang === 'es' && (MONTHS_ES.includes(lower) || lower === 'setiembre')) return false;
   return true;

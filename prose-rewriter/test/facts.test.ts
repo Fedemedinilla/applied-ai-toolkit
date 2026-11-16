@@ -459,3 +459,18 @@ describe('a name at the start of a sentence that is also a common word', () => {
     expect(checkEdit(edit, { O, C: { cv: '' }, sentences: ['Hi.', 'Your team referred me.'], lang: 'en' })).toMatchObject({ status: 'reverted', reason: 'invented' });
   });
 });
+
+describe('a surname with a verb ending at the start of a sentence', () => {
+  // "-amos/-emos/-imos" and "-aste/-iste" read "¿Pudiste ver...?" and "¿Hablamos...?" as verbs in
+  // the F6b run, and also Ramos, Lemos and Jean-Baptiste.
+  it('reports a lost or invented Ramos, Lemos or Jean-Baptiste', () => {
+    const R = 'Hola. Me pasaron tu contacto. Busco trabajo.';
+    for (const name of ['Ramos', 'Lemos', 'Jean-Baptiste']) {
+      const O = `Hola. ${name} me pasó tu contacto. Busco trabajo.`;
+      expect(factInvariant(O, R, { cv: '' }, [], ES).missing.map((f) => f.text), name).toEqual([name]);
+      expect(factInvariant(R, O, { cv: '' }, [], ES).extra.map((f) => f.text), name).toEqual([name]);
+    }
+    const edit = { sentenceId: 0, before: 'Ramos me pasó', after: 'Me pasaron', reason: 'test' };
+    expect(checkEdit(edit, { O: 'Ramos me pasó tu contacto.', C: { cv: '' }, sentences: ['Ramos me pasó tu contacto.'], lang: 'es' })).toMatchObject({ status: 'reverted', reason: 'lost' });
+  });
+});
