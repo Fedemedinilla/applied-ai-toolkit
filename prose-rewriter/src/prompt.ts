@@ -17,9 +17,9 @@
  * every stage. No prefill: the conversation ends in that user turn (gateway.ts:364), and the shape
  * of the reply comes from the stage's output schema (outputs.ts).
  *
- * The user's text, the CV, the recipient, the goal, the keep phrases and the lint findings (which
- * quote the text) are data: each goes inside a <texto> or <perfil> block built by wrapData(), which
- * the data cannot close. The voice goes as data lines (voicePromptLines()), never adjectives.
+ * The user's text, the CV, the recipient, the goal, the keep phrases, the lint findings (which
+ * quote the text) and the plan S2 wrote (model output that read the text) are data: each goes
+ * inside a <texto> or <perfil> block built by wrapData(), which the data cannot close. The voice goes as data lines (voicePromptLines()), never adjectives.
  *
  * Pure: the caller loads style-refs' JSON and passes it in.
  */
@@ -47,7 +47,11 @@ export interface PromptRefs {
 export interface PromptContext {
   /** Already parsed with RewriteInput. */
   readonly input: RewriteInput;
-  /** The register the principles and examples are chosen for. The caller resolves the default. */
+  /**
+   * The register the principles and examples are chosen for. The caller resolves the default when
+   * input.register is not set; when it is set, this must be the same (registerOf() throws otherwise),
+   * so a casual principle never reaches a text the input marked formal (design 4.8).
+   */
   readonly register: Register;
   readonly refs: PromptRefs;
 }
@@ -77,8 +81,12 @@ const MODE_LINES: Readonly<Record<Mode, string>> = {
 
 const bullets = (lines: readonly string[]): string[] => lines.map((l) => `- ${l}`);
 
-/** Model output echoed into a later prompt cannot open or close a block: every `<` is escaped. */
-const inert = (s: string): string => s.replace(/</g, '&lt;');
+/** The context's register, checked against the input's own. */
+function registerOf(c: PromptContext): Register {
+  const asked = c.input.register;
+  if (asked !== undefined && asked !== c.register) throw new Error(`the prompt context register (${c.register}) differs from the input register (${asked})`);
+  return c.register;
+}
 
 function conventions(c: PromptContext): string[] {
   const { genre, lang, variety } = c.input;
@@ -90,7 +98,7 @@ function conventions(c: PromptContext): string[] {
       : lang === 'es'
         ? 'Standard spelling: an edit may add an initial capital, accents and ¿¡ where the writer left them out.'
         : 'Standard spelling: an edit may add an initial capital where the writer left it out.';
-  const lines = [`Genre: ${genre}. Language: ${where}. Register: ${c.register}.`, spelling];
+  const lines = [`Genre: ${genre}. Language: ${where}. Register: ${registerOf(c)}.`, spelling];
   if (genre === 'follow-up') lines.push("A follow-up answers the recipient's previous message, which comes with the recipient.");
   return lines;
 }
@@ -101,12 +109,12 @@ function principleLines(principles: readonly Principle[]): string[] {
 
 function lessons(c: PromptContext, kind: 'do' | 'avoid'): Principle[] {
   const { genre, lang, variety } = c.input;
-  return principlesFor(c.refs.principles, c.refs.sources, { lang, genre, register: c.register, kind, ...(variety === undefined ? {} : { variety }) });
+  return principlesFor(c.refs.principles, c.refs.sources, { lang, genre, register: registerOf(c), kind, ...(variety === undefined ? {} : { variety }) });
 }
 
 function examples(c: PromptContext): Example[] {
   const { genre, lang, variety } = c.input;
-  return c.refs.examples.filter((e) => e.genre === genre && e.lang === lang && e.register === c.register && e.variety === variety);
+  return c.refs.examples.filter((e) => e.genre === genre && e.lang === lang && e.register === registerOf(c) && e.variety === variety);
 }
 
 function exampleLines(e: Example): string[] {
@@ -228,15 +236,18 @@ const EDIT_TASK = [
 export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<typeof EditOutput> {
   const sentences = splitSentences(c.input.text, c.input.lang);
   const items = plan.items.map((i) => {
-    const rule = i.ruleId === undefined ? '' : ` (${inert(i.ruleId)})`;
-    const request = i.request === undefined ? '' : ` ${inert(i.request)}`;
-    return `[${i.sentenceId}] ${i.action}${rule}: ${inert(i.reason)}${request}`;
+    const rule = i.ruleId === undefined ? '' : ` (${i.ruleId})`;
+    const request = i.request === undefined ? '' : ` ${i.request}`;
+    return `[${i.sentenceId}] ${i.action}${rule}: ${i.reason}${request}`;
   });
+  // The plan is model output that read the user's text: it goes in a data block like the text, so
+  // a line it carries can neither close a block nor pass for a section of rules.
+  const planBlock = items.length === 0 ? 'None.' : wrapData('texto', items.join('\n'));
   return {
     task: 'rewrite.edit',
     promptVersion: `rewrite-edit@${PROMPT_VERSION}`,
     system: systemBlocks(c),
-    messages: conversation(EDIT_TASK, [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', ...(items.length === 0 ? ['None.'] : items)]),
+    messages: conversation(EDIT_TASK, [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', planBlock]),
     schema: EditOutput,
   };
 }
