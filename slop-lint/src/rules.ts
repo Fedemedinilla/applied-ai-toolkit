@@ -1341,7 +1341,8 @@ const followUp: Rule[] = [
     },
     deviation:
       'The report sets the 8-word limit for text copied from the job posting. Applying it to the earlier message of a follow-up is this ' +
-      "implementation's synthesis. Words are compared without case or punctuation, and a run that crosses a sentence end still counts. " +
+      "implementation's synthesis. Only prose sentences of the two messages are compared, so the greeting, the sign-off and the name they " +
+      'share are not copied text. Words are compared without case or punctuation, and a run that crosses a sentence end still counts. ' +
       'It needs the earlier message (`previous`, or --previous on the command line) and does nothing without it.',
     falsePositives: 'A quotation of the earlier message that the writer wants on purpose, such as the exact question asked.',
     examples: [

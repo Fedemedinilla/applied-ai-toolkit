@@ -493,6 +493,22 @@ describe('SEG-03, a follow-up that copies the earlier message', () => {
     expect(ids(copy, { lang: 'en', genre: 'follow-up' })).not.toContain('SEG-03');
   });
 
+  it('compares only prose: a shared greeting and sign-off are not copied words', () => {
+    const before = 'Hi Dana,\n\nThe stock dashboard is live. I can send the sample on Monday.\n\nBest regards,\nSam Ruiz';
+    const after = 'Hi Dana,\n\nAny news on the role? Happy to send the sample on Monday.\n\nBest regards,\nSam Ruiz';
+    expect(ids(after, { lang: 'en', genre: 'follow-up', previous: before })).not.toContain('SEG-03');
+    const antes = 'Hola, Laura:\n\nTe paso el tablero. Te mando el ejemplo el lunes.\n\nUn saludo grande,\nAna Ruiz';
+    const despues = 'Hola, Laura:\n\n¿Hay novedades? Sigo con el ejemplo el lunes.\n\nUn saludo grande,\nAna Ruiz';
+    expect(ids(despues, { lang: 'es', genre: 'follow-up', previous: antes })).not.toContain('SEG-03');
+    // Exactly 8 words of the body copied, then the shared sign-off: within the limit.
+    const eightThenSignOff = 'Hi Dana,\n\nLast week I wrote that I cut the refresh from 40 minutes to 12.\n\nBest,\nSam';
+    expect(ids(eightThenSignOff, { lang: 'en', genre: 'follow-up', previous })).not.toContain('SEG-03');
+    // A copied run starts at the body, not at the greeting the two messages share.
+    const fromTheTop = 'Hi Dana,\n\nI rebuilt the stock dashboard for the Rosario branch, as I said. Could we look at it on Thursday?\n\nBest,\nSam';
+    const seg = lint(fromTheTop, { lang: 'en', genre: 'follow-up', previous }).findings.filter((f) => f.ruleId === 'SEG-03');
+    expect(seg.map((f) => [f.match, f.detail])).toEqual([['I rebuilt the stock dashboard for the Rosario branch', '9 words in a row from the earlier message']]);
+  });
+
   it('works in Spanish too', () => {
     const anterior = 'Hola, Laura:\n\nTe mandé el tablero de ventas de la sucursal Rosario con los datos de marzo.\n\nSaludos,\nAna';
     const seguimiento = 'Hola, Laura:\n\nTe escribo porque te mandé el tablero de ventas de la sucursal Rosario con los datos. ¿Lo pudiste ver?\n\nSaludos,\nAna';
