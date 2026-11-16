@@ -141,3 +141,26 @@ describe('"why X matters" needs "matters" to end the clause', () => {
     }
   });
 });
+
+describe('the new phrases accept any run of whitespace between their words', () => {
+  // Hard-wrapped email and follow-up text breaks lines between words; the repeat key in lint.ts
+  // already folds whitespace runs.
+  const spent = 'The work was pivotal and robust. ';
+  for (const text of ['This\nmatters for the close.', 'That is why\nit matters.', 'So this   matters.', 'That is why it matters.']) {
+    it(`LEX-04 reports ${JSON.stringify(text)}`, () => {
+      const result = lint(spent + text, { lang: 'en' });
+      expect(result.findings.map((f) => [f.ruleId, f.severity])).toEqual([['LEX-04', 'low']]);
+    });
+  }
+
+  for (const text of [
+    'Me encantaría\ntener la oportunidad de charlar.',
+    'Me encantaría  tener la oportunidad de charlar.',
+    'Me encantaría tener la oportunidad\nde charlar.',
+  ]) {
+    it(`REG-02 reports ${JSON.stringify(text)}`, () => {
+      const result = lint(text, { lang: 'es' });
+      expect(result.findings.filter((f) => f.ruleId === 'REG-02')).toHaveLength(1);
+    });
+  }
+});
