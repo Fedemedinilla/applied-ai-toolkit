@@ -211,6 +211,7 @@ export default defineConfig({
         'evals/scripts/cli.ts',
         'content-forge/cli.ts',
         'prose-rewriter/cli.ts',
+        'prose-rewriter/evals/cli.ts',
         'apps/caja/server/env.ts',
         'apps/chat-widget/server/env.ts',
         'apps/salon-assistant/server/env.ts',

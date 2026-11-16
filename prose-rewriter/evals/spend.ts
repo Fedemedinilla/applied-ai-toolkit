@@ -19,7 +19,7 @@
  *   its worst case.
  * - costRows() and costReport(): the cost table of design 4.10 step 4, next to gateMarkdown.
  *
- * Refusals are SpendRefusal, a CapError, so runPipelines() and judgePieces() stop the run on the
+ * Refusals (a cap, a missing price, a ledger it cannot read or write) are SpendRefusal, a CapError, so runPipelines() and judgePieces() stop the run on the
  * first one instead of failing every later piece the same way.
  */
 import { randomUUID } from 'node:crypto';
@@ -70,13 +70,14 @@ export function spendMonth(at: Date, timeZone: string = SPEND_TIME_ZONE): string
 }
 
 /** Why a call was refused before it reached the gateway. */
-export type RefusalReason = 'monthly' | 'run' | 'unpriced';
+export type RefusalReason = 'monthly' | 'run' | 'unpriced' | 'ledger';
 
 /** A call refused by the budget. The API was not called. A CapError, so a run stops on it. */
 export class SpendRefusal extends CapError {
   readonly reason: RefusalReason;
-  constructor(reason: RefusalReason, spentUsd: number, capUsd: number, message: string) {
+  constructor(reason: RefusalReason, spentUsd: number, capUsd: number, message: string, options?: ErrorOptions) {
     super('cap_monthly_global', spentUsd, capUsd);
+    if (options?.cause !== undefined) this.cause = options.cause;
     this.reason = reason;
     this.message = message;
   }
@@ -298,7 +299,14 @@ export function budgetedGateway(inner: Gateway<string>, options: BudgetOptions):
     if (max !== null && run.settled + run.open + micros(worst) > micros(max)) {
       throw new SpendRefusal('run', usd(run.settled + run.open), max, `Refused: the call's worst case of US$${worst} would take this run past its per-run cap of US$${max}`);
     }
-    const r = ledger.reserve(worst);
+    let r: Reservation;
+    try {
+      r = ledger.reserve(worst);
+    } catch (error) {
+      if (error instanceof SpendRefusal) throw error;
+      // A ledger that cannot be read or written cannot hold the budget: no call, and the run stops.
+      throw new SpendRefusal('ledger', 0, ledger.capUsd, `Refused: ${(error as Error).message}`, { cause: error });
+    }
     run.open += r.micros;
     return { r, worst };
   };

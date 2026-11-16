@@ -1,8 +1,8 @@
 // F6a step 3: the spend ledger, the budgeted gateway, the cost report and the eval CLI core,
 // offline, over the scripted gateway. No key, no network; every ledger lives in a temp folder.
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BUILT_IN_MODELS, CapError, pricesInForce, RequestError, type Gateway, type Price } from '../../gateway/src/index.ts';
 import type { PieceRecord } from '../evals/pipeline.ts';
@@ -16,6 +16,11 @@ import {
   spendMonth,
   type Clock,
 } from '../evals/spend.ts';
+import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
+import type { LoadedCase } from '../evals/cases.ts';
+import { EVAL_EXIT, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import type { PromptRefs } from '../src/prompt.ts';
+import { RewriteInput } from '../src/types.ts';
 import { NOW, scriptedGateway } from './scripted-gateway.ts';
 
 const PRICES = pricesInForce(
@@ -168,6 +173,16 @@ describe('the budgeted gateway', () => {
     expect(scripted.calls).toHaveLength(0);
   });
 
+  it('refuses a call, as a CapError that stops the run, when the ledger cannot be read', async () => {
+    const { scripted, budget, path } = setup({ 'rewrite.judge': [REPLY] });
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, 'not json');
+    const refused = budget.gateway.text(judgeRequest());
+    await expect(refused).rejects.toBeInstanceOf(CapError);
+    await expect(refused).rejects.toThrow(/ledger .* is not readable/);
+    expect(scripted.calls).toHaveLength(0);
+  });
+
   it('refuses a task it has no model for', async () => {
     const { budget } = setup({});
     await expect(budget.gateway.text({ ...judgeRequest(), task: 'summary' })).rejects.toThrow(/no model for task summary/);
@@ -212,3 +227,139 @@ describe('the cost report', () => {
   });
 });
 
+
+const ROOT = new URL('../../', import.meta.url);
+const json = (file: string): unknown[] => JSON.parse(readFileSync(new URL(file, ROOT), 'utf8')) as unknown[];
+const REFS: PromptRefs = {
+  sources: json('style-refs/sources.json').map((s) => Source.parse(s)),
+  principles: LANGS.flatMap((lang) => json(`style-refs/principles/${lang}.json`).map((p) => Principle.parse(p))),
+  examples: LANGS.flatMap((lang) => json(`style-refs/examples/${lang}.json`).map((e) => Example.parse(e))),
+};
+const CV_ES = readFileSync(new URL('prose-rewriter/evals/cases/cv/es-rioplatense.md', ROOT), 'utf8');
+const loaded = (id: string, text: string, genre: 'email' | 'whatsapp'): LoadedCase => ({
+  id,
+  kind: 'good',
+  input: RewriteInput.parse({ text, genre, lang: 'es', variety: 'rioplatense', profile: { cvMarkdown: CV_ES } }),
+  expect: { survive: [], acceptedDrops: [], placeholdersAllowed: false },
+});
+/** Fictional. Clean: S1b returns it unchanged, with no model call. */
+const CLEAN = loaded('es-whatsapp-clean', 'Hola Marta, te paso el link del sitio nuevo de la panadería. Lo armé en Astro y carga en 1,6 s. Avisame si querés que lo veamos el jueves.', 'whatsapp');
+/** Fictional, with slop: the pipeline would call the model. */
+const SLOP = loaded('es-email-slop', 'Hola Marta,\nEspero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio de la panadería ya carga en 1,6 s. ¿Lo vemos el jueves?\nSaludos,\nValeria', 'email');
+const SECRET = 'sk-test-not-a-real-key';
+
+interface Harness {
+  readonly deps: EvalCliDeps;
+  readonly out: string[];
+  readonly err: string[];
+  readonly built: number[];
+  readonly ledgerPath: string;
+  readonly dir: string;
+}
+
+function harness(gateway: () => Gateway<string>, over: Partial<EvalCliDeps> = {}): Harness {
+  const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
+  const out: string[] = [];
+  const err: string[] = [];
+  const built: number[] = [];
+  const deps: EvalCliDeps = {
+    apiKey: SECRET,
+    stdout: (t) => void out.push(t),
+    stderr: (t) => void err.push(t),
+    clock: fixed,
+    home: dir,
+    cases: () => [CLEAN, SLOP],
+    refs: () => REFS,
+    gateway: (_key, cap) => {
+      built.push(cap);
+      return gateway();
+    },
+    ...over,
+  };
+  return { deps, out, err, built, ledgerPath: join(dir, '.applied-ai-toolkit', 'eval-spend.json'), dir };
+}
+const never = (): Gateway<string> => {
+  throw new Error('the live gateway must not be built');
+};
+
+describe('the eval CLI', () => {
+  it('refuses to run without --live or --dry-run, building no gateway', async () => {
+    const h = harness(never);
+    expect(await runEvalCli([], h.deps)).toBe(EVAL_EXIT.usage);
+    expect(h.err.join('')).toMatch(/--live/);
+    expect(h.built).toEqual([]);
+  });
+
+  it('--dry-run prints the worst case of the whole run, makes zero calls and needs no key', async () => {
+    const h = harness(never, { apiKey: undefined });
+    expect(await runEvalCli(['--dry-run', '--variants', 'full,single-call'], h.deps)).toBe(EVAL_EXIT.ok);
+    const text = h.out.join('');
+    expect(text).toMatch(/Dry run: 4 pieces \(2 cases x 2 variants\), no model call made/);
+    expect(text).toMatch(/Worst case of the whole run: US\$\d+\.\d{4} over at most \d+ calls/);
+    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0000 of US\$20/);
+    expect(h.built).toEqual([]);
+    expect(existsSync(h.ledgerPath)).toBe(false);
+  });
+
+  it('filters cases by genre, language and id, and applies --limit', async () => {
+    const h = harness(never);
+    await runEvalCli(['--dry-run', '--variants', 'full', '--cases', 'whatsapp,es'], h.deps);
+    expect(h.out.join('')).toMatch(/1 pieces \(1 cases x 1 variants\)/);
+    const h2 = harness(never);
+    await runEvalCli(['--dry-run', '--variants', 'full', '--limit', '1'], h2.deps);
+    expect(h2.out.join('')).toMatch(/1 pieces/);
+    const h3 = harness(never);
+    expect(await runEvalCli(['--dry-run', '--cases', 'no-such-case'], h3.deps)).toBe(EVAL_EXIT.usage);
+    expect(h3.err.join('')).toMatch(/no-such-case/);
+  });
+
+  it('refuses a monthly cap above the budget and bad numbers', async () => {
+    for (const argv of [['--monthly-cap', '25'], ['--max-usd', '-1'], ['--limit', '0'], ['--variants', 'nope']]) {
+      const h = harness(never);
+      expect(await runEvalCli(['--dry-run', ...argv], h.deps)).toBe(EVAL_EXIT.usage);
+    }
+  });
+
+  it('--live without a key refuses before building anything', async () => {
+    const h = harness(never, { apiKey: undefined });
+    expect(await runEvalCli(['--live', '--out', 'x'], h.deps)).toBe(EVAL_EXIT.failed);
+    expect(h.err.join('')).toMatch(/ANTHROPIC_API_KEY/);
+  });
+
+  it('--live runs, records, judges and reports the gate, the cost table and the month spend', async () => {
+    const judge = (text: string) => ({ text, usage: { input: 1000, output: 100 } });
+    const scripted = scriptedGateway({ 'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}')] });
+    const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN] });
+    const outDir = join(h.dir, 'run');
+    expect(await runEvalCli(['--live', '--variants', 'full', '--out', outDir], h.deps)).toBe(EVAL_EXIT.ok);
+    scripted.assertDone();
+    expect(h.built).toEqual([20]);
+    expect(readdirSync(outDir).sort()).toEqual(['code.jsonl', 'judges.jsonl', 'pieces.jsonl', 'report.md']);
+    const text = h.out.join('');
+    expect(text).toContain('### Cost per rewrite');
+    expect(text).toContain('| full | whatsapp | minimo | 1 | 1 | 0.0000 | 0.0000 |');
+    expect(text).toMatch(/no baseline among the variants/);
+    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0060 of US\$20/);
+    expect(text).toMatch(/This run: US\$0\.0060 over 2 calls/);
+    expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');
+    expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.006);
+    expect(h.out.join('') + h.err.join('')).not.toContain(SECRET);
+  });
+
+  it('--live stops on the budget and says so, with what it recorded', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: '{"fits": true, "note": ""}' }] });
+    const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN] });
+    const outDir = join(h.dir, 'run');
+    expect(await runEvalCli(['--live', '--variants', 'full', '--out', outDir, '--max-usd', '0.000001'], h.deps)).toBe(EVAL_EXIT.stopped);
+    expect(scripted.calls).toHaveLength(0);
+    expect(h.out.join('')).toMatch(/Stopped: Refused: .*per-run cap/);
+  });
+
+  it('refuses an --out that already holds a run', async () => {
+    const h = harness(() => scriptedGateway({}).gateway as Gateway<string>, { cases: () => [CLEAN] });
+    const outDir = join(h.dir, 'run');
+    await runEvalCli(['--live', '--variants', 'full', '--out', outDir, '--max-usd', '0.000001'], h.deps);
+    expect(await runEvalCli(['--live', '--variants', 'full', '--out', outDir], h.deps)).toBe(EVAL_EXIT.usage);
+    expect(h.err.join('')).toMatch(/already exists/);
+  });
+});
