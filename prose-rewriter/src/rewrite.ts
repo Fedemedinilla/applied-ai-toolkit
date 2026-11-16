@@ -20,7 +20,8 @@
  *
  * With RewriteOptions.strategy 'single', steps 2 to 4 are one call that plans and edits
  * (stages/model.ts singleStage); its edits go through the same placement, S5 in code and S6, then
- * steps 5 and 6 run as above. No S4 and no extra round: at most one call plus the judge's.
+ * steps 5 and 6 run as above. No S4 and no extra round: one call, two when its reply cannot be
+ * read and is asked for again (below), plus the judge's.
  *
  * A model stage whose reply the gateway cannot read against its schema (ResponseError
  * 'invalid_output') is asked once more; if the second reply cannot be read either, that stage
@@ -176,7 +177,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   let extraInvented = false;
   if (options.strategy === 'single') {
     // S2 and S3 in one call; its edits go through the same placement, S5 in code and S6. No S4 and
-    // no extra round: the strategy is one call plus the judge's.
+    // no extra round: the strategy is one call (two with the retry of an unreadable reply) plus the judge's.
     check(propose((await readable(() => singleStage(m, a.lint.findings))) ?? [], 'edit', 1));
   } else extraInvented = await staged();
 

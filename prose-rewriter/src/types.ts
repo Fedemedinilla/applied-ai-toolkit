@@ -176,8 +176,9 @@ export interface RewriteOptions {
   /**
    * 'staged' (the default): S2 plan and S3 edit, S4 style and at most one extra S3 round.
    * 'single': one call plans and edits (the prompt of the single-call baseline, design 4.10), and
-   * its edits pass the same S5, the fact judge, S6 and S7; no S4 and no extra round. At most one
-   * call plus the judge's. F6b measures it against both (decided 16/11/2026).
+   * its edits pass the same S5, the fact judge, S6 and S7; no S4 and no extra round. One call, two
+   * when its reply cannot be read and is asked for again, plus the judge's. F6b measures it
+   * against both (decided 16/11/2026).
    */
   readonly strategy?: Strategy;
 }
