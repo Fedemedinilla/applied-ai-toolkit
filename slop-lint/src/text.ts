@@ -157,33 +157,40 @@ const LOWERCASE_TOOLS = ['pandas', 'numpy', 'dbt', 'npm', 'git', 'scikit-learn',
 const FIRST_PERSON_EN = new Set(['I', "I'm", "I've", "I'd", "I'll", 'I’m', 'I’ve', 'I’d', 'I’ll']);
 
 /**
- * Counts anchors in a sentence: numbers (digits or number words), proper nouns
- * (a capitalized word that is not the sentence's first word, and not "I"),
- * acronyms (two or more capitals, anywhere), and the extra terms given by the caller.
- * "una", "one", "half" and "medio" are not counted: they are articles or pronouns
- * far more often than figures.
+ * The anchors in a sentence, as the words or phrases that hold them, in order: numbers (digits or
+ * number words), proper nouns (a capitalized word that is not the sentence's first word, and not
+ * "I"), acronyms (two or more capitals, anywhere), and the extra terms given by the caller.
+ * "una", "one", "half" and "medio" are not anchors: they are articles or pronouns far more often
+ * than figures. A multi-word extra term is one more anchor, as the sentence writes it, on top of
+ * the words in it that are anchors on their own.
  */
-export function countAnchors(sentence: string, lang: Lang, extra: readonly string[] = []): number {
+export function extractAnchors(sentence: string, lang: Lang, extra: readonly string[] = []): string[] {
   const ws = words(sentence);
   const numberWords = new Set(NUMBER_WORDS[lang].filter((w) => w !== 'una' && w !== 'one' && w !== 'half' && w !== 'medio'));
   // Extra terms are trimmed, as --anchors trims them, and a blank one is dropped: it would match everywhere.
   const extras = extra.map((t) => t.trim()).filter(Boolean);
   const terms = [...LOWERCASE_TOOLS, ...extras].map((t) => t.toLowerCase());
-  let count = 0;
+  const found: string[] = [];
   ws.forEach((w, index) => {
     const lower = w.text.toLowerCase();
-    if (/\p{N}/u.test(w.text)) count++;
-    else if (numberWords.has(lower)) count++;
-    else if (/^\p{Lu}{2,}/u.test(w.text)) count++;
-    else if (index > 0 && /^\p{Lu}/u.test(w.text) && !(lang === 'en' && FIRST_PERSON_EN.has(w.text))) count++;
-    else if (terms.includes(lower)) count++;
+    if (/\p{N}/u.test(w.text)) found.push(w.text);
+    else if (numberWords.has(lower)) found.push(w.text);
+    else if (/^\p{Lu}{2,}/u.test(w.text)) found.push(w.text);
+    else if (index > 0 && /^\p{Lu}/u.test(w.text) && !(lang === 'en' && FIRST_PERSON_EN.has(w.text))) found.push(w.text);
+    else if (terms.includes(lower)) found.push(w.text);
   });
   // Multi-word extra terms ("Power BI", "SQL Server") are matched on the whole sentence, as whole
   // words: "power bill" is not "Power BI". Any run of whitespace stands for the spaces in the term.
   for (const term of extras) {
     if (!/\s/u.test(term)) continue;
     const source = term.split(/\s+/u).map((part) => part.replace(/[\\^$.*+?()[\]{}|/]/gu, '\\$&')).join(String.raw`\s+`);
-    if (compile(`${B}${source}${E}`, 'iu').test(sentence)) count++;
+    const match = compile(`${B}${source}${E}`, 'iu').exec(sentence);
+    if (match !== null) found.push(match[0]);
   }
-  return count;
+  return found;
+}
+
+/** How many anchors a sentence holds: always extractAnchors(...).length, so the two cannot drift. */
+export function countAnchors(sentence: string, lang: Lang, extra: readonly string[] = []): number {
+  return extractAnchors(sentence, lang, extra).length;
 }

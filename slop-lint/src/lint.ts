@@ -312,3 +312,4 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
 
 export { RULES };
 export { GENRES, GENRE_PROFILES, guessGenre, resolveRules, type GenreGuess, type GenreProfile } from './genres.ts';
+export { extractAnchors } from './text.ts';
