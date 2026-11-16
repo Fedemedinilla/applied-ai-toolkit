@@ -326,3 +326,41 @@ describe('the extra round on an S3 edit a style edit holds', () => {
     expectSound(i, result);
   });
 });
+
+// F6b review: a style edit whose quote of the original is not unique in its unit ("the proposal
+// for" twice) is widened. On en-follow-up-light with a second proposal in the sentence.
+describe('a style edit widened to place it once in the original', () => {
+  const base = input('en-follow-up-light');
+  const sentence = 'I sent the proposal for the help desk and the proposal for the wiki.';
+  const text = base.text.replace('I just wanted to follow up on the proposal I sent for your help desk, a project I am passionate about.', sentence);
+  const s3 = { sentenceId: 1, before: 'and the proposal for the wiki', after: 'and the wiki proposal', reason: 'Shorter.', ruleId: 'LEX-03' };
+  const mine = { sentenceId: 1, before: 'the proposal for', after: 'my proposal for', reason: 'Say whose.', principleId: 'en-omit-needless-words' };
+  const run = async (i: RewriteInput, style: ReadonlyArray<typeof mine>, expected: string) => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(4)],
+      'rewrite.edit': [{ data: { edits: [s3] } }, { data: { edits: [] } }],
+      'rewrite.style': [{ data: { edits: style } }],
+      'rewrite.judge': [verdict(expected, 'en')],
+    });
+    return rewrite(i, { gateway: scripted.gateway, refs: REFS });
+  };
+
+  it('merges the other style edits of its sentence instead of refusing them as overlaps', async () => {
+    const i = { ...base, text };
+    const sent = { sentenceId: 1, before: 'I sent', after: 'I emailed', reason: 'Say how.', principleId: 'en-specific-concrete' };
+    const expected = text.replace(sentence, 'I emailed my proposal for the help desk and the wiki proposal.');
+    const result = await run(i, [mine, sent], expected);
+    expect(result.changes.filter((c) => /overlaps/.test(c.revertReason ?? ''))).toEqual([]);
+    expect(result.rewritten).toBe(expected);
+    expectSound(i, result);
+  });
+
+  it('is not refused for a keep[] phrase that no edit touches', async () => {
+    const i = { ...base, text, keep: ['help desk'] };
+    const expected = text.replace(sentence, 'I sent my proposal for the help desk and the wiki proposal.');
+    const result = await run(i, [mine], expected);
+    expect(result.changes.filter((c) => /kept as written/.test(c.revertReason ?? ''))).toEqual([]);
+    expect(result.rewritten).toBe(expected);
+    expectSound(i, result);
+  });
+});

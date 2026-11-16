@@ -9,7 +9,9 @@
  *   step aside (reverted, "merged into eN"); every check runs on the merged edit, and if it is
  *   refused or reverted the S3 edits come back (restoreMerged);
  * - two style edits whose quotes overlap each other still conflict: the second is refused, as
- *   applyEdits refuses an overlap. Two that only share an S3 edit are merged into the first.
+ *   applyEdits refuses an overlap. Two that only share an S3 edit are merged into the first;
+ * - an edit whose text in the original is written more than once in its unit grows a word at a
+ *   time until it sits there once (widen), and takes in the other style edits it reaches.
  *
  * Why: the first real-model eval run gave S4 the original text, and its edits on every sentence
  * S3 had edited were refused as overlaps (full 45, no-examples 39, edit-sonnet 44).
@@ -146,17 +148,21 @@ export function composeStyle(a: Analysis, units: readonly Sentence[], proposals:
     first.cur = { start: Math.min(s.cur, ...joined.map((c) => c.cur.start)), end: Math.max(e.cur, ...joined.map((c) => c.cur.end)) };
   }
 
-  for (const c of clusters) {
-    // The quote of the original must sit once in its unit, where code places it; else the whole sentence.
+  // The quote of the original must sit once in its unit, where code places it. A cluster whose
+  // quote does not grows a word at a time, and takes in the clusters it reaches.
+  const ready: Cluster[] = [];
+  for (const c of [...clusters]) {
+    if (!clusters.includes(c)) continue;
     const unit = units.find((u) => u.id === c.sentence.id);
     if (unit === undefined) {
       refuse(c.head, `there is no sentence ${c.sentence.id}`);
       continue;
     }
-    if (occurrences(unit.text, a.text.slice(c.orig.start, c.orig.end)).length !== 1) {
-      c.orig = c.sentence.orig;
-      c.cur = c.sentence.cur;
-    }
+    widen(a, current, clusters, c, unit.text);
+    ready.push(c);
+  }
+
+  for (const c of ready.filter((r) => clusters.includes(r))) {
     const merged = current.live.filter((e) => c.orig.start <= e.span.start && e.span.end <= c.orig.end);
     const shifted = merged.map((m) => ({ ...m, span: { start: m.span.start - c.orig.start, end: m.span.end - c.orig.start } }));
     if (renderEdits(a.text.slice(c.orig.start, c.orig.end), shifted) !== current.text.slice(c.cur.start, c.cur.end)) {
@@ -189,6 +195,53 @@ export function composeStyle(a: Analysis, units: readonly Sentence[], proposals:
       member.reason = `merged into ${c.head.id}`;
       member.mergedInto = c.head.id;
     }
+  }
+}
+
+/**
+ * Grows `c` over the original a word at a time, left then right, until its text sits once in
+ * `unit` (at most to its whole sentence), never ending inside a live edit. Each other cluster of
+ * the sentence it then reaches is merged into it, so it is not refused as an overlap.
+ *
+ * Why: widening straight to the whole sentence refused the other style edits of that sentence as
+ * overlaps, and a keep[] phrase no edit touched, as soon as a short quote ("the proposal for")
+ * was written twice in the unit.
+ */
+function widen(a: Analysis, current: Current, clusters: Cluster[], c: Cluster, unit: string): void {
+  const bounds = c.sentence.orig;
+  const once = (): boolean => occurrences(unit, a.text.slice(c.orig.start, c.orig.end)).length === 1;
+  const live = current.live;
+  // An insertion at a boundary falls inside the range, as renderEdits applies it there.
+  const toCur = (p: number, side: 'start' | 'end'): number =>
+    p + live.filter((e) => e.span.end < p || (e.span.end === p && (side === 'end' || e.span.start < p))).reduce((shift, e) => shift + shiftOf(e), 0);
+  const word = /\S/u;
+  while (!once() && (c.orig.start > bounds.start || c.orig.end < bounds.end)) {
+    let start = c.orig.start;
+    while (start > bounds.start && !word.test(a.text[start - 1] ?? '')) start--;
+    while (start > bounds.start && word.test(a.text[start - 1] ?? '')) start--;
+    start = live.find((e) => e.span.start < start && start < e.span.end)?.span.start ?? start;
+    if (start < c.orig.start) c.orig = { start, end: c.orig.end };
+    else {
+      let end = c.orig.end;
+      while (end < bounds.end && !word.test(a.text[end] ?? '')) end++;
+      while (end < bounds.end && word.test(a.text[end] ?? '')) end++;
+      end = live.find((e) => e.span.start < end && end < e.span.end)?.span.end ?? end;
+      c.orig = { start: c.orig.start, end };
+    }
+    c.cur = { start: toCur(c.orig.start, 'start'), end: toCur(c.orig.end, 'end') };
+  }
+  if (!once()) {
+    c.orig = c.sentence.orig;
+    c.cur = c.sentence.cur;
+  }
+  for (let other = reached(); other !== undefined; other = reached()) {
+    c.quotes.push(...other.quotes);
+    c.orig = { start: Math.min(c.orig.start, other.orig.start), end: Math.max(c.orig.end, other.orig.end) };
+    c.cur = { start: Math.min(c.cur.start, other.cur.start), end: Math.max(c.cur.end, other.cur.end) };
+    clusters.splice(clusters.indexOf(other), 1);
+  }
+  function reached(): Cluster | undefined {
+    return clusters.find((o) => o !== c && o.sentence === c.sentence && intersects(o.cur, c.cur));
   }
 }
 
