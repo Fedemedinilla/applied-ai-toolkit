@@ -116,7 +116,7 @@ const SlopRuleId = z.string().regex(/^[A-Z]{2,4}(?:-[A-Z]{2})?-\d{2}$/, 'a slop-
  * A principle in our own words, with the sources it comes from and how it is checked. An `avoid`
  * entry is one item of the "no imitar" list: the rewriter shows its text as a negative constraint
  * (stage S4) and looks for its terms after the rewrite (stage S6). Its sources are the works whose
- * trait it warns against, so the scope of a casual source does not limit it.
+ * trait it warns against, or that warn against it, so the scope of a casual source does not limit it.
  */
 export const Principle = z.strictObject({
   id: Id,

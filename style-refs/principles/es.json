@@ -1,1 +1,148 @@
-[]
+[
+  {
+    "id": "es-adjective-only-with-a-fact",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Keep an adjective only when it adds a fact the noun does not carry; a precise noun needs no colour around it.",
+    "check": "Every adjective left in the rewrite carries a fact (a place, a size, a tool, a date); evaluative ones with no fact behind them, such as 'excelente' or 'increíble', are cut.",
+    "sources": ["quiroga-decalogo"]
+  },
+  {
+    "id": "es-know-the-end-first",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Know what the message has to get before writing its first word; the opening and the close weigh the most.",
+    "check": "The first sentence states the purpose and the last one asks for or confirms a single next step.",
+    "sources": ["quiroga-decalogo"]
+  },
+  {
+    "id": "es-plain-exact-words",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Say each thing with the plain words that state it exactly; do not swap them for rarer synonyms or for the sound of the sentence.",
+    "check": "No word of the original was replaced by a rarer synonym, and a key term keeps the same word each time it appears.",
+    "sources": ["quiroga-decalogo"]
+  },
+  {
+    "id": "es-only-what-moves-the-reader",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Tell only what the reader needs to act on, one fact after another; cut the sentence that repeats or decorates.",
+    "check": "No fact appears twice, and every sentence that was cut held no fact (facts-preserved).",
+    "sources": ["quiroga-decalogo", "quiroga-cuentos-1917"]
+  },
+  {
+    "id": "es-verb-not-abstract-noun",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Say the action with its verb, not with an abstract noun and an empty verb: 'migré los mails', not 'realicé la migración de los mails'.",
+    "check": "slop-lint OFI-01 does not fire where the genre turns it on; no 'realizar la', 'llevar a cabo la' or 'efectuar la' before a noun in -ción or -miento.",
+    "slopRules": ["OFI-01"],
+    "sources": ["federal-plain-language"]
+  },
+  {
+    "id": "es-vary-sentence-length",
+    "lang": "es",
+    "genres": ["cover-letter", "email"],
+    "registers": ["formal", "neutral"],
+    "text": "Alternate short and long sentences; a run of sentences of the same length reads flat.",
+    "check": "slop-lint EST-11 does not fire on a text of eight or more sentences.",
+    "slopRules": ["EST-11"],
+    "sources": ["lincoln-gettysburg"]
+  },
+  {
+    "id": "es-lead-with-the-point",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Put the request or the news in the first sentence and the context after it.",
+    "check": "The first sentence names what the writer asks for or reports; no opening about the writer's feelings or the weather.",
+    "sources": ["govuk-style-guide"]
+  },
+  {
+    "id": "es-address-the-reader-with-vos",
+    "lang": "es",
+    "variety": "rioplatense",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "In rioplatense Spanish, speak to the reader with vos and direct verbs ('podés', 'tenés que'), as the Argentine state's own site does.",
+    "check": "The rewrite keeps the treatment of the original (voice-kept); no 'usted' or 'tú' forms appear where the original used vos.",
+    "sources": ["argentina-gob-ar"]
+  },
+  {
+    "id": "es-say-it-as-you-would-tell-it",
+    "lang": "es",
+    "genres": ["email", "follow-up", "whatsapp"],
+    "registers": ["neutral", "casual"],
+    "text": "Write the way you would tell it to the person in front of you: common words in their natural order, no stock formulas.",
+    "check": "No stock formula such as 'me pongo en contacto con usted' or 'quedo a su entera disposición'; the judge's same-voice rubric holds.",
+    "sources": ["mansilla-ranqueles"]
+  },
+  {
+    "id": "es-whatsapp-talk-like-people",
+    "lang": "es",
+    "variety": "rioplatense",
+    "genres": ["whatsapp"],
+    "registers": ["casual"],
+    "text": "In a casual WhatsApp message, write the way people from Buenos Aires talk: short clauses, vos, everyday words, and none of the formulas of a letter.",
+    "check": "No letter greeting or closing ('Estimado', 'Saludos cordiales'); voseo kept; no 'che', slang or emoji that the original did not have (voice-kept).",
+    "sources": ["arlt-aguafuertes"]
+  },
+  {
+    "id": "es-avoid-archaisms-and-enclitics",
+    "kind": "avoid",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not imitate the period language of the literary sources: no archaisms and no pronoun fused onto a conjugated verb ('díjole', 'hállase', 'quedose').",
+    "check": "S6 finds none of the terms; the judge's literary-contamination rubric flags any other archaism.",
+    "terms": ["díjole", "hállase", "hallábase", "quedose", "echose", "empero", "otrosí"],
+    "sources": ["galdos-fortunata-y-jacinta"]
+  },
+  {
+    "id": "es-avoid-ornament",
+    "kind": "avoid",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not add literary ornament: no stacked adjectives, no metaphors and no lyrical images in a message about work.",
+    "check": "The judge's literary-contamination rubric finds no ornament the original did not have.",
+    "sources": ["quiroga-decalogo", "quiroga-cuentos-1917"]
+  },
+  {
+    "id": "es-avoid-long-periods",
+    "kind": "avoid",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not chain clauses into a long period; when a sentence carries two ideas, split it.",
+    "check": "No sentence of the rewrite is longer than the longest sentence of the original; the judge's literary-contamination rubric holds.",
+    "sources": ["sarmiento-facundo"]
+  },
+  {
+    "id": "es-avoid-lunfardo-in-mail",
+    "kind": "avoid",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "In an email, a follow-up or a cover letter, no lunfardo and no loose spoken syntax, even in rioplatense Spanish.",
+    "check": "S6 finds none of the terms; the judge's register-fit rubric holds.",
+    "terms": ["che", "laburo", "laburar", "guita", "bondi", "fiaca", "chamuyo", "morfar", "garpar"],
+    "sources": ["arlt-aguafuertes"]
+  },
+  {
+    "id": "es-avoid-tragic-or-sardonic-tone",
+    "kind": "avoid",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not take the tone of a story: no fatalism, no drama and no irony at the reader's expense.",
+    "check": "The judge's literary-contamination and register-fit rubrics find no tragic or sardonic turn the original did not have.",
+    "sources": ["quiroga-cuentos-1917", "arlt-aguafuertes"]
+  }
+]

@@ -1,1 +1,137 @@
-[]
+[
+  {
+    "id": "en-omit-needless-words",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Cut every word that carries no fact or no step; padding such as 'the fact that' goes first.",
+    "check": "Each cut leaves the facts intact (facts-preserved), and no 'the fact that', 'in order to' or 'at this point in time' is left.",
+    "sources": ["strunk-elements-1920"]
+  },
+  {
+    "id": "en-active-voice",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Use the active voice, so the reader sees who does what: 'I wrote 60 help articles', not '60 help articles were written'.",
+    "check": "No passive sentence hides an actor that the original or the CV names.",
+    "sources": ["strunk-elements-1920", "federal-plain-language", "govuk-style-guide"]
+  },
+  {
+    "id": "en-verb-not-abstract-noun",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Say the action with its verb, not with a noun hiding the verb: 'we analysed the tickets', not 'we conducted an analysis of the tickets'.",
+    "check": "slop-lint OFI-01 does not fire where the genre turns it on; no 'conduct an', 'carry out the' or 'make a decision' before a noun in -tion, -ment or -ance.",
+    "slopRules": ["OFI-01"],
+    "sources": ["federal-plain-language"]
+  },
+  {
+    "id": "en-specific-concrete",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Prefer the specific claim to the general one: a number, a name or a date from the CV says more than an adjective.",
+    "check": "Every claim about results carries a figure, a name or a date that is in the original or the CV (no-new-facts).",
+    "sources": ["strunk-elements-1920"]
+  },
+  {
+    "id": "en-vary-sentence-length",
+    "lang": "en",
+    "genres": ["cover-letter", "email"],
+    "registers": ["formal", "neutral"],
+    "text": "Alternate short and long sentences; a run of sentences of the same length reads flat.",
+    "check": "slop-lint EST-11 does not fire on a text of eight or more sentences.",
+    "slopRules": ["EST-11"],
+    "sources": ["lincoln-gettysburg"]
+  },
+  {
+    "id": "en-lead-with-the-point",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Put the most important thing first, the request or the news, and let the detail follow.",
+    "check": "The first sentence names what the writer asks for or reports; no 'I hope this email finds you well' before it.",
+    "sources": ["govuk-style-guide"]
+  },
+  {
+    "id": "en-short-common-words",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Choose the short common word over the formal one: 'use' over 'utilise', 'start' over 'commence', 'enough' over 'sufficient'.",
+    "check": "No formal word replaced a plain one of the original; the judge's register-fit rubric holds.",
+    "sources": ["govuk-style-guide", "twain-cooper-offences"]
+  },
+  {
+    "id": "en-address-the-reader",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Write to the reader as 'you', one person to another, and drop throat-clearing such as 'please note'.",
+    "check": "No 'please note', 'kindly be advised' or 'it should be noted that' is left.",
+    "sources": ["govuk-style-guide"]
+  },
+  {
+    "id": "en-right-word-plain-style",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Use the exact word, not a near one, and keep the style simple and straight.",
+    "check": "No word of the original was swapped for a vaguer or fancier near-synonym.",
+    "sources": ["twain-cooper-offences", "bierce-write-it-right"]
+  },
+  {
+    "id": "en-avoid-archaic-words",
+    "kind": "avoid",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not imitate the period language of the literary sources: no archaic words or eighteenth-century spelling.",
+    "check": "S6 finds none of the terms; the judge's literary-contamination rubric flags any other archaism.",
+    "terms": ["whilst", "hitherto", "heretofore", "thereof", "herewith", "betwixt", "perchance", "wherein"],
+    "sources": ["franklin-autobiography"]
+  },
+  {
+    "id": "en-avoid-dialect",
+    "kind": "avoid",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Take Twain's economy, never his dialect: no spelled-out accents, dropped letters or folksy grammar.",
+    "check": "S6 finds none of the terms; the judge's literary-contamination rubric holds.",
+    "terms": ["ain't", "y'all", "reckon", "nothin'", "somethin'"],
+    "sources": ["twain-cooper-offences"]
+  },
+  {
+    "id": "en-avoid-sardonic-tone",
+    "kind": "avoid",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Take Bierce's concision, never his tone: no sneer, no scolding and no joke at the reader's expense.",
+    "check": "The judge's register-fit rubric finds no sardonic aside the original did not have.",
+    "sources": ["bierce-write-it-right", "twain-cooper-offences"]
+  },
+  {
+    "id": "en-avoid-long-periods",
+    "kind": "avoid",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not build long periods of chained clauses; when a sentence carries two ideas, split it.",
+    "check": "No sentence of the rewrite is longer than the longest sentence of the original.",
+    "sources": ["franklin-autobiography", "lincoln-gettysburg"]
+  },
+  {
+    "id": "en-avoid-tragic-tone",
+    "kind": "avoid",
+    "lang": "en",
+    "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
+    "registers": ["formal", "neutral", "casual"],
+    "text": "Do not borrow the mood of a story: no melancholy, no lyrical scene-setting and no drama in a message about work.",
+    "check": "The judge's literary-contamination rubric finds no tragic or lyrical turn the original did not have.",
+    "sources": ["chekhov-garnett-lady-with-the-dog"]
+  }
+]
