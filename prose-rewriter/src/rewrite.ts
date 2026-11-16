@@ -19,10 +19,10 @@
  * 6. S7 assemble: the diff from the accepted edits, the changes, the fact report and the
  *    invariant O ⊆ R ⊆ O ∪ C, lint before and after, the flags, the status and the usage.
  *
- * With RewriteOptions.strategy 'single', the default (DEFAULT_STRATEGY), steps 2 to 4 are one call that plans and edits
- * (stages/model.ts singleStage); its edits go through the same placement, S5 in code and S6, then
- * steps 5 and 6 run as above. No S4 and no extra round: one call, two when its reply cannot be
- * read and is asked for again (below), plus the judge's.
+ * With RewriteOptions.strategy 'single', the default (DEFAULT_STRATEGY), steps 2 to 4 are one
+ * call that plans and edits (stages/model.ts singleStage); its edits go through the same
+ * placement, S5 in code and S6, then steps 5 and 6 run as above. No S4 and no extra round: one
+ * call, two when its reply cannot be read and is asked for again (below), plus the judge's.
  *
  * A model stage whose reply the gateway cannot read against its schema (ResponseError
  * 'invalid_output') is asked once more; if the second reply cannot be read either, that stage
