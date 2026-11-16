@@ -1,1 +1,152 @@
-[]
+[
+  {
+    "id": "strunk-vigorous-concise",
+    "source": "strunk-elements-1920",
+    "lang": "en",
+    "text": "Vigorous writing is concise. A sentence should contain no unnecessary words, a paragraph no unnecessary sentences, for the same reason that a drawing should have no unnecessary lines and a machine no unnecessary parts.",
+    "teaches": "Every word has a job; cut the ones that do none.",
+    "avoid": "The run of parallel clauses as a flourish. In a short email, one plain statement of the rule is enough.",
+    "url": "https://www.gutenberg.org/cache/epub/37134/pg37134.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "strunk-definite-assertions",
+    "source": "strunk-elements-1920",
+    "lang": "en",
+    "text": "Make definite assertions. Avoid tame, colorless, hesitating, non-committal language.",
+    "teaches": "Say what you mean without hedging: a claim the reader can act on.",
+    "avoid": "The imperative of a rule book. A letter to a person states facts; it does not issue rules.",
+    "url": "https://www.gutenberg.org/cache/epub/37134/pg37134.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "strunk-emphatic-end",
+    "source": "strunk-elements-1920",
+    "lang": "en",
+    "text": "The proper place in the sentence for the word, or group of words, which the writer desires to make most prominent is usually the end.",
+    "teaches": "Put the word that matters most at the end of the sentence.",
+    "avoid": "The long subject before the verb, which is the fault the sentence warns about.",
+    "url": "https://www.gutenberg.org/cache/epub/37134/pg37134.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "twain-say-it",
+    "source": "twain-cooper-offences",
+    "lang": "en",
+    "text": "Say what he is proposing to say, not merely come near it.",
+    "teaches": "Name the thing itself, not something close to it.",
+    "avoid": "The third person of the list and its sardonic frame; the essay mocks Cooper, and a rewrite mocks no one.",
+    "url": "https://www.gutenberg.org/cache/epub/3172/pg3172.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "twain-right-word",
+    "source": "twain-cooper-offences",
+    "lang": "en",
+    "text": "Use the right word, not its second cousin.",
+    "teaches": "Pick the exact word over a near synonym.",
+    "avoid": "The joke as a device. A professional text earns trust with the exact word, not a quip about it.",
+    "url": "https://www.gutenberg.org/cache/epub/3172/pg3172.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "twain-simple-style",
+    "source": "twain-cooper-offences",
+    "lang": "en",
+    "text": "Employ a simple and straightforward style.",
+    "teaches": "Plain sentences in plain order.",
+    "avoid": "Twain's dialect and his tone elsewhere in the essay; take the rule, not the voice.",
+    "url": "https://www.gutenberg.org/cache/epub/3172/pg3172.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "bierce-precision",
+    "source": "bierce-write-it-right",
+    "lang": "en",
+    "text": "It is attained by choice of the word that accurately and adequately expresses what the writer has in mind, and by exclusion of that which either denotes or connotes something else.",
+    "teaches": "Precision comes from choosing one word and leaving out the words that suggest something else.",
+    "avoid": "The Latinate doublets (accurately and adequately, denotes or connotes) and the scolding tone of the book.",
+    "url": "https://www.gutenberg.org/cache/epub/12474/pg12474.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "bierce-must-understand",
+    "source": "bierce-write-it-right",
+    "lang": "en",
+    "text": "As Quintilian puts it, the writer should so write that his reader not only may, but must, understand.",
+    "teaches": "Write so the reader cannot misread you, not only so they can follow you.",
+    "avoid": "The inverted, old-fashioned order (should so write) and the appeal to a classical authority.",
+    "url": "https://www.gutenberg.org/cache/epub/12474/pg12474.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "bierce-act-not-action",
+    "source": "bierce-write-it-right",
+    "lang": "en",
+    "text": "A blow is not an action but an act. An action may consist of many acts.",
+    "teaches": "Two short sentences that fix one distinction with a concrete case.",
+    "avoid": "The blacklist habit of forbidding words; a rewrite fixes the sentence in front of it, it does not lecture.",
+    "url": "https://www.gutenberg.org/cache/epub/12474/pg12474.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "franklin-attentive-to-manner",
+    "source": "franklin-autobiography",
+    "lang": "en",
+    "text": "I saw the justice of his remarks, and thence grew more attentive to the manner in writing, and determined to endeavor at improvement.",
+    "teaches": "Take criticism of how you write as a reason to revise, and say so plainly.",
+    "avoid": "Eighteenth-century diction (thence, endeavor at) and the chain of clauses joined by and.",
+    "url": "https://www.gutenberg.org/cache/epub/20203/pg20203.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "franklin-method-of-thoughts",
+    "source": "franklin-autobiography",
+    "lang": "en",
+    "text": "This was to teach me method in the arrangement of thoughts.",
+    "teaches": "Order the ideas before you write the sentences.",
+    "avoid": "The period phrasing (method in the arrangement of thoughts); today it reads: put the points in order.",
+    "url": "https://www.gutenberg.org/cache/epub/20203/pg20203.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "lincoln-fitting-and-proper",
+    "source": "lincoln-gettysburg",
+    "lang": "en",
+    "text": "It is altogether fitting and proper that we should do this.",
+    "teaches": "A short sentence after long ones gives the reader a place to stop.",
+    "avoid": "The solemn register of a speech at a cemetery and the doublet fitting and proper.",
+    "url": "https://en.wikisource.org/wiki/Gettysburg_Address_(Bliss_copy)",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "lincoln-little-note",
+    "source": "lincoln-gettysburg",
+    "lang": "en",
+    "text": "The world will little note, nor long remember what we say here, but it can never forget what they did here.",
+    "teaches": "Contrast carried by plain, short words: say against did.",
+    "avoid": "The elevated, tragic tone and the inverted word order (will little note); no email speaks like this.",
+    "url": "https://en.wikisource.org/wiki/Gettysburg_Address_(Bliss_copy)",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "chekhov-morning-mist",
+    "source": "chekhov-garnett-lady-with-the-dog",
+    "lang": "en",
+    "text": "Yalta was hardly visible through the morning mist; white clouds stood motionless on the mountain-tops.",
+    "teaches": "Concrete things the reader can see, with no adjective of feeling.",
+    "avoid": "The landscape and the lyric mood of a story; a professional text describes the work, not the weather.",
+    "url": "https://www.gutenberg.org/cache/epub/13415/pg13415.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "chekhov-under-forty",
+    "source": "chekhov-garnett-lady-with-the-dog",
+    "lang": "en",
+    "text": "He was under forty, but he had a daughter already twelve years old, and two sons at school.",
+    "teaches": "Facts do the describing: ages and numbers instead of judgements.",
+    "avoid": "The narrator's distance and the translated rhythm of 1917 English.",
+    "url": "https://www.gutenberg.org/cache/epub/13415/pg13415.txt",
+    "fetched": "2026-11-16"
+  }
+]

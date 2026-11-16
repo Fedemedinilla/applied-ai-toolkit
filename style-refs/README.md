@@ -2,7 +2,7 @@
 
 style-refs holds the writing references of the prose rewriter (`prose-rewriter/`): the sources it draws on, the principles we wrote from them, short annotated excerpts and before and after examples per genre. It is data and a validator, with no I/O at runtime. The caller loads the JSON files and passes them to `validateRefs()`.
 
-This folder is at phase F3 of its design. `sources.json` lists every author and register guide of the design, excluded ones included, and `validateRefs()` checks the licensing rules. `principlesFor()` picks the principles a prompt for one text may show. Principles, excerpts and examples come in the steps of F3.
+This folder is at phase F3 of its design. `sources.json` lists every author and register guide of the design, excluded ones included, and `validateRefs()` checks the licensing rules. `principlesFor()` picks the principles a prompt for one text may show. The principles and the excerpts are in; the examples come in the next step of F3.
 
 ## Run it
 
@@ -20,7 +20,7 @@ npm run check                # tsc --noEmit, strict
 - Each source has a use, one of `excerpts`, `principles`, `link-only` or `excluded`. An Argentine work declares `paidPublicDomain`, and `scope` limits the genres and registers of the principles that cite a source.
 - `principles/es.json` and `principles/en.json` hold principles in our own words. Each one names its genres, the registers it applies to (`formal`, `neutral`, `casual`), the sentence a prompt shows, how a rewrite is checked against it, and its sources. A Spanish one may name a `variety` (voseo is `rioplatense`), and `slopRules` names the slop-lint rules that check the same fault, such as OFI-01. The text and the check are in English, like the rest of the folder; the Spanish words they quote stay in Spanish. No principle quotes a source: Quiroga, Mansilla and Arlt appear only as lessons we wrote.
 - A principle of `kind: "avoid"` is one item of the "no imitar" list of the design: the rewriter shows its text as a negative constraint (stage S4) and looks for its `terms` after the rewrite (stage S6). Its sources are the works whose trait it warns against, or that warn against it.
-- `excerpts/es.json` and `excerpts/en.json` hold excerpts of one or two sentences and at most 45 words. Each has what it teaches and what not to imitate, with the URL of the plain text it was checked against and the day it was fetched. They are not few-shot examples.
+- `excerpts/es.json` and `excerpts/en.json` hold excerpts of one or two sentences and at most 45 words. Each has what it teaches and what not to imitate, with the URL of the plain text it was checked against and the day it was fetched. They are not few-shot examples, and they reach a prompt only once the eval shows they raise `quality` without raising `literary-contamination` (design section 5). The English ones come from Strunk, Twain, Bierce, Franklin, Lincoln and Chekhov in Constance Garnett's translation; the Spanish ones from Galdós only, in neutral Spanish. No Argentine author gives an excerpt (D12). Each text was checked word for word, after collapsing whitespace, against the plain text fetched on 2026-11-16; the texts themselves are not stored here, so `test/excerpts.test.ts` checks what it can offline.
 - `examples/<genre>.<es|en>.json` (from F3) holds before and after pairs we wrote over a fictional CV. They are the only few-shot examples, and each one is marked `fictional: true`.
 
 ## Licensing rules
