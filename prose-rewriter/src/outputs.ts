@@ -51,7 +51,21 @@ function fmt04(text: string): string[] {
  */
 export const EDIT_EXTRA_SENTENCES = 1;
 
-const sentenceCount = (s: string): number => (s.trim() === '' ? 0 : splitSentences(s, 'en').length);
+/**
+ * The splitter's count, or a rougher one when that is higher: the pieces with a letter or a digit
+ * between line breaks and terminators, wherever the next sentence starts (no space after the
+ * period, a lowercase letter, a new line). A period between two digits is a decimal, not an end.
+ * Both the quote and the replacement are counted the same way, so an abbreviation or a domain the
+ * quote already has costs nothing.
+ */
+const sentenceCount = (s: string): number => {
+  if (s.trim() === '') return 0;
+  const rough = s
+    .replace(/(\d)[.,](?=\d)/gu, '$1')
+    .split(/\n|[.!?…]+/u)
+    .filter((piece) => /[\p{L}\p{N}]/u.test(piece)).length;
+  return Math.max(splitSentences(s, 'en').length, rough);
+};
 
 /**
  * What a model's edit may write, beyond the Edit schema: no marker without a real label, even one

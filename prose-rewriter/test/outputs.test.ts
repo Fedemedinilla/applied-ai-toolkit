@@ -79,6 +79,14 @@ describe('what an edit may write', () => {
     expect(both('Uno. Dos. Tres.', 'Uno y dos. Tres.')).toEqual([true, true]);
   });
 
+  it('counts sentences with no space after the period, or on lines that start in lowercase', () => {
+    const before = 'Quería comentarte que me apasiona potenciar sinergias.';
+    expect(both('quería contarte que el sitio está listo.te aviso cuando esté online.te mando el link mañana.te escribo pronto.', before)).toEqual([false, false]);
+    expect(both('quería contarte que el sitio está listo\nte aviso cuando esté online\nte mando el link mañana', before)).toEqual([false, false]);
+    // A decimal and a domain the quote already has are no new sentence.
+    expect(both('El sitio carga en 1.6 s en panaderia.ar.', 'El sitio de panaderia.ar carga en 1.6 s.')).toEqual([true, true]);
+  });
+
   it('names the field and never the text when it refuses one', () => {
     const result = ok(EditOutput, { edits: [{ ...edit, before: 'Hola.', after: 'Estimado equipo. Escribo para postularme. Tengo cinco años con Astro.' }] });
     expect(result.ok).toBe(false);
