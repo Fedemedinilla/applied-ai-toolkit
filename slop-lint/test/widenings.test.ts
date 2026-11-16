@@ -110,3 +110,34 @@ describe('a "why X matters" phrase never swallows a full-strength hit inside X',
     expect(lintEn('The work was pivotal and robust. That is why this matters.').reported).toEqual([['LEX-04', 'why this matters', 'low']]);
   });
 });
+
+describe('"why X matters" needs "matters" to end the clause', () => {
+  // "Why legal matters are slow" uses the noun. The verb reading ends the clause, so the phrase
+  // only counts when punctuation or the end of the text follows "matters".
+  const spent = 'The work was pivotal and robust. ';
+  for (const text of [
+    'Why legal matters are slow.',
+    'He explained why tax matters were delayed.',
+    'Why these matters are urgent.',
+    'Why do the matters matter?',
+    'Why financial matters matter.',
+  ]) {
+    it(`leaves "${text}" alone`, () => {
+      const result = lint(spent + text, { lang: 'en' });
+      expect(result.stats.tier2Used).toBe(2);
+      expect(result.findings).toEqual([]);
+      expect(lint(text, { lang: 'en' }).stats.tier2Used).toBe(0);
+    });
+  }
+
+  it('still reports the verb at the end of a clause', () => {
+    for (const [text, match] of [
+      ['That is why the Rosario branch matters.', 'why the Rosario branch matters'],
+      ['Here is why it matters, in short', 'why it matters'],
+      ['Here is why it matters', 'why it matters'],
+    ]) {
+      const result = lint(spent + text, { lang: 'en' });
+      expect(result.findings.map((f) => [f.match, f.severity])).toEqual([[match, 'low']]);
+    }
+  });
+});
