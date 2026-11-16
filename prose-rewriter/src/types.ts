@@ -171,6 +171,8 @@ export interface RewriteOptions {
   readonly userId?: string | null;
   /** The gateway's jobId, which groups the calls of one rewrite under the per-job cap. Default null. */
   readonly jobId?: string | null;
+  /** Skips S4 in every mode: the "without S4" ablation of the evals (design 5). Default false. */
+  readonly skipStyle?: boolean;
 }
 
 /**

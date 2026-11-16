@@ -1,7 +1,7 @@
 export { capWindows, checkCaps, type CapWindows } from './caps.ts';
 export { CLAUDE_API_URL, createClaudeClient, type ClaudeClientOptions } from './client.ts';
 export { AccountCaps, CallConfig, GlobalCaps, TaskConfig, UsageTotals } from './config.ts';
-export { costUsd, PriceRow, pricesInForce, splitUsage, type AttemptUsage, type Price, type TokenTotals } from './cost.ts';
+export { costUsd, estimateInputTokens, PriceRow, pricesInForce, splitUsage, type AttemptUsage, type InputParts, type Price, type TokenTotals } from './cost.ts';
 export {
   ApiError,
   CapError,
