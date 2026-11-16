@@ -68,6 +68,33 @@ describe('extract', () => {
   });
 });
 
+describe('numbers written in words', () => {
+  it('reads every number word, compounds included, as its number', () => {
+    expect(keys('Atiendo veinticinco clientes, trece sitios y dieciséis tiendas.')).toEqual(['25', '13', '16']);
+    expect(keys('Son sesenta, doscientos y treinta y cinco.')).toEqual(['60', '200', '35']);
+    expect(keys('Cobré mil quinientos y luego dos mil trescientos cuarenta.')).toEqual(['1500', '2340']);
+    expect(keys('Took twenty-five calls, thirteen tickets and two hundred and five emails over fifteen hundred days.', EN)).toEqual(['25', '13', '205', '1500 d']);
+    // Separate numbers stay separate; "un", "una" and "one" are articles unless a multiplier follows.
+    expect(keys('Tengo dos, tres o cuatro. Una idea y un millón de gracias.')).toEqual(['2', '3', '4', '1000000']);
+  });
+
+  it('reverts a change between number words', () => {
+    const O = 'Atiendo veinticinco clientes.';
+    expect(checkEdit({ sentenceId: 0, before: 'veinticinco', after: 'sesenta', reason: 'test' }, { O, C: { cv: '' }, sentences: [O], lang: 'es' })).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+  });
+
+  it('accepts a number rewritten between digits and words', () => {
+    const accepts = (O: string, before: string, after: string) =>
+      checkEdit({ sentenceId: 0, before, after, reason: 'test' }, { O, C: { cv: '' }, sentences: [O], lang: 'es' }).status;
+    expect(accepts('Cobro dos mil pesos.', 'dos mil pesos', '2.000 pesos')).toBe('accepted');
+    expect(accepts('Cobro 2.000 pesos.', '2.000 pesos', 'dos mil pesos')).toBe('accepted');
+    expect(accepts('Son 1.500 por mes.', '1.500', 'mil quinientos')).toBe('accepted');
+    expect(accepts('Bajó un 10% el rebote.', '10%', 'diez por ciento')).toBe('accepted');
+    expect(accepts('Llego a las 15:00.', '15:00', '15 h')).toBe('accepted');
+    expect(keys('Trabajé 15 h seguidas.')).toEqual(['15 h']);
+  });
+});
+
 describe('inventory', () => {
   it('labels each fact of the original and flags what is not in the CV', () => {
     const O = 'Hola Marta, armé el formulario de la Ferretería Quintana: recibe 40 pedidos por semana y lo usan 25 personas.';

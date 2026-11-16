@@ -132,6 +132,8 @@ const DATE_EN = new RegExp(
 );
 /** "a las 18 hs": the Argentine way to write a time on the hour. */
 const HOUR_HS = new RegExp(String.raw`${B}(\d{1,2})\s?hs${E}`, 'giu');
+/** "a las 15 h": after "las", an hour; elsewhere "15 h" is a duration. */
+const HOUR_H = new RegExp(String.raw`(?<=${B}las\s{1,3})(\d{1,2})\s?h${E}`, 'giu');
 
 /** Units kept with their number, one key per unit in both languages ("9 hours" and "9 horas" are "9 h"). */
 const UNITS: Readonly<Record<string, string>> = {
@@ -139,9 +141,14 @@ const UNITS: Readonly<Record<string, string>> = {
   h: 'h', hora: 'h', horas: 'h', hour: 'h', hours: 'h', hrs: 'h', min: 'min', minuto: 'min', minutos: 'min', minute: 'min', minutes: 'min',
   'día': 'd', 'días': 'd', dia: 'd', dias: 'd', day: 'd', days: 'd', semana: 'wk', semanas: 'wk', week: 'wk', weeks: 'wk',
   mes: 'mo', meses: 'mo', month: 'mo', months: 'mo', 'año': 'y', 'años': 'y', year: 'y', years: 'y',
-  km: 'km', kg: 'kg', kb: 'KB', mb: 'MB', gb: 'GB', tb: 'TB', x: 'x',
+  km: 'km', kg: 'kg', kb: 'KB', mb: 'MB', gb: 'GB', tb: 'TB', x: 'x', 'por ciento': '%', percent: '%', 'per cent': '%',
 };
-const UNIT = new RegExp(String.raw`^\s?(%|(?:${Object.keys(UNITS).filter((u) => u !== '%').sort((a, b) => b.length - a.length).join('|')})${E})`, 'iu');
+const UNIT = new RegExp(
+  String.raw`^\s?(%|(?:${Object.keys(UNITS).filter((u) => u !== '%').sort((a, b) => b.length - a.length).map((u) => u.replace(' ', String.raw`\s+`)).join('|')})${E})`,
+  'iu',
+);
+/** A currency written after a number in words: "dos mil pesos". */
+const CURRENCY_AFTER = new RegExp(String.raw`^\s?(USD|ARS|EUR|€|dólares|dolares|dollars|pesos|euros)${E}`, 'iu');
 /**
  * A token with letters and digits, such as n8n, S3 or GPT-4: a name, not a number, unless it is a
  * number and its unit ("6s") or an ordinal ("1st").
@@ -155,6 +162,127 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
   fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, hundred: 100, thousand: 1000, million: 1_000_000,
 };
+
+/**
+ * Every number word below a thousand, compounds included, with its value. slop-lint's list stops
+ * at a few round numbers; a fact check has to read "veinticinco" and "two hundred and five" too.
+ */
+const SMALL_NUMBERS: Readonly<Record<Lang, Readonly<Record<string, number>>>> = {
+  es: {
+    cero: 0, uno: 1, un: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, 'dieciséis': 16, dieciseis: 16, diecisiete: 17, dieciocho: 18,
+    diecinueve: 19, veinte: 20, veintiuno: 21, 'veintiún': 21, veintiun: 21, veintiuna: 21, 'veintidós': 22, veintidos: 22,
+    'veintitrés': 23, veintitres: 23, veinticuatro: 24, veinticinco: 25, 'veintiséis': 26, veintiseis: 26, veintisiete: 27,
+    veintiocho: 28, veintinueve: 29, treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80,
+    noventa: 90, cien: 100, ciento: 100, doscientos: 200, doscientas: 200, trescientos: 300, trescientas: 300,
+    cuatrocientos: 400, cuatrocientas: 400, quinientos: 500, quinientas: 500, seiscientos: 600, seiscientas: 600,
+    setecientos: 700, setecientas: 700, ochocientos: 800, ochocientas: 800, novecientos: 900, novecientas: 900,
+  },
+  en: {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30,
+    forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  },
+};
+/** Multipliers that close a group: "mil", "millón", "thousand", "million". "hundred" multiplies the group itself. */
+const BIG_NUMBERS: Readonly<Record<Lang, Readonly<Record<string, number>>>> = {
+  es: { mil: 1000, 'millón': 1_000_000, millon: 1_000_000, millones: 1_000_000 },
+  en: { thousand: 1000, million: 1_000_000, millions: 1_000_000 },
+};
+/** Articles that are a number only before a multiplier ("un millón"), and "ciento" only before another number. */
+const WEAK_NUMBERS = new Set(['un', 'una', 'one', 'ciento']);
+
+/** The place of a number below a thousand, to tell "treinta y cinco" (one number) from "dos tres" (two). */
+const placeOf = (n: number): number => (n >= 100 ? 3 : n >= 30 || n === 20 ? 2 : 1);
+
+interface NumberRun {
+  readonly start: number;
+  readonly end: number;
+  readonly value: number;
+}
+
+/**
+ * The numbers a text writes in words, each run of number words read as one number ("mil
+ * quinientos" is 1500, "treinta y cinco" is 35), on the masked text so nothing read before is
+ * read again. A word joins the run only where the number goes on: "dos tres" is two numbers.
+ */
+function numberWordRuns(text: string, lang: Lang): NumberRun[] {
+  const small = SMALL_NUMBERS[lang];
+  const big = BIG_NUMBERS[lang];
+  const connector = lang === 'es' ? 'y' : 'and';
+  const tokens = [...text.matchAll(/\p{L}+(?:-\p{L}+)*/gu)].map((m) => ({ start: m.index, end: m.index + m[0].length, word: m[0].toLowerCase() }));
+  const parts = (word: string): string[] => (lang === 'en' ? word.split('-') : [word]);
+  const isNumberWord = (p: string): boolean => small[p] !== undefined || big[p] !== undefined || (lang === 'en' && p === 'hundred');
+  const spaceBetween = (a: { end: number }, b: { start: number }): boolean => /^\s+$/u.test(text.slice(a.end, b.start));
+  const out: NumberRun[] = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const first = tokens[i] as { start: number; end: number; word: string };
+    if (!parts(first.word).every(isNumberWord)) {
+      i++;
+      continue;
+    }
+    let total = 0;
+    let group = 0;
+    let place = 4; // the place of the last word below a hundred or of "hundred"; 4: none yet in this group
+    let lastBig = Infinity;
+    const used: string[] = [];
+    let end = first.end;
+    let j = i;
+    // One word (or hyphenated part) at a time, while the number goes on.
+    const accept = (p: string): boolean => {
+      const value = small[p];
+      if (value !== undefined) {
+        if (placeOf(value) >= place) return false;
+        group += value;
+        place = placeOf(value);
+      } else if (p === 'hundred') {
+        if (group >= 100) return false;
+        group = (group === 0 ? 1 : group) * 100;
+        place = 3;
+      } else {
+        const m = big[p] as number;
+        if (m >= lastBig) return false;
+        total += (group === 0 ? 1 : group) * m;
+        group = 0;
+        place = 4;
+        lastBig = m;
+      }
+      used.push(p);
+      return true;
+    };
+    for (; j < tokens.length; j++) {
+      const t = tokens[j] as { start: number; end: number; word: string };
+      if (j > i && !spaceBetween(tokens[j - 1] as { end: number }, t)) break;
+      if (j > i && t.word === connector) {
+        const next = tokens[j + 1];
+        const joins = lang === 'es' ? place === 2 : place === 3 || lastBig < Infinity;
+        if (!joins || next === undefined || small[next.word] === undefined || !spaceBetween(t, next)) break;
+        continue;
+      }
+      const ps = parts(t.word);
+      if (!ps.every(isNumberWord)) break;
+      const saved = { total, group, place, lastBig, n: used.length };
+      if (!ps.every(accept)) {
+        ({ total, group, place, lastBig } = saved);
+        used.length = saved.n;
+        break;
+      }
+      end = t.end;
+    }
+    // An article is a number only before a multiplier ("un millón", "one hundred"), and "ciento"
+    // only before another number ("ciento veinte"; "por ciento" is a unit).
+    const head = used[0] ?? '';
+    const multiplierNext = used[1] !== undefined && (big[used[1]] !== undefined || used[1] === 'hundred');
+    if (WEAK_NUMBERS.has(head) && (head === 'ciento' ? used.length === 1 : !multiplierNext)) {
+      i++;
+      continue;
+    }
+    out.push({ start: first.start, end, value: total + group });
+    i = j;
+  }
+  return out;
+}
 
 /**
  * A number as one canonical string. Spanish groups thousands with "." and writes decimals with ",",
@@ -271,6 +399,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   });
   pass(TIME, (m) => ({ kind: 'time', text: trimmed(m[0]), key: asTime(trimmed(m[0])) }));
   pass(HOUR_HS, (m) => (Number(m[1]) <= 23 ? { kind: 'time', text: m[0], key: `${Number(m[1])}:00` } : undefined));
+  pass(HOUR_H, (m) => (Number(m[1]) <= 23 ? { kind: 'time', text: m[0], key: `${Number(m[1])}:00` } : undefined));
   pass(ALNUM, (m) => {
     const unit = /^\d+(.*)$/u.exec(m[0]);
     if (unit !== null && (unit[1] === '' || UNIT.test(unit[1] ?? '') || /^(?:st|nd|rd|th|er|do|ro|to|vo|mo|no)$/iu.test(unit[1] ?? ''))) return undefined;
@@ -278,9 +407,20 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   });
   const unitAfter = (end: number): { text: string; unit: string } | undefined => {
     const u = UNIT.exec(rest.slice(end));
-    return u === null ? undefined : { text: u[0], unit: UNITS[(u[1] ?? '').toLowerCase()] ?? (u[1] ?? '') };
+    return u === null ? undefined : { text: u[0], unit: UNITS[(u[1] ?? '').toLowerCase().replace(/\s+/gu, ' ')] ?? (u[1] ?? '') };
   };
   const numberKey = (n: string, unit: string | undefined): string => (unit === undefined ? n : unit === '%' ? `${n}%` : `${n} ${unit}`);
+  // Numbers in words, before ALNUM and the anchors: "dos mil pesos" is one amount, "diez por ciento" one percentage.
+  for (const run of numberWordRuns(rest, lang)) {
+    const value = String(run.value);
+    const raw = text.slice(run.start, run.end);
+    const currency = CURRENCY_AFTER.exec(rest.slice(run.end));
+    if (currency !== null) take('amount', run.start, raw + currency[0], `${CURRENCY[(currency[1] ?? '').toLowerCase()] ?? '$'} ${value}`);
+    else {
+      const u = unitAfter(run.end);
+      take('number', run.start, raw + (u?.text ?? ''), numberKey(value, u?.unit));
+    }
+  }
   pass(NUMBER, (m) => {
     const u = unitAfter((m.index ?? 0) + m[0].length);
     return { kind: 'number', text: m[0] + (u?.text ?? ''), key: numberKey(canonicalNumber(m[0], lang), u?.unit) };
