@@ -81,7 +81,21 @@ export interface PatternRule extends RuleBase {
   quoteExempt?: boolean;
   /** Only tested against the start of each sentence. */
   sentenceStart?: boolean;
+  /**
+   * Alternatives whose source is weaker than the rule's own, reported at a lower severity. They
+   * belong to the rule: same id, level, budget and place in the Tier 2 pool. A setting that changes
+   * the rule's severity, from a genre profile or a config file, changes theirs too.
+   */
+  weaker?: WeakerPatterns;
   examples: readonly Example[];
+}
+
+export interface WeakerPatterns {
+  /** What the alternatives match, for the README table. */
+  label: string;
+  patterns: Partial<Record<Lang, string>>;
+  severity: Severity;
+  source: Source;
 }
 
 export interface StructuralRule extends RuleBase {

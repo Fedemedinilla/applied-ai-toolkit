@@ -156,8 +156,9 @@ export function applySetting(rule: Rule, setting: GenreSetting | undefined): Rul
   if (setting === 'off') return undefined;
   if (setting === undefined) return rule;
   const changed = { ...rule, level: setting.level ?? rule.level, severity: setting.severity ?? rule.severity };
-  if (rule.kind === 'pattern' && setting.budget !== undefined) return { ...(changed as PatternRule), budget: setting.budget };
-  return changed;
+  if (changed.kind !== 'pattern') return changed;
+  const weaker = changed.weaker && setting.severity !== undefined ? { weaker: { ...changed.weaker, severity: setting.severity } } : {};
+  return { ...changed, ...weaker, ...(setting.budget === undefined ? {} : { budget: setting.budget }) };
 }
 
 /** The rules a catalog rule runs as in this genre: itself, or its parts when the profile splits it. */

@@ -14,6 +14,8 @@ interface Hit {
   start: number;
   end: number;
   detail?: string;
+  /** Set for a match of the rule's weaker alternatives, which carry their own severity. */
+  severity?: Severity;
   /** A structural hit's own wording, which replaces the rule's message and suggestion. */
   message?: string;
   suggestion?: string;
@@ -28,25 +30,36 @@ export function appliesTo(rule: Rule, lang: Lang, genre: Genre = DEFAULT_GENRE):
  * Raw matches of one pattern rule, before anchors, quotes, overlaps and budgets are
  * taken into account. Sentence-start rules are tested against each sentence.
  */
-export function rawMatches(rule: PatternRule, text: string, lang: Lang, sentences = splitSentences(text)): Array<{ start: number; end: number }> {
+export function rawMatches(
+  rule: PatternRule,
+  text: string,
+  lang: Lang,
+  sentences = splitSentences(text),
+): Array<{ start: number; end: number; severity?: Severity }> {
   const source = rule.patterns[lang];
   if (source === undefined || !appliesTo(rule, lang)) return [];
-  const re = compile(source, rule.flags);
-  if (rule.sentenceStart) {
-    return sentences.flatMap((s) => {
-      const m = [...s.text.matchAll(re)].find((x) => x.index === 0 && x[0].length > 0);
-      return m ? [{ start: s.start, end: s.start + m[0].length }] : [];
-    });
-  }
-  const all = (src: string) =>
-    [...text.matchAll(compile(src, rule.flags))].filter((m) => m[0].length > 0).map((m) => ({ start: m.index, end: m.index + m[0].length }));
+  const all = (src: string): Array<{ start: number; end: number; severity?: Severity }> => {
+    const re = compile(src, rule.flags);
+    if (rule.sentenceStart) {
+      return sentences.flatMap((s) => {
+        const m = [...s.text.matchAll(re)].find((x) => x.index === 0 && x[0].length > 0);
+        return m ? [{ start: s.start, end: s.start + m[0].length }] : [];
+      });
+    }
+    return [...text.matchAll(re)].filter((m) => m[0].length > 0).map((m) => ({ start: m.index, end: m.index + m[0].length }));
+  };
   const hits = all(source);
   const closing = rule.closingPatterns?.[lang];
   if (closing !== undefined) {
     const closingFrom = sentences.filter(isProse).slice(-2)[0]?.start ?? Infinity;
     hits.push(...all(closing).filter((m) => m.start >= closingFrom));
-    hits.sort((x, y) => x.start - y.start);
   }
+  const weaker = rule.weaker;
+  const weakerSource = weaker?.patterns[lang];
+  if (weaker !== undefined && weakerSource !== undefined) {
+    hits.push(...all(weakerSource).map((m) => ({ ...m, severity: weaker.severity })));
+  }
+  if (hits.length > 0 && (closing !== undefined || weakerSource !== undefined)) hits.sort((x, y) => x.start - y.start);
   return hits;
 }
 
@@ -239,7 +252,7 @@ function run(source: string, text: string, sentences: Span[], options: LintOptio
       const f: Finding = {
         ruleId: h.rule.id,
         level: h.rule.level,
-        severity: h.rule.severity,
+        severity: h.severity ?? h.rule.severity,
         start: h.start,
         end: h.end,
         line,
