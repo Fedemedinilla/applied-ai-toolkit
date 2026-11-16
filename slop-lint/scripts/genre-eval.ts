@@ -87,6 +87,8 @@ export function validateSet(raw: unknown, file: string): string[] {
     err('', '"items" must be a non-empty array');
     return errors;
   }
+  // The rules the genre runs: a label that names any other could never be met.
+  const running = (LABELED_GENRES as readonly unknown[]).includes(raw.genre) ? levelsIn(raw.genre as LabeledGenre) : undefined;
   const ids = new Set<string>();
   raw.items.forEach((item: unknown, i: number) => {
     const at = `[${i}]`;
@@ -103,6 +105,8 @@ export function validateSet(raw: unknown, file: string): string[] {
     if (item.previous !== undefined && (raw.genre !== 'follow-up' || typeof item.previous !== 'string' || item.previous.trim() === '')) err(at, '"previous" is a non-empty string, and only in follow-up');
     if (item.textRules !== undefined && (!isStringArray(item.textRules) || item.textRules.some((r) => !DOCUMENT_SCOPE_IDS.has(r)))) {
       err(at, `"textRules" may only hold ${[...DOCUMENT_SCOPE_IDS].join(', ')}`);
+    } else if (isStringArray(item.textRules) && running !== undefined) {
+      for (const r of item.textRules) if (!running.has(r)) err(at, `${r} is off in ${String(raw.genre)}, so no label can expect it`);
     }
     // ESP-02 measures nothing under its genre's words per anchor, so a label that expects it there could never be met.
     if (isStringArray(item.textRules) && item.textRules.includes('ESP-02') && typeof item.text === 'string' && (LABELED_GENRES as readonly unknown[]).includes(raw.genre)) {
@@ -121,6 +125,7 @@ export function validateSet(raw: unknown, file: string): string[] {
       if (!isStringArray(s.rules)) return err(sat, '"rules" must be an array of rule ids');
       for (const r of s.rules) {
         if (!KNOWN_IDS.has(r)) err(sat, `unknown rule id ${r}`);
+        else if (running !== undefined && !running.has(r)) err(sat, `${r} is off in ${String(raw.genre)}, so no label can expect it`);
         if (DOCUMENT_SCOPE_IDS.has(r)) err(sat, `${r} judges the whole text: put it in the item's "textRules"`);
       }
       if (new Set(s.rules).size !== s.rules.length) err(sat, 'a rule id is repeated');

@@ -228,7 +228,6 @@
           "text": "En resumen, optimizarlo es fundamental para potenciar tus ventas.",
           "slop": true,
           "rules": [
-            "EST-05",
             "LEX-02"
           ]
         }

@@ -60,6 +60,7 @@ describe('validateSet', () => {
     ['text left unlabelled', (s: LabeledSet) => void s.items[1]!.sentences.pop(), 'the sentences do not cover the text'],
     ['an earlier message outside follow-up', (s: LabeledSet) => void (s.items[1]!.previous = 'Hi.'), '"previous" is a non-empty string, and only in follow-up'],
     ['a variety in English', (s: LabeledSet) => void (s.items[1]!.variety = 'neutral'), '"variety" is rioplatense or neutral, and only in Spanish'],
+    ['a rule the genre turns off', (s: LabeledSet) => void (s.items[0]!.sentences[1]!.rules = ['EST-06']), 'EST-06 is off in email, so no label can expect it'],
     // 28 words of prose, under the 35 that ESP-02 needs before it measures anything.
     ['ESP-02 expected of a text too short for it', (s: LabeledSet) => void (s.items[0]!.textRules = ['ESP-02']), 'ESP-02 cannot report a text with 28 words of prose; it needs 35'],
   ])('reports %s', (_name, spoil, message) => {
