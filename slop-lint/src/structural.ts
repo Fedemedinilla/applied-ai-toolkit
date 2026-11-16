@@ -100,10 +100,10 @@ const COPY_WORD = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
 const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
 
 /** MAIL-01: the thanks formula as a whole sentence, or as the sign-off line itself (a comma, an ellipsis or no mark). */
-const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration(?:[.!,…]|\.\.\.)?$/iu;
+const SOLE_THANKS = /^(?:thank[ \t]+you|thanks)(?:[ \t]+(?:so|very)[ \t]+much)?[ \t]+for[ \t]+your[ \t]+time[ \t]+and[ \t]+consideration(?:[.!,…]|\.\.\.)?$/iu;
 
 /** MAIL-01: a sign-off line; whatever follows it is the signature, whatever its punctuation. */
-const MAIL_SIGN_OFF = /^(?:best|regards|kind regards|warm regards|best regards|best wishes|all the best|many thanks|thanks|cheers|sincerely|yours sincerely|yours truly)\b/iu;
+const MAIL_SIGN_OFF = /^(?:best|regards|kind[ \t]+regards|warm[ \t]+regards|many[ \t]+thanks|thanks|cheers|sincerely|yours[ \t]+(?:sincerely|truly)|all[ \t]+the[ \t]+best)\b/iu;
 
 /** MAIL-01: a postscript, which is one more thing said after the thanks. */
 const POSTSCRIPT = /^p\.?[ \t]?s\b/iu;
