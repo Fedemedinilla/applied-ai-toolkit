@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { BUILT_IN_MODELS, CapError, pricesInForce, RequestError, type Gateway, type Price } from '../../gateway/src/index.ts';
+import { z } from 'zod';
+import { ApiError, BUILT_IN_MODELS, CapError, pricesInForce, RequestError, ResponseError, type Gateway, type Price } from '../../gateway/src/index.ts';
 import type { PieceRecord } from '../evals/pipeline.ts';
 import {
   budgetedGateway,
@@ -15,8 +16,10 @@ import {
   LOCK_STALE_MS,
   MONTHLY_BUDGET_USD,
   openLedger,
+  requestInputTokens,
   SpendRefusal,
   spendMonth,
+  worstCaseUsd,
   type Clock,
 } from '../evals/spend.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
@@ -162,7 +165,86 @@ describe('the spend ledger', () => {
   });
 });
 
+describe('the worst case of one call', () => {
+  it('prices every input token at the dearest input rate and the output at the dearest output rate of every model in force, since a server-side fallback can answer', () => {
+    // Fable 5.1 has the highest rates of the registry: cache write 1 h at 20 and output at 50 per million.
+    expect(worstCaseUsd('claude-sonnet-5-5', 1000, 100, PRICES)).toBe(0.025);
+    expect(worstCaseUsd('claude-fable-5-2', 1_000_000, 0, PRICES)).toBe(20);
+    expect(worstCaseUsd('claude-opus-5-5', 0, 1_000_000, PRICES)).toBe(50);
+  });
+
+  it('is null when the requested model has no price, whatever the others cost', () => {
+    const prices = new Map([...PRICES].filter(([model]) => model !== 'claude-sonnet-5-5'));
+    expect(worstCaseUsd('claude-sonnet-5-5', 1000, 100, prices)).toBeNull();
+  });
+
+  it('bounds the input by the request, its output schema and its attachment bound', () => {
+    const plain = requestInputTokens(judgeRequest(), null);
+    expect(plain).toBeGreaterThan(0);
+    expect(requestInputTokens({ ...judgeRequest(), attachmentTokenBound: 500 }, null)).toBe(plain + 500);
+    expect(requestInputTokens(judgeRequest(), z.object({ verdict: z.boolean(), note: z.string() }))).toBeGreaterThan(plain);
+  });
+});
+
+/** A gateway that answers text calls with `answer`, and records the month's open reservations during the call. */
+function fakeInner(answer: () => Promise<{ text: string; meta: { costUsd: number | null } }>, seen: (() => void) | null = null): Gateway<string> {
+  return {
+    structured: () => Promise.reject(new Error('not scripted')),
+    structuredStream: () => ({ started: Promise.resolve(), final: Promise.reject(new Error('not scripted')) }),
+    text: async () => {
+      seen?.();
+      return answer();
+    },
+  } as unknown as Gateway<string>;
+}
+
 describe('the budgeted gateway', () => {
+  const worst = (maxTokens = 1000): number => worstCaseUsd('claude-sonnet-5-5', requestInputTokens(judgeRequest(maxTokens), null), maxTokens, PRICES)!;
+  const over = (inner: Gateway<string>) => {
+    const ledger = openLedger({ path: tempLedger(), monthlyCapUsd: 20, clock: fixed });
+    return { ledger, budget: budgetedGateway(inner, { ledger, prices: () => PRICES, maxRunUsd: null }) };
+  };
+
+  it('reserves enough for a fallback to the dearest model: the reservation covers what the call then costs', async () => {
+    let open = -1;
+    const box: { ledger?: ReturnType<typeof openLedger> } = {};
+    // The same tokens answered by Fable 5.1 after a fallback, at its prices.
+    const fallbackCost = Math.round((requestInputTokens(judgeRequest(), null) * 10 + 1000 * 50)) / 1e6;
+    const { ledger, budget } = over(fakeInner(async () => ({ text: 'yes', meta: { costUsd: fallbackCost } }), () => (open = box.ledger!.month().openUsd)));
+    box.ledger = ledger;
+    await budget.gateway.text(judgeRequest());
+    expect(open).toBe(worst());
+    expect(open).toBeGreaterThanOrEqual(fallbackCost);
+    expect(ledger.month()).toMatchObject({ spentUsd: fallbackCost, openUsd: 0, calls: 1 });
+  });
+
+  it('bills a success the gateway could not price at its worst case, never at zero', async () => {
+    const { ledger, budget } = over(fakeInner(async () => ({ text: 'yes', meta: { costUsd: null } })));
+    await budget.gateway.text(judgeRequest());
+    expect(ledger.month()).toMatchObject({ spentUsd: worst(), calls: 1 });
+  });
+
+  it('bills a call cut after it reached the API at its worst case, and one that never left at zero', async () => {
+    const failure = { code: 'timeout' as const, status: null, apiType: null, retryAfterSec: null, requestId: null };
+    const reached = over(fakeInner(() => Promise.reject(new ApiError(failure, 'usage-row-1'))));
+    await expect(reached.budget.gateway.text(judgeRequest())).rejects.toBeInstanceOf(ApiError);
+    expect(reached.ledger.month()).toMatchObject({ spentUsd: worst(), openUsd: 0, calls: 1 });
+    const never = over(fakeInner(() => Promise.reject(new ApiError(failure, null))));
+    await expect(never.budget.gateway.text(judgeRequest())).rejects.toBeInstanceOf(ApiError);
+    expect(never.ledger.month()).toMatchObject({ spentUsd: 0, calls: 1 });
+  });
+
+  it('bills a billed response that failed (a refusal) at its measured cost, or at its worst case when unpriced', async () => {
+    const response = { usageId: 'usage-row-2', requestId: null, modelResponded: 'claude-sonnet-5-5', stopReason: 'refusal' };
+    const priced = over(fakeInner(() => Promise.reject(new ResponseError('refusal', 'refused', { ...response, costUsd: 0.0042 }))));
+    await expect(priced.budget.gateway.text(judgeRequest())).rejects.toBeInstanceOf(ResponseError);
+    expect(priced.ledger.month()).toMatchObject({ spentUsd: 0.0042, calls: 1 });
+    const unpriced = over(fakeInner(() => Promise.reject(new ResponseError('refusal', 'refused', { ...response, costUsd: null }))));
+    await expect(unpriced.budget.gateway.text(judgeRequest())).rejects.toBeInstanceOf(ResponseError);
+    expect(unpriced.ledger.month()).toMatchObject({ spentUsd: worst(), calls: 1 });
+  });
+
+
   const setup = (script: Parameters<typeof scriptedGateway>[0], options: { cap?: number; maxRunUsd?: number | null; prices?: ReadonlyMap<string, Price>; path?: string } = {}) => {
     const scripted = scriptedGateway(script);
     const path = options.path ?? tempLedger();
@@ -184,7 +266,7 @@ describe('the budgeted gateway', () => {
     const path = tempLedger();
     const seed = openLedger({ path, monthlyCapUsd: 20, clock: fixed });
     seed.settle(seed.reserve(19.995), 19.995);
-    // Worst case of a 1000-token judge reply alone is US$0.01 at Sonnet 5.5's output price.
+    // Worst case of a 1000-token judge reply alone is US$0.05 at the registry's dearest output price.
     const { scripted, budget, ledger } = setup({ 'rewrite.judge': [REPLY] }, { path });
     const refused = budget.gateway.text(judgeRequest());
     await expect(refused).rejects.toThrow(SpendRefusal);
@@ -194,7 +276,8 @@ describe('the budgeted gateway', () => {
   });
 
   it('refuses a call over the per-run cap, apart from the month', async () => {
-    const { scripted, budget } = setup({ 'rewrite.judge': [REPLY, REPLY] }, { maxRunUsd: 0.012 });
+    // Room for one worst case, and not for a second one after the first settles at US$0.003.
+    const { scripted, budget } = setup({ 'rewrite.judge': [REPLY, REPLY] }, { maxRunUsd: worst() + 0.002 });
     await budget.gateway.text(judgeRequest());
     await expect(budget.gateway.text(judgeRequest())).rejects.toThrow(/per-run cap/);
     expect(scripted.calls).toHaveLength(1);

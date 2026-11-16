@@ -17,11 +17,14 @@
  *   fresh past LOCK_WAIT_MS refuses the call. A file it cannot parse is an error, never
  *   overwritten: the budget fails closed.
  * - budgetedGateway(): before every call it reserves the call's worst case (estimateInputTokens of
- *   the request at the highest input rate of the model, plus maxTokens at its output rate) and
+ *   the request at the highest input rate in force, plus maxTokens at the highest output rate in
+ *   force, across every model, because a server-side fallback can answer on another one) and
  *   refuses the call if the month's spend plus that reservation would pass the cap, or the run's
  *   would pass --max-usd. A model with no price is refused. After the call the reservation settles
  *   to the measured costUsd. A reservation that never settles (the process died) keeps counting at
- *   its worst case.
+ *   its worst case. Limit, as in the gateway: the worst case covers one attempt, so a refusal
+ *   mid-stream followed by a fallback can settle above it; the month then sits over the cap by
+ *   that excess and every later reservation is refused.
  * - costRows() and costReport(): the cost table of design 4.10 step 4, next to gateMarkdown.
  *
  * Refusals (a cap, a missing price, a ledger it cannot read or write) are SpendRefusal, a CapError, so runPipelines() and judgePieces() stop the run on the
@@ -305,14 +308,19 @@ export function requestInputTokens(request: GatewayRequest<string>, schema: z.Zo
 }
 
 /**
- * The most a call can cost on `model`: every input token at the dearest input rate (plain, cache
- * write 5 m or 1 h) and the whole output budget. Priced by the gateway's costUsd. Null with no price.
+ * The most one attempt of a call can cost: every input token at the dearest input rate (plain,
+ * cache write 5 m or 1 h) and the whole output budget at the dearest output rate, each taken over
+ * every model in force, not only `model`. Every built-in model goes out with server-side fallback
+ * ("default"), so another model can answer and bill at its own rates; the gateway's own
+ * reservation takes the highest price in force for the same reason (gateway.ts, reservedUsd).
+ * Priced by the gateway's costUsd. Null when `model` itself has no price.
  */
 export function worstCaseUsd(model: string, inputTokens: number, maxTokens: number, prices: ReadonlyMap<string, Price>): number | null {
-  const at = (bucket: 'input' | 'cacheWrite5m' | 'cacheWrite1h') =>
-    costUsd([{ kind: 'single', model, input: 0, output: maxTokens, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, [bucket]: inputTokens }], prices).usd;
-  const all = [at('input'), at('cacheWrite5m'), at('cacheWrite1h')];
-  return all.some((c) => c === null) ? null : Math.max(...(all as number[]));
+  if (!prices.has(model)) return null;
+  const zero = { kind: 'single' as const, input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
+  const most = (tokens: Partial<typeof zero>): number => Math.max(...[...prices.keys()].map((m) => costUsd([{ ...zero, model: m, ...tokens }], prices).usd ?? 0));
+  const input = Math.max(most({ input: inputTokens }), most({ cacheWrite5m: inputTokens }), most({ cacheWrite1h: inputTokens }));
+  return Math.round((input + most({ output: maxTokens })) * MICROS) / MICROS;
 }
 
 /** What a failed call cost: nothing when it is known not to have reached the API, else its worst case. */
