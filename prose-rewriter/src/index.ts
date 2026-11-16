@@ -6,8 +6,9 @@
  * caps (tasks.ts), evals' ModelClient over the gateway (model-client.ts), which the fact judge
  * calls through, the judge's own rubric with its revert plan and the D10 switch (rubric.ts), the
  * output schemas of the plan, edit and style stages (outputs.ts) and their prompt (prompt.ts).
- * F5b adds rewrite() (rewrite.ts), the stages S0 to S7 that put these together; the CLI comes
- * next, in prose-rewriter/cli.ts.
+ * F5b adds rewrite() (rewrite.ts), the stages S0 to S7 that put these together (stages/), and the
+ * CLI: prose-rewriter/cli.ts builds the live gateway and src/cli.ts is its testable core, which this
+ * entry does not export.
  */
 export { rewrite } from './rewrite.ts';
 export {

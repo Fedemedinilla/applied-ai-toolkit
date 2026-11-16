@@ -2,16 +2,39 @@
 
 prose-rewriter takes a text you wrote: a cover letter, an email, a follow-up or a WhatsApp message. It finds the patterns of generic text in it with slop-lint and returns the same text improved, with your CV as the only source of facts. The model never returns a whole text. It proposes edits over exact quoted spans, and code applies them, checks each one against the facts of your text and your CV, and reverts any edit that adds a fact or loses one.
 
-This folder is at phase F5a of its design. It holds the contract of `rewrite()` as zod schemas (`src/types.ts`), the pure core that checks a model's edits and the pieces the model stages are built from. It also holds two fictional CVs for the evals and the test that keeps real data out of the fixtures. The stages S0 to S7, with `rewrite()` and the CLI, come in F5b.
+This folder is at phase F5b of its design. It holds the contract of `rewrite()` as zod schemas (`src/types.ts`), the pure core that checks a model's edits, the pieces the model stages are built from, the stages S0 to S7 behind `rewrite()` and the CLI. It also holds two fictional CVs for the evals and the test that keeps real data out of the fixtures. The caps, the efforts and a few limits below are provisional until F6 measures real rewrites.
 
 ## Run it
 
 Offline, no key, from the repository root:
 
 ```sh
-npx vitest run prose-rewriter   # the contract, the pure core and the fixture checks
+npx vitest run prose-rewriter   # the contract, the core, the stages and the CLI, over a scripted gateway
 npm run check                   # tsc --noEmit, strict
 ```
+
+The CLI calls the model, so it needs `ANTHROPIC_API_KEY` in the environment. It never reads the key from a file or an argument, and it refuses to run without it, except when S1b finds nothing to change and no call is needed:
+
+```sh
+node prose-rewriter/cli.ts --genre follow-up --lang es --variety rioplatense \
+     --cv ~/cv.md [--to recipient.json] [--previous previous.txt] \
+     [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--json] draft.txt
+```
+
+- `--to` names a JSON file with the recipient's `name`, `org` and `role`. `--previous` names the earlier message of a follow-up. `--keep` can be repeated, and each phrase is left as it is.
+- The output starts with the rewritten text. Then come the changes, each with its reason and whether it was applied or reverted. After them, the facts taken from the CV, the ones only your text states, the placeholders, the flags and the status. `--json` prints the whole `RewriteResult` instead.
+- The CV's path is read and never printed, not even when the file cannot be read. A failed call prints the error's name and gateway code, never the error's cause.
+- The live gateway is built only in `cli.ts` (`cli.ts:28`), over in-memory stores with the four tasks and the provisional caps of `src/tasks.ts`. Everything else is `src/cli.ts`, which the tests run over the scripted gateway (`test/cli.test.ts`).
+
+Exit codes (`src/cli.ts:29`), provisional because the design left them open:
+
+| Code | Meaning |
+|---|---|
+| 0 | `ok`, or `--help` |
+| 1 | `needs-review`: an edit was reverted for inventing, or a fact check failed |
+| 2 | `blocked`: an invented fact persisted after the extra round |
+| 3 | bad usage: an unknown or missing option, an unreadable file, an input the schema refuses |
+| 4 | could not run: no `ANTHROPIC_API_KEY`, or a model call failed |
 
 ## The contract
 
@@ -31,7 +54,7 @@ Four modules with no model, no gateway and no I/O. `src/index.ts` exports all of
 
 ## The model-facing pieces
 
-Phase F5a adds what the model stages need, with no stage that runs them yet. `src/index.ts` exports all of it.
+Phase F5a added what the model stages need. `src/index.ts` exports all of it.
 
 - **Tasks** (`src/tasks.ts`). The four gateway tasks (`:21`) with their model and effort (`:24`). Plan, edit and style run on `claude-fable-5-2`, and the fact judge on `claude-sonnet-5-5`. The effort (`medium` for all four) and the caps (`:41`) are provisional until F6 measures a rewrite.
 - **Judge client** (`src/model-client.ts`). `gatewayModelClient()` (`src/model-client.ts:29`) gives evals' judge a `ModelClient` over the gateway, so its calls pass the caps too.
@@ -39,13 +62,27 @@ Phase F5a adds what the model stages need, with no stage that runs them yet. `sr
 - **Output schemas** (`src/outputs.ts`). `PlanOutput` (`src/outputs.ts:93`) holds an action and a reason per sentence and no text. A missing fact is asked for only as a labelled `[COMPLETAR: ...]` whose label holds a letter or a digit (`:31`). `EditOutput` (`:101`) is an array of the existing `Edit`, so a bare `[COMPLETAR]` is refused there as well. `checkModelEdit()` (`:72`) refuses a model's edit that hides an unlabelled marker behind an invisible character or adds a placeholder slop-lint reports as FMT-04. It also refuses one with more sentences than its quote plus `EDIT_EXTRA_SENTENCES` (`:52`, provisional). `styleOutput()` (`:114`) takes the ids of the principles the prompt showed and refuses any other id. It caps the edits per text with `STYLE_MAX_EDITS` (`:108`), a provisional value.
 - **Prompt** (`src/prompt.ts`). `systemBlocks()` (`src/prompt.ts:140`) returns four system blocks, each a cache breakpoint, ordered so the ones that change least come first. The first holds the hard rules (`HARD_RULES`, `:70`), the genre's principles from style-refs and its conventions. Then come the examples, the CV, and last the voice, the recipient, the goal and the mode. The design lists the conventions as a fifth block, but the gateway accepts four breakpoints, and the conventions change with the same keys as the principles. `planPrompt()` (`:218`), `editPrompt()` (`:236`) and `stylePrompt()` (`:256`) add one user turn with the stage's task and the numbered text, so the conversation never ends on a prefill. The text, the CV and anything that quotes them travel inside `wrapData()` blocks, and so does the plan echoed into the edit stage (`:245`). Neither the data nor a model's reply can close a block or add a section of rules. The register comes from the input: a context that names another one is refused.
 
+## The stages
+
+`rewrite(input, { gateway })` (`src/rewrite.ts:35`) runs the stages of design 4.4 in order. The caller injects the gateway, and the tests pass the scripted one.
+
+- **S0 prepare** (`src/stages/analyse.ts:38`). Normalizes the text to NFC, numbers its sentences, keeps subject, greeting, body and signature apart and flags injection in the text and the CV.
+- **S1 analyse** (`src/stages/analyse.ts:95`). Runs slop-lint with the genre, the language and the variety, measures the voice and takes the fact inventory. It resolves the mode and the register. The default register per genre (`src/types.ts:46`) is provisional. It is formal for a cover letter, neutral for an email and a follow-up and casual for WhatsApp, as in style-refs' examples.
+- **S1b early exit** (`src/stages/analyse.ts:119`). In `minimo` with no finding at level 1 or 2, it returns the text as it is with "No encontré nada para cambiar", and no model is called.
+- **S2 plan** (`src/stages/model.ts:88`). One `rewrite.plan` call. It returns an action and a reason per sentence, and no text.
+- **S3 edit** (`src/stages/model.ts:110`). One `rewrite.edit` call. It keeps at most one edit per plan item that is not `keep` (`editCap()`, `:98`, provisional) and drops the rest before placement. In `reescritura` an edit may span a paragraph (`src/stages/check.ts:50`).
+- **S4 style** (`src/stages/model.ts:150`). One `rewrite.style` call, capped by `STYLE_MAX_EDITS` (`src/outputs.ts:108`, provisional). Skipped in `minimo` and when no principle applies.
+- **S5 facts** (`src/stages/check.ts:108`, judge at `:176`). Code places each edit by its exact quote (`:79`) and reverts one that invents or loses a fact. The judge runs as D10 says, once on what the code left and again only when it reverted something.
+- **S6 re-lint and voice** (`src/stages/check.ts:145`). Reverts an edit that adds a level 1 finding, breaks a trait of the voice or touches a `keep` phrase. If level 1 findings remain (`src/rewrite.ts:87`), one extra S3 round (`src/stages/model.ts:136`) gets them as a list and goes through S5 and S6 again.
+- **S7 assemble** (`src/rewrite.ts:106`). Builds the diff from the accepted edits, the changes, the fact report, lint before and after, the flags, the status and the usage. The status is `blocked` when the rewrite still states a fact outside the text and the CV, or the extra round invented again. It is `needs-review` when an edit was reverted for inventing or a fact went missing, and `ok` otherwise.
+
 ## Fixtures and data
 
 The evals use two invented people: a freelance web developer in Córdoba (`evals/cases/cv/es-rioplatense.md`) and a support engineer in Leeds (`evals/cases/cv/en.md`). Each CV opens with a comment that marks it as fiction. `test/fixtures.test.ts` scans every eval case and the style-refs data. It fails on an address outside a reserved domain, a phone number that is not zero-filled (with or without separators), a web host outside the reserved names (with a scheme, or bare under a common top-level domain such as linkedin.com), a missing fiction marker, or one of the repository owner's identifiers. A witness test feeds it real-looking data, so a check that stopped matching would fail instead of passing. Your own CV never enters this repository.
 
 ## What the gateway records
 
-Every model call of the rewriter will go through the gateway, and the CV travels in the prompt. Phase F0 reviewed what the gateway keeps or writes about a call, so the CV is known to stop at the request sent to the API (`gateway/src/gateway.ts:767` and `:770`). Lines are from the review of November 2026.
+Every model call of the rewriter goes through the gateway, and the CV travels in the prompt. Phase F0 reviewed what the gateway keeps or writes about a call, so the CV is known to stop at the request sent to the API (`gateway/src/gateway.ts:767` and `:770`). Lines are from the review of November 2026.
 
 - **Ledger rows** (`UsageRow`, `gateway/src/ports.ts:62-99`; table `llm_usage`, `gateway/sql/schema.sql:113-152`) hold ids, the task, the prompt version, models, token counts, cost, stop reason, refusal category, request id, duration and an error code. There is no column for prompt or response text.
 - **Event logs** (`EventLog`, `gateway/src/ports.ts:23-26`) carry ids, counts, codes and costs, never text. Each logged error goes through `errorName()` (`gateway/src/gateway.ts:389-395`), which keeps the error's code or class name and drops its message. `jsonLinesLog` writes to `console.warn` by default (`gateway/src/ports.ts:28-29`).
