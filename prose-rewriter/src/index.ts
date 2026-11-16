@@ -1,6 +1,7 @@
 /**
- * The public entry of prose-rewriter. Phase F0 publishes the contract only; rewrite() itself
- * comes in F5, once the pure core (F4) and the stages through the gateway exist.
+ * The public entry of prose-rewriter. Phase F0 published the contract; F4 adds the pure core
+ * (voice profile, facts, edits, injection). rewrite() itself comes in F5, with the stages through
+ * the gateway.
  */
 export {
   Change,
@@ -21,3 +22,14 @@ export {
   STAGES,
   Variety,
 } from './types.ts';
+export {
+  GENRE_REQUIRES,
+  type Treatment,
+  type VoiceContext,
+  type VoiceProfile,
+  voicePromptLines,
+  voiceProfile,
+  type VoiceTrait,
+  type VoiceViolation,
+  voiceViolations,
+} from './voice.ts';
