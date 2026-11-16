@@ -435,6 +435,8 @@ The report sorts vocabulary into three tiers and gives every catalog rule a thre
 
 The shared budget is spent in reading order, so context words without an anchor can use it up before a Tier 2 word appears. <!-- slop-lint-disable -->In the English "before" letter, "drive" and "impactful" take the two free slots, and "dynamic", "fostering" and "align with" are reported.<!-- slop-lint-enable -->
 
+A rule can hold alternatives whose source is weaker than its own, reported at a lower severity. LEX-04 has two, <!-- slop-lint-disable -->"this matters" and "why X matters"<!-- slop-lint-enable -->, from a commercial analytics firm the report tags REPORTADO. They spend the shared Tier 2 budget like any LEX-04 word, so one of them can push a later word past the budget. Once reported, they cost the low penalty instead of the medium one. A severity set for LEX-04 in a genre or a config applies to them too.
+
 ## Design decisions
 
 **Levels come from the report's columns, with two documented exceptions.** A rule's level follows from its threshold and severity, so a reviewer can check it against the source. The first exception is ESP-01, kept at level 2 because a regex cannot see the CV (see below). The second is EST-04, checked at every sentence start because a model also clears its throat in the middle of a paragraph. The participle-tail rule (EST-08) has threshold 0 but medium severity and known false positives, so it is a level 2 warning. The report's own English "after" letter shows why: "cutting it from three days to four hours" is a participle tail with the number in it, and it should not fail the letter.
@@ -465,10 +467,11 @@ The shared budget is spent in reading order, so context words without an anchor 
 
 359 tests in 14 files, all offline and without an API key:
 
-- `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
+- `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, its own source and a lower severity for a rule's weaker alternatives, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
 - `text.test.ts`: sentence splitting with abbreviations, initials, dotted abbreviations, decimals, line breaks and closing quotes; prose detection; anchor counting; offsets to line and column.
 - `cover-letters.test.ts`: the six letters of section 15 (below).
+- `widenings.test.ts`: the REG-02 and LEX-04 phrases added in 0.2.0, in every genre, with the Tier 2 budget they spend and the severity they are reported at.
 - `markdown.test.ts`: the masked copy keeps length and newlines; code blocks, inline code, tables, comments, link URLs and markers are masked; findings point into the original file; FMT-01 is skipped and the other rules still fire; list items do not merge into one sentence; EST-10 scope; inline code as an anchor; the three directives; text mode unchanged.
 - `cli.test.ts`: exit codes 0, 1 and 2, text and JSON output, stdin, `--anchors`, `--format` and the `.md` default, several files with one summary line each.
 - `output-regression.test.ts`: the text and JSON output for one file and for two, and the SARIF output for two, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
@@ -536,7 +539,7 @@ Generated with `node slop-lint/scripts/rules-table.ts`. A test checks that every
 | LEX-01 | Tier 1 phrases (Spanish) | es | 1 | high | 0 | pattern | SÍNTESIS | Section 12, Spanish Tier 1 list |
 | LEX-02 | Tier 2 vocabulary (Spanish) | es | 2 | medium | Tier 2: 2, no repeats | pattern | SÍNTESIS | Section 12, Spanish Tier 2; Spanish analogues of Kobak et al. 2025 |
 | LEX-03 | Tier 1 phrases (English) | en | 1 | high | 0 | pattern | MEDIDO, CONSENSO | Kobak et al. 2025, Science Advances (arxiv.org/pdf/2406.07016); section 12, English Tier 1 |
-| LEX-04 | Tier 2 vocabulary (English) | en | 2 | medium | Tier 2: 2, no repeats | pattern | MEDIDO | Liang et al. 2024, ICML (arxiv.org/html/2403.07183v2); Kobak et al. 2025 |
+| LEX-04 | Tier 2 vocabulary (English) | en | 2 | medium; low for "this matters", "why X matters" | Tier 2: 2, no repeats | pattern | MEDIDO; REPORTADO for "this matters", "why X matters" | Liang et al. 2024, ICML (arxiv.org/html/2403.07183v2); Kobak et al. 2025; Graphite, 1 October 2026, via Metatalks: "this matters" and "why X matters" in Claude Opus 5.5 (commercial source) |
 | LEX-05 | Intensifiers | both | 2 | low | 1 | pattern | SÍNTESIS | Section 3 audit of the earlier rule set |
 | LEX-06 | Self-proclaimed honesty or humility | both | 1 | high | 0 | pattern | CONSENSO | Section 3 audit; section 12 |
 | LEX-07 | Tier 3 context words (Spanish) | es | 3 | medium | anchor, else Tier 2 | pattern | SÍNTESIS | Section 12, Tier 3 decision rule |

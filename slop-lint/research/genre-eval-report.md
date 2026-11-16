@@ -43,7 +43,7 @@ The criterion for whatsapp to leave experimental is zero here (design 3.6).
 | email | 3 | 1.00 (2/2) | n/a | 0.00 (0/145) |
 | email | any | 0.82 (27/33) | 0.96 (26/27) | 0.04 (6/145) |
 | follow-up | 1 | 1.00 (9/9) | 1.00 (9/9) | 0.00 (0/120) |
-| follow-up | 2 | 1.00 (7/7) | 0.88 (7/8) | 0.00 (0/120) |
+| follow-up | 2 | 1.00 (8/8) | 0.88 (7/8) | 0.00 (0/120) |
 | follow-up | 3 | n/a | n/a | 0.00 (0/120) |
 | follow-up | any | 1.00 (16/16) | 1.00 (16/16) | 0.00 (0/120) |
 | whatsapp | 1 | 1.00 (6/6) | 1.00 (6/6) | 0.00 (0/45) |
@@ -90,6 +90,7 @@ Only the rules that fired or that a label names, per genre.
 | follow-up | MAIL-01 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/142) |
 | follow-up | MAIL-02 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/143) |
 | follow-up | OFI-01 | 2 | text | 0 | 1 | 0 | 0.00 (0/1) | n/a | 0.05 (1/20) |
+| follow-up | REG-02 | 2 | sentence | 0 | 1 | 0 | 0.00 (0/1) | n/a | 0.01 (1/144) |
 | follow-up | SEG-03 | 2 | sentence | 6 | 0 | 0 | 1.00 (6/6) | 1.00 (6/6) | 0.00 (0/138) |
 | follow-up | SIN-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/143) |
 | whatsapp | EST-04 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/64) |
@@ -118,6 +119,7 @@ Sentence 0 is the whole text. "on slop" says the sentence is labelled slop for a
 | email | email-en-07 | 5 | LEX-08 | 3 | yes |
 | follow-up | follow-up-es-04 | 0 | ESP-02 | 2 | no |
 | follow-up | follow-up-es-08 | 0 | OFI-01 | 2 | yes |
+| follow-up | follow-up-es-08 | 4 | REG-02 | 2 | yes |
 
 ## guessGenre
 
