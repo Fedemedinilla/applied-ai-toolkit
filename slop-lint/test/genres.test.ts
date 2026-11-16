@@ -450,6 +450,14 @@ describe('MAIL-01 and the lines after the formula', () => {
     expect(match(`${body}Thank you for your time and consideration\nSam`)).toEqual(['Thank you for your time and consideration']);
   });
 
+  it('reads a doubled space or a tab between the words as one space', () => {
+    expect(match(`${body}Thank you  for your time and consideration.\n\nBest,\nSam`)).toEqual(['Thank you  for your time and consideration.']);
+    expect(match(`${body}Thank you for your time\tand consideration.\n\nBest,\nSam`)).toEqual(['Thank you for your time\tand consideration.']);
+    for (const subject of ['Asunto: Oportunidad   emocionante', 'Asunto: Oportunidad\temocionante']) {
+      expect(ids(`${subject}\n\nHola, Laura:\n\nTe paso el tablero.`, { lang: 'es', genre: 'email' }), subject).toContain('MAIL-03');
+    }
+  });
+
   it('still fires with a bare name after the formula, and not when a sentence or a P.S. follows it', () => {
     expect(match(`${body}Thank you for your time and consideration.\n\nSam`)).toEqual(['Thank you for your time and consideration.']);
     expect(match(`${body}Thank you for your time and consideration.\nI can send the code sample on Monday.\n\nBest,\nSam`)).toEqual([]);

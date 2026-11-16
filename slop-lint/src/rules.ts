@@ -1312,7 +1312,7 @@ const mail: Rule[] = [
     level: 2,
     severity: 'medium',
     // Without the m flag, ^ is the start of the text: only a subject on the first line counts.
-    patterns: { es: String.raw`(?<=^\s*(?:asunto|subject)[ \t]*:[^\n]*)${B}oportunidad(?:es)? emocionantes?${E}` },
+    patterns: { es: String.raw`(?<=^\s*(?:asunto|subject)[ \t]*:[^\n]*)${B}oportunidad(?:es)?[ \t]+emocionantes?${E}` },
     flags: 'giu',
     message: 'Generic subject. It says nothing the reader can sort the mail by.',
     suggestion: 'Role, name and one fact: "Analista de datos · Ana Ruiz · Power BI y Python".',
