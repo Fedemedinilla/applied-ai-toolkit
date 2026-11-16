@@ -133,3 +133,57 @@ describe('principlesFor', () => {
     expect(principlesFor([leaked], [], { lang: 'es', genre: 'whatsapp', register: 'casual', variety: 'rioplatense' })).toEqual([]);
   });
 });
+
+describe('the principles on disk', () => {
+  const read = (file: string): unknown => JSON.parse(readFileSync(join(import.meta.dirname, '..', file), 'utf8'));
+  const sources = (read('sources.json') as unknown[]).map((s) => Source.parse(s));
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const principles = [...(read('principles/es.json') as unknown[]), ...(read('principles/en.json') as unknown[])].map((p) => Principle.parse(p));
+  const lessons = principles.filter((p) => p.kind !== 'avoid');
+  const avoid = principles.filter((p) => p.kind === 'avoid');
+  const citing = (id: string) => principles.filter((p) => p.sources.includes(id)).map((p) => p.id);
+
+  it('has lessons and avoid entries in both languages', () => {
+    for (const lang of ['es', 'en'] as const) {
+      expect(lessons.filter((p) => p.lang === lang).length, lang).toBeGreaterThan(0);
+      expect(avoid.filter((p) => p.lang === lang).length, lang).toBeGreaterThan(0);
+    }
+  });
+
+  it('uses Arlt only for the casual rioplatense register of WhatsApp', () => {
+    const arlt = lessons.filter((p) => p.sources.includes('arlt-aguafuertes'));
+    expect(arlt.length).toBeGreaterThan(0);
+    for (const p of arlt) expect([p.genres, p.registers, p.variety], p.id).toEqual([['whatsapp'], ['casual'], 'rioplatense']);
+  });
+
+  it('never cites a casual source from a lesson in a formal register', () => {
+    const casual = new Set(sources.filter((s) => s.scope?.registers.includes('casual')).map((s) => s.id));
+    const leaks = lessons.filter((p) => p.registers.includes('formal') && p.sources.some((id) => casual.has(id)));
+    expect(leaks.map((p) => p.id)).toEqual([]);
+  });
+
+  it('covers the principles the design names in layer 1', () => {
+    expect(citing('quiroga-decalogo').length).toBeGreaterThan(0);
+    expect(citing('strunk-elements-1920').length).toBeGreaterThan(0);
+    expect(citing('govuk-style-guide').length).toBeGreaterThan(0);
+    for (const rule of ['OFI-01', 'EST-11']) {
+      for (const lang of ['es', 'en'] as const) expect(lessons.some((p) => p.lang === lang && p.slopRules?.includes(rule)), `${rule} ${lang}`).toBe(true);
+    }
+  });
+
+  it('carries the "no imitar" list of the design, with terms for the lexical check', () => {
+    const terms = avoid.flatMap((p) => p.terms ?? []);
+    for (const t of ['díjole', 'hállase', 'empero']) expect(terms, t).toContain(t);
+    for (const id of ['arlt-aguafuertes', 'sarmiento-facundo', 'twain-cooper-offences', 'bierce-write-it-right']) {
+      expect(avoid.some((p) => p.sources.includes(id)), id).toBe(true);
+    }
+    const lunfardo = avoid.find((p) => p.sources.includes('arlt-aguafuertes'));
+    expect(lunfardo?.genres).not.toContain('whatsapp');
+  });
+
+  it('cites only sources that may give principles', () => {
+    for (const p of principles) {
+      for (const id of p.sources) expect(['principles', 'excerpts'], `${p.id} ${id}`).toContain(byId.get(id)?.use);
+    }
+  });
+});
