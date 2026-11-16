@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { CapError, GlobalCaps, TaskConfig } from '../../gateway/src/index.ts';
 import { gatewayModelClient } from '../src/model-client.ts';
 import { callSettings, PROVISIONAL_CAPS, REWRITE_TASKS, TASK_CONFIGS, taskConfig } from '../src/tasks.ts';
-import { scriptedGateway, UnscriptedCallError, USER } from './scripted-gateway.ts';
+import { ScriptMismatchError, scriptedGateway, UnscriptedCallError, USER } from './scripted-gateway.ts';
 
 const PROMPT_VERSION = 'rewrite-judge@test';
 const conversation = { system: [{ type: 'text' as const, text: 'Judge each line.' }], messages: [{ role: 'user' as const, content: '1. Hola.' }] };
@@ -126,6 +126,32 @@ describe('scriptedGateway', () => {
     const [edit, judge] = scripted.calls.map((c) => c.sent?.model);
     expect(edit).toBe('claude-fable-5-2');
     expect(judge).toBe('claude-sonnet-5-5');
+  });
+
+  it('keeps the reply of a call the gateway refused before the API, for the next call of its task', async () => {
+    const scripted = scriptedGateway({ 'rewrite.plan': [{ data: { items: ['for call 1'] } }, { data: { items: ['for call 2'] } }] });
+    const g = scripted.gateway;
+    await expect(g.structured(PlanReply, { ...request('rewrite.plan'), userId: 'not-a-uuid' })).rejects.toThrow(/userId/);
+    const streamed = g.structuredStream(PlanReply, { ...request('rewrite.plan'), userId: 'not-a-uuid' });
+    await expect(streamed.final).rejects.toThrow(/userId/);
+    expect((await g.structured(PlanReply, request('rewrite.plan'))).data.items).toEqual(['for call 1']);
+    expect(scripted.calls.map((c) => c.sent !== null)).toEqual([false, false, true]);
+    expect(() => scripted.assertDone()).toThrow(/rewrite\.plan: 1/);
+    expect((await g.structured(PlanReply, request('rewrite.plan'))).data.items).toEqual(['for call 2']);
+    scripted.assertDone();
+  });
+
+  it('answers a structured call only with a data reply, and a text call only with a text reply', async () => {
+    const scripted = scriptedGateway({ 'rewrite.edit': [{ data: { items: ['x'] } }], 'rewrite.plan': [{ text: '{"items":["y"]}' }] });
+    const g = scripted.gateway;
+    await expect(g.text(request('rewrite.edit'))).rejects.toThrow(ScriptMismatchError);
+    await expect(g.structured(PlanReply, request('rewrite.plan'))).rejects.toThrow(/text reply.*structured/);
+    await expect(g.structuredStream(PlanReply, request('rewrite.plan')).final).rejects.toThrow(ScriptMismatchError);
+    // A mismatch uses no reply: the script still holds both.
+    expect(scripted.calls).toEqual([]);
+    expect((await g.structured(PlanReply, request('rewrite.edit'))).data.items).toEqual(['x']);
+    expect((await g.text(request('rewrite.plan'))).text).toBe('{"items":["y"]}');
+    scripted.assertDone();
   });
 
   it('fails loudly on an unscripted call, and on a script left unused', async () => {

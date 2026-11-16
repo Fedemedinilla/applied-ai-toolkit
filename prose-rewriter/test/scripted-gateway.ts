@@ -9,8 +9,15 @@
  * are built locally. Every id, cap and token count is a fixture.
  *
  * A reply is taken from its task's script when the call starts, so concurrent calls of one task
- * get their replies in call order. A call to a task with no reply left throws UnscriptedCallError
- * before the gateway runs, and assertDone() fails while any reply is unused.
+ * get their replies in call order. A call the gateway refuses before it reaches the fake API (a
+ * malformed request, a cap) puts its reply back at the front of its task's script, so the reply
+ * goes to the next call of that task and assertDone() still sees it as unused if none comes. A
+ * call to a task with no reply left throws UnscriptedCallError before the gateway runs, and
+ * assertDone() fails while any reply is unused.
+ *
+ * A `data` reply answers only a structured call (structured, structuredStream) and a `text` reply
+ * only a text call: a stage that asks for text where it should ask for a schema-checked object, or
+ * the other way round, fails with ScriptMismatchError instead of passing on a reply turned to JSON.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
@@ -67,6 +74,13 @@ export class UnscriptedCallError extends Error {
   constructor(task: string, operation: string) {
     super(`unscripted gateway call: ${operation} for task ${task} has no reply left in the script`);
     this.name = 'UnscriptedCallError';
+  }
+}
+
+export class ScriptMismatchError extends Error {
+  constructor(task: string, operation: string, kind: 'data' | 'text') {
+    super(`script mismatch: the next reply for task ${task} is a ${kind} reply, which cannot answer a ${operation} call`);
+    this.name = 'ScriptMismatchError';
   }
 }
 
@@ -188,26 +202,49 @@ export function scriptedGateway(script: Script, options: ScriptedOptions = {}): 
     failures: { log: () => undefined },
   });
 
-  function enter<R>(operation: RecordedCall['operation'], request: GatewayRequest<string>, run: () => R): R {
-    const reply = queues.get(request.task)?.shift();
-    if (reply === undefined) throw new UnscriptedCallError(request.task, operation);
+  /** Takes the task's next reply for this call; `settled` gives it back if the call never reached the API. */
+  function enter<R>(operation: RecordedCall['operation'], request: GatewayRequest<string>, run: () => R): { result: R; settled: (done: Promise<unknown>) => void } {
+    const queue = queues.get(request.task);
+    const reply = queue?.[0];
+    if (queue === undefined || reply === undefined) throw new UnscriptedCallError(request.task, operation);
+    replyText(reply);
+    const kind = reply.data === undefined ? 'text' : 'data';
+    if ((kind === 'text') !== (operation === 'text')) throw new ScriptMismatchError(request.task, operation, kind);
+    queue.shift();
     const record: RecordedCall = { operation, task: request.task, request, sent: null };
     calls.push(record);
-    return current.run({ record, reply }, run);
+    const giveBack = () => {
+      if (record.sent === null) queue.unshift(reply);
+    };
+    try {
+      const result = current.run({ record, reply }, run);
+      return { result, settled: (done) => void done.catch(giveBack) };
+    } catch (error) {
+      giveBack();
+      throw error;
+    }
+  }
+
+  async function call<R>(operation: 'structured' | 'text', request: GatewayRequest<string>, run: () => Promise<R>): Promise<R> {
+    const { result, settled } = enter(operation, request, run);
+    settled(result);
+    return result;
   }
 
   const gateway: Gateway = {
-    structured: async (schema, request) => enter('structured', request, () => inner.structured(schema, request)),
+    structured: (schema, request) => call('structured', request, () => inner.structured(schema, request)),
     structuredStream: (schema, request) => {
       try {
-        return enter('structuredStream', request, () => inner.structuredStream(schema, request));
+        const { result, settled } = enter('structuredStream', request, () => inner.structuredStream(schema, request));
+        settled(result.final);
+        return result;
       } catch (error) {
         const final = Promise.reject(error);
         final.catch(() => undefined);
         return { started: Promise.resolve(), final };
       }
     },
-    text: async (request) => enter('text', request, () => inner.text(request)),
+    text: (request) => call('text', request, () => inner.text(request)),
   };
 
   return {
