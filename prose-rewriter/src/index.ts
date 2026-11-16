@@ -56,4 +56,20 @@ export {
   placeholders,
   type RevertReason,
 } from './facts.ts';
-export { type PartSpan, type Sentence, splitSentences, textParts, type TextPart } from './edits.ts';
+export {
+  type AppliedEdit,
+  applyEdits,
+  type ApplyOptions,
+  type ApplyResult,
+  diffHunks,
+  type PartSpan,
+  type RejectedEdit,
+  type RejectReason,
+  renderEdits,
+  revertEdit,
+  type Sentence,
+  splitSentences,
+  type TextPart,
+  textParts,
+  type TextRange,
+} from './edits.ts';

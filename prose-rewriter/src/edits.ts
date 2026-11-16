@@ -8,7 +8,7 @@
  *
  * Pure: no I/O, no model, no gateway.
  */
-import type { Lang } from './types.ts';
+import type { DiffHunk, Edit, Lang } from './types.ts';
 import { isGreetingLine, signOffIndex } from './voice.ts';
 
 interface Span {
@@ -175,4 +175,156 @@ export function splitSentences(text: string, lang: Lang): Sentence[] {
     }
   }
   return out;
+}
+
+/** A [start, end) range: in the original text, or in the rewritten one for AppliedEdit.newSpan. */
+export interface TextRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** An edit code placed and applied. */
+export interface AppliedEdit {
+  readonly id: string;
+  readonly edit: Edit;
+  /** Where `before` sits in the original text. */
+  readonly span: TextRange;
+  /** Where `after` sits in the text the accepted edits produce, so a finding there names its edit. */
+  readonly newSpan: TextRange;
+  readonly before: string;
+  readonly after: string;
+}
+
+/**
+ * Why code refused an edit: its quote is not in its sentence (or there is no such sentence), it is
+ * there more than once, it overlaps an edit accepted before it, it touches a keep[] phrase, or it
+ * changes nothing.
+ */
+export type RejectReason = 'not-found' | 'ambiguous' | 'overlap' | 'keep' | 'no-op';
+
+export interface RejectedEdit {
+  readonly id: string;
+  readonly edit: Edit;
+  readonly reason: RejectReason;
+  readonly message: string;
+  /** Where the edit would have applied, when its quote was placed. */
+  readonly span?: TextRange;
+  /** The accepted edit it overlaps (reason 'overlap'). */
+  readonly conflictsWith?: string;
+}
+
+export interface ApplyOptions {
+  /** RewriteInput.keep: phrases no edit may touch. */
+  readonly keep?: readonly string[];
+  /** Ids are `${idPrefix}${n}`, n counting the edits from 1 in the order given. Default 'e'. */
+  readonly idPrefix?: string;
+}
+
+export interface ApplyResult {
+  readonly text: string;
+  /** In text order. */
+  readonly accepted: AppliedEdit[];
+  /** In the order the edits were given. */
+  readonly rejected: RejectedEdit[];
+}
+
+const intersects = (a: TextRange, b: TextRange): boolean => a.start < b.end && b.start < a.end;
+
+/** Every place `needle` starts in `haystack`, overlapping places included ("aa" twice in "aaa"). */
+function occurrences(haystack: string, needle: string): number[] {
+  const out: number[] = [];
+  for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + 1)) out.push(at);
+  return out;
+}
+
+/**
+ * The text the given edits produce from the original, applied right to left so each span stays
+ * valid, with each edit's span in the new text. The edits must not overlap.
+ */
+function render(original: string, edits: readonly AppliedEdit[]): { text: string; accepted: AppliedEdit[] } {
+  const ordered = [...edits].sort((a, b) => a.span.start - b.span.start);
+  for (let i = 0; i < ordered.length; i++) {
+    const e = ordered[i] as AppliedEdit;
+    if (original.slice(e.span.start, e.span.end) !== e.before) {
+      throw new Error(`edit ${e.id}: "${e.before}" is no longer at ${e.span.start}-${e.span.end} of the original`);
+    }
+    const prev = ordered[i - 1];
+    if (prev !== undefined && intersects(prev.span, e.span)) throw new Error(`edits ${prev.id} and ${e.id} overlap`);
+  }
+  let text = original;
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const e = ordered[i] as AppliedEdit;
+    text = text.slice(0, e.span.start) + e.after + text.slice(e.span.end);
+  }
+  let shift = 0;
+  const accepted = ordered.map((e) => {
+    const start = e.span.start + shift;
+    shift += e.after.length - e.before.length;
+    return { ...e, newSpan: { start, end: start + e.after.length } };
+  });
+  return { text, accepted };
+}
+
+/**
+ * Places each edit by its exact quote inside its sentence, refuses what it cannot place, and
+ * applies the rest. In the order given: an edit whose `before` is not in its sentence, exactly as
+ * written, is 'not-found'; one whose `before` is there more than once is 'ambiguous', since code
+ * would have to guess which; one that changes nothing is 'no-op'; one that overlaps a keep[]
+ * phrase is 'keep'; one that overlaps an edit accepted before it is 'overlap' (the first stands).
+ * Edits that only touch at an edge do not overlap.
+ *
+ * `sentences` must be the ones splitSentences cut from `text`; a sentence that does not slice the
+ * text exactly is a caller's mistake and throws.
+ */
+export function applyEdits(text: string, sentences: readonly Sentence[], edits: readonly Edit[], options: ApplyOptions = {}): ApplyResult {
+  for (const s of sentences) {
+    if (text.slice(s.start, s.end) !== s.text) throw new Error(`sentence ${s.id} was not cut from this text`);
+  }
+  const keep = (options.keep ?? []).filter((k) => k !== '').flatMap((k) => occurrences(text, k).map((start) => ({ phrase: k, start, end: start + k.length })));
+  const prefix = options.idPrefix ?? 'e';
+  const accepted: AppliedEdit[] = [];
+  const rejected: RejectedEdit[] = [];
+  edits.forEach((edit, i) => {
+    const id = `${prefix}${i + 1}`;
+    const reject = (reason: RejectReason, message: string, extra: { span?: TextRange; conflictsWith?: string } = {}) =>
+      rejected.push({ id, edit, reason, message, ...extra });
+    const sentence = sentences.find((s) => s.id === edit.sentenceId);
+    if (sentence === undefined) return reject('not-found', `there is no sentence ${edit.sentenceId}`);
+    const places = occurrences(sentence.text, edit.before);
+    if (places.length === 0) return reject('not-found', `"${edit.before}" is not in sentence ${edit.sentenceId}`);
+    if (places.length > 1) return reject('ambiguous', `"${edit.before}" appears ${places.length} times in sentence ${edit.sentenceId}`);
+    const start = sentence.start + (places[0] as number);
+    const span = { start, end: start + edit.before.length };
+    if (edit.after === edit.before) return reject('no-op', 'the edit changes nothing', { span });
+    const kept = keep.find((k) => intersects(k, span));
+    if (kept !== undefined) return reject('keep', `the edit touches "${kept.phrase}", which is kept as written`, { span });
+    const other = accepted.find((a) => intersects(a.span, span));
+    if (other !== undefined) return reject('overlap', `the edit overlaps ${other.id}, accepted before it`, { span, conflictsWith: other.id });
+    accepted.push({ id, edit, span, newSpan: span, before: edit.before, after: edit.after });
+  });
+  return { ...render(text, accepted), rejected };
+}
+
+/** The text the accepted edits produce from the original: what S5 and S6 re-derive after a revert. */
+export function renderEdits(original: string, accepted: readonly AppliedEdit[]): string {
+  return render(original, accepted).text;
+}
+
+/**
+ * Reverts one accepted edit alone (S5, S6) and re-derives the text from the original with the
+ * others, so no revert depends on the order of the ones before it. An unknown id reverts nothing.
+ */
+export function revertEdit(
+  original: string,
+  accepted: readonly AppliedEdit[],
+  id: string,
+): { text: string; accepted: AppliedEdit[]; reverted?: AppliedEdit } {
+  const reverted = accepted.find((a) => a.id === id);
+  const rendered = render(original, accepted.filter((a) => a.id !== id));
+  return reverted === undefined ? rendered : { ...rendered, reverted };
+}
+
+/** RewriteResult.diff: one hunk per accepted edit, in the original's coordinates and in text order. */
+export function diffHunks(original: string, accepted: readonly AppliedEdit[]): DiffHunk[] {
+  return render(original, accepted).accepted.map((a) => ({ span: { start: a.span.start, end: a.span.end }, before: a.before, after: a.after }));
 }
