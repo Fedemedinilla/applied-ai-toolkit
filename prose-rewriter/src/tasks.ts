@@ -7,9 +7,12 @@
  * claude-sonnet-5-5, a different model from the one that edits (4.6 step 3).
  *
  * Effort is fixed per task, with no hard-case variant, because changing it invalidates the prompt
- * cache (gateway/src/config.ts:10). The levels are a starting point: the design leaves the effort
- * to the evals gate (D2). The three writing tasks take `high`, the effort Agency-Seeker set for its
- * Fable 5.2 writer; the judge takes `medium`, the effort of evals' own judge (JUDGE_CALL).
+ * cache (gateway/src/config.ts:10). PROVISIONAL, like the caps: the design leaves the effort to the
+ * evals gate (D2), which sets it in F6. Every task starts at `medium`. For the three writing tasks
+ * that is the default of Agency-Seeker's Fable 5.2 writer (WRITER_EFFORT in its src/writer/write.ts,
+ * whose note says `high` cost US$1.40 per application in its first real run); Agency-Seeker's
+ * CLAUDE.md says `high`, a mismatch design 4.10 points out. The judge's `medium` is the effort of evals'
+ * own judge (JUDGE_CALL).
  */
 import type { CallSettings } from '../../evals/src/index.ts';
 import type { GlobalCaps, TaskConfig } from '../../gateway/src/index.ts';
@@ -19,9 +22,9 @@ export const REWRITE_TASKS = ['rewrite.plan', 'rewrite.edit', 'rewrite.style', '
 export type RewriteTask = (typeof REWRITE_TASKS)[number];
 
 export const TASK_CONFIGS: Readonly<Record<RewriteTask, TaskConfig>> = {
-  'rewrite.plan': { task: 'rewrite.plan', model: 'claude-fable-5-2', effort: 'high', hardCaseEffort: null },
-  'rewrite.edit': { task: 'rewrite.edit', model: 'claude-fable-5-2', effort: 'high', hardCaseEffort: null },
-  'rewrite.style': { task: 'rewrite.style', model: 'claude-fable-5-2', effort: 'high', hardCaseEffort: null },
+  'rewrite.plan': { task: 'rewrite.plan', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
+  'rewrite.edit': { task: 'rewrite.edit', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
+  'rewrite.style': { task: 'rewrite.style', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
   'rewrite.judge': { task: 'rewrite.judge', model: 'claude-sonnet-5-5', effort: 'medium', hardCaseEffort: null },
 };
 

@@ -43,7 +43,13 @@ export interface ScriptedReply {
   readonly data?: unknown;
   /** A text reply, used as is. Exactly one of data and text. */
   readonly text?: string;
-  readonly usage?: { readonly input?: number; readonly output?: number };
+  readonly usage?: {
+    readonly input?: number;
+    readonly output?: number;
+    readonly cacheRead?: number;
+    readonly cacheWrite5m?: number;
+    readonly cacheWrite1h?: number;
+  };
 }
 
 export type Script = Readonly<Record<string, readonly ScriptedReply[]>>;
@@ -95,6 +101,8 @@ function replyText(reply: ScriptedReply): string {
 }
 
 function message(model: unknown, reply: ScriptedReply) {
+  const write5m = reply.usage?.cacheWrite5m ?? 0;
+  const write1h = reply.usage?.cacheWrite1h ?? 0;
   return {
     id: 'msg_scripted',
     container: null,
@@ -108,9 +116,9 @@ function message(model: unknown, reply: ScriptedReply) {
     stop_sequence: null,
     type: 'message',
     usage: {
-      cache_creation: null,
-      cache_creation_input_tokens: 0,
-      cache_read_input_tokens: 0,
+      cache_creation: { ephemeral_5m_input_tokens: write5m, ephemeral_1h_input_tokens: write1h },
+      cache_creation_input_tokens: write5m + write1h,
+      cache_read_input_tokens: reply.usage?.cacheRead ?? 0,
       fallback_credit: null,
       inference_geo: null,
       input_tokens: reply.usage?.input ?? 0,
@@ -141,9 +149,9 @@ function sse(msg: ReturnType<typeof message>): string {
         usage: {
           input_tokens: msg.usage.input_tokens,
           output_tokens: msg.usage.output_tokens,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-          cache_creation: null,
+          cache_creation_input_tokens: msg.usage.cache_creation_input_tokens,
+          cache_read_input_tokens: msg.usage.cache_read_input_tokens,
+          cache_creation: msg.usage.cache_creation,
           iterations: null,
           output_tokens_details: null,
           server_tool_use: null,

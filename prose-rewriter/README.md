@@ -33,7 +33,7 @@ Four modules with no model, no gateway and no I/O. `src/index.ts` exports all of
 
 Phase F5a adds what the model stages need, with no stage that runs them yet. `src/index.ts` exports all of it.
 
-- **Tasks** (`src/tasks.ts`). The four gateway tasks (`:18`) with their model and effort (`:21`). Plan, edit and style run on `claude-fable-5-2`, and the fact judge on `claude-sonnet-5-5`. The caps (`:38`) are provisional until F6 measures a rewrite.
+- **Tasks** (`src/tasks.ts`). The four gateway tasks (`:21`) with their model and effort (`:24`). Plan, edit and style run on `claude-fable-5-2`, and the fact judge on `claude-sonnet-5-5`. The effort (`medium` for all four) and the caps (`:41`) are provisional until F6 measures a rewrite.
 - **Judge client** (`src/model-client.ts`). `gatewayModelClient()` (`src/model-client.ts:29`) gives evals' judge a `ModelClient` over the gateway, so its calls pass the caps too.
 - **Fact judge** (`src/rubric.ts`). The rewriter's own rubric (`src/rubric.ts:37`, `:78`) reads the rewrite line by line against the CV and the original draft. `planReverts()` (`:231`) turns a verdict into the edits to revert, and `judgeRuns()` (`:137`) applies D10.
 - **Output schemas** (`src/outputs.ts`). `PlanOutput` (`src/outputs.ts:35`) holds an action and a reason per sentence and no text. A missing fact is asked for only as a labelled `[COMPLETAR: ...]` (`:23`). `EditOutput` (`:39`) is an array of the existing `Edit`, so a bare `[COMPLETAR]` is refused there as well. `styleOutput()` (`:52`) takes the ids of the principles the prompt showed and refuses any other id. It caps the edits per text with `STYLE_MAX_EDITS` (`:46`), a provisional value.

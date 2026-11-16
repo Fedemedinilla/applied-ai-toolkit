@@ -9,6 +9,8 @@ import { callSettings, PROVISIONAL_CAPS, REWRITE_TASKS, TASK_CONFIGS, taskConfig
 import { ScriptMismatchError, scriptedGateway, UnscriptedCallError, USER } from './scripted-gateway.ts';
 
 const PROMPT_VERSION = 'rewrite-judge@test';
+const JOB_A = '00000000-0000-4000-8000-00000000a001';
+const JOB_B = '00000000-0000-4000-8000-00000000b001';
 const conversation = { system: [{ type: 'text' as const, text: 'Judge each line.' }], messages: [{ role: 'user' as const, content: '1. Hola.' }] };
 
 describe('the rewrite tasks', () => {
@@ -30,8 +32,19 @@ describe('the rewrite tasks', () => {
     expect(taskConfig('rewrite.judge').model).not.toBe(taskConfig('rewrite.edit').model);
   });
 
-  it('has provisional caps the gateway accepts', () => {
+  it('starts every task at effort medium, a provisional level the evals gate replaces (D2)', () => {
+    // medium is what Agency-Seeker's Fable 5.2 writer runs at (WRITER_EFFORT) and what evals' judge uses.
+    expect(REWRITE_TASKS.map((task) => [task, taskConfig(task).effort])).toEqual([
+      ['rewrite.plan', 'medium'],
+      ['rewrite.edit', 'medium'],
+      ['rewrite.style', 'medium'],
+      ['rewrite.judge', 'medium'],
+    ]);
+  });
+
+  it('has provisional caps the gateway accepts, low on purpose', () => {
     expect(GlobalCaps.parse(PROVISIONAL_CAPS)).toEqual(PROVISIONAL_CAPS);
+    expect(PROVISIONAL_CAPS).toEqual({ perJobUsd: 0.5, dailyPerUserUsd: 2, monthlyUsd: 10 });
   });
 
   it('builds the evals call settings from the task config, with no output format', () => {
@@ -54,6 +67,24 @@ describe('gatewayModelClient', () => {
     expect(call?.sent).toMatchObject({ model: 'claude-sonnet-5-5', output_config: { effort: taskConfig('rewrite.judge').effort } });
     expect(scripted.stores.usage.calls.map((row) => row.task)).toEqual(['rewrite.judge']);
     scripted.assertDone();
+  });
+
+  it('reports the cache reads and both kinds of cache writes the gateway measured', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'ok', usage: { input: 10, output: 2, cacheRead: 30, cacheWrite5m: 7, cacheWrite1h: 5 } }] });
+    const client = gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, promptVersion: PROMPT_VERSION });
+    const reply = await client.create({ ...callSettings('rewrite.judge', 2000), ...conversation });
+    expect(reply.usage).toEqual({ input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 30, cache_creation_input_tokens: 12 });
+  });
+
+  it('passes the job id, so the per-job cap holds the calls of one rewrite', async () => {
+    // Fixture usage: 60,000 output tokens of claude-sonnet-5-5 cost US$0.60, over the provisional US$0.50 per job.
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'first', usage: { input: 10, output: 60_000 } }, { text: 'other job' }, { text: 'never sent' }] });
+    const job = (jobId: string) => gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, jobId, promptVersion: PROMPT_VERSION });
+    const settings = callSettings('rewrite.judge', 70_000);
+    expect((await job(JOB_A).create({ ...settings, ...conversation })).text).toBe('first');
+    expect(scripted.stores.usage.calls.map((row) => row.jobId)).toEqual([JOB_A]);
+    await expect(job(JOB_A).create({ ...settings, ...conversation })).rejects.toMatchObject({ code: 'cap_per_job' });
+    expect((await job(JOB_B).create({ ...settings, ...conversation })).text).toBe('other job');
   });
 
   it('refuses settings that differ from the task config before calling', async () => {
