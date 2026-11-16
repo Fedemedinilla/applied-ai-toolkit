@@ -186,6 +186,37 @@ describe('names are matched as names', () => {
   });
 });
 
+describe('numbers are compared as a sequence, not a set', () => {
+  // Design 4.6: "un número cambiado (12 por 15) se revierte siempre", also when the new value is
+  // already somewhere in O, when two numbers swap places, or when a number is repeated in place
+  // of another word.
+  const edit = (sentenceId: number, before: string, after: string) => ({ sentenceId, before, after, reason: 'test' });
+  const of = (sentences: string[]) => ({ O: sentences.join(' '), C: { cv: '' }, sentences, lang: 'es' as const });
+
+  it('reverts two numbers that swap places', () => {
+    const ctx = of(['La página pasó de 4,1 s a 1,6 s.']);
+    expect(checkEdit(edit(0, 'de 4,1 s a 1,6 s', 'de 1,6 s a 4,1 s'), ctx)).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(factInvariant('La página pasó de 4,1 s a 1,6 s.', 'La página pasó de 1,6 s a 4,1 s.', { cv: '' }, [], ES).holds).toBe(false);
+  });
+
+  it('reverts a number changed to one O states elsewhere', () => {
+    const ctx = of(['Atendí 12 clientes y 12 proveedores.', 'Cerré 15 pedidos.']);
+    expect(checkEdit(edit(0, '12 proveedores', '15 proveedores'), ctx)).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    const R = 'Atendí 12 clientes y 15 proveedores. Cerré 15 pedidos.';
+    expect(factInvariant(ctx.O, R, { cv: '' }, [], ES).holds).toBe(false);
+  });
+
+  it('reverts a count repeated in place of another word', () => {
+    const ctx = of(['Tengo una clienta y dos proveedores.']);
+    expect(checkEdit(edit(0, 'una clienta', 'dos clientas'), ctx)).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+  });
+
+  it('still lets numbers of different kinds move within the sentence', () => {
+    const ctx = of(['En marzo de 2023 migré 12 casillas.']);
+    expect(checkEdit(edit(0, 'En marzo de 2023 migré 12 casillas', 'Migré 12 casillas en marzo de 2023'), ctx).status).toBe('accepted');
+  });
+});
+
 describe('factInvariant', () => {
   const O = 'Migré los mails de 12 personas. Armé un formulario que recibe muchos pedidos.';
 

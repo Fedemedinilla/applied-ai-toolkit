@@ -380,6 +380,35 @@ function states(pool: Pool, fact: Fact): boolean {
   return false;
 }
 
+/**
+ * The numbers of `a` that `b` lacks, counted: "12 y 12" against "12 y 15" lacks one 12. Numbers
+ * are facts per occurrence, so a value that stays elsewhere does not hide a changed one.
+ */
+function surplus(a: readonly Fact[], b: readonly Fact[]): Fact[] {
+  const left = new Map<string, number>();
+  for (const f of b) left.set(f.key, (left.get(f.key) ?? 0) + 1);
+  return a.filter((f) => {
+    const n = left.get(f.key) ?? 0;
+    if (n > 0) left.set(f.key, n - 1);
+    return n === 0;
+  });
+}
+
+/** What a number counts: its unit, its currency, or its kind. Numbers of one class keep their order. */
+const numberClass = (f: Fact): string =>
+  f.kind === 'number' ? `n${f.key.replace(/^[\d.]+/u, '')}` : f.kind === 'amount' ? `a${f.key.split(' ')[0] ?? ''}` : f.kind;
+
+/** The numbers of one class that `b` writes in another order than `a`, when both state the same ones. */
+function reordered(a: readonly Fact[], b: readonly Fact[]): Fact[] {
+  const out: Fact[] = [];
+  for (const cls of new Set(a.map(numberClass))) {
+    const x = a.filter((f) => numberClass(f) === cls);
+    const y = b.filter((f) => numberClass(f) === cls);
+    if (x.length === y.length && surplus(x, y).length === 0 && x.some((f, i) => f.key !== y[i]?.key)) out.push(...y);
+  }
+  return out;
+}
+
 const unique = (facts: readonly Fact[]): Fact[] => {
   const seen = new Set<string>();
   return facts.filter((f) => !seen.has(f.key) && seen.add(f.key) !== undefined);
@@ -443,18 +472,28 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
   const after = sentence.slice(0, at) + edit.after + sentence.slice(at + edit.before.length);
   const known = namesOf([context.O, sourcesText(context.C), sentence, after], context);
   const read = { ...context, knownNames: known, openings: true };
-  const beforeFacts = unique(extract(sentence, read));
-  const afterFacts = unique(extract(after, read));
+  const allBefore = extract(sentence, read);
+  const allAfter = extract(after, read);
+  const beforeFacts = unique(allBefore);
+  const afterFacts = unique(allAfter);
   const beforePool: Pool = { text: sentence, keys: new Set(beforeFacts.map((f) => f.key)) };
   const afterPool: Pool = { text: after, keys: new Set(afterFacts.map((f) => f.key)) };
-  const lost = beforeFacts.filter((f) => !states(afterPool, f));
-  const added = afterFacts.filter((f) => !states(beforePool, f));
+  // Numbers are compared per occurrence and in order; words, as a set.
+  const numbersBefore = allBefore.filter((f) => NUMERIC_KINDS.has(f.kind));
+  const numbersAfter = allAfter.filter((f) => NUMERIC_KINDS.has(f.kind));
+  const lostNumbers = surplus(numbersBefore, numbersAfter);
+  const addedNumbers = surplus(numbersAfter, numbersBefore);
+  const lost = [...beforeFacts.filter((f) => !NUMERIC_KINDS.has(f.kind) && !states(afterPool, f)), ...unique(lostNumbers)];
+  const added = [...afterFacts.filter((f) => !NUMERIC_KINDS.has(f.kind) && !states(beforePool, f)), ...unique(addedNumbers)];
 
-  const lostNumbers = lost.filter((f) => NUMERIC_KINDS.has(f.kind));
-  const addedNumbers = added.filter((f) => NUMERIC_KINDS.has(f.kind));
   if (lostNumbers.length > 0 && addedNumbers.length > 0) {
     return { status: 'reverted', reason: 'changed-number', facts: [...lostNumbers, ...addedNumbers], message: `changed ${listOf(lostNumbers)} to ${listOf(addedNumbers)}` };
   }
+  // A number the sentence already states, written once more, stands in for another count ("una clienta" to "dos clientas").
+  const repeated = addedNumbers.filter((f) => beforePool.keys.has(f.key));
+  if (repeated.length > 0) return { status: 'reverted', reason: 'changed-number', facts: repeated, message: `repeats ${listOf(repeated)} in place of another count` };
+  const moved = reordered(numbersBefore, numbersAfter);
+  if (moved.length > 0) return { status: 'reverted', reason: 'changed-number', facts: moved, message: `reorders ${listOf(moved)}` };
   const original = poolOf(context.O, context);
   const sources = poolOf(sourcesText(context.C), context);
   const invented = added.filter((f) => !states(original, f) && !states(sources, f));
@@ -470,13 +509,18 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
 
 export interface InvariantResult {
   readonly holds: boolean;
-  /** Facts of O that R does not state and that no accepted drop covers. */
+  /** Facts of O that R does not state and that no accepted drop covers; numbers per occurrence. */
   readonly missing: Fact[];
-  /** Facts of R that neither O nor C states. */
+  /** Facts of R that neither O nor C states; a number R repeats more often than O, too. */
   readonly extra: Fact[];
+  /** Numbers of one class (unit, currency or kind) that R states in another order than O. Only present when there are some. */
+  readonly reordered?: Fact[];
 }
 
-/** Step 4 of 4.6: O ⊆ R (except the accepted drops, by key) and R ⊆ O ∪ C, with the differences. */
+/**
+ * Step 4 of 4.6: O ⊆ R (except the accepted drops, by key) and R ⊆ O ∪ C, with the differences.
+ * Numbers count per occurrence, and those of one class keep their order ("de 4,1 s a 1,6 s").
+ */
 export function factInvariant(
   original: string,
   rewritten: string,
@@ -488,9 +532,21 @@ export function factInvariant(
   const R = poolOf(rewritten, options);
   const C = poolOf(sourcesText(sources), options);
   const read = { ...options, knownNames: namesOf([original, rewritten, C.text], options), openings: true };
-  const missing = unique(extract(original, read)).filter((f) => !states(R, f) && !acceptedDrops.includes(f.key));
-  const extra = unique(extract(rewritten, read)).filter((f) => !states(O, f) && !states(C, f));
-  return { holds: missing.length === 0 && extra.length === 0, missing, extra };
+  const inO = extract(original, read);
+  const inR = extract(rewritten, read);
+  const isNumber = (f: Fact): boolean => NUMERIC_KINDS.has(f.kind);
+  const numbersO = inO.filter(isNumber);
+  const numbersR = inR.filter(isNumber);
+  const missing = [
+    ...unique(inO).filter((f) => !isNumber(f) && !states(R, f)),
+    ...surplus(numbersO, numbersR),
+  ].filter((f) => !acceptedDrops.includes(f.key)).sort((a, b) => a.start - b.start);
+  const extra = [
+    ...unique(inR).filter((f) => !isNumber(f) && !states(O, f) && !states(C, f)),
+    ...surplus(numbersR, numbersO).filter((f) => O.keys.has(f.key) || !states(C, f)),
+  ].sort((a, b) => a.start - b.start);
+  const moved = reordered(numbersO, numbersR);
+  return { holds: missing.length === 0 && extra.length === 0 && moved.length === 0, missing, extra, ...(moved.length > 0 ? { reordered: moved } : {}) };
 }
 
 /**
