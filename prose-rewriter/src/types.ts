@@ -163,13 +163,8 @@ export type RewriteResult = z.infer<typeof RewriteResult>;
 
 /** What rewrite() is given besides the input (section 4.11): the caller injects the gateway; tests pass a fake. */
 export interface RewriteOptions {
+  /** Every model call goes through it, the fact judge's included (design 4.6): there is no other client to pass. */
   readonly gateway: Gateway<string>;
-  /**
-   * The fact judge's client. By default gatewayModelClient over `gateway` for the task
-   * rewrite.judge, so the judge spends under the same caps. A client passed here is counted in
-   * usage.calls, and makes usage.costUsd null, since its replies carry no price.
-   */
-  readonly judge?: JudgeClient;
   /** style-refs' principles, sources and examples, loaded by the caller (style-refs has no I/O). Without them the prompt shows none and S4 is skipped. */
   readonly refs?: PromptRefs;
   /** The gateway's userId: a UUID or null, never a name or an address. Default null. */

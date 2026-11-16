@@ -29,7 +29,7 @@ import { editProblem } from './outputs.ts';
 import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
-import { editStage, extraEditStage, metered, meteredJudge, planStage, sentenceAt, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
+import { editStage, extraEditStage, metered, planStage, sentenceAt, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
 const EMPTY_REFS = { principles: [], sources: [], examples: [] } as const;
@@ -100,10 +100,8 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
 
   let judged = { fellBack: false, reverted: 0, flags: [] as Flag[] };
   if (judgeRuns(a.input)) {
-    const client =
-      options.judge === undefined
-        ? gatewayModelClient(gateway, { task: 'rewrite.judge', userId, jobId, promptVersion: REWRITE_JUDGE_PROMPT_VERSION })
-        : meteredJudge(options.judge, usage);
+    // Always over the metered gateway: the judge's calls pass the same caps and the same ledger.
+    const client = gatewayModelClient(gateway, { task: 'rewrite.judge', userId, jobId, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
     judged = await judgeStage(a, units, proposals, client);
   }
 
