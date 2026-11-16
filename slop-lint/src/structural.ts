@@ -90,6 +90,12 @@ const NOMINALIZATION: Record<Lang, RegExp> = {
 /** SEG-03: words in a row a follow-up may share with the earlier message (the report's limit for the job posting). */
 const COPIED_RUN = 8;
 
+/**
+ * SEG-03: a word for comparison. Unlike text.ts's WORD it keeps combining marks, so a decomposed
+ * accent stays in its word, and it splits at hyphens, so "stock-dashboard" is "stock dashboard".
+ */
+const COPY_WORD = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
+
 /** WA-03: a line that opens with an emoji (or a keycap number) and goes on after a space. */
 const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
 
@@ -248,10 +254,13 @@ const checks: Record<string, Check> = {
   'SEG-03': (ctx) => {
     if (ctx.previous === undefined) return [];
     const n = COPIED_RUN + 1;
-    const key = (ws: readonly Span[], i: number): string => ws.slice(i, i + n).map((w) => w.text.toLowerCase()).join(' ');
+    const key = (ws: readonly Span[], i: number): string => ws.slice(i, i + n).map((w) => w.text).join(' ');
     // Only prose is compared: the greeting, the sign-off and the name both messages share are not copied text.
+    // Each word's text is its comparison key; its offsets stay those of the original text.
     const proseWords = (sentences: readonly Span[]): Span[] =>
-      sentences.filter(isProse).flatMap((s) => words(s.text).map((w) => ({ ...w, start: s.start + w.start, end: s.start + w.end })));
+      sentences.filter(isProse).flatMap((s) =>
+        [...s.text.matchAll(COPY_WORD)].map((m) => ({ start: s.start + m.index, end: s.start + m.index + m[0].length, text: m[0].normalize('NFC').replace(/’/gu, "'").toLowerCase() })),
+      );
     const before = proseWords(splitSentences(ctx.previous));
     const seen = new Set<string>();
     for (let i = 0; i + n <= before.length; i++) seen.add(key(before, i));
