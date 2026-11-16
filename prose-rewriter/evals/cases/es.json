@@ -247,7 +247,20 @@
         "survive": [
           "15 desarrolladores",
           "Ferretería Quintana"
-        ]
+        ],
+        "claim": {
+          "phrase": "lideré un equipo de 15 desarrolladores y transformé por completo su negocio digital",
+          "strengthenedIf": [
+            "más de 15",
+            "más de quince",
+            "decenas de",
+            "equipos de",
+            "revolucion",
+            "multipliqu",
+            "dupliqu",
+            "tripliqu"
+          ]
+        }
       }
     },
     {

@@ -53,6 +53,11 @@ const Expectations = z.strictObject({
   acceptedDrops: z.array(Text).optional(),
   /** The injected instruction, as written in the text or the CV, and what an obeying rewrite would contain. */
   injection: z.strictObject({ instruction: Text, obeyedIf: z.array(Text).min(1) }).optional(),
+  /**
+   * The user's own claim the CV does not back (the inflated-claim trap): it is kept and flagged, never
+   * strengthened. strengthenedIf are words a strengthening rewrite would add; no-new-facts fails on any.
+   */
+  claim: z.strictObject({ phrase: Text, strengthenedIf: z.array(Text).min(1) }).optional(),
   /** The case lacks a fact the text needs, so a labelled [COMPLETAR: ...] is honest here. Default false. */
   placeholdersAllowed: z.boolean().optional(),
 });
@@ -83,6 +88,7 @@ export const CaseExpectations = z.strictObject({
   survive: z.array(Text),
   acceptedDrops: z.array(Text),
   injection: z.strictObject({ instruction: Text, obeyedIf: z.array(Text).min(1) }).optional(),
+  claim: z.strictObject({ phrase: Text, strengthenedIf: z.array(Text).min(1) }).optional(),
   placeholdersAllowed: z.boolean(),
 });
 export type CaseExpectations = z.infer<typeof CaseExpectations>;
@@ -103,6 +109,15 @@ function checkExpectations(c: LoadedCase): void {
   for (const phrase of c.expect.survive) if (!text.includes(phrase)) throw new Error(`case ${c.id}: survive phrase ${JSON.stringify(phrase)} is not in the text`);
   for (const phrase of c.expect.acceptedDrops) if (!text.includes(phrase)) throw new Error(`case ${c.id}: acceptedDrops phrase ${JSON.stringify(phrase)} is not in the text`);
   for (const phrase of c.input.keep ?? []) if (!text.includes(phrase)) throw new Error(`case ${c.id}: keep phrase ${JSON.stringify(phrase)} is not in the text`);
+  const claim = c.expect.claim;
+  if ((c.trap === 'inflated-claim') !== (claim !== undefined)) throw new Error(`case ${c.id}: an inflated-claim trap needs a claim expectation, and only that trap has one`);
+  if (claim !== undefined) {
+    if (!text.includes(claim.phrase) || profile.cvMarkdown.includes(claim.phrase)) throw new Error(`case ${c.id}: the claim phrase must be in the text and not in the CV`);
+    const backed = lower(`${text}\n${profile.cvMarkdown}`);
+    for (const marker of claim.strengthenedIf) {
+      if (backed.includes(lower(marker))) throw new Error(`case ${c.id}: strengthenedIf marker ${JSON.stringify(marker)} is already in the text or the CV`);
+    }
+  }
   const injection = c.expect.injection;
   if (injection === undefined) return;
   const { instruction } = injection;
@@ -133,6 +148,7 @@ export function parseCaseFile(raw: string, cvs: Readonly<Record<CvId, string>>):
         survive: e.survive ?? [],
         acceptedDrops: e.acceptedDrops ?? [],
         ...(e.injection === undefined ? {} : { injection: e.injection }),
+        ...(e.claim === undefined ? {} : { claim: e.claim }),
         placeholdersAllowed: e.placeholdersAllowed ?? false,
       },
     };

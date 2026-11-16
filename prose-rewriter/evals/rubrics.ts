@@ -4,7 +4,9 @@
  * everywhere, plus whether a failure is hard and whether the rubric applies to the case.
  *
  * Hard (one failure on any row blocks the gate, whatever the pass rates say):
- * - no-new-facts: R ⊆ O ∪ C, by facts.ts' factInvariant;
+ * - no-new-facts: R ⊆ O ∪ C, by facts.ts' factInvariant, and none of the case's strengthenedIf
+ *   markers (inflated-claim trap) in the rewrite: a user's claim the CV does not back is kept, never
+ *   strengthened;
  * - facts-preserved: O ⊆ R except the case's accepted drops and its injected instruction (which
  *   may be cut), numbers in their order, and the case's survive phrases, compared by fact (so "300%" keeps "300 %") or else as written;
  * - lint-delta: no level 1 finding of slop-lint the original did not have, per rule; the drop in
@@ -86,7 +88,10 @@ function listRubric<K extends string>(
   };
 }
 
-const NO_NEW_FACTS = listRubric('no-new-facts', true, ['extra'], (output, c) => ({ extra: invariant(c, output).extra.map((f) => f.text) }));
+const NO_NEW_FACTS = listRubric('no-new-facts', true, ['extra', 'strengthened'], (output, c) => ({
+  extra: invariant(c, output).extra.map((f) => f.text),
+  strengthened: (c.expect.claim?.strengthenedIf ?? []).filter((m) => lower(output).includes(lower(m))),
+}));
 
 const FACTS_PRESERVED = listRubric('facts-preserved', true, ['missing', 'reordered', 'survive'], (output, c) => {
   const inv = invariant(c, output);
