@@ -98,3 +98,43 @@ describe('voiceViolations', () => {
     expect(kinds('I am sending the quote today.', 'I am sending the quote today, ¿ok?', 'email', 'en')).toEqual([]);
   });
 });
+
+describe('treatment, read as people write it', () => {
+  const email = { genre: 'email', lang: 'es' } as const;
+
+  it('reads usted from the formal formulas when the pronoun is left out', () => {
+    expect(voiceProfile('Le escribo para consultarle si puede enviarme el presupuesto. Quedo atento a su respuesta.', 'es').treatment).toBe('usted');
+    expect(voiceProfile('Te paso el teléfono de Marta y su mail.', 'es').treatment).toBe('none');
+    expect(voiceViolations('Le escribo por el puesto. Quedo a su disposición.', 'Te escribo por el puesto. Si querés, avisame.', email).map((v) => v.kind)).toEqual(['treatment']);
+  });
+
+  it('reads voseo written without accents as voseo, not as a mix', () => {
+    const p = voiceProfile('che, vos sabes que necesitas mandar eso? avisame', 'es');
+    expect(p.treatment).toBe('voseo');
+    expect(p.counts.tuteo).toBe(0);
+    expect(voicePromptLines(p)[0]).toBe('usa voseo');
+    const tuteo = 'che, tú puedes mandar eso? avísame';
+    expect(voiceViolations('che, vos sabes que necesitas mandar eso? avisame', tuteo, { genre: 'whatsapp', lang: 'es' }).map((v) => v.kind)).toContain('treatment');
+    expect(voiceProfile('¿Sabes si llegó? Dime.', 'es').treatment).toBe('tuteo');
+  });
+
+  it('flags a treatment added to a text that addressed no one', () => {
+    const kinds = voiceViolations('Mañana mando el informe a primera hora.', 'Si quieres, mañana te mando el informe a primera hora.', { genre: 'whatsapp', lang: 'es' }).map((v) => v.kind);
+    expect(kinds).toEqual(['treatment']);
+    expect(voiceViolations('Mañana mando el informe.', 'Mañana te mando el informe, si querés.', email).map((v) => v.kind)).toEqual(['treatment']);
+  });
+
+  it('measures decomposed accents as their letters', () => {
+    const p = voiceProfile('Si podés, mirá el link.'.normalize('NFD'), 'es');
+    expect(p.counts.voseo).toBe(2);
+    expect(p.counts.accents).toBe(2);
+  });
+});
+
+describe('what each genre requires', () => {
+  const plain = 'hola, te paso el link. avisame si lo podes ver';
+  const tidy = 'Hola, te paso el link. Avisame si lo podés ver';
+  it.each(['cover-letter', 'email', 'follow-up'] as const)('lets %s add the initial capital and the accents', (genre) => {
+    expect(voiceViolations(plain, tidy, { genre, lang: 'es' })).toEqual([]);
+  });
+});
