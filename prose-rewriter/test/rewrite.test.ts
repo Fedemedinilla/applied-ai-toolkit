@@ -793,23 +793,23 @@ describe('S5 per edit, losses across edits', () => {
 // strategy 'single': one call plans and edits, then the same S5, S6 and S7 (F6b run 3)
 // ---------------------------------------------------------------------------
 
-describe("strategy 'single': one call, the same guards", () => {
-  type Case = { id: string; input: RewriteInput };
-  const caseOf = (lang: 'es' | 'en', id: string): Case => {
-    const file = JSON.parse(readFileSync(new URL(`../evals/cases/${lang}.json`, import.meta.url), 'utf8')) as { cases: Case[] };
-    const found = file.cases.find((c) => c.id === id);
-    if (found === undefined) throw new Error(`no eval case ${id}`);
-    return found;
-  };
-  /** A fictional eval case with its fictional CV, as the eval runs it. */
-  const evalInput = (lang: 'es' | 'en', id: string): RewriteInput => ({ ...caseOf(lang, id).input, profile: { cvMarkdown: lang === 'es' ? CV_ES : CV_EN } });
-  const verdictIn = (lang: 'es' | 'en', rewritten: string, invented: readonly number[] = []) => ({
-    text: JSON.stringify({
-      lines: judgeLines(rewritten, lang).map((l) => ({ line: l.line, support: invented.includes(l.line) ? 'invented' : 'no-claim', note: invented.includes(l.line) ? 'not in the CV' : '' })),
-      note: '',
-    }),
-  });
+type Case = { id: string; input: RewriteInput };
+const caseOf = (lang: 'es' | 'en', id: string): Case => {
+  const file = JSON.parse(readFileSync(new URL(`../evals/cases/${lang}.json`, import.meta.url), 'utf8')) as { cases: Case[] };
+  const found = file.cases.find((c) => c.id === id);
+  if (found === undefined) throw new Error(`no eval case ${id}`);
+  return found;
+};
+/** A fictional eval case with its fictional CV, as the eval runs it. */
+const evalInput = (lang: 'es' | 'en', id: string): RewriteInput => ({ ...caseOf(lang, id).input, profile: { cvMarkdown: lang === 'es' ? CV_ES : CV_EN } });
+const verdictIn = (lang: 'es' | 'en', rewritten: string, invented: readonly number[] = []) => ({
+  text: JSON.stringify({
+    lines: judgeLines(rewritten, lang).map((l) => ({ line: l.line, support: invented.includes(l.line) ? 'invented' : 'no-claim', note: invented.includes(l.line) ? 'not in the CV' : '' })),
+    note: '',
+  }),
+});
 
+describe("strategy 'single': one call, the same guards", () => {
   // es-email-heavy, the single-call piece of run 3: its subject edit invented "Mantenimiento" and
   // lost "Propuesta", and the unguarded baseline shipped it. The edits rebuild that piece's text.
   const SUBJECT = { sentenceId: 0, before: 'Propuesta de valor para potenciar su presencia digital', after: 'Mantenimiento del sitio de la cooperativa' };
@@ -901,6 +901,51 @@ describe("strategy 'single': one call, the same guards", () => {
     expect(tasksOf(scripted)).toEqual(['rewrite.edit']);
     expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
     expect(result.changes.map((c) => c.status)).toEqual(['applied', 'reverted', 'reverted']);
+    expectSound(input, result);
+  });
+});
+
+describe('S5 drops against what the judge leaves', () => {
+  // es-cover-letter-heavy, edit-sonnet-5-5 piece of run 3. S3 deleted the "Estudio Lumen" sentence
+  // without drop (reverted: it loses the name); S4 sent the same deletion with drop, accepted
+  // because S3's first sentence then also named Estudio Lumen. The judge reverted that sentence,
+  // and the drop stayed: the rewrite lost the name. The edits are that piece's.
+  const LUMEN = 'Estoy convencida de que mi perfil encaja perfectamente con los valores de Estudio Lumen.';
+  const OPENING = {
+    sentenceId: 1,
+    before: 'En un mundo cada vez más digital, me apasiona potenciar sinergias y aportar valor agregado a cada proyecto.',
+    after: 'Me postulo a la búsqueda de desarrolladora web de Estudio Lumen [COMPLETAR: nombre exacto de la búsqueda o puesto].',
+  };
+  const ADJECTIVES = {
+    sentenceId: 2,
+    before: 'Soy una profesional proactiva, apasionada y orientada a resultados, con una sólida trayectoria en el desarrollo web.',
+    after: 'Trabajo como desarrolladora web por cuenta propia desde marzo de 2023: armé para la Ferretería Quintana un formulario de pedidos con Supabase que recibe unos 40 pedidos por semana y mantengo tres sitios WordPress.',
+  };
+  const CLOSING = { sentenceId: 5, before: 'Quedo a la espera de su respuesta.', after: 'Si le sirve, le muestro estos proyectos en una llamada corta.' };
+  const SPLIT = { sentenceId: 2, before: 'desde marzo de 2023: armé', after: 'desde marzo de 2023. Armé', principleId: 'es-vary-sentence-length' };
+  const TWIN = { sentenceId: 4, before: LUMEN, after: '', reason: 'no fact', principleId: 'es-only-what-moves-the-reader', drop: true };
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+
+  it('reverts an accepted drop once the edit that kept its fact is reverted by the judge', async () => {
+    const input = evalInput('es', 'es-cover-letter-heavy');
+    const styled = ADJECTIVES.after.replace(SPLIT.before, SPLIT.after);
+    const judged = applyAll(input.text, [OPENING, { ...ADJECTIVES, after: styled }, { before: LUMEN, after: '' }, CLOSING]);
+    const lineOf = (text: string, needle: string): number => judgeLines(text, 'es').find((l) => l.text.includes(needle))!.line;
+    const expected = applyAll(input.text, [{ ...ADJECTIVES, after: styled }, CLOSING]);
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2, 4, 5)],
+      'rewrite.edit': [edits(OPENING, ADJECTIVES, { sentenceId: 4, before: LUMEN, after: '' }, CLOSING)],
+      'rewrite.style': [{ data: { edits: [{ reason: 'rhythm', ...SPLIT }, TWIN] } }],
+      'rewrite.judge': [verdictIn('es', judged, [lineOf(judged, 'Me postulo')]), verdictIn('es', expected)],
+    });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toContain('Estudio Lumen');
+    expect(result.rewritten).toBe(expected);
+    const deletions = result.changes.filter((c) => c.before === LUMEN);
+    expect(deletions.map((c) => [c.stage, c.status])).toEqual([['edit', 'reverted'], ['style', 'reverted']]);
+    expect(deletions[1]?.revertReason).toMatch(/^facts: .*Estudio/);
+    expect(result.status).toBe('needs-review');
     expectSound(input, result);
   });
 });

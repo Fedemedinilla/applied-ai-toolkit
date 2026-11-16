@@ -161,6 +161,26 @@ export function checkFacts(a: Analysis, units: readonly Sentence[], proposals: r
 }
 
 /**
+ * The live edits whose drop S5 accepted, checked again against the live edits as they are now,
+ * in the order made, until none is reverted. A drop stands only if its fact stays elsewhere; when
+ * the edit that kept it there is reverted later (by S6, the extra round or the judge), the drop
+ * would lose the fact. Returns the edits reverted.
+ *
+ * Why: in run 3 (es-cover-letter-heavy) S4 sent again, with drop, a deletion S3 had lost a name
+ * with; it stood because an S3 edit also named it, and the judge reverted that edit afterwards.
+ */
+export function recheckDrops(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[]): Proposal[] {
+  const reverted: Proposal[] = [];
+  for (;;) {
+    const drops = proposals.filter((p) => p.status === 'live' && p.check?.status === 'accepted' && p.check.dropped.length > 0);
+    checkFacts(a, units, proposals, drops);
+    const gone = drops.filter((p) => p.status !== 'live');
+    if (gone.length === 0) return reverted;
+    reverted.push(...gone);
+  }
+}
+
+/**
  * The sentences checkEdit() reads for an edit on `unit`: the unit itself at its id, and, at an
  * index no sentence has, the rest of the text with `others` applied and the unit cut out. Every
  * other index is blank, so "elsewhere" is exactly that rest.
@@ -277,6 +297,8 @@ export async function judgeStage(a: Analysis, units: readonly Sentence[], propos
       return null;
     }
     revert(made.revert, kind === 'first' ? 'judge: the sentence claimed something the CV and the text do not back' : 'judge: still invented on the second verdict; back to the original');
+    // A drop that stood on a line the judge just took back no longer stands.
+    if (made.revert.length > 0) recheckDrops(a, units, proposals);
     return made;
   };
   const unread = { kind: 'not-in-cv', message: UNREAD[a.input.lang] } as const satisfies Flag;

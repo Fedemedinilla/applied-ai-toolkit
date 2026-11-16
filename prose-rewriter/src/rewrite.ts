@@ -38,7 +38,7 @@ import { editProblem } from './outputs.ts';
 import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
-import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
+import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, recheckDrops, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
 import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
@@ -74,6 +74,8 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     place(a, units, proposals, fresh.filter((p) => p.status === 'live'));
     checkFacts(a, units, proposals, fresh);
     relintAndVoice(a, units, proposals, fresh);
+    // S6 may have reverted the edit that kept a dropped fact in the text.
+    recheckDrops(a, units, proposals);
   };
 
   /** S2, S3 and its checks, S4 and the extra round; true when the extra round invented a fact again. */
