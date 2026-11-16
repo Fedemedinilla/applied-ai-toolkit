@@ -216,7 +216,7 @@ const lexical: PatternRule[] = [
     },
     weaker: {
       label: '"this matters", "why X matters"',
-      patterns: { en: wordList(['this matters', String.raw`why (?:[\p{L}\p{N}'’-]+ ){1,3}matters(?=\s*(?:[.,;:!?)\]"”’]|$))`]) },
+      patterns: { en: wordList([String.raw`this\s+matters`, String.raw`why\s+(?:[\p{L}\p{N}'’-]+\s+){1,3}matters(?=\s*(?:[.,;:!?)\]"”’]|$))`]) },
       severity: 'low',
       source: {
         evidence: ['REPORTADO'],
@@ -926,7 +926,7 @@ const spanishGrammar: PatternRule[] = [
         'la posición de',
         'hac(?:er|e) sentido',
         'agregar valor',
-        'me encantaría tener la oportunidad de',
+        String.raw`me\s+encantaría\s+tener\s+la\s+oportunidad\s+de`,
       ]),
     },
     flags: 'giu',
