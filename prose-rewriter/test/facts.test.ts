@@ -95,6 +95,33 @@ describe('numbers written in words', () => {
   });
 });
 
+describe('magnitudes, hours and days', () => {
+  const change = (O: string, before: string, after: string, lang: 'es' | 'en' = 'es') =>
+    checkEdit({ sentenceId: 0, before, after, reason: 'test' }, { O, C: { cv: '' }, sentences: [O], lang });
+
+  it('keeps the magnitude word or letter with its number', () => {
+    expect(keys('Facturó 1,2 millones y luego 3 mil.')).toEqual(['1200000', '3000']);
+    expect(keys('Raised USD 1.2k and then USD 1.2M; 2.5 billion users.', EN)).toEqual(['USD 1200', 'USD 1200000', '2500000000']);
+    expect(keys('Recaudó dos millones de dólares.')).toEqual(['USD 2000000']);
+    expect(change('Facturó 1,2 millones.', 'millones', 'billones')).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(change('Raised USD 1.2k.', '1.2k', '1.2M', 'en')).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+  });
+
+  it('reads am and pm on a whole hour', () => {
+    expect(keys('Meet at 9 am or at 9 pm, or 3 p.m.', EN)).toEqual(['9:00', '21:00', '15:00']);
+    expect(change('Meet at 9 am.', '9 am', '9 pm', 'en')).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+  });
+
+  it('reads a weekday or a month alone as a date', () => {
+    expect(keys('Nos vemos el lunes y arranco en marzo.')).toEqual(['weekday:1', '--03']);
+    expect(keys('We meet on Monday and I start in May.', EN)).toEqual(['weekday:1', '--05']);
+    expect(keys('May I send it on Friday?', EN)).toEqual(['weekday:5']);
+    expect(change('We meet on Monday.', 'Monday', 'Friday', 'en')).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(change('Arranco en marzo.', 'marzo', 'abril')).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(factInvariant('Nos vemos el lunes.', 'Nos vemos el viernes.', { cv: '' }, [], ES).holds).toBe(false);
+  });
+});
+
 describe('inventory', () => {
   it('labels each fact of the original and flags what is not in the CV', () => {
     const O = 'Hola Marta, armé el formulario de la Ferretería Quintana: recibe 40 pedidos por semana y lo usan 25 personas.';
