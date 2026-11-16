@@ -4,15 +4,15 @@
  * name a task and never a model, so the gateway's task config is the only place a model is chosen.
  *
  * Models (D2): plan, edit and style run on claude-fable-5-2; the fact judge runs on
- * claude-sonnet-5-5, a different model from the one that edits (4.6 step 3).
+ * claude-sonnet-5-5, a different model from the one that edits (4.6 step 3). Fixed in F6 (design
+ * 4.10 step 5) on F6b's fourth real-model run, 2026-11-16 (README, "Measured").
  *
  * Effort is fixed per task, with no hard-case variant, because changing it invalidates the prompt
- * cache (gateway/src/config.ts:10). PROVISIONAL, like the caps: the design leaves the effort to the
- * evals gate (D2), which sets it in F6. Every task starts at `medium`. For the three writing tasks
- * that is the default of Agency-Seeker's Fable 5.2 writer (WRITER_EFFORT in its src/writer/write.ts,
- * whose note says `high` cost US$1.40 per application in its first real run); Agency-Seeker's
- * CLAUDE.md says `high`, a mismatch design 4.10 points out. The judge's `medium` is the effort of evals'
- * own judge (JUDGE_CALL).
+ * cache (gateway/src/config.ts:10). Every task runs at `medium`, the effort that run measured:
+ * the default strategy, 'single', kept the voice in 21 of 23 scored cases with no hard failure.
+ * For the three writing tasks it is also the default of Agency-Seeker's Fable 5.2 writer
+ * (WRITER_EFFORT in its src/writer/write.ts, whose note says `high` cost US$1.40 per application in
+ * its first real run). The judge's `medium` is the effort of evals' own judge (JUDGE_CALL).
  */
 import type { CallSettings } from '../../evals/src/index.ts';
 import type { GlobalCaps, TaskConfig } from '../../gateway/src/index.ts';
@@ -33,13 +33,24 @@ export function taskConfig(task: RewriteTask): TaskConfig {
 }
 
 /**
- * PROVISIONAL. These caps are placeholders, not measurements: no rewrite has been run against the
- * real model yet. Phase F6 measures the cost per rewrite (median and p90 by genre and mode, design
- * 4.10 step 4) and sets the real values from it (step 5). Until then they are kept low on purpose,
- * as a guard against a loop, and say nothing about what a rewrite costs.
+ * The caps a deploy starts with, set in F6 (design 4.10 step 5) from F6b's fourth real-model run,
+ * 2026-11-16: 33 fictional cases, cost per rewrite measured on the gateway, fact judge included
+ * (README, "Measured"). The export keeps its F5a name so the callers that seed a gateway with it
+ * do not change; the values are no longer placeholders.
+ *
+ * - perJobUsd 0.25: above the highest p90 measured, US$0.1412 for the staged strategy on a
+ *   follow-up, with room for the retry of a stage reply that cannot be read. The default strategy,
+ *   'single', had a p90 of at most US$0.0652.
+ * - dailyPerUserUsd 2: at the measured medians, 58 to 153 rewrites a day with 'single'
+ *   (US$0.0341 cover letter to US$0.0130 follow-up) or 19 to 47 with 'staged' (US$0.1012
+ *   follow-up to US$0.0424 WhatsApp).
+ * - monthlyUsd 10: on the same medians, 293 to 769 rewrites a month with 'single' or 98 to 235
+ *   with 'staged'.
+ *
+ * 33 cases is a small sample (D3 is open): the caps are revised when the case set grows.
  */
 export const PROVISIONAL_CAPS: GlobalCaps = {
-  perJobUsd: 0.5,
+  perJobUsd: 0.25,
   dailyPerUserUsd: 2,
   monthlyUsd: 10,
 };

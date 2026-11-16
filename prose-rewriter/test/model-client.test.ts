@@ -1,4 +1,4 @@
-// The rewriter's model-facing building blocks: the four task configs with their provisional caps,
+// The rewriter's model-facing building blocks: the four task configs with the caps measured in F6,
 // the evals ModelClient over the gateway, and the scripted gateway the stage tests will use. Every
 // call here goes through a real gateway over in-memory stores and a fake fetch: no key, no network.
 import { describe, expect, it } from 'vitest';
@@ -32,7 +32,7 @@ describe('the rewrite tasks', () => {
     expect(taskConfig('rewrite.judge').model).not.toBe(taskConfig('rewrite.edit').model);
   });
 
-  it('starts every task at effort medium, a provisional level the evals gate replaces (D2)', () => {
+  it('runs every task at effort medium, the level measured in the fourth F6b run (D2)', () => {
     // medium is what Agency-Seeker's Fable 5.2 writer runs at (WRITER_EFFORT) and what evals' judge uses.
     expect(REWRITE_TASKS.map((task) => [task, taskConfig(task).effort])).toEqual([
       ['rewrite.plan', 'medium'],
@@ -42,9 +42,11 @@ describe('the rewrite tasks', () => {
     ]);
   });
 
-  it('has provisional caps the gateway accepts, low on purpose', () => {
+  it('has the caps measured in F6, which the gateway accepts', () => {
     expect(GlobalCaps.parse(PROVISIONAL_CAPS)).toEqual(PROVISIONAL_CAPS);
-    expect(PROVISIONAL_CAPS).toEqual({ perJobUsd: 0.5, dailyPerUserUsd: 2, monthlyUsd: 10 });
+    expect(PROVISIONAL_CAPS).toEqual({ perJobUsd: 0.25, dailyPerUserUsd: 2, monthlyUsd: 10 });
+    // Above the highest p90 per rewrite measured in run 4 (US$0.1412, staged follow-up).
+    expect(PROVISIONAL_CAPS.perJobUsd).toBeGreaterThan(0.1412);
   });
 
   it('builds the evals call settings from the task config, with no output format', () => {
@@ -77,7 +79,7 @@ describe('gatewayModelClient', () => {
   });
 
   it('passes the job id, so the per-job cap holds the calls of one rewrite', async () => {
-    // Fixture usage: 60,000 output tokens of claude-sonnet-5-5 cost US$0.60, over the provisional US$0.50 per job.
+    // Fixture usage: 60,000 output tokens of claude-sonnet-5-5 cost US$0.60, over the US$0.25 per job.
     const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'first', usage: { input: 10, output: 60_000 } }, { text: 'other job' }, { text: 'never sent' }] });
     const job = (jobId: string) => gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, jobId, promptVersion: PROMPT_VERSION });
     const settings = callSettings('rewrite.judge', 70_000);
