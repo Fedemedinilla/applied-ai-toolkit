@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { EXIT, loadRefs, parseArgs, runCli, USAGE, type CliDeps } from '../src/cli.ts';
 import { RewriteResult } from '../src/types.ts';
-import { scriptedGateway, type Script } from './scripted-gateway.ts';
+import { SetupError, type Gateway } from '../../gateway/src/index.ts';
+import { scriptedGateway, type Script, type ScriptedGateway } from './scripted-gateway.ts';
 
 const CV_ES = readFileSync(new URL('../evals/cases/cv/es-rioplatense.md', import.meta.url), 'utf8');
 const REFS = loadRefs(new URL('../../', import.meta.url));
@@ -24,9 +25,10 @@ interface Run {
   readonly out: string;
   readonly err: string;
   readonly keys: string[];
+  readonly calls: ScriptedGateway['calls'];
 }
 
-async function run(argv: string[], script: Script = {}, extra: { files?: Record<string, string>; apiKey?: string | undefined } = {}): Promise<Run> {
+async function run(argv: string[], script: Script = {}, extra: { files?: Record<string, string>; apiKey?: string | undefined; gateway?: Gateway } = {}): Promise<Run> {
   const files: Record<string, string> = { 'draft.txt': CHAT, [CV_PATH]: CV_ES, ...extra.files };
   const scripted = scriptedGateway(script);
   let out = '';
@@ -43,12 +45,12 @@ async function run(argv: string[], script: Script = {}, extra: { files?: Record<
     stderr: (s) => (err += s),
     gateway: (apiKey) => {
       keys.push(apiKey);
-      return scripted.gateway;
+      return extra.gateway ?? scripted.gateway;
     },
     refs: () => REFS,
   };
   const code = await runCli(argv, deps);
-  return { code, out, err, keys };
+  return { code, out, err, keys, calls: scripted.calls };
 }
 
 const BASE = ['--genre', 'whatsapp', '--lang', 'es', '--variety', 'rioplatense', '--cv', CV_PATH];
@@ -83,10 +85,20 @@ describe('parseArgs', () => {
     [['--genre', 'whatsapp', '--lang', 'es', '--mode', 'total', '--cv', 'cv.md', 'draft.txt'], /--mode/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--bogus', 'draft.txt'], /--bogus/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv'], /--cv/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv=', 'draft.txt'], /--cv needs a value/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--keep', '', 'draft.txt'], /--keep needs a value/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--json=1', 'draft.txt'], /--json takes no value/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--mode', 'minimo', '--mode', 'pulido', 'draft.txt'], /--mode is given twice/],
   ])('refuses %j', (argv, message) => {
     const args = parseArgs(argv);
     expect(typeof args).toBe('string');
     expect(args).toMatch(message);
+  });
+});
+
+describe('parseArgs: the end of the options', () => {
+  it('reads every argument after -- as the draft, even one that starts with --', () => {
+    expect(parseArgs(['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--', '--draft.txt'])).toMatchObject({ draft: '--draft.txt' });
   });
 });
 
@@ -103,6 +115,14 @@ describe('runCli: usage errors', () => {
     const r = await run(['--help']);
     expect(r.code).toBe(EXIT.ok);
     expect(r.out).toContain(USAGE);
+  });
+
+  it('prints the usage on -h, but reads -h as a value when it follows an option that takes one', async () => {
+    expect((await run(['-h'])).out).toContain(USAGE);
+    const r = await run([...BASE, '--keep', '-h', 'clean.txt'], {}, { files: { 'clean.txt': CLEAN } });
+    expect(r.code).toBe(EXIT.ok);
+    expect(r.out).not.toContain(USAGE);
+    expect(r.out).toContain(CLEAN);
   });
 
   it('refuses a variety with English (the input schema), with the usage code', async () => {
@@ -204,6 +224,9 @@ describe('runCli: output and exit codes', () => {
     const result = RewriteResult.parse(JSON.parse(r.out));
     expect(result.rewritten).toContain('¿Lo vemos el jueves?');
     expect(result.changes.find((c) => c.after === 'el viernes')).toMatchObject({ status: 'reverted' });
+    const prompt = JSON.stringify(r.calls[0]?.request);
+    expect(prompt).toContain('Panadería Los Álamos');
+    expect(prompt).toContain('Hola Valeria, ¿cómo va el sitio?');
   });
 
   it('flags a claim not in the CV in the text output (D7)', async () => {
@@ -213,11 +236,35 @@ describe('runCli: output and exit codes', () => {
     expect(r.out).toContain('not-in-cv');
   });
 
-  it('reports a failed model call with its own code, never the error cause', async () => {
+  it('reports a failed gateway call with its name, code and message, never the error cause', async () => {
+    const failing: Gateway = {
+      structured: async () => {
+        throw new SetupError('the gateway is not set up', { cause: new Error('cause with secret-detail') });
+      },
+      structuredStream: () => {
+        throw new Error('not used');
+      },
+      text: async () => {
+        throw new Error('not used');
+      },
+    };
+    const r = await run([...BASE, 'draft.txt'], {}, { gateway: failing });
+    expect(r.code).toBe(EXIT.failed);
+    expect(r.err).toBe('rewrite failed: SetupError (invalid_setup): the gateway is not set up\n');
+    expect(r.out).toBe('');
+  });
+
+  it('reports any other failure by its name only', async () => {
     const r = await run([...BASE, 'draft.txt'], { 'rewrite.plan': [plan(1)] });
     expect(r.code).toBe(EXIT.failed);
-    expect(r.err).toMatch(/rewrite failed/);
-    expect(r.out).toBe('');
+    expect(r.err).toBe('rewrite failed: UnscriptedCallError\n');
+  });
+
+  it('gives every call of one run the same fresh jobId, for the per-job cap', async () => {
+    const r = await run([...BASE, 'draft.txt'], OK);
+    const ids = new Set(r.calls.map((c) => c.request.jobId));
+    expect(ids.size).toBe(1);
+    expect([...ids][0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
   });
 });
 

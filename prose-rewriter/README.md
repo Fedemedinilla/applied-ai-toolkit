@@ -23,8 +23,9 @@ node prose-rewriter/cli.ts --genre follow-up --lang es --variety rioplatense \
 
 - `--to` names a JSON file with the recipient's `name`, `org` and `role`. `--previous` names the earlier message of a follow-up. `--keep` can be repeated, and each phrase is left as it is.
 - The output starts with the rewritten text. Then come the changes, each with its reason and whether it was applied or reverted. After them, the facts taken from the CV, the ones only your text states, the placeholders, the flags and the status. `--json` prints the whole `RewriteResult` instead.
-- The CV's path is read and never printed, not even when the file cannot be read. A failed call prints the error's name and gateway code, never the error's cause.
-- The live gateway is built only in `cli.ts` (`cli.ts:28`), over in-memory stores with the four tasks and the provisional caps of `src/tasks.ts`. Everything else is `src/cli.ts`, which the tests run over the scripted gateway (`test/cli.test.ts`).
+- The CV's path is read and never printed, not even when the file cannot be read. A failed gateway call prints the error's name, its gateway code and its message, never the error's cause. Any other failure prints only the error's name.
+- The live gateway is built only in `cli.ts` (`cli.ts:32`), over in-memory stores with the four tasks and the provisional caps of `src/tasks.ts`. Everything else is `src/cli.ts`, which the tests run over the scripted gateway (`test/cli.test.ts`).
+- The stores live as long as one run. Each run gets a new job id, so the per-job cap binds within a run. The daily and monthly caps start from zero on every run, and with no user id the daily cap is skipped, so neither limits repeated runs. Persistent stores (the gateway's Postgres stores) would make them bind.
 
 Exit codes (`src/cli.ts:29`), provisional because the design left them open:
 
