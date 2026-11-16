@@ -82,7 +82,7 @@ Each entry gives the page, a quote under 30 words, and the tag. Only pages that 
 
 <!-- slop-lint-disable -->
 - Wikipedia, "Wikipedia:Signs of AI writing", https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing `[REPORTADO]`. It lists the opener as a real example of LLM text, under "Communication intended for the user": "I hope this message finds you well. I am writing to request an edit for the Wikipedia entry".
-- The same page says such comments sound like correspondence: "Many LLM-generated comments tend to sound like they're coming from a clerk or customer service representative" `[REPORTADO]`.
+- The same page, under "Comment-specific indicators", says of talk-page comments: "Many LLM-generated comments tend to sound like they're coming from a clerk or customer service representative" `[REPORTADO]`. It makes the point about wiki comments, not about email, so it is context for MAIL-04 and no evidence for it.
 - Grammarly, https://www.grammarly.com/blog/writing-tips/i-hope-this-email-finds-you-well/ `[CONSENSO]`: "the opener has become a recognizable email cliché".
 - Emphasis, a UK business writing firm, https://www.emphasis.co.uk/blog/has-i-hope-youre-well-had-its-day/ `[CONSENSO]`: "those five words have become the default opener for almost every email". It adds that the phrase can read as insincere.
 - Alore, a sales email blog, https://www.alore.io/blog/what-can-i-say-instead-of-im-reaching-out `[CONSENSO]`. It covers "I'm reaching out" and its softened forms and says: "In cold email the softening can read as hesitation, so state the reason directly." Two reads of the page named different headings for that sentence, so this note names none.
