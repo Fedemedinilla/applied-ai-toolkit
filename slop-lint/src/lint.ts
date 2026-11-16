@@ -82,12 +82,20 @@ function sentenceIndexAt(sentences: readonly Span[], offset: number): number {
  * "passionate" (ESP-04) inside "passionate about" (LEX-03), or "ultimately" (LEX-04)
  * inside "ultimately," (EST-05). On an identical span and level the earlier rule in
  * the catalog wins. Each piece of text is charged once.
+ *
+ * A match of a rule's weaker alternatives never covers a full-strength hit: when it holds one
+ * ("why this pivotal work matters" holds "pivotal"), the weaker match is dropped and the hit
+ * inside it is kept, so wrapping a word in the phrase never lowers its severity, hides a repeat
+ * or removes another rule's finding.
  */
 function dropCovered(hits: readonly Hit[]): Hit[] {
+  const isWeaker = (h: Hit): boolean => h.severity !== undefined;
   return hits.filter(
     (h) =>
+      !(isWeaker(h) && hits.some((g) => !isWeaker(g) && g.start >= h.start && g.end <= h.end)) &&
       !hits.some((g) => {
         if (g === h || g.start > h.start || g.end < h.end) return false;
+        if (isWeaker(g) && !isWeaker(h)) return false;
         if (g.rule.level !== h.rule.level) return g.rule.level < h.rule.level;
         const longer = g.end - g.start > h.end - h.start;
         return longer || (g.end - g.start === h.end - h.start && g.order < h.order);

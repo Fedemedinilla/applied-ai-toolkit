@@ -65,3 +65,48 @@ describe('LEX-04 counts "this matters" and "why X matters" as Tier 2 words at lo
     expect(result.findings.map((f) => [f.match, f.severity])).toEqual([['This matters', 'high']]);
   });
 });
+
+describe('a "why X matters" phrase never swallows a full-strength hit inside X', () => {
+  // dropCovered() keeps the longer of two nested hits. The weaker phrase is longer than any word
+  // inside X, so without this guard it would demote a medium Tier 2 word to low, hide a repeat
+  // and drop another rule's finding. The outputs below are the ones before the widening.
+  const lintEn = (text: string) => {
+    const result = lint(text, { lang: 'en' });
+    return {
+      points: result.score.points,
+      tier2Used: result.stats.tier2Used,
+      reported: result.findings.map((f) => [f.ruleId, f.match, f.severity]),
+    };
+  };
+
+  it('keeps a Tier 2 word inside X at medium once the budget is spent', () => {
+    expect(lintEn('The work was pivotal and robust. Why innovative design matters.')).toEqual({
+      points: 13.5,
+      tier2Used: 3,
+      reported: [['LEX-04', 'innovative', 'medium']],
+    });
+    expect(lintEn('Additionally, I wrote the docs. Moreover, I fixed it. I explain why this pivotal work matters.')).toEqual({
+      points: 13.5,
+      tier2Used: 3,
+      reported: [['LEX-04', 'pivotal', 'medium']],
+    });
+  });
+
+  it('reports a Tier 2 word repeated inside X', () => {
+    const result = lint('Key role. Why the key role matters.', { lang: 'en' });
+    expect(result.findings.map((f) => [f.ruleId, f.match, f.severity])).toEqual([['LEX-04', 'key role', 'medium']]);
+    expect(result.findings[0]?.detail).toContain('repeated');
+  });
+
+  it("keeps another rule's hit inside X", () => {
+    expect(lintEn('I explain why it really matters. I really like it.')).toEqual({
+      points: 14.5,
+      tier2Used: 0,
+      reported: [['LEX-05', 'really', 'low']],
+    });
+  });
+
+  it('still counts a phrase with nothing else inside it once', () => {
+    expect(lintEn('The work was pivotal and robust. That is why this matters.').reported).toEqual([['LEX-04', 'why this matters', 'low']]);
+  });
+});

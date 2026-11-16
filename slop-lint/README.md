@@ -435,7 +435,7 @@ The report sorts vocabulary into three tiers and gives every catalog rule a thre
 
 The shared budget is spent in reading order, so context words without an anchor can use it up before a Tier 2 word appears. <!-- slop-lint-disable -->In the English "before" letter, "drive" and "impactful" take the two free slots, and "dynamic", "fostering" and "align with" are reported.<!-- slop-lint-enable -->
 
-A rule can hold alternatives whose source is weaker than its own, reported at a lower severity. LEX-04 has two, <!-- slop-lint-disable -->"this matters" and "why X matters"<!-- slop-lint-enable -->, from a commercial analytics firm the report tags REPORTADO. They spend the shared Tier 2 budget like any LEX-04 word, so one of them can push a later word past the budget. Once reported, they cost the low penalty instead of the medium one. A severity set for LEX-04 in a genre or a config applies to them too.
+A rule can hold alternatives whose source is weaker than its own, reported at a lower severity. LEX-04 has two, <!-- slop-lint-disable -->"this matters" and "why X matters"<!-- slop-lint-enable -->, from a commercial analytics firm the report tags REPORTADO. They spend the shared Tier 2 budget like any LEX-04 word, so one of them can push a later word past the budget. Once reported, they cost the low penalty instead of the medium one. A "why X matters" whose X holds a hit of LEX-04 or of another rule is dropped, and that hit is reported as it would be without the phrase. A severity set for LEX-04 in a genre or a config applies to them too.
 
 ## Design decisions
 
