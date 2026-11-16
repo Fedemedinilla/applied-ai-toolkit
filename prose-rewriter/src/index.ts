@@ -3,8 +3,9 @@
  * the voice profile (voice.ts), the fact check (facts.ts), the sentences, edits and diff
  * (edits.ts) and the injection guard (injection.ts). No model, no gateway and no I/O in any of
  * them. F5 adds the model-facing building blocks: the four gateway tasks with their provisional
- * caps (tasks.ts) and evals' ModelClient over the gateway (model-client.ts), which the fact judge
- * calls through. rewrite(), with the stages S0 to S7 and the CLI, comes later in F5.
+ * caps (tasks.ts), evals' ModelClient over the gateway (model-client.ts), which the fact judge
+ * calls through, and the judge's own rubric with its revert plan and the D10 switch (rubric.ts).
+ * rewrite(), with the stages S0 to S7 and the CLI, comes later in F5.
  */
 export {
   Change,
@@ -86,3 +87,20 @@ export {
 } from './injection.ts';
 export { callSettings, PROVISIONAL_CAPS, REWRITE_TASKS, type RewriteTask, TASK_CONFIGS, taskConfig } from './tasks.ts';
 export { gatewayModelClient, type ModelClientOptions } from './model-client.ts';
+export {
+  factSheet,
+  type Fallback,
+  type JudgeLine,
+  judgeLines,
+  judgeRuns,
+  type PlanInput,
+  planReverts,
+  type RevertPlan,
+  REWRITE_JUDGE_PROMPT_VERSION,
+  REWRITE_RUBRIC,
+  REWRITE_RUBRIC_VERSION,
+  rewritePiece,
+  rewriteRubric,
+  RewriteVerdict,
+  type UserClaim,
+} from './rubric.ts';
