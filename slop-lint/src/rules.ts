@@ -216,7 +216,7 @@ const lexical: PatternRule[] = [
     },
     weaker: {
       label: '"this matters", "why X matters"',
-      patterns: { en: wordList(['this matters', String.raw`why (?:[\p{L}\p{N}'’-]+ ){1,3}matters`]) },
+      patterns: { en: wordList(['this matters', String.raw`why (?:[\p{L}\p{N}'’-]+ ){1,3}matters(?=\s*(?:[.,;:!?)\]"”’]|$))`]) },
       severity: 'low',
       source: {
         evidence: ['REPORTADO'],
@@ -227,7 +227,8 @@ const lexical: PatternRule[] = [
     deviation:
       '"key" from the section 12 list only matches before a small set of abstract nouns, so "API key" does not count. ' +
       '"this matters" and "why X matters" come from a commercial source the report tags REPORTADO, so they share the ' +
-      'Tier 2 budget but are reported at low severity; X is one to three words, a bound the report does not give.',
+      'Tier 2 budget but are reported at low severity; X is one to three words, a bound the report does not give, ' +
+      'and "matters" must end the clause, so the noun ("why legal matters are slow") does not count.',
     examples: [
       { lang: 'en', fire: 'This was a pivotal year for the team.', pass: 'I built the pivot table in an hour.' },
       { lang: 'en', fire: 'Additionally, I wrote the docs.', pass: 'I added two columns to the report.' },
