@@ -20,7 +20,7 @@ import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
 import { EditReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
 import { editPrompt, planPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
-import type { Edit, JudgeClient } from '../types.ts';
+import type { Edit } from '../types.ts';
 
 /**
  * PROVISIONAL output budgets per stage, in tokens, thinking included: starting values under the
@@ -59,18 +59,6 @@ export function metered(gateway: Gateway<string>, usage: Usage): Gateway<string>
       return { started: call.started, final: call.final.then(add) };
     },
     text: async (request) => add(await gateway.text(request)),
-  };
-}
-
-/** A judge client the caller passed: counted, with no price. */
-export function meteredJudge(client: JudgeClient, usage: Usage): JudgeClient {
-  return {
-    async create(request) {
-      const reply = await client.create(request);
-      usage.calls += 1;
-      usage.costUsd = null;
-      return reply;
-    },
   };
 }
 

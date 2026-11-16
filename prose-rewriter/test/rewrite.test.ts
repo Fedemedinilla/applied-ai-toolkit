@@ -406,14 +406,60 @@ describe('modes and usage', () => {
     expectSound(input, result);
   });
 
-  it('gives costUsd null when a call has no price, and counts a judge passed in', async () => {
+  it('adds up the cost of every call, and gives costUsd null once a call has no price', async () => {
     const expected = MAIL.replace(SINERGIAS, FIXED);
-    const scripted = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })], 'rewrite.style': [edits()] });
-    const judge: JudgeClient = {
-      create: async () => ({ text: verdict(expected).text, stopReason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }),
+    const tokens = { usage: { input: 1200, output: 300 } };
+    const script = () =>
+      scriptedGateway({
+        'rewrite.plan': [{ ...plan(2), ...tokens }],
+        'rewrite.edit': [{ ...edits({ sentenceId: 2, before: SINERGIAS, after: FIXED }), ...tokens }],
+        'rewrite.style': [{ ...edits(), ...tokens }],
+        'rewrite.judge': [{ ...verdict(expected), ...tokens }],
+      });
+    /** The scripted gateway, with each call's cost recorded, and none for the tasks in `unpriced`. */
+    const watched = (unpriced: readonly string[]) => {
+      const scripted = script();
+      const costs: Array<number | null> = [];
+      const price = <R extends { meta: { costUsd: number | null } }>(task: string, r: R): R => {
+        const meta = { ...r.meta, costUsd: unpriced.includes(task) ? null : r.meta.costUsd };
+        costs.push(meta.costUsd);
+        return { ...r, meta };
+      };
+      const gateway: typeof scripted.gateway = {
+        ...scripted.gateway,
+        structured: async (schema, request) => price(request.task, await scripted.gateway.structured(schema, request)),
+        text: async (request) => price(request.task, await scripted.gateway.text(request)),
+      };
+      return { scripted, costs, gateway };
     };
-    const result = await rewrite(mail(MAIL), { gateway: scripted.gateway, refs: REFS, judge });
-    expect(result.usage).toEqual({ calls: 4, costUsd: null });
+    const priced = watched([]);
+    const result = await rewrite(mail(MAIL), { gateway: priced.gateway, refs: REFS });
+    priced.scripted.assertDone();
+    expect(priced.costs).toHaveLength(4);
+    const sum = priced.costs.reduce<number>((total, c) => total + (c ?? Number.NaN), 0);
+    expect(sum).toBeGreaterThan(0);
+    expect(result.usage.calls).toBe(4);
+    expect(result.usage.costUsd).toBeCloseTo(sum, 12);
+
+    const unpriced = watched(['rewrite.style']);
+    const partial = await rewrite(mail(MAIL), { gateway: unpriced.gateway, refs: REFS });
+    expect(partial.usage).toEqual({ calls: 4, costUsd: null });
+  });
+
+  it('sends the judge through the gateway even when a caller passes its own client', async () => {
+    const expected = MAIL.replace(SINERGIAS, FIXED);
+    const scripted = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })], 'rewrite.style': [edits()], 'rewrite.judge': [verdict(expected)] });
+    let bypassed = 0;
+    const judge: JudgeClient = {
+      create: async () => {
+        bypassed += 1;
+        return { text: verdict(expected).text, stopReason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
+      },
+    };
+    const options = { gateway: scripted.gateway, refs: REFS, judge };
+    await rewrite(mail(MAIL), options);
+    scripted.assertDone();
+    expect(bypassed).toBe(0);
   });
 });
 
