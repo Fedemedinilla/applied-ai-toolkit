@@ -22,6 +22,8 @@ node prose-rewriter/cli.ts --genre follow-up --lang es --variety rioplatense \
      [--strategy staged|single] [--json] draft.txt
 ```
 
+The folder is a private workspace of the repository (`package.json`), never published, so it has no bin. From the root, `npm run rewrite -- <arguments>` runs the same CLI, and `npm run rewrite:evals -- <arguments>` runs the eval CLI below, as `npm run evals:gate` does for `evals/`.
+
 - `--to` names a JSON file with the recipient's `name`, `org` and `role`. `--previous` names the earlier message of a follow-up. `--keep` can be repeated, and each phrase is left as it is. Without `--strategy`, the rewrite makes one call that plans and edits, with the same checks after it (`single`, the default since 2026-11-16; see "Measured"). `--strategy staged` runs the stages S2 to S4 instead (see "The stages").
 - The output starts with the rewritten text. Then come the changes, each with its reason and whether it was applied or reverted. After them, the facts taken from the CV, the ones only your text states, the placeholders, the flags and the status. `--json` prints the whole `RewriteResult` instead.
 - The CV's path is read and never printed, not even when the file cannot be read. A failed gateway call prints the error's name, its gateway code and its message, never the error's cause. Any other failure prints only the error's name.

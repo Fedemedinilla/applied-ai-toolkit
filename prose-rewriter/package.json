@@ -1,0 +1,10 @@
+{
+  "name": "prose-rewriter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Returns a text you wrote improved, with your CV as the only source of facts. Not published.",
+  "type": "module",
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

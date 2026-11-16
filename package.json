@@ -6,7 +6,9 @@
     "csp-build-guard",
     "gateway",
     "import-fences",
-    "slop-lint"
+    "prose-rewriter",
+    "slop-lint",
+    "style-refs"
   ],
   "engines": {
     "node": ">=24.15.0 <25"
@@ -43,6 +45,8 @@
     "evals:gate": "node evals/scripts/gate.ts",
     "evals:report": "node evals/scripts/report.ts",
     "genre:eval": "node slop-lint/scripts/genre-eval.ts slop-lint/fixtures",
+    "rewrite": "node prose-rewriter/cli.ts",
+    "rewrite:evals": "node prose-rewriter/evals/cli.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "release": "npm run pack:check && changeset publish"
