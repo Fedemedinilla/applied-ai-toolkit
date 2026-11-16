@@ -43,6 +43,14 @@ export const EVIDENCE = ['MEDIDO', 'REPORTADO', 'CONSENSO', 'SÍNTESIS'] as cons
 export const USES = ['excerpts', 'principles', 'link-only', 'excluded'] as const;
 export type Use = (typeof USES)[number];
 
+/** A `do` principle is a lesson for the prompt; an `avoid` entry belongs to the "no imitar" list of design 4.8. */
+export const PRINCIPLE_KINDS = ['do', 'avoid'] as const;
+export type PrincipleKind = (typeof PRINCIPLE_KINDS)[number];
+
+/** The varieties of Spanish the design names; `rioplatense` brings voseo. */
+export const VARIETIES = ['rioplatense', 'neutral'] as const;
+export type Variety = (typeof VARIETIES)[number];
+
 /** Design decision D11: an excerpt is at most two sentences and this many words. */
 export const EXCERPT_MAX_SENTENCES = 2;
 export const EXCERPT_MAX_WORDS = 45;
@@ -91,21 +99,42 @@ export const Source = z.strictObject({
   use: z.enum(USES),
   /** Limits the principles that cite this source, as a casual register source never reaches a formal prompt. */
   scope: z.strictObject({ genres: z.array(z.enum(GENRES)).min(1), registers: z.array(z.enum(REGISTERS)).min(1) }).optional(),
+  /**
+   * The credit line an open licence asks for (OGL v3.0, CC BY 4.0). Required before a source under
+   * an open licence gives principles or excerpts; our principles are adapted from it, never copied.
+   */
+  attribution: z.string().min(1).optional(),
   /** What the source is for and what stays unverified, in plain words. */
   note: z.string().min(1).optional(),
 });
 export type Source = z.infer<typeof Source>;
 
-/** A principle in our own words, with the sources it comes from and how it is checked. */
+/** A slop-lint rule id such as OFI-01 or SIN-EN-01. style-refs imports no other library, so only the form is checked. */
+const SlopRuleId = z.string().regex(/^[A-Z]{2,4}(?:-[A-Z]{2})?-\d{2}$/, 'a slop-lint rule id such as OFI-01');
+
+/**
+ * A principle in our own words, with the sources it comes from and how it is checked. An `avoid`
+ * entry is one item of the "no imitar" list: the rewriter shows its text as a negative constraint
+ * (stage S4) and looks for its terms after the rewrite (stage S6). Its sources are the works whose
+ * trait it warns against, so the scope of a casual source does not limit it.
+ */
 export const Principle = z.strictObject({
   id: Id,
+  /** Absent means `do`. */
+  kind: z.enum(PRINCIPLE_KINDS).optional(),
   lang: z.enum(LANGS),
+  /** Only for that variety of Spanish, e.g. voseo for rioplatense. Absent means every variety. */
+  variety: z.enum(VARIETIES).optional(),
   genres: z.array(z.enum(GENRES)).min(1),
   registers: z.array(z.enum(REGISTERS)).min(1),
   /** The sentence a prompt shows, word for word. */
   text: z.string().min(1),
   /** How code or a reviewer checks that a rewrite follows it. */
   check: z.string().min(1),
+  /** For an `avoid` entry: words stage S6 looks for, whole and ignoring case. */
+  terms: z.array(z.string().min(1)).min(1).optional(),
+  /** The slop-lint rules that check the same thing, so the prompt and the linter point at one fault. */
+  slopRules: z.array(SlopRuleId).min(1).optional(),
   sources: z.array(Id).min(1),
 });
 export type Principle = z.infer<typeof Principle>;
@@ -130,7 +159,7 @@ export const Example = z.strictObject({
   id: Id,
   genre: z.enum(GENRES),
   lang: z.enum(LANGS),
-  variety: z.enum(['rioplatense', 'neutral']).optional(),
+  variety: z.enum(VARIETIES).optional(),
   before: z.string().min(1),
   after: z.string().min(1),
   notes: z.string().min(1),
@@ -200,11 +229,14 @@ export function validateRefs(data: RefsData): RefsProblem[] {
     unique(file, entries);
     entries.forEach((p, i) => {
       if (p.lang !== lang) problems.push({ file, path: `${i}.lang`, message: `lang ${p.lang} in the ${lang} file` });
+      if (p.variety !== undefined && p.lang !== 'es') problems.push({ file, path: `${i}.variety`, message: `a variety of Spanish on an ${p.lang} principle` });
+      if (p.terms !== undefined && p.kind !== 'avoid') problems.push({ file, path: `${i}.terms`, message: 'only an avoid entry has terms' });
       p.sources.forEach((id, j) => {
         const source = cites(file, `${i}.sources.${j}`, id);
         if (source === undefined) return;
         if (source.use === 'link-only' || source.use === 'excluded') problems.push({ file, path: `${i}.sources.${j}`, message: `${id} is ${source.use}` });
-        if (source.scope === undefined) return;
+        // An avoid entry warns against the source's trait, so it may name a casual source in a formal register.
+        if (source.scope === undefined || p.kind === 'avoid') return;
         const genres = p.genres.filter((g) => !source.scope?.genres.includes(g));
         const registers = p.registers.filter((r) => !source.scope?.registers.includes(r));
         if (genres.length > 0) problems.push({ file, path: `${i}.genres`, message: `${id} is limited to ${source.scope.genres.join(', ')}, and this principle also covers ${genres.join(', ')}` });
@@ -242,6 +274,37 @@ export function validateRefs(data: RefsData): RefsProblem[] {
   return problems;
 }
 
+export interface PrincipleQuery {
+  readonly lang: Lang;
+  readonly genre: Genre;
+  readonly register: Register;
+  /** Absent means a Spanish text of no particular variety, so only principles with no variety match. */
+  readonly variety?: Variety;
+  /** Absent returns both lessons and avoid entries. */
+  readonly kind?: PrincipleKind;
+}
+
+/**
+ * The principles a prompt for one text may show, in file order. It checks the scope of each cited
+ * source again, so a lesson from a casual source stays out of a formal prompt even when the data
+ * skipped validateRefs, and a lesson citing a missing or unusable source is dropped.
+ */
+export function principlesFor(principles: readonly Principle[], sources: readonly Source[], q: PrincipleQuery): Principle[] {
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  return principles.filter((p) => {
+    const kind = p.kind ?? 'do';
+    if (p.lang !== q.lang || !p.genres.includes(q.genre) || !p.registers.includes(q.register)) return false;
+    if (p.variety !== undefined && p.variety !== q.variety) return false;
+    if (q.kind !== undefined && kind !== q.kind) return false;
+    if (kind === 'avoid') return true;
+    return p.sources.every((id) => {
+      const s = byId.get(id);
+      if (s === undefined || (s.use !== 'principles' && s.use !== 'excerpts')) return false;
+      return s.scope === undefined || (s.scope.genres.includes(q.genre) && s.scope.registers.includes(q.register));
+    });
+  });
+}
+
 type Local = { path: string; message: string };
 
 const FREE: ReadonlySet<LegalStatus> = new Set(['public-domain', 'open-licence']);
@@ -262,6 +325,13 @@ function sourceProblems(s: Source): Local[] {
   for (const place of JURISDICTIONS) {
     const from = s.freeFrom?.[place];
     if (from !== undefined && FREE.has(s.status[place])) out.push({ path: `freeFrom.${place}`, message: `free from ${from}, so ${place} cannot be ${s.status[place]} yet` });
+  }
+  if (s.scope?.registers.includes('casual') === true && s.scope.registers.includes('formal')) {
+    out.push({ path: 'scope.registers', message: 'a source scoped to the casual register cannot also reach formal' });
+  }
+  const open = JURISDICTIONS.some((place) => s.status[place] === 'open-licence');
+  if (open && (s.use === 'principles' || s.use === 'excerpts') && s.attribution === undefined) {
+    out.push({ path: 'attribution', message: `an open licence asks for attribution, and this source gives ${s.use} without one` });
   }
   if (s.use === 'excerpts' && s.status.us !== 'public-domain') out.push({ path: 'use', message: `a source for excerpts must be public-domain in the US, and it is ${s.status.us}` });
   if (s.kind === 'literary' && s.use !== 'excluded') {

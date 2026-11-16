@@ -196,6 +196,20 @@ describe('an excerpt is short, verbatim from Gutenberg or Wikisource, and never 
   });
 });
 
+describe('an open-licence source names its attribution before anything draws on it', () => {
+  const guide = { ...work, kind: 'guide', authorDied: null, use: 'principles', status: { ar: 'open-licence', us: 'open-licence', eu: 'open-licence', es: 'open-licence' } };
+  it('refuses an open-licence guide that gives principles with no attribution', () => {
+    expect(messages({ ...empty, sources: [guide] })).toEqual([
+      'sources.json 0.attribution: an open licence asks for attribution, and this source gives principles without one',
+    ]);
+  });
+  it('accepts it with an attribution, and asks none of a link-only guide or a public-domain work', () => {
+    expect(messages({ ...empty, sources: [{ ...guide, attribution: 'Contains material from an invented guide, CC BY 4.0.' }] })).toEqual([]);
+    expect(messages({ ...empty, sources: [{ ...guide, use: 'link-only' }] })).toEqual([]);
+    expect(messages({ ...empty, sources: [work] })).toEqual([]);
+  });
+});
+
 describe('the Argentine rule reaches works, not open-licence guides', () => {
   it('asks no paid public domain flag of an Argentine guide', () => {
     const guide = { ...work, kind: 'guide', authorDied: null, nationality: ['ar'], lang: 'es', originalLang: 'es', use: 'principles', url: 'https://www.argentina.gob.ar/acerca' };
