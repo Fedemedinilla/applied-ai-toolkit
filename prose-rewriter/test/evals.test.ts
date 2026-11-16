@@ -3,8 +3,9 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendJsonl, readJsonl } from '../../evals/src/index.ts';
+import { appendJsonl, decide, gate, parseRun, readJsonl } from '../../evals/src/index.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
+import { caseOrder, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from '../evals/judges.ts';
 import { pipelineVariant, runPipelines, singleCall, VARIANTS, type EvalCase, type PieceRecord } from '../evals/pipeline.ts';
 import { PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from '../src/prompt.ts';
 import { rewrite } from '../src/rewrite.ts';
@@ -216,5 +217,109 @@ describe('runPipelines', () => {
       ['es-whatsapp-clean', 'full', 'done', 0, 0],
       ['es-whatsapp-clean', 'single-call', 'done', 0, 0],
     ]);
+  });
+});
+
+describe('the blind judges as a per-piece pass (design 5)', () => {
+  const NOW = new Date('2026-11-16T12:00:00Z');
+  const pipelined = MAIL.replace(SINERGIAS, FIXED);
+  const single = MAIL.replace(SINERGIAS, 'Te escribo por el sitio.');
+  const piece = (variant: string, rewritten: string): PieceRecord => ({
+    case: 'es-email-slop',
+    genre: 'email',
+    lang: 'es',
+    mode: 'pulido',
+    variant,
+    status: 'done',
+    rewritten,
+    result: { kind: 'single-call', rewritten, applied: 1, refused: 0, usage: { calls: 1, costUsd: 0 } },
+    usage: { calls: 1, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, extraRound: false },
+  });
+  const choice = (c: 'A' | 'B') => ({ text: JSON.stringify({ choice: c, note: '' }) });
+  const yes = (key: string, value: boolean) => ({ text: JSON.stringify({ [key]: value, note: '' }) });
+
+  it('lists the four judge rubrics of design 5, pairwise twice', () => {
+    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination']);
+  });
+
+  it('derives the A/B order from the case id alone: the same on every run', () => {
+    expect(caseOrder('es-email-slop', 'pairwise-original')).toBe(caseOrder('es-email-slop', 'pairwise-original'));
+    const orders = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => caseOrder(id, 'pairwise-original')));
+    expect(orders).toEqual(new Set(['AB', 'BA']));
+  });
+
+  it('judges blind through rewrite.judge, maps the choice back through the order, and feeds gate() and decide()', async () => {
+    // Every pairwise judge answers "A": whether that is the candidate depends on the order of the case.
+    const scripted = scriptedGateway({
+      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true)],
+    });
+    const seen: JudgeRecord[] = [];
+    const records = await judgePieces(CASES, [piece('full', pipelined), piece('single-call', single)], { gateway: scripted.gateway, now: NOW, record: (r) => seen.push(r) });
+    scripted.assertDone();
+    expect(seen).toEqual(records);
+    expect(scripted.calls.every((c) => c.task === 'rewrite.judge' && c.sent?.['model'] === 'claude-sonnet-5-5')).toBe(true);
+
+    // Blind: no variant name reaches the judge, and the A/B texts follow the order of the case.
+    for (const c of scripted.calls) expect(JSON.stringify(c.request.messages)).not.toMatch(/single-call|full|pipeline/);
+    const pairOrder = caseOrder('es-email-slop', 'pairwise-original');
+    const first = String(scripted.calls[0]?.request.messages[0]?.content);
+    const a = first.slice(first.indexOf('VERSION A'), first.indexOf('VERSION B'));
+    expect(a).toContain(pairOrder === 'AB' ? 'Quería comentarte que me apasiona potenciar sinergias.' : 'Quería contarte');
+
+    const pass = (rubric: string, variant: string) => records.find((r) => r.rubric === rubric && r.variant === variant)?.pass;
+    const aWins = (order: string) => order === 'BA'; // A is the candidate when the order is BA
+    expect(pass('pairwise-original', 'full')).toBe(aWins(pairOrder));
+    expect(pass('pairwise-original', 'single-call')).toBe(aWins(pairOrder));
+    expect(pass('pairwise-baseline', 'full')).toBe(aWins(caseOrder('es-email-slop', 'pairwise-baseline')));
+    expect(records.filter((r) => r.rubric === 'pairwise-baseline').map((r) => r.variant)).toEqual(['full']);
+    // The judging order is shuffled, so the yes/no verdicts land on either variant; each count holds.
+    for (const rubric of ['same-voice', 'literary-contamination']) expect(records.filter((r) => r.rubric === rubric).map((r) => r.pass).sort()).toEqual([false, true]);
+    expect(records.filter((r) => r.rubric === 'register-fit').map((r) => r.pass)).toEqual([true, true]);
+    expect(records.every((r) => r.usage.calls === 1)).toBe(true);
+
+    const runs = judgeRuns(records);
+    const full = parseRun(runs.get('pairwise-original/full'));
+    const baseline = parseRun(runs.get('pairwise-original/single-call'));
+    expect(full.results).toEqual([{ case: 'es-email-slop', sample: 1, status: 'scored', pass: aWins(pairOrder), metrics: {} }]);
+    expect(gate(baseline, full).state).toMatch(/^(pass|fail|inconclusive)$/);
+    // pairwise-baseline gives both sides from the same verdicts: the baseline's pass is the pipeline's loss.
+    const versus = parseRun(runs.get('pairwise-baseline/single-call vs full'));
+    expect(versus.results[0]?.pass).toBe(!pass('pairwise-baseline', 'full'));
+    const pipelineSide = parseRun(runs.get('pairwise-baseline/full'));
+    const count = (run: typeof versus) => run.results.filter((r) => r.pass === true).length;
+    expect(gate(versus, pipelineSide).state).toBe(decide(count(versus), 1, count(pipelineSide), 1));
+  });
+
+  it('does not pay to compare a text with itself, and carries a failed piece to every rubric', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [yes('fits', true), yes('contaminated', false)] });
+    const failed: PieceRecord = { ...piece('no-style', ''), status: 'failed', error: 'ResponseError: x' } as PieceRecord;
+    const records = await judgePieces(CASES, [piece('full', MAIL), failed], { gateway: scripted.gateway, now: NOW });
+    scripted.assertDone();
+    const full = records.filter((r) => r.variant === 'full').map((r) => [r.rubric, r.status, r.pass]);
+    expect(full).toEqual([
+      ['pairwise-original', 'no-output', null],
+      ['same-voice', 'no-output', null],
+      ['register-fit', 'scored', true],
+      ['literary-contamination', 'scored', true],
+    ]);
+    expect(records.filter((r) => r.variant === 'no-style').map((r) => [r.rubric, r.status])).toEqual([
+      ['pairwise-original', 'failed'],
+      ['same-voice', 'failed'],
+      ['register-fit', 'failed'],
+      ['literary-contamination', 'failed'],
+    ]);
+  });
+
+  it('records a judge reply it cannot read as failed and goes on', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false)] });
+    const records = await judgePieces(CASES, [piece('full', pipelined)], { gateway: scripted.gateway, now: NOW });
+    scripted.assertDone();
+    expect(records.map((r) => [r.rubric, r.status])).toEqual([
+      ['pairwise-original', 'failed'],
+      ['same-voice', 'scored'],
+      ['register-fit', 'scored'],
+      ['literary-contamination', 'scored'],
+    ]);
+    expect(records[0]?.error).toMatch(/^JudgeError/);
   });
 });

@@ -166,21 +166,24 @@ export type PieceRecord =
   /** `error` is the error's class and message; gateway and schema messages name fields, never the text. */
   | (PieceBase & { readonly status: 'failed'; readonly error: string });
 
-interface Meter {
+/** Calls, cost and tokens of the calls made through measuredGateway(). */
+export interface Meter {
   calls: number;
   costUsd: number | null;
   tokens: { input: number; output: number; cacheRead: number; cacheWrite5m: number; cacheWrite1h: number };
   editCalls: number;
 }
 
+export const newMeter = (): Meter => ({ calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, editCalls: 0 });
+
 /**
- * The gateway as one variant sees it: the variant's task overrides go in the request's config,
- * and every call is measured. Streaming is passed through unmeasured: no stage streams.
+ * The gateway with every call measured into `meter`, and the given task overrides sent in the
+ * request's config. Streaming is passed through unmeasured: no stage and no judge streams.
  */
-function variantGateway(gateway: Gateway<string>, v: PipelineVariant, meter: Meter): Gateway<string> {
+export function measuredGateway(gateway: Gateway<string>, meter: Meter, tasks: PipelineVariant['tasks'] = {}): Gateway<string> {
   const configured = <R extends GatewayRequest<string>>(request: R): R => {
     if (request.task === 'rewrite.edit') meter.editCalls += 1;
-    const override = v.tasks?.[request.task as OverridableTask];
+    const override = tasks[request.task as OverridableTask];
     return override === undefined ? request : { ...request, config: override };
   };
   const cost = (c: number | null): void => {
@@ -194,6 +197,7 @@ function variantGateway(gateway: Gateway<string>, v: PipelineVariant, meter: Met
     return result;
   };
   const paidFailure = (error: unknown): never => {
+    // A reply the model sent and the schema refused was paid for.
     if (error instanceof ResponseError) cost(error.costUsd);
     throw error;
   };
@@ -229,8 +233,8 @@ export async function runPipelines(cases: readonly EvalCase[], variants: readonl
   const records: PieceRecord[] = [];
   for (const c of parsed) {
     for (const v of variants) {
-      const meter: Meter = { calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, editCalls: 0 };
-      const gateway = variantGateway(options.gateway, v, meter);
+      const meter = newMeter();
+      const gateway = measuredGateway(options.gateway, meter, v.tasks);
       const refs = v.withoutExamples === true ? { ...options.refs, examples: [] } : options.refs;
       // One job per piece, so the per-job cap applies to each piece. The gateway takes a UUID only.
       const common = { gateway, refs, userId: options.userId ?? null, jobId: randomUUID() };
