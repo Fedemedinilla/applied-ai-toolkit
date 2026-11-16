@@ -28,6 +28,7 @@ describe('the public entry', () => {
     expect(entry.PlanOutput.safeParse({ items: [] }).success).toBe(true);
     expect(entry.EditOutput.safeParse({ edits: [] }).success).toBe(true);
     expect(entry.STYLE_MAX_EDITS).toBeGreaterThan(0);
+    expect(entry.EDIT_EXTRA_SENTENCES).toBeGreaterThan(0);
   });
 
   it('exports the data tags and not rewrite() yet', () => {
