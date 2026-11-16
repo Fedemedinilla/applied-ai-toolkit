@@ -67,14 +67,33 @@ const CURRENCY: Readonly<Record<string, string>> = {
   'us$': 'USD', 'u$s': 'USD', usd: 'USD', 'dólares': 'USD', dolares: 'USD', dollars: 'USD',
   ars: 'ARS', pesos: 'ARS', eur: 'EUR', '€': 'EUR', euros: 'EUR', $: '$',
 };
-const AMOUNT_BEFORE = new RegExp(String.raw`(?<![\p{L}\p{N}])(US\$|U\$S|u\$s|USD|ARS|EUR|€|\$)\s?(${NUM})`, 'gu');
-const AMOUNT_AFTER = new RegExp(String.raw`(${NUM})\s?(USD|ARS|EUR|€|dólares|dolares|dollars|pesos|euros)${E}`, 'giu');
+/**
+ * A magnitude written after a number, as powers of ten: "1,2 millones", "USD 1.2k", "2.5 billion".
+ * A Spanish "billón" is a million millions; an English "billion", a thousand millions.
+ */
+const MAGNITUDES: Readonly<Record<string, number>> = {
+  k: 3, K: 3, mil: 3, thousand: 3, M: 6, MM: 6, mill: 6, 'millón': 6, millon: 6, millones: 6, million: 6, millions: 6,
+  bn: 9, billion: 9, billions: 9, 'billón': 12, billon: 12, billones: 12,
+};
+const MAG = String.raw`(${Object.keys(MAGNITUDES).sort((a, b) => b.length - a.length).join('|')})${E}`;
+const AMOUNT_BEFORE = new RegExp(String.raw`(?<![\p{L}\p{N}])(US\$|U\$S|u\$s|USD|ARS|EUR|€|\$)\s?(${NUM})(?:\s?${MAG})?`, 'gu');
+const AMOUNT_AFTER = new RegExp(String.raw`(${NUM})(?:\s?${MAG}(?:\s+de)?)?\s?((?i:USD|ARS|EUR|€|dólares|dolares|dollars|pesos|euros))${E}`, 'gu');
+const NUMBER_MAGNITUDE = new RegExp(String.raw`(?<![\p{L}\p{N}.,])(${NUM})\s?${MAG}`, 'gu');
+/** "9 am", "3 p.m.": a 12-hour time on the hour. */
+const HOUR_AMPM = new RegExp(String.raw`${B}(\d{1,2})\s?([ap])\.?\s?m\.?(?![\p{L}\p{N}])`, 'giu');
+const WEEKDAYS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 /** A run of digits with separators long enough to be a phone (9 digits or more, checked below). */
 const PHONE = /\+?\d[\d ().-]{7,}\d/gu;
 
 const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS_EN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const WEEKDAY = new RegExp(String.raw`${B}(${[...WEEKDAYS_ES, 'miercoles', 'sabado', ...WEEKDAYS_EN].join('|')})${E}`, 'giu');
+const weekdayOf = (name: string): number => {
+  const lower = name.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  const es = WEEKDAYS_ES.map((d) => d.normalize('NFD').replace(/\p{M}/gu, '')).indexOf(lower);
+  return es >= 0 ? es + 1 : WEEKDAYS_EN.findIndex((d) => d.toLowerCase() === lower) + 1;
+};
 /**
  * Frequent first words of a sentence that are never a name: articles, pronouns, prepositions,
  * conjunctions, adverbs, greetings and the verbs job-search texts open with. A capitalized first
@@ -148,7 +167,7 @@ const UNIT = new RegExp(
   'iu',
 );
 /** A currency written after a number in words: "dos mil pesos". */
-const CURRENCY_AFTER = new RegExp(String.raw`^\s?(USD|ARS|EUR|€|dólares|dolares|dollars|pesos|euros)${E}`, 'iu');
+const CURRENCY_AFTER = new RegExp(String.raw`^(?:\s+de)?\s?(USD|ARS|EUR|€|dólares|dolares|dollars|pesos|euros)${E}`, 'iu');
 /**
  * A token with letters and digits, such as n8n, S3 or GPT-4: a name, not a number, unless it is a
  * number and its unit ("6s") or an ordinal ("1st").
@@ -311,6 +330,17 @@ export function canonicalNumber(raw: string, lang: Lang): string {
   return decimals === '' ? integer : `${integer}.${decimals}`;
 }
 
+/** A canonical number times a power of ten, in the same canonical form: scale("1.2", 6) is "1200000". */
+function scale(n: string, exp: number): string {
+  const [int = '', dec = ''] = n.split('.');
+  const digits = int + dec.padEnd(exp, '0');
+  const whole = digits.slice(0, int.length + exp).replace(/^0+(?=\d)/u, '');
+  const rest = digits.slice(int.length + exp).replace(/0+$/u, '');
+  return rest === '' ? whole : `${whole}.${rest}`;
+}
+const scaled = (raw: string, magnitude: string | undefined, lang: Lang): string =>
+  scale(canonicalNumber(raw, lang), magnitude === undefined ? 0 : (MAGNITUDES[magnitude] ?? 0));
+
 const pad = (n: number): string => String(n).padStart(2, '0');
 const year = (y: string): number => (y.length === 2 ? 2000 + Number(y) : Number(y));
 function dateKey(y: number | undefined, m: number, d: number | undefined): string | undefined {
@@ -318,7 +348,7 @@ function dateKey(y: number | undefined, m: number, d: number | undefined): strin
   if (y !== undefined && d !== undefined) return `${y}-${pad(m)}-${pad(d)}`;
   if (y !== undefined) return `${y}-${pad(m)}`;
   if (d !== undefined) return `--${pad(m)}-${pad(d)}`;
-  return undefined;
+  return `--${pad(m)}`;
 }
 
 /** Word facts are compared by key and, failing that, as the same word in the other text (a name, capitalized). */
@@ -371,8 +401,9 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 
   pass(URL_LIKE, (m) => ({ kind: 'url', text: trimmed(m[0]), key: trimmed(m[0]).toLowerCase().replace(/\/$/u, '') }));
   pass(EMAIL, (m) => ({ kind: 'email', text: m[0], key: m[0].toLowerCase() }));
-  pass(AMOUNT_BEFORE, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[1] ?? '').toLowerCase()] ?? '$'} ${canonicalNumber(m[2] ?? '', lang)}` }));
-  pass(AMOUNT_AFTER, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[2] ?? '').toLowerCase()] ?? '$'} ${canonicalNumber(m[1] ?? '', lang)}` }));
+  pass(AMOUNT_BEFORE, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[1] ?? '').toLowerCase()] ?? '$'} ${scaled(m[2] ?? '', m[3], lang)}` }));
+  pass(AMOUNT_AFTER, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[3] ?? '').toLowerCase()] ?? '$'} ${scaled(m[1] ?? '', m[2], lang)}` }));
+  pass(NUMBER_MAGNITUDE, (m) => ({ kind: 'number', text: m[0], key: scaled(m[1] ?? '', m[2], lang) }));
   pass(PHONE, (m) => {
     const digits = m[0].replace(/\D/gu, '');
     return digits.length >= 9 ? { kind: 'phone', text: m[0], key: `tel:${m[0].startsWith('+') ? '+' : ''}${digits}` } : undefined;
@@ -392,12 +423,19 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     const key = dateKey(m[3] === undefined ? undefined : Number(m[3]), monthOf(m[2] ?? ''), m[1] === undefined ? undefined : Number(m[1]));
     return key === undefined ? undefined : { kind: 'date', text: m[0], key };
   });
+  pass(WEEKDAY, (m) => ({ kind: 'date', text: m[0], key: `weekday:${weekdayOf(m[1] ?? '')}` }));
   pass(DATE_EN, (m) => {
     const day = m[1] ?? m[3];
+    // "May" alone at a sentence start is the verb ("May I send it?"), not the month.
+    if (m[2] === 'May' && day === undefined && m[4] === undefined && /(?:^|[.!?…]\s*|\n\s*)$/u.test(text.slice(0, m.index))) return undefined;
     const key = dateKey(m[4] === undefined ? undefined : Number(m[4]), monthOf(m[2] ?? ''), day === undefined ? undefined : Number(day));
     return key === undefined ? undefined : { kind: 'date', text: m[0], key };
   });
   pass(TIME, (m) => ({ kind: 'time', text: trimmed(m[0]), key: asTime(trimmed(m[0])) }));
+  pass(HOUR_AMPM, (m) => {
+    const hour = Number(m[1]);
+    return hour >= 1 && hour <= 12 ? { kind: 'time', text: m[0], key: asTime(`${hour}:00${m[2] ?? ''}m`) } : undefined;
+  });
   pass(HOUR_HS, (m) => (Number(m[1]) <= 23 ? { kind: 'time', text: m[0], key: `${Number(m[1])}:00` } : undefined));
   pass(HOUR_H, (m) => (Number(m[1]) <= 23 ? { kind: 'time', text: m[0], key: `${Number(m[1])}:00` } : undefined));
   pass(ALNUM, (m) => {
