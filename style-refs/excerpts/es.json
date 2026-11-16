@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": "galdos-sarten",
+    "source": "galdos-fortunata-y-jacinta",
+    "lang": "es",
+    "text": "Juanito Santa Cruz y Miquis llevaron un día una sartén (no sé si a la clase de Novar o a la de Uribe, que explicaba Metafísica) y frieron un par de huevos.",
+    "teaches": "One concrete anecdote says more than an adjective about the characters.",
+    "avoid": "The aside in brackets and the narrator's doubt; in a cover letter or an email the facts come without asides.",
+    "url": "https://www.gutenberg.org/cache/epub/17013/pg17013.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "galdos-no-alargar",
+    "source": "galdos-fortunata-y-jacinta",
+    "lang": "es",
+    "text": "Otras muchas tonterías de este jaez cuenta Villalonga, las cuales no copio por no alargar este relato.",
+    "teaches": "Leave out what does not serve the text, and do it without apology.",
+    "avoid": "The archaisms (de este jaez, las cuales) and the narrator talking about his own text.",
+    "url": "https://www.gutenberg.org/cache/epub/17013/pg17013.txt",
+    "fetched": "2026-11-16"
+  },
+  {
+    "id": "galdos-charlando",
+    "source": "galdos-fortunata-y-jacinta",
+    "lang": "es",
+    "text": "Allí pasaban el rato charlando por lo bajo, leyendo novelas, dibujando caricaturas o soplándose recíprocamente la lección cuando el catedrático les preguntaba.",
+    "teaches": "Verbs of action in a list show what people did, without telling the reader what to think.",
+    "avoid": "The long period with gerunds piled up, and the adverb recíprocamente; neutral Spanish today is shorter.",
+    "url": "https://www.gutenberg.org/cache/epub/17013/pg17013.txt",
+    "fetched": "2026-11-16"
+  }
+]
