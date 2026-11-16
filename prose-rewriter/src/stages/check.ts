@@ -88,7 +88,9 @@ export function place(a: Analysis, units: readonly Sentence[], proposals: readon
     const p = at(r.id);
     if (p === undefined || !fresh.includes(p)) throw new Error('a live edit no longer places');
     p.status = 'refused';
-    p.reason = r.message;
+    // The message names the edit it overlaps by its place in `all` ("#1"); the user sees ids.
+    const other = r.conflictsWith === undefined ? undefined : at(r.conflictsWith);
+    p.reason = other === undefined || r.conflictsWith === undefined ? r.message : r.message.replace(r.conflictsWith, other.id);
     if (r.span !== undefined) p.span = r.span;
     p.before = r.edit.before.normalize('NFC');
     p.after = r.edit.after.normalize('NFC');
