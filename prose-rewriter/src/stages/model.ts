@@ -14,11 +14,11 @@
  * counted with its cost.
  */
 import type { z } from 'zod';
-import type { CallMeta, Conversation, Gateway } from '../../../gateway/src/index.ts';
+import { ResponseError, type CallMeta, type Conversation, type Gateway } from '../../../gateway/src/index.ts';
 import type { Finding } from '../../../slop-lint/src/types.ts';
 import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
-import { EditOutput, type PlanOutput } from '../outputs.ts';
+import { EditReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
 import { editPrompt, planPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
 import type { Edit, JudgeClient } from '../types.ts';
 
@@ -36,13 +36,24 @@ export interface Usage {
 
 /** The gateway, with every call it completes added to `usage`. */
 export function metered(gateway: Gateway<string>, usage: Usage): Gateway<string> {
-  const add = <R extends { readonly meta: CallMeta<string> }>(result: R): R => {
+  const count = (cost: number | null): void => {
     usage.calls += 1;
-    usage.costUsd = usage.costUsd === null || result.meta.costUsd === null ? null : usage.costUsd + result.meta.costUsd;
+    usage.costUsd = usage.costUsd === null || cost === null ? null : usage.costUsd + cost;
+  };
+  const add = <R extends { readonly meta: CallMeta<string> }>(result: R): R => {
+    count(result.meta.costUsd);
     return result;
   };
   return {
-    structured: async (schema, request) => add(await gateway.structured(schema, request)),
+    structured: async (schema, request) => {
+      try {
+        return add(await gateway.structured(schema, request));
+      } catch (error) {
+        // A reply the model sent and the schema refused was paid for.
+        if (error instanceof ResponseError) count(error.costUsd);
+        throw error;
+      }
+    },
     structuredStream: (schema, request) => {
       const call = gateway.structuredStream(schema, request);
       return { started: call.started, final: call.final.then(add) };
@@ -109,7 +120,7 @@ export interface EditRound {
 /** S3. */
 export async function editStage(m: ModelStages, plan: PlanOutput): Promise<EditRound> {
   const prompt = editPrompt(m.prompt, plan);
-  const parsed = await call(m, prompt);
+  const parsed = await call(m, { ...prompt, schema: EditReply });
   return { prompt, parsed, edits: parsed.edits.slice(0, editCap(plan)) };
 }
 
@@ -142,15 +153,21 @@ export async function extraEditStage(m: ModelStages, first: EditRound, remaining
     { role: 'assistant', content: JSON.stringify(first.parsed) },
     { role: 'user', content: [EXTRA_TASK, '', 'FINDINGS (slop-lint, by sentenceId)', wrapData('texto', lines.join('\n'))].join('\n') },
   ];
-  const parsed = await call(m, { ...first.prompt, promptVersion: `${first.prompt.promptVersion}${EXTRA_SUFFIX}` }, messages);
-  return parsed.edits.slice(0, remaining.length);
+  try {
+    const parsed = await call(m, { ...first.prompt, schema: EditReply, promptVersion: `${first.prompt.promptVersion}${EXTRA_SUFFIX}` }, messages);
+    return parsed.edits.slice(0, remaining.length);
+  } catch (error) {
+    // The round is optional: a reply that cannot be read leaves the first round as it stands.
+    if (error instanceof ResponseError) return [];
+    throw error;
+  }
 }
 
 /** S4, or null when it does not run (see the header). */
 export async function styleStage(m: ModelStages): Promise<Edit[] | null> {
   const prompt = stylePrompt(m.prompt);
   if (prompt.principleIds.length === 0) return null;
-  return (await call(m, prompt)).edits;
+  return (await call(m, { ...prompt, schema: styleReply(prompt.principleIds) })).edits;
 }
 
 /** The sentence of `sentences` a position falls in, or null. */

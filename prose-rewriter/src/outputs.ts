@@ -118,3 +118,23 @@ export function styleOutput(principleIds: readonly string[]) {
   return z.strictObject({ edits: z.array(Edit.extend({ principleId }).superRefine(checkModelEdit)).max(max) });
 }
 export type StyleOutput = z.infer<ReturnType<typeof styleOutput>>;
+
+/**
+ * What the edit stages hand the gateway: the JSON shape of EditOutput and styleOutput() without
+ * their per-edit checks, so a reply with one bad edit is still parsed. editProblem() then runs
+ * those checks on each edit in code, and the stage refuses only the edit that fails them.
+ */
+const EditShape = Edit.extend({ after: z.string() });
+export const EditReply = z.strictObject({ edits: z.array(EditShape) });
+export function styleReply(principleIds: readonly string[]) {
+  const [first, ...rest] = principleIds;
+  const principleId = first === undefined ? z.string().min(1) : z.enum([first, ...rest]);
+  return z.strictObject({ edits: z.array(EditShape.extend({ principleId })).max(first === undefined ? 0 : STYLE_MAX_EDITS) });
+}
+
+/** Why EditOutput would refuse this edit (the Edit schema, then checkModelEdit()), or null. */
+export function editProblem(e: z.infer<typeof EditShape>): string | null {
+  const parsed = Edit.safeParse(e);
+  if (!parsed.success) return parsed.error.issues[0]?.message ?? 'the edit does not satisfy the schema';
+  return modelEditProblem(e);
+}
