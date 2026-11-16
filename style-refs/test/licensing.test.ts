@@ -259,6 +259,18 @@ describe('an open-licence source names its attribution before anything draws on 
   });
 });
 
+describe('the Biblioteca Virtual Miguel de Cervantes stays out, whatever kind a source declares', () => {
+  const guide = { ...work, kind: 'guide', authorDied: null, use: 'principles', url: 'https://www.cervantesvirtual.com/obra/x' };
+  it('refuses a guide on its host that gives principles or excerpts', () => {
+    const refused = 'sources.json 0.url: www.cervantesvirtual.com claims rights over its database (design 4.8), so nothing draws on it';
+    expect(messages({ ...empty, sources: [guide] })).toEqual([refused]);
+    expect(messages({ ...empty, sources: [{ ...guide, use: 'excerpts' }] })).toContain(refused);
+  });
+  it('lets it stay as a link for the reader', () => {
+    expect(messages({ ...empty, sources: [{ ...guide, use: 'link-only' }] })).toEqual([]);
+  });
+});
+
 describe('the Argentine rule reaches works, not open-licence guides', () => {
   it('asks no paid public domain flag of an Argentine guide', () => {
     const guide = { ...work, kind: 'guide', authorDied: null, nationality: ['ar'], lang: 'es', originalLang: 'es', use: 'principles', url: 'https://www.argentina.gob.ar/acerca' };

@@ -65,6 +65,12 @@ export const US_FREE_THROUGH = 1930;
 /** Excerpt text comes only from these hosts (and their subdomains), without what they add to it. */
 export const TEXT_HOSTS = ['gutenberg.org', 'wikisource.org'] as const;
 
+/**
+ * Hosts no principle or excerpt draws on, whatever kind a source declares: the Biblioteca Virtual
+ * Miguel de Cervantes claims rights over its database (design 4.8). A link for the reader is allowed.
+ */
+export const DENIED_HOSTS = ['cervantesvirtual.com'] as const;
+
 const Id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a kebab-case id');
 const Year = z.number().int().min(1500).max(2100);
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a YYYY-MM-DD date');
@@ -329,10 +335,13 @@ type Local = { path: string; message: string };
 
 const FREE: ReadonlySet<LegalStatus> = new Set(['public-domain', 'open-licence']);
 
+/** Whether a host is one of the names or a subdomain of one; a lookalike such as notgutenberg.org is not. */
+const onHost = (host: string, names: readonly string[]): boolean => names.some((h) => host === h || host.endsWith(`.${h}`));
+
 /** The host of a URL the schema already parsed, and whether it is one of TEXT_HOSTS. */
 function textHost(url: string): { host: string; allowed: boolean } {
   const host = new URL(url).hostname.toLowerCase();
-  return { host, allowed: TEXT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`)) };
+  return { host, allowed: onHost(host, TEXT_HOSTS) };
 }
 
 /** The rules of one source on its own: translation, Argentine authors, dates of freedom, text host. */
@@ -365,6 +374,10 @@ function sourceProblems(s: Source): Local[] {
   if (s.kind === 'literary' && s.use !== 'excluded') {
     const { host, allowed } = textHost(s.url);
     if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
+  } else if (s.use === 'principles' || s.use === 'excerpts') {
+    // `kind` is self-declared, so a guide is held to the denied hosts (a literary source is refused above).
+    const { host } = textHost(s.url);
+    if (onHost(host, DENIED_HOSTS)) out.push({ path: 'url', message: `${host} claims rights over its database (design 4.8), so nothing draws on it` });
   }
   return out;
 }
