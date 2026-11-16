@@ -122,6 +122,29 @@ describe('magnitudes, hours and days', () => {
   });
 });
 
+describe('phones, lists and fractions', () => {
+  const accepts = (O: string, before: string, after: string) =>
+    checkEdit({ sentenceId: 0, before, after, reason: 'test' }, { O, C: { cv: '' }, sentences: [O], lang: 'es' }).status;
+
+  it('does not read a list of numbers or a date and a count as a phone', () => {
+    expect(keys('Talles 36 38 40 42 44.')).toEqual(['36', '38', '40', '42', '44']);
+    expect(keys('Desde el 2026-11-03 15 personas.')).toEqual(['2026-11-03', '15']);
+    expect(keys('Trabajé 2018-2020-2022.')).toEqual(['2018', '2020', '2022']);
+    expect(accepts('Desde el 2026-11-03 trabajo así.', '2026-11-03', '3/11/2026')).toBe('accepted');
+    expect(accepts('Talles 36 38 40 42 44.', '36 38 40 42 44', '36, 38, 40, 42 y 44')).toBe('accepted');
+  });
+
+  it('still reads the phones people write', () => {
+    expect(keys('Llamá al 351 000-0000 o al (011) 4444-5555, o al 3510000000.')).toEqual(['tel:3510000000', 'tel:01144445555', 'tel:3510000000']);
+    expect(keys('Not a phone: 12345678.', EN)).toEqual(['12345678']);
+  });
+
+  it('reads 24/7 and a fraction as numbers, and a day and month as a date', () => {
+    expect(keys('Atención 24/7 y 1/2 kilo de pan.')).toEqual(['24/7', '1/2']);
+    expect(keys('Lo entrego el 3/4 y el 3/11.')).toEqual(['--04-03', '--11-03']);
+  });
+});
+
 describe('inventory', () => {
   it('labels each fact of the original and flags what is not in the CV', () => {
     const O = 'Hola Marta, armé el formulario de la Ferretería Quintana: recibe 40 pedidos por semana y lo usan 25 personas.';

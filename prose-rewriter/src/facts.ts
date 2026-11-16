@@ -82,8 +82,34 @@ const NUMBER_MAGNITUDE = new RegExp(String.raw`(?<![\p{L}\p{N}.,])(${NUM})\s?${M
 /** "9 am", "3 p.m.": a 12-hour time on the hour. */
 const HOUR_AMPM = new RegExp(String.raw`${B}(\d{1,2})\s?([ap])\.?\s?m\.?(?![\p{L}\p{N}])`, 'giu');
 const WEEKDAYS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-/** A run of digits with separators long enough to be a phone (9 digits or more, checked below). */
-const PHONE = /\+?\d[\d ().-]{7,}\d/gu;
+/** A run of digits with separators long enough to be a phone; isPhone() decides. */
+const PHONE = /\+?\(?\d[\d ().-]{7,}\d/gu;
+
+/**
+ * Whether a run of digits is a phone: 9 digits or more, and an international "+", an area code
+ * in parentheses, or groups the way phones are written (one of 4 digits or more, after a group of
+ * 3 or more, or one unbroken run). A list of sizes ("36 38 40 42 44") or of years
+ * ("2018-2020-2022") is not a phone.
+ */
+function isPhone(raw: string): boolean {
+  const groups = raw.match(/\d+/gu) ?? [];
+  if (groups.join('').length < 9) return false;
+  if (raw.startsWith('+') || raw.startsWith('(')) return true;
+  if (groups.length > 1 && groups.every((g) => /^(?:19|20)\d\d$/u.test(g))) return false;
+  return groups.length === 1 || (groups.some((g) => g.length >= 4) && groups.filter((g) => g.length >= 3).length >= 2);
+}
+
+/** Words before a day and month that make it a date: "el 3/4", "on 3/4". */
+const DATE_CUE = /(?:^|[^\p{L}])(?:el|del|al|desde|hasta|para|on|by|until|from|to|the|since|before|after)\s+$/iu;
+
+/**
+ * Whether a day and month with no year is a fraction instead: "24/7" always, and a smaller
+ * number over 10 or less ("1/2", "3/4") unless a word before it makes it a date ("el 3/4").
+ */
+function isFraction(a: number, b: number, before: string): boolean {
+  if (a === 24 && b === 7) return true;
+  return a < b && b <= 10 && !DATE_CUE.test(before);
+}
 
 const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -404,17 +430,15 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   pass(AMOUNT_BEFORE, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[1] ?? '').toLowerCase()] ?? '$'} ${scaled(m[2] ?? '', m[3], lang)}` }));
   pass(AMOUNT_AFTER, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[3] ?? '').toLowerCase()] ?? '$'} ${scaled(m[1] ?? '', m[2], lang)}` }));
   pass(NUMBER_MAGNITUDE, (m) => ({ kind: 'number', text: m[0], key: scaled(m[1] ?? '', m[2], lang) }));
-  pass(PHONE, (m) => {
-    const digits = m[0].replace(/\D/gu, '');
-    return digits.length >= 9 ? { kind: 'phone', text: m[0], key: `tel:${m[0].startsWith('+') ? '+' : ''}${digits}` } : undefined;
-  });
   pass(DATE_ISO, (m) => {
     const key = dateKey(Number(m[1]), Number(m[2]), Number(m[3]));
     return key === undefined ? undefined : { kind: 'date', text: m[0], key };
   });
+  pass(PHONE, (m) => (isPhone(m[0]) ? { kind: 'phone', text: m[0], key: `tel:${m[0].startsWith('+') ? '+' : ''}${m[0].replace(/\D/gu, '')}` } : undefined));
   // Numeric dates are day first in Spanish and month first in English, as each is written.
   pass(DATE_NUMERIC, (m) => {
     const [a, b] = [Number(m[1]), Number(m[2])];
+    if (m[3] === undefined && isFraction(a, b, text.slice(0, m.index))) return { kind: 'number', text: m[0], key: `${a}/${b}` };
     const [d, mo] = lang === 'es' ? [a, b] : [b, a];
     const key = dateKey(m[3] === undefined ? undefined : year(m[3]), mo, d);
     return key === undefined ? undefined : { kind: 'date', text: m[0], key };
