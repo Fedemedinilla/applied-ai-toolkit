@@ -95,7 +95,8 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
     }
     if (!(VALUE_FLAGS as readonly string[]).includes(name)) return `unknown option --${name}`;
     const value = eq === -1 ? argv[++i] : arg.slice(eq + 1);
-    if (value === undefined || value === '') return `--${name} needs a value`;
+    // A value that starts with "--" is the next flag, not this one's value ("--out --dry-run").
+    if (value === undefined || value === '' || (eq === -1 && value.startsWith('--'))) return `--${name} needs a value`;
     if (values[name as ValueFlag] !== undefined) return `--${name} is given twice`;
     values[name as ValueFlag] = value;
   }
@@ -110,6 +111,10 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
   if (typeof cap === 'string') return cap;
   if (typeof maxUsd === 'string') return maxUsd;
   if (cap !== null && cap > MONTHLY_BUDGET_USD) return `--monthly-cap is at most ${MONTHLY_BUDGET_USD} (D14); raising the budget is Federico's decision, made in code`;
+  const variants = values.variants === undefined ? null : list(values.variants);
+  const cases = values.cases === undefined ? null : list(values.cases);
+  if (variants?.length === 0) return '--variants needs at least one variant id';
+  if (cases?.length === 0) return '--cases needs at least one genre, language or case id';
   let limit: number | null = null;
   if (values.limit !== undefined) {
     limit = Number(values.limit);
@@ -118,8 +123,8 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
   return {
     dryRun,
     live,
-    variants: values.variants === undefined ? null : list(values.variants),
-    cases: values.cases === undefined ? null : list(values.cases),
+    variants,
+    cases,
     limit,
     monthlyCap: cap ?? MONTHLY_BUDGET_USD,
     maxUsd,

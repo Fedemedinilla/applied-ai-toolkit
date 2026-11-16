@@ -24,7 +24,7 @@ import {
 } from '../evals/spend.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import type { LoadedCase } from '../evals/cases.ts';
-import { EVAL_EXIT, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import { EVAL_EXIT, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
 import type { PromptRefs } from '../src/prompt.ts';
 import { RewriteInput } from '../src/types.ts';
 import { NOW, scriptedGateway } from './scripted-gateway.ts';
@@ -462,6 +462,23 @@ describe('the eval CLI', () => {
     expect(await runEvalCli(['--dry-run'], h.deps)).toBe(EVAL_EXIT.failed);
     expect(h.err.join('')).toMatch(/repair it by hand/);
     expect(h.err.join('')).not.toMatch(/move it/);
+  });
+
+  it('refuses flags that clash, repeat, take a value they should not, or swallow the next flag as their value', () => {
+    expect(parseEvalArgs(['--dry-run', '--live', '--out', 'x'])).toMatch(/exclude each other/);
+    expect(parseEvalArgs(['--dry-run', '--limit', '1', '--limit', '2'])).toMatch(/--limit is given twice/);
+    expect(parseEvalArgs(['--dry-run=yes'])).toMatch(/--dry-run takes no value/);
+    expect(parseEvalArgs(['--live', '--max-usd', '1', '--out', '--dry-run'])).toMatch(/--out needs a value/);
+    expect(parseEvalArgs(['--dry-run', '--variants', '--live'])).toMatch(/--variants needs a value/);
+    expect(parseEvalArgs(['--dry-run', '--monthly-cap', '21'])).toMatch(/at most 20/);
+  });
+
+  it('refuses an empty list after --variants or --cases instead of running none or all', async () => {
+    for (const argv of [['--variants', ','], ['--cases', ','], ['--variants', ' , ']]) {
+      expect(parseEvalArgs(['--dry-run', ...argv])).toMatch(/needs at least one/);
+      const h = harness(never);
+      expect(await runEvalCli(['--dry-run', ...argv], h.deps)).toBe(EVAL_EXIT.usage);
+    }
   });
 
   it('--live without a key refuses before building anything', async () => {
