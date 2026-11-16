@@ -58,6 +58,12 @@ import type { PieceRecord } from './pipeline.ts';
 /** D14: the monthly budget of all real-model eval runs, in US$. Raising it is Federico's call, made here. */
 export const MONTHLY_BUDGET_USD = 20;
 
+/**
+ * The most --monthly-cap may raise a month's budget to, in US$ (November 2026: Federico's 50).
+ * A typo such as 500 for 50 is refused instead of multiplying the budget; going higher is a code change.
+ */
+export const MONTHLY_CAP_CEILING_USD = 50;
+
 /** The months follow Federico's calendar, as the gateway's caps do (prose-rewriter/cli.ts). */
 export const SPEND_TIME_ZONE = 'America/Argentina/Buenos_Aires';
 
@@ -222,6 +228,9 @@ export function openLedger(options: LedgerOptions): SpendLedger {
   const { path, clock } = options;
   const cap = options.monthlyCapUsd;
   if (!(Number.isFinite(cap) && cap > 0)) throw new Error(`the monthly cap must be a positive number of US$, got ${cap}`);
+  if (cap > MONTHLY_CAP_CEILING_USD) {
+    throw new Error(`a monthly cap of US$${cap} is above the ceiling of US$${MONTHLY_CAP_CEILING_USD}; raising the ceiling is a code change (MONTHLY_CAP_CEILING_USD)`);
+  }
   if (cap > MONTHLY_BUDGET_USD && options.raised !== true) {
     throw new Error(`a monthly cap of US$${cap} is above the default of US$${MONTHLY_BUDGET_USD} (D14); raising it for a month takes an explicit --monthly-cap`);
   }
