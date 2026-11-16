@@ -432,16 +432,24 @@ export function settingsFor(config: Config, path: string | undefined, origin: st
   for (const rule of all) {
     // The config's setting for a rule replaces the genre's as a whole: the config wins over the genre.
     // A rule the genre splits takes that setting on every part, except a part whose own id is set.
-    for (const part of splitRule(rule, resolvedGenre)) {
-      const setting = settings[part.id] ?? settings[rule.id] ?? profile[part.id] ?? profile[rule.id];
+    const parts = splitRule(rule, resolvedGenre);
+    const offParts: string[] = [];
+    let offByOwnId = false;
+    for (const part of parts) {
+      const own = part.id === rule.id ? undefined : (settings[part.id] ?? (settings[rule.id] === undefined ? profile[part.id] : undefined));
+      const setting = own ?? settings[rule.id] ?? profile[rule.id];
       const applied = applySetting(part, setting);
       if (applied === undefined) {
-        off.push(part.id);
+        offParts.push(part.id);
+        if (own !== undefined) offByOwnId = true;
         continue;
       }
       const message = messageFor(applied, resolvedGenre);
       rules.push(message === applied.message ? applied : { ...applied, message });
     }
+    // The whole rule turned off by its catalog id is one rule off, as it was before the genre split it.
+    if (offParts.length === parts.length && !offByOwnId) off.push(rule.id);
+    else off.push(...offParts);
   }
   return { lang, format, genre: resolvedGenre, variety: resolvedVariety, anchors, rules, off, suppressions: { ...DEFAULT_SUPPRESSIONS, ...config.suppressions } };
 }
