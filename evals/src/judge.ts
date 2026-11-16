@@ -43,6 +43,7 @@ Then judge the piece as a whole:
 Judge only what is written. Do not reward length.`;
 
 export const LineSupport = z.enum(['fact-sheet', 'brief', 'arithmetic', 'no-claim', 'invented']);
+export type LineSupport = z.infer<typeof LineSupport>;
 
 export const Verdict = z.strictObject({
   lines: z.array(z.strictObject({ line: z.number().int().min(1), support: LineSupport, note: z.string() })),
