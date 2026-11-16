@@ -170,6 +170,22 @@ describe('the code rubrics', () => {
     expect(score(c, c.input.text.replace('WordPress', 'WordPress y Astro'))['no-new-facts']!.pass).toBe(true);
   });
 
+  it('facts-preserved and no-new-facts: pass the single-call rewrites the F6b run failed on a capitalized first word', () => {
+    // The run's own outputs: "missing: Quedo", "missing: Solo, Quedo", "missing: Unlocking", "extra: Cualquier".
+    const outputs: Record<string, string> = {
+      'es-email-heavy': 'Asunto: Propuesta para el sitio de la cooperativa\n\nHola Martín,\n\n Te escribo porque quiero trabajar en el sitio de la cooperativa. Soy desarrolladora web y trabajo por cuenta propia desde marzo de 2023.\n\nMantengo tres sitios WordPress con copias semanales y actualizaciones mensuales. Para el sitio de la cooperativa te propongo [COMPLETAR: qué harías en concreto].\n\nSi te interesa, lo hablamos cuando puedas.\n\nSaludos,\nValeria',
+      'es-follow-up-heavy': 'Hola Martín,\n\n Te escribo por el presupuesto que te pasé para mantener el sitio de la cooperativa.\n\nHoy mantengo tres sitios WordPress con copias semanales y actualizaciones mensuales. Si tenés alguna duda sobre el presupuesto, avisame.\n\nSaludos,\nValeria',
+      'es-whatsapp-heavy': 'Hola Sofi! Espero que estés muy bien. Te escribo porque [COMPLETAR: qué le querés pedir o contar a Sofi]. Soy desarrolladora web freelance. Hago sitios en WordPress y en Astro. Cualquier cosa avisame!',
+      'es-trap-follow-up-date': 'Hola Martín,\n\n Te escribo por el presupuesto que te mandé el 3/11 para el sitio de la cooperativa. Contame si lo pudiste ver o si tenés alguna duda.\n\nSaludos,\nValeria',
+      'en-email-heavy': 'Subject: Support work at Kestrel Books\n\nHi Tom,\n\n I am a support engineer and I am writing to [COMPLETAR: what you are asking Tom for, such as a role or a question]. At Brightwell Parcels I cut the median first reply time on the help desk from 9 hours to 3 hours.\n\nI use Zendesk every day and wrote 60 help articles for Brightwell Parcels.\n\nPlease do not hesitate to reach out if you have any questions.\n\nBest,\nDaniel',
+    };
+    for (const [id, output] of Object.entries(outputs)) {
+      const s = score(byId(id), output);
+      expect(s['facts-preserved']!.detail ?? '', id).not.toMatch(/missing/);
+      expect(s['no-new-facts']!.detail ?? '', id).not.toMatch(/extra/);
+    }
+  });
+
   it('facts-preserved: fails a lost fact, a lost survive phrase and a reordered pair; accepts a fact rewritten in another format and an accepted drop', () => {
     const light = byId('es-cover-letter-light');
     expect(score(light, light.input.text.replace(' y la página principal pasó de 4,1 s a 1,6 s de carga en un celular de gama baja', ''))['facts-preserved']!.pass).toBe(false);
