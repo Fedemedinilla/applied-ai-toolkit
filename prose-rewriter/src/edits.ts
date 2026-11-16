@@ -241,6 +241,38 @@ function graphemeBoundaries(text: string): Set<number> {
 /** A replacement that would join the character before it: a combining mark, a joiner or a variation selector. */
 const JOINS_PREVIOUS = /^[\p{M}\u200D\uFE0E\uFE0F]/u;
 
+/**
+ * Where each keep[] phrase sits in the text. A phrase is matched as the text writes it: in NFC,
+ * with any run of whitespace (a line break, two spaces) standing for each space in it, as
+ * slop-lint matches a multi-word anchor. A blank phrase is ignored: it would match everywhere.
+ */
+function keepSpans(text: string, phrases: readonly string[]): Array<TextRange & { phrase: string }> {
+  return phrases.flatMap((raw) => {
+    const phrase = raw.normalize('NFC').trim();
+    if (phrase === '') return [];
+    const source = phrase.split(/\s+/u).map((part) => part.replace(/[\\^$.*+?()[\]{}|/]/gu, '\\$&')).join(String.raw`\s+`);
+    return [...text.matchAll(new RegExp(source, 'gu'))].map((m) => ({ phrase: raw, start: m.index, end: m.index + m[0].length }));
+  });
+}
+
+const WORD_CHAR = /[\p{L}\p{N}\p{M}]/u;
+
+/**
+ * Whether an edit that only touches a kept phrase at its edge would glue text onto it, so the
+ * phrase no longer stands as a word ("Power BI" followed by "X mucho" reads "Power BIX").
+ */
+function gluesOnto(text: string, kept: TextRange, span: TextRange, after: string): boolean {
+  if (span.start === kept.end) {
+    const next = (after + text.slice(span.end))[0] ?? '';
+    return WORD_CHAR.test(text[kept.end - 1] ?? '') && WORD_CHAR.test(next);
+  }
+  if (span.end === kept.start) {
+    const previous = (text.slice(0, span.start) + after).at(-1) ?? '';
+    return WORD_CHAR.test(text[kept.start] ?? '') && WORD_CHAR.test(previous);
+  }
+  return false;
+}
+
 /** Every place `needle` starts in `haystack`, overlapping places included ("aa" twice in "aaa"). */
 function occurrences(haystack: string, needle: string): number[] {
   const out: number[] = [];
@@ -282,8 +314,9 @@ function render(original: string, edits: readonly AppliedEdit[]): { text: string
  * written, is 'not-found'; one whose `before` is there more than once is 'ambiguous', since code
  * would have to guess which; one that starts or ends inside a character is 'boundary'; one that
  * changes nothing is 'no-op'; one that overlaps a keep[]
- * phrase is 'keep'; one that overlaps an edit accepted before it is 'overlap' (the first stands).
- * Edits that only touch at an edge do not overlap.
+ * phrase, or touches one at its edge in a way that glues text onto it, is 'keep'; one that
+ * overlaps an edit accepted before it is 'overlap' (the first stands). Edits that only touch at an
+ * edge do not overlap.
  *
  * The text must be in NFC (S0
  * normalizes it); each edit's quote and replacement are normalized to NFC before they are placed,
@@ -298,7 +331,7 @@ export function applyEdits(text: string, sentences: readonly Sentence[], edits: 
   for (const s of sentences) {
     if (text.slice(s.start, s.end) !== s.text) throw new Error(`sentence ${s.id} was not cut from this text`);
   }
-  const keep = (options.keep ?? []).filter((k) => k !== '').flatMap((k) => occurrences(text, k).map((start) => ({ phrase: k, start, end: start + k.length })));
+  const keep = keepSpans(text, options.keep ?? []);
   const prefix = options.idPrefix ?? 'e';
   const accepted: AppliedEdit[] = [];
   const rejected: RejectedEdit[] = [];
@@ -319,7 +352,7 @@ export function applyEdits(text: string, sentences: readonly Sentence[], edits: 
       return reject('boundary', 'the edit starts or ends inside a character', { span });
     }
     if (after === before) return reject('no-op', 'the edit changes nothing', { span });
-    const kept = keep.find((k) => intersects(k, span));
+    const kept = keep.find((k) => intersects(k, span) || gluesOnto(text, k, span, after));
     if (kept !== undefined) return reject('keep', `the edit touches "${kept.phrase}", which is kept as written`, { span });
     const other = accepted.find((a) => intersects(a.span, span));
     if (other !== undefined) return reject('overlap', `the edit overlaps ${other.id}, accepted before it`, { span, conflictsWith: other.id });
