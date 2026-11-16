@@ -24,7 +24,9 @@ import {
 } from '../evals/spend.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import type { LoadedCase } from '../evals/cases.ts';
-import { EVAL_EXIT, estimateRun, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import { EVAL_EXIT, estimateRun, gateReport, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import type { JudgeRecord } from '../evals/judges.ts';
+import type { CodeRecord } from '../evals/rubrics.ts';
 import { JUDGE_MAX_TOKENS, JUDGE_RUBRICS } from '../evals/judges.ts';
 import { VARIANTS } from '../evals/pipeline.ts';
 import { rewriteRubric } from '../src/rubric.ts';
@@ -456,6 +458,61 @@ describe('the dry run estimate', () => {
   });
 });
 
+describe('the gate report (design 5, "Puerta")', () => {
+  const variants = (...ids: string[]) => VARIANTS.filter((v) => ids.includes(v.id));
+  const zero = { calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 } };
+  /** `n` scored judge records of a rubric and variant, the first `passes` of them passing, then `none` with nothing to judge. */
+  const judged = (rubric: string, variant: string, n: number, passes: number, none = 0): JudgeRecord[] => [
+    ...Array.from({ length: n }, (_, i): JudgeRecord => ({ rubric, version: '1', case: `c${i}`, variant, status: 'scored', pass: i < passes, usage: zero })),
+    ...Array.from({ length: none }, (_, i): JudgeRecord => ({ rubric, version: '1', case: `c${n + i}`, variant, status: 'no-output', pass: null, usage: zero })),
+  ];
+  /** The baseline's side of pairwise-baseline: the pipeline's losses, as judgeRuns derives it. */
+  const versus = (variant: string, n: number, wins: number, none = 0) => judged('pairwise-baseline', variant, n, wins, none);
+  const sameVoice = (n: number, none = 0) => [...judged('same-voice', 'single-call', n, n, none), ...judged('same-voice', 'full', n, n, none)];
+  const hard = (variant: string): CodeRecord => ({ case: 'c0', variant, rubric: 'no-new-facts', version: '1', hard: true, status: 'scored', pass: false, metrics: {}, detail: 'extra: 40%' });
+
+  it('gates the cases that have something to judge: a rewrite equal to its reference is left out, not a refusal', () => {
+    const r = gateReport([...versus('full', 60, 50, 2), ...sameVoice(60, 2)], [], variants('full', 'single-call'));
+    expect(r.markdown).not.toMatch(/Not gated/);
+    expect(r.markdown).toMatch(/same-voice: full against single-call[\s\S]*### Eval gate: pass/);
+    expect(r.state).toBe('pass');
+  });
+
+  it('passes pairwise-baseline only when the pipeline beats the baseline, not when it loses by a little', () => {
+    expect(gateReport([...versus('full', 800, 392), ...sameVoice(60)], [], variants('full', 'single-call')).state).not.toBe('pass');
+    expect(gateReport([...versus('full', 800, 400), ...sameVoice(60)], [], variants('full', 'single-call')).state).not.toBe('pass');
+    expect(gateReport([...versus('full', 800, 300), ...sameVoice(60)], [], variants('full', 'single-call')).state).toBe('fail');
+    const won = gateReport([...versus('full', 800, 480), ...sameVoice(60)], [], variants('full', 'single-call'));
+    expect(won.state).toBe('pass');
+    expect(won.markdown).toMatch(/full wins 480 of 800/);
+  });
+
+  it('blocks a variant with a hard failure, whatever its rates', () => {
+    const r = gateReport([...versus('full', 800, 480), ...sameVoice(60)], [hard('full'), hard('single-call')], variants('full', 'single-call'));
+    expect(r.state).toBe('blocked');
+    expect(r.markdown).toMatch(/full against single-call: blocked by 1 hard failure/);
+  });
+
+  it('gates each ablation against the full pipeline, so a stage shows whether it contributes', () => {
+    const judges = [...judged('pairwise-original', 'full', 60, 55), ...judged('pairwise-original', 'no-style', 60, 20), ...versus('full', 60, 50), ...versus('no-style', 60, 50), ...sameVoice(60), ...judged('same-voice', 'no-style', 60, 60)];
+    const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'));
+    expect(r.markdown).toMatch(/### Ablation: no-style against full/);
+    expect(r.markdown).toMatch(/the stage no-style leaves out contributes/);
+    // The exit follows the shipped pipeline, full; the ablations inform the decision.
+    expect(r.state).toBe('pass');
+  });
+
+  it('warns when the case set is too small for same-voice to pass at the margin, even at 100% on both sides', () => {
+    const r = gateReport([...versus('full', 33, 30), ...sameVoice(33)], [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/cannot pass with 33 scored cases/);
+    expect(r.state).toBe('inconclusive');
+  });
+
+  it('is inconclusive with no baseline among the variants', () => {
+    expect(gateReport([], [], variants('full')).state).toBe('inconclusive');
+  });
+});
+
 describe('the eval CLI', () => {
   it('refuses to run without --live or --dry-run, building no gateway', async () => {
     const h = harness(never);
@@ -541,7 +598,8 @@ describe('the eval CLI', () => {
     const scripted = scriptedGateway({ 'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}')] });
     const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN] });
     const outDir = join(h.dir, 'run');
-    expect(await runEvalCli(['--live', '--variants', 'full', '--out', outDir], h.deps)).toBe(EVAL_EXIT.ok);
+    // No baseline among the variants: the run finished, the gate could not run.
+    expect(await runEvalCli(['--live', '--variants', 'full', '--out', outDir], h.deps)).toBe(EVAL_EXIT.inconclusive);
     scripted.assertDone();
     expect(h.built).toEqual([20]);
     expect(readdirSync(outDir).sort()).toEqual(['code.jsonl', 'judges.jsonl', 'pieces.jsonl', 'report.md']);

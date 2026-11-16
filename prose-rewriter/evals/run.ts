@@ -17,14 +17,15 @@
  *   verdicts and code scores as JSONL row by row (evals' appendJsonl, so a run cut short keeps
  *   what it paid for), and prints the gate, the cost table and the month's spend.
  *
- * Exit codes (PROVISIONAL, like the rewriter CLI's): 0 the run finished (the gate's own state is
- * in the report), 1 a cap or the budget stopped it, 3 bad usage, 4 could not run (no key, or a
- * ledger it cannot read).
+ * Exit codes (PROVISIONAL, like the rewriter CLI's): 0 the gate passed, 1 a cap or the budget
+ * stopped the run, 2 the gate failed or a hard rubric blocked it, 3 bad usage, 4 could not run (no
+ * key, or a ledger it cannot read), 5 the gate is inconclusive or could not run (no baseline,
+ * too few cases). The gate is the full pipeline's when it ran (gateReport); a --dry-run exits 0.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { z } from 'zod';
-import { appendJsonl, freshOutput, gate, gateMarkdown, GateRefusal, type StoredRun } from '../../evals/src/index.ts';
+import { appendJsonl, decide, freshOutput, gate, gateMarkdown, GateRefusal, RUN_FORMAT, summarize, wilson, type StoredRun } from '../../evals/src/index.ts';
 import { BUILT_IN_MODELS, CapError, estimateInputTokens, pricesInForce, type Gateway, type GatewayRequest, type Price } from '../../gateway/src/index.ts';
 import type { PromptRefs } from '../src/prompt.ts';
 import { judgeRuns as factJudgeRuns, rewriteRubric } from '../src/rubric.ts';
@@ -34,7 +35,7 @@ import { defaultMode, Genre, Lang } from '../src/types.ts';
 import type { LoadedCase } from './cases.ts';
 import { BASELINE, JUDGE_MAX_TOKENS, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from './judges.ts';
 import { runPipelines, VARIANTS, type PieceRecord, type PipelineVariant } from './pipeline.ts';
-import { codeRuns, hardFailures, scorePieces } from './rubrics.ts';
+import { codeRuns, hardFailures, scorePieces, type CodeRecord } from './rubrics.ts';
 import {
   budgetedGateway,
   costReport,
@@ -49,7 +50,7 @@ import {
   type SpendLedger,
 } from './spend.ts';
 
-export const EVAL_EXIT = { ok: 0, stopped: 1, usage: 3, failed: 4 } as const;
+export const EVAL_EXIT = { ok: 0, stopped: 1, blocked: 2, usage: 3, failed: 4, inconclusive: 5 } as const;
 
 export const EVAL_USAGE =
   'usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...] [--limit N] ' +
@@ -247,29 +248,89 @@ const usd4 = (x: number): string => x.toFixed(4);
 const spendLine = (m: MonthSpend): string =>
   `Spend this month (${m.month}): US$${usd4(m.spentUsd)} of US$${m.capUsd} (US$${usd4(m.openUsd)} of it open reservations), US$${usd4(m.remainingUsd)} left.`;
 
-/** The gates of design 5: each pipeline variant against the single-call baseline. */
-export function gateReport(judges: readonly JudgeRecord[], variants: readonly PipelineVariant[]): string {
-  if (!variants.some((v) => v.id === BASELINE)) return '### Eval gate\n\nNo gate: no baseline among the variants (add single-call to --variants).';
-  const runs = judgeRuns(judges);
-  const sections: string[] = [];
-  const one = (title: string, baseline: StoredRun | undefined, candidate: StoredRun | undefined): void => {
-    if (baseline === undefined || candidate === undefined) {
-      sections.push(`### ${title}\n\nNot gated: no judged pieces on one side.`);
-      return;
-    }
-    try {
-      sections.push(`#### ${title}\n\n${gateMarkdown(gate(baseline, candidate))}`);
-    } catch (error) {
-      if (!(error instanceof GateRefusal)) throw error;
-      sections.push(`### ${title}\n\nNot gated: ${error.message}.`);
-    }
+/** The verdict of a run: a variant's gate, or the run's (from the full pipeline when it ran). */
+export type GateVerdict = 'pass' | 'fail' | 'blocked' | 'inconclusive';
+
+/** The pipeline the gate decides on; the other pipeline variants are its ablations. */
+export const SHIPPED = 'full';
+
+const WORST: readonly GateVerdict[] = ['blocked', 'fail', 'inconclusive', 'pass'];
+const worstOf = (states: readonly GateVerdict[]): GateVerdict => WORST.find((s) => states.includes(s)) ?? 'inconclusive';
+const pct = (x: number): string => `${Math.round(x * 100)}%`;
+
+/**
+ * "Beats the baseline" on pairwise-baseline. The baseline's side of each verdict is the pipeline's
+ * loss, so the two sides are one sample split as p and 1 - p, not two runs gate() could compare.
+ * The test is one-sided on the pipeline's win rate over the pieces with something to judge: pass
+ * when its 95% Wilson interval lies above one half, fail when it lies below, inconclusive otherwise
+ * (a tie included).
+ */
+function beatsBaseline(run: StoredRun, variant: string): { state: Exclude<GateVerdict, 'blocked'>; markdown: string } {
+  const s = summarize(run);
+  if (s.scored === 0) return { state: 'inconclusive', markdown: 'Not gated: no comparison with something to judge.' };
+  const [lo, hi] = wilson(s.passes, s.scored);
+  const state = lo > 0.5 ? 'pass' : hi < 0.5 ? 'fail' : 'inconclusive';
+  const why = state === 'pass' ? 'the whole interval is above one half' : state === 'fail' ? 'the whole interval is below one half' : 'the interval includes one half';
+  return {
+    state,
+    markdown: `### Eval gate: ${state}\n\n${variant} wins ${s.passes} of ${s.scored} comparisons with ${BASELINE} (${pct(s.rate)}, 95% CI ${pct(lo)} to ${pct(hi)}): ${why}. Not scored: ${s.failed} failed, ${s.noOutput} with the same text on both sides.`,
   };
+}
+
+/** gate() over the pieces with something to judge: a text equal to its reference, or a failed judge call, is left out and counted. */
+function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefined): { state: Exclude<GateVerdict, 'blocked'>; markdown: string } {
+  if (baseline === undefined || candidate === undefined) return { state: 'inconclusive', markdown: 'Not gated: no judged pieces on one side.' };
+  let result;
+  try {
+    result = gate(baseline, candidate, { allowMissing: true });
+  } catch (error) {
+    if (!(error instanceof GateRefusal)) throw error;
+    return { state: 'inconclusive', markdown: `Not gated: ${error.message}.` };
+  }
+  const n = Math.min(result.baseline.scored, result.candidate.scored);
+  const small =
+    result.state === 'inconclusive' && decide(n, n, n, n, result.margin) !== 'pass'
+      ? `\n\nThis gate cannot pass with ${n} scored cases at a margin of ${result.margin}, even at 100% on both sides: grow the case set (D3) or change the margin (D13).`
+      : '';
+  return { state: result.state, markdown: `${gateMarkdown(result)}${small}` };
+}
+
+/**
+ * The gate of design 5, per pipeline variant against the single-call baseline: hard failures on
+ * any of its rows block it; else it must beat the baseline on pairwise-baseline and not lose on
+ * same-voice. Each other pipeline variant is also gated against full on pairwise-original, which
+ * tells whether the stage it leaves out contributes. The run's state is full's when full ran,
+ * else the worst of the variants'.
+ */
+export function gateReport(judges: readonly JudgeRecord[], code: readonly CodeRecord[], variants: readonly PipelineVariant[]): { markdown: string; state: GateVerdict } {
+  if (!variants.some((v) => v.id === BASELINE)) return { markdown: '### Eval gate\n\nNo gate: no baseline among the variants (add single-call to --variants).', state: 'inconclusive' };
+  const runs = judgeRuns(judges);
+  const hard = hardFailures(code);
+  const sections: string[] = [];
+  const states = new Map<string, GateVerdict>();
   for (const v of variants) {
     if (v.id === BASELINE) continue;
-    one(`pairwise-baseline: ${v.id} against ${BASELINE}`, runs.get(`pairwise-baseline/${BASELINE} vs ${v.id}`), runs.get(`pairwise-baseline/${v.id}`));
-    one(`same-voice: ${v.id} against ${BASELINE}`, runs.get(`same-voice/${BASELINE}`), runs.get(`same-voice/${v.id}`));
+    const blocking = hard.filter((r) => r.variant === v.id).length;
+    const beats = beatsBaseline(runs.get(`pairwise-baseline/${v.id}`) ?? { format: RUN_FORMAT, rubric: { name: 'pairwise-baseline', version: '1' }, label: v.id, results: [], tables: [] }, v.id);
+    const voice = notWorse(runs.get(`same-voice/${BASELINE}`), runs.get(`same-voice/${v.id}`));
+    const state: GateVerdict = blocking > 0 ? 'blocked' : worstOf([beats.state, voice.state]);
+    states.set(v.id, state);
+    const head = blocking > 0 ? `blocked by ${blocking} hard failure${blocking === 1 ? '' : 's'} (listed below)` : state;
+    sections.push(`## ${v.id} against ${BASELINE}: ${head}`, `#### pairwise-baseline: ${v.id} against ${BASELINE}\n\n${beats.markdown}`, `#### same-voice: ${v.id} against ${BASELINE}\n\n${voice.markdown}`);
   }
-  return sections.join('\n\n');
+  if (variants.some((v) => v.id === SHIPPED)) {
+    for (const v of variants) {
+      if (v.id === BASELINE || v.id === SHIPPED) continue;
+      const ablation = notWorse(runs.get(`pairwise-original/${SHIPPED}`), runs.get(`pairwise-original/${v.id}`));
+      const reading =
+        ablation.state === 'fail'
+          ? `${v.id} is worse than ${SHIPPED}: the stage ${v.id} leaves out contributes.`
+          : `No evidence that the stage ${v.id} leaves out contributes (${ablation.state}).`;
+      sections.push(`### Ablation: ${v.id} against ${SHIPPED}\n\n${reading}\n\n${ablation.markdown}`);
+    }
+  }
+  const state = states.get(SHIPPED) ?? worstOf([...states.values()]);
+  return { markdown: [`# Eval gate: ${state}`, ...sections].join('\n\n'), state };
 }
 
 export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Promise<number> {
@@ -359,9 +420,10 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
   for (const r of code) appendJsonl(paths.code, r);
   const hard = hardFailures(code);
   const run = budget.run();
+  const verdict = gateReport(judges, code, variants);
   const report = [
     stopped === null ? null : `Stopped: ${stopped.message}. The records hold what ran before it.`,
-    gateReport(judges, variants),
+    verdict.markdown,
     `### Hard failures\n\n${hard.length === 0 ? 'None.' : hard.slice(0, 20).map((r) => `- ${r.rubric} on ${r.case} (${r.variant})${r.detail === undefined ? '' : `: ${r.detail}`}`).join('\n')}`,
     `Code rubric runs: ${codeRuns(code).size}.`,
     costReport(costRows(pieces)),
@@ -372,5 +434,6 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
     .join('\n\n');
   writeFileSync(paths.report, `${report}\n`);
   deps.stdout(`${report}\n`);
-  return stopped === null ? EVAL_EXIT.ok : EVAL_EXIT.stopped;
+  if (stopped !== null) return EVAL_EXIT.stopped;
+  return verdict.state === 'pass' ? EVAL_EXIT.ok : verdict.state === 'inconclusive' ? EVAL_EXIT.inconclusive : EVAL_EXIT.blocked;
 }
