@@ -906,6 +906,31 @@ describe("strategy 'single': one call, the same guards", () => {
   });
 });
 
+describe('S5 drops against what S6 leaves', () => {
+  // F6b review: with no judge (D10 on a WhatsApp in minimo), only check() rechecks a drop after S6
+  // reverts the edit that kept its fact. Fictional chat: the first edit names Marta in sentence 1
+  // with a "che" the writer does not use; the second deletes the greeting, with drop, since Marta
+  // is then named elsewhere.
+  const GREETING = 'Hola Marta, espero que estés bien.';
+  it('reverts an accepted drop once S6 reverts the edit that kept its fact', async () => {
+    const keeper = { sentenceId: 1, before: SINERGIAS, after: 'Marta, quería contarte que el sitio está listo, che.', reason: 'fix' };
+    const deletion = { sentenceId: 0, before: GREETING, after: '', reason: 'Marta is named in sentence 1', drop: true };
+    const scripted = scriptedGateway({ 'rewrite.edit': [{ data: { edits: [keeper, deletion] } }] });
+    const input = whatsapp(CHAT);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.edit']);
+    expect(result.rewritten).toBe(CHAT);
+    expect(result.changes.map((c) => [c.before, c.status])).toEqual([
+      [SINERGIAS, 'reverted'],
+      [GREETING, 'reverted'],
+    ]);
+    expect(result.changes[0]?.revertReason).toMatch(/^voice: /);
+    expect(result.changes[1]?.revertReason).toMatch(/^facts: .*Marta/);
+    expectSound(input, result);
+  });
+});
+
 describe('S5 drops against what the judge leaves', () => {
   // es-cover-letter-heavy, edit-sonnet-5-5 piece of run 3. S3 deleted the "Estudio Lumen" sentence
   // without drop (reverted: it loses the name); S4 sent the same deletion with drop, accepted
