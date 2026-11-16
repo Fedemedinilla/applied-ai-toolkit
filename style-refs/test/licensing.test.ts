@@ -138,6 +138,30 @@ describe('an excerpt comes only from a work in the public domain in the United S
     ]);
     expect(messages(withExcerpt(work, { ...excerpt, url: 'https://www.gutenberg.org/ebooks/1.txt.utf-8' }))).toEqual([]);
   });
+  describe('ties an excerpt URL to the page its source names', () => {
+    const page = { ...work, lang: 'es', originalLang: 'es', nationality: ['es'], url: 'https://es.wikisource.org/wiki/Invented_book' };
+    const fromPage = (url: string) => ({ ...excerpt, lang: 'es', text: 'Escribía corto. Funcionaba.', url });
+    it('accepts the source page itself, or a variant the source lists in excerptUrls', () => {
+      expect(messages(withExcerpt(page, fromPage('https://es.wikisource.org/wiki/Invented_book')))).toEqual([]);
+      const listed = { ...page, excerptUrls: ['https://es.wikisource.org/wiki/Invented_book_(first_edition)'] };
+      expect(messages(withExcerpt(listed, fromPage('https://es.wikisource.org/wiki/Invented_book_(first_edition)')))).toEqual([]);
+    });
+    it("refuses a Wikisource page of another work, such as an Argentine author's, under a cleared source", () => {
+      expect(messages(withExcerpt(page, fromPage('https://es.wikisource.org/wiki/Aguafuertes_porte%C3%B1as')))).toEqual([
+        'excerpts/es.json 0.url: https://es.wikisource.org/wiki/Aguafuertes_porte%C3%B1as is not the page of plain-work nor one of its excerptUrls',
+      ]);
+    });
+    it('refuses a Gutenberg text under a source that names no Gutenberg ebook', () => {
+      expect(messages(withExcerpt(page, fromPage('https://www.gutenberg.org/cache/epub/13507/pg13507.txt')))).toEqual([
+        'excerpts/es.json 0.url: https://www.gutenberg.org/cache/epub/13507/pg13507.txt is not the page of plain-work nor one of its excerptUrls',
+      ]);
+    });
+    it('refuses an excerptUrls entry off the text hosts', () => {
+      expect(messages({ ...empty, sources: [{ ...page, excerptUrls: ['https://www.cervantesvirtual.com/obra/x'] }] })).toEqual([
+        'sources.json 0.excerptUrls.0: www.cervantesvirtual.com is not gutenberg.org or wikisource.org',
+      ]);
+    });
+  });
   it('refuses a principle that cites a link-only source', () => {
     expect(messages({ ...empty, sources: [{ ...work, use: 'link-only' }], principles: { 'principles/en.json': [principle] } })).toEqual([
       'principles/en.json 0.sources.0: plain-work is link-only',

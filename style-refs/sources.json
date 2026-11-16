@@ -287,10 +287,13 @@
     },
     "licence": "public domain where status says public-domain; see status per jurisdiction",
     "url": "https://en.wikisource.org/wiki/Gettysburg_Address",
+    "excerptUrls": [
+      "https://en.wikisource.org/wiki/Gettysburg_Address_(Bliss_copy)"
+    ],
     "verified": "2026-11-15",
     "evidence": "REPORTADO",
     "use": "excerpts",
-    "note": "Economy. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+    "note": "Economy. The excerpts are checked against the Bliss copy, the only manuscript Lincoln signed (per its Wikisource page), listed in excerptUrls. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
   },
   {
     "id": "chekhov-garnett-lady-with-the-dog",

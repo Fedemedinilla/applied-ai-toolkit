@@ -37,24 +37,25 @@ npm run check                # tsc --noEmit, strict
 `validateRefs()` enforces them and `test/licensing.test.ts` breaks each one on purpose:
 
 - An excerpt comes only from a source marked `excerpts` and in the public domain in the United States. An open licence is not enough, and `unverified` is not free.
-- That source was published in 1930 or earlier (`US_FREE_THROUGH`, what the United States frees as of 2026-01-01; it moves one year each January), and an unknown year counts as not free. A Gutenberg excerpt comes from the ebook its source names.
+- That source was published in 1930 or earlier (`US_FREE_THROUGH`, what the United States frees as of 2026-01-01; it moves one year each January), and an unknown year counts as not free. A Gutenberg excerpt comes from the ebook its source names. Any other excerpt URL, a Wikisource page above all, is the source's `url` or one of its `excerptUrls`. Otherwise an excerpt could pass another work's text under a cleared source.
 - No excerpt of an Argentine author while the paid public domain of Decreto-ley 1224/58 is unresolved (design decision D12). Quiroga, Arlt, Mansilla and Sarmiento give principles in our own words; Arlt only for the casual register of WhatsApp.
 - A translation needs its translator and the year they died.
-- An excerpt has at most two sentences and 45 words (D11), its text comes from gutenberg.org or wikisource.org without what they add, and it never names Project Gutenberg, whose licence allows the text to travel only without that name.
+- An excerpt has at most two sentences and 45 words (D11), its text comes from gutenberg.org or wikisource.org (or a subdomain, never a lookalike host) without what they add, and it never names Project Gutenberg, whose licence allows the text to travel only without that name.
 - A source under an open licence (the OGL v3.0 of GOV.UK, the CC BY 4.0 of argentina.gob.ar) carries its `attribution` before it gives principles. The principles adapt the guidance in our own words and never copy it.
+- No source that gives principles or excerpts lives on cervantesvirtual.com, whatever its `kind`, because the Biblioteca Virtual Miguel de Cervantes claims rights over its database.
 - A principle never cites a `link-only` or `excluded` source. Baroja, Azorín, Orwell's essay and the Strunk and White edition of 1959 are recorded as excluded.
 - Every legal status is REPORTADO. It comes from the public-domain research of 2026-11-15 and was not checked against each law.
 
 ## Decreto-ley 1224/58 (D12)
 
-Argentina charges a fee for the use of works in the public domain (the "dominio público pagante" of Decreto-ley 1224/58). Whether it reaches a free repository is unverified, so decision D12 starts with the English authors and Galdós. Each Argentine work in `sources.json` carries `paidPublicDomain: "unresolved"`, and while it does, `validateRefs()` refuses any excerpt of it. Quiroga gives principles in our own words, Arlt only principles for the casual rioplatense register of WhatsApp, and Mansilla and Sarmiento principles only. Changing the flag to `cleared` needs a reading of the decree first, recorded in the source's `note`.
+Argentina charges a fee for the use of works in the public domain (the "dominio público pagante" of Decreto-ley 1224/58). Whether it reaches a free repository is unverified, so decision D12 starts with the English authors and Galdós. Each Argentine work in `sources.json` carries `paidPublicDomain: "unresolved"`, and while it does, `validateRefs()` refuses any excerpt of it, and the source itself if it declares `use: "excerpts"`. Quiroga gives principles in our own words, Arlt only principles for the casual rioplatense register of WhatsApp, and Mansilla and Sarmiento principles only. Changing the flag to `cleared` needs a reading of the decree first, recorded in the source's `note`.
 
 ## Adding a source
 
 1. Add the work to `sources.json` with its status in each of `ar`, `us`, `eu` and `es`. A status taken from research is `REPORTADO`; a cell the research left unverified is `unverified`, never `public-domain`. A place that frees the work on a known day goes in `freeFrom`, with a status that is not free yet.
 2. Give its year of publication, or `null` when it is unverified, and the year its author died. A translation names its translator and the year they died. An Argentine author needs `paidPublicDomain`.
 3. Choose its use. `excerpts` needs `public-domain` in the United States and a year of 1930 or earlier, and a URL on gutenberg.org or wikisource.org. A source under an open licence needs its `attribution`.
-4. For an excerpt, fetch the plain text outside the repository, check the excerpt is an exact substring after collapsing whitespace, and record the URL and the day it was fetched. Keep it to two sentences and 45 words, with what it teaches and what not to imitate.
+4. For an excerpt, fetch the plain text outside the repository, check the excerpt is an exact substring after collapsing whitespace, and record the URL and the day it was fetched. A Wikisource variant of the source page (such as a manuscript copy) goes in the source's `excerptUrls`. Keep it to two sentences and 45 words, with what it teaches and what not to imitate.
 5. Run `npx vitest run style-refs prose-rewriter`.
 
 ## Registers

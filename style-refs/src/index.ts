@@ -105,6 +105,12 @@ export const Source = z.strictObject({
   paidPublicDomain: z.enum(['unresolved', 'cleared']).optional(),
   licence: z.string().min(1),
   url: z.url({ protocol: /^https$/ }),
+  /**
+   * Other pages of the same work an excerpt may be checked against, such as a Wikisource variant
+   * (Gettysburg_Address_(Bliss_copy)). An excerpt URL is the source's url, one of these, or the
+   * plain text of the Gutenberg ebook the source names; anything else could pass another work's text.
+   */
+  excerptUrls: z.array(z.url({ protocol: /^https$/ })).min(1).optional(),
   /** When the status was last checked against the law or the licence. */
   verified: IsoDate,
   /** How the status is known. Nothing here was checked against each law, so it is REPORTADO. */
@@ -371,6 +377,10 @@ function sourceProblems(s: Source): Local[] {
     out.push({ path: 'use', message: 'an Argentine author gives no excerpts while the paid public domain (Decreto-ley 1224/58) is unresolved' });
   }
   if (s.use === 'excerpts' && s.status.us !== 'public-domain') out.push({ path: 'use', message: `a source for excerpts must be public-domain in the US, and it is ${s.status.us}` });
+  s.excerptUrls?.forEach((url, i) => {
+    const { host, allowed } = textHost(url);
+    if (!allowed) out.push({ path: `excerptUrls.${i}`, message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
+  });
   if (s.kind === 'literary' && s.use !== 'excluded') {
     const { host, allowed } = textHost(s.url);
     if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
@@ -385,7 +395,7 @@ function sourceProblems(s: Source): Local[] {
 /** The ebook number of a gutenberg.org URL (/ebooks/N, /cache/epub/N/, /files/N/), or undefined. */
 function gutenbergEbook(url: string): string | undefined {
   const u = new URL(url);
-  if (!textHost(url).host.endsWith('gutenberg.org')) return undefined;
+  if (!onHost(textHost(url).host, ['gutenberg.org'])) return undefined;
   return /^\/(?:ebooks|cache\/epub|files)\/(\d+)(?:[./]|$)/.exec(u.pathname)?.[1];
 }
 
@@ -429,6 +439,10 @@ function excerptProblems(e: Excerpt, source: Source | undefined): Local[] {
   const sourceEbook = source === undefined ? undefined : gutenbergEbook(source.url);
   if (ebook !== undefined && sourceEbook !== undefined && ebook !== sourceEbook) {
     out.push({ path: 'url', message: `Gutenberg ebook ${ebook}, and the source ${source?.id} is ebook ${sourceEbook}` });
+  } else if (source !== undefined && allowed && (ebook === undefined || sourceEbook === undefined)) {
+    // Any other page (a Wikisource one above all) must be one the source names, or the Argentine and US rules could be passed by citing the wrong source.
+    const pages = [source.url, ...(source.excerptUrls ?? [])].map((u) => new URL(u).href);
+    if (!pages.includes(new URL(e.url).href)) out.push({ path: 'url', message: `${e.url} is not the page of ${source.id} nor one of its excerptUrls` });
   }
   return out;
 }
