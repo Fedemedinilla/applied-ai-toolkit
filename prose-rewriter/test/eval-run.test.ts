@@ -88,11 +88,20 @@ describe('the spend ledger', () => {
     expect(() => ledger.reserve(0.01)).not.toThrow();
   });
 
-  it('refuses a cap above the budget Federico fixed, and a cap that is not a positive number', () => {
+  it('refuses a cap above the default budget unless it was raised on purpose, and a cap that is not a positive number', () => {
     const path = tempLedger();
-    expect(() => openLedger({ path, monthlyCapUsd: 20.01, clock: fixed })).toThrow(/at most US\$20/);
+    expect(MONTHLY_BUDGET_USD).toBe(20);
+    expect(() => openLedger({ path, monthlyCapUsd: 20.01, clock: fixed })).toThrow(/above the default of US\$20.*--monthly-cap/);
     expect(() => openLedger({ path, monthlyCapUsd: 0, clock: fixed })).toThrow(/positive/);
+    expect(() => openLedger({ path, monthlyCapUsd: 0, clock: fixed, raised: true })).toThrow(/positive/);
     expect(() => openLedger({ path, monthlyCapUsd: 5, clock: fixed })).not.toThrow();
+    // November 2026: 50 (Federico, 16/11/2026), set with the flag; the ledger then holds that cap.
+    const raised = openLedger({ path, monthlyCapUsd: 50, clock: fixed, raised: true });
+    raised.settle(raised.reserve(45), 45);
+    expect(raised.month()).toMatchObject({ capUsd: 50, spentUsd: 45, remainingUsd: 5 });
+    expect(() => raised.reserve(5.01)).toThrow(SpendRefusal);
+    // The next run at the default sees the same spend against 20 and refuses any call.
+    expect(() => openLedger({ path, monthlyCapUsd: 20, clock: fixed }).reserve(0.01)).toThrow(SpendRefusal);
   });
 
   it('persists across two runs: a second ledger on the same file sees the first one spend', () => {
@@ -595,7 +604,7 @@ describe('the eval CLI', () => {
     const text = h.out.join('');
     expect(text).toMatch(/Dry run: 4 pieces \(2 cases x 2 variants\), no model call made/);
     expect(text).toMatch(/Worst case of the whole run: US\$\d+\.\d{4} over at most \d+ calls/);
-    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0000 of US\$20/);
+    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0000 of US\$20 \(the default monthly budget\)/);
     expect(h.built).toEqual([]);
     expect(existsSync(h.ledgerPath)).toBe(false);
   });
@@ -612,8 +621,23 @@ describe('the eval CLI', () => {
     expect(h3.err.join('')).toMatch(/no-such-case/);
   });
 
-  it('refuses a monthly cap above the budget and bad numbers', async () => {
-    for (const argv of [['--monthly-cap', '25'], ['--max-usd', '-1'], ['--limit', '0'], ['--variants', 'nope']]) {
+  it('raises the monthly cap only with --monthly-cap, and says in the report who set it', async () => {
+    const h = harness(never, { apiKey: undefined });
+    expect(await runEvalCli(['--dry-run', '--variants', 'full', '--monthly-cap', '50'], h.deps)).toBe(EVAL_EXIT.ok);
+    expect(h.out.join('')).toMatch(/of US\$50 \(set by --monthly-cap; the default is US\$20\)/);
+    const seed = openLedger({ path: h.ledgerPath, monthlyCapUsd: 50, clock: fixed, raised: true });
+    seed.settle(seed.reserve(30), 30);
+    // At the default, a month that spent 30 has nothing left: the first call is refused.
+    const scripted = scriptedGateway({});
+    const h2 = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN], home: h.deps.home });
+    expect(await runEvalCli(['--live', '--variants', 'full', '--out', join(h2.dir, 'run')], h2.deps)).toBe(EVAL_EXIT.stopped);
+    expect(scripted.calls).toHaveLength(0);
+    expect(h2.built).toEqual([20]);
+    expect(h2.out.join('')).toMatch(/US\$30\.0000 of US\$20 \(the default monthly budget\)/);
+  });
+
+  it('refuses bad numbers', async () => {
+    for (const argv of [['--monthly-cap', '0'], ['--max-usd', '-1'], ['--limit', '0'], ['--variants', 'nope']]) {
       const h = harness(never);
       expect(await runEvalCli(['--dry-run', ...argv], h.deps)).toBe(EVAL_EXIT.usage);
     }
@@ -644,7 +668,9 @@ describe('the eval CLI', () => {
     expect(parseEvalArgs(['--dry-run=yes'])).toMatch(/--dry-run takes no value/);
     expect(parseEvalArgs(['--live', '--max-usd', '1', '--out', '--dry-run'])).toMatch(/--out needs a value/);
     expect(parseEvalArgs(['--dry-run', '--variants', '--live'])).toMatch(/--variants needs a value/);
-    expect(parseEvalArgs(['--dry-run', '--monthly-cap', '21'])).toMatch(/at most 20/);
+    expect(parseEvalArgs(['--dry-run'])).toMatchObject({ monthlyCap: 20, monthlyCapSetBy: 'default' });
+    expect(parseEvalArgs(['--dry-run', '--monthly-cap', '50'])).toMatchObject({ monthlyCap: 50, monthlyCapSetBy: 'flag' });
+    expect(parseEvalArgs(['--dry-run', '--monthly-cap', '5'])).toMatchObject({ monthlyCap: 5, monthlyCapSetBy: 'flag' });
     expect(parseEvalArgs(['--dry-run', '--margin', '1'])).toMatch(/--margin needs a fraction from 0 to below 1/);
     expect(parseEvalArgs(['--dry-run', '--margin', 'x'])).toMatch(/--margin needs a fraction/);
     expect(parseEvalArgs(['--dry-run', '--margin', '0.11'])).toMatchObject({ margin: 0.11 });

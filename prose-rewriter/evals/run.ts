@@ -54,7 +54,7 @@ export const EVAL_EXIT = { ok: 0, stopped: 1, blocked: 2, usage: 3, failed: 4, i
 
 export const EVAL_USAGE =
   'usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...] [--limit N] [--margin F] ' +
-  `[--monthly-cap USD (default and most ${MONTHLY_BUDGET_USD})] [--max-usd USD]`;
+  `[--monthly-cap USD (default ${MONTHLY_BUDGET_USD})] [--max-usd USD]`;
 
 export interface EvalArgs {
   readonly dryRun: boolean;
@@ -63,6 +63,8 @@ export interface EvalArgs {
   readonly cases: readonly string[] | null;
   readonly limit: number | null;
   readonly monthlyCap: number;
+  /** Who set the cap in force: the default (MONTHLY_BUDGET_USD) or --monthly-cap, which may raise it. */
+  readonly monthlyCapSetBy: 'default' | 'flag';
   readonly maxUsd: number | null;
   /** The margin gate() takes for same-voice and the ablations (D13). Default DEFAULT_MARGIN. */
   readonly margin: number;
@@ -113,7 +115,6 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
   const maxUsd = positive('max-usd', values['max-usd']);
   if (typeof cap === 'string') return cap;
   if (typeof maxUsd === 'string') return maxUsd;
-  if (cap !== null && cap > MONTHLY_BUDGET_USD) return `--monthly-cap is at most ${MONTHLY_BUDGET_USD} (D14); raising the budget is Federico's decision, made in code`;
   let margin = DEFAULT_MARGIN;
   if (values.margin !== undefined) {
     margin = Number(values.margin);
@@ -135,6 +136,7 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
     cases,
     limit,
     monthlyCap: cap ?? MONTHLY_BUDGET_USD,
+    monthlyCapSetBy: cap === null ? 'default' : 'flag',
     maxUsd,
     margin,
     out: values.out ?? null,
@@ -253,8 +255,10 @@ export interface EvalCliDeps {
 }
 
 const usd4 = (x: number): string => x.toFixed(4);
-const spendLine = (m: MonthSpend): string =>
-  `Spend this month (${m.month}): US$${usd4(m.spentUsd)} of US$${m.capUsd} (US$${usd4(m.openUsd)} of it open reservations), US$${usd4(m.remainingUsd)} left.`;
+const capBy = (setBy: EvalArgs['monthlyCapSetBy']): string =>
+  setBy === 'default' ? 'the default monthly budget' : `set by --monthly-cap; the default is US$${MONTHLY_BUDGET_USD}`;
+const spendLine = (m: MonthSpend, setBy: EvalArgs['monthlyCapSetBy']): string =>
+  `Spend this month (${m.month}): US$${usd4(m.spentUsd)} of US$${m.capUsd} (${capBy(setBy)}), US$${usd4(m.openUsd)} of it in open reservations, US$${usd4(m.remainingUsd)} left.`;
 
 /** The verdict of a run: a variant's gate, or the run's (from the full pipeline when it ran). */
 export type GateVerdict = 'pass' | 'fail' | 'blocked' | 'inconclusive';
@@ -370,7 +374,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
   let ledger: SpendLedger;
   let month: MonthSpend;
   try {
-    ledger = openLedger({ path: defaultLedgerPath(deps.home), monthlyCapUsd: args.monthlyCap, clock: deps.clock });
+    ledger = openLedger({ path: defaultLedgerPath(deps.home), monthlyCapUsd: args.monthlyCap, raised: args.monthlyCapSetBy === 'flag', clock: deps.clock });
   } catch (error) {
     return usage((error as Error).message);
   }
@@ -386,7 +390,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
     const lines = [
       `Dry run: ${estimate.pieces} pieces (${cases.length} cases x ${variants.length} variants), no model call made.`,
       `Worst case of the whole run: US$${usd4(estimate.worstUsd)} over at most ${estimate.calls} calls (an upper estimate; each live call reserves its own worst case).`,
-      spendLine(month),
+      spendLine(month, args.monthlyCapSetBy),
     ];
     if (estimate.worstUsd > month.remainingUsd) lines.push('The worst case is more than what is left this month: the live run may stop on the budget. Try --limit or fewer --variants.');
     if (args.maxUsd !== null && estimate.worstUsd > args.maxUsd) lines.push(`The worst case is more than --max-usd ${args.maxUsd}: the live run may stop on it.`);
@@ -408,7 +412,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
   }
 
   const budget = budgetedGateway(deps.gateway(deps.apiKey, args.monthlyCap), { ledger, prices, maxRunUsd: args.maxUsd });
-  deps.stdout(`${spendLine(month)}\nLive run: ${cases.length} cases x ${variants.length} variants, records in ${dir}\n`);
+  deps.stdout(`${spendLine(month, args.monthlyCapSetBy)}\nLive run: ${cases.length} cases x ${variants.length} variants, records in ${dir}\n`);
   const pieces: PieceRecord[] = [];
   const judges: JudgeRecord[] = [];
   let stopped: CapError | null = null;
@@ -445,7 +449,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
     `Code rubric runs: ${codeRuns(code).size}.`,
     costReport(costRows(pieces)),
     `This run: US$${usd4(run.spentUsd)} over ${run.calls} calls, judges included.`,
-    spendLine(ledger.month()),
+    spendLine(ledger.month(), args.monthlyCapSetBy),
   ]
     .filter((s) => s !== null)
     .join('\n\n');

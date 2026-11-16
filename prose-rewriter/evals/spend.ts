@@ -2,7 +2,9 @@
  * What the eval runs spend, and the budget that stops them (design 4.10 "Costo" and D14).
  *
  * Federico fixed the budget of every real-model eval run at US$20 a month (D14, 16/11/2026), paid
- * from his prepaid credits. The gateway's caps cannot hold it: the CLI builds the gateway over
+ * from his prepaid credits: MONTHLY_BUDGET_USD is that default. A month's budget is raised only by
+ * an explicit --monthly-cap (openLedger's `raised`); for November 2026 he set US$50 to use
+ * promotional credit that expires, and from December the default holds again. The gateway's caps cannot hold it: the CLI builds the gateway over
  * in-memory stores that start from zero on every run (prose-rewriter/cli.ts). So the budget lives
  * here, in a ledger file outside the repository that every run reads and writes:
  *
@@ -179,8 +181,10 @@ function parseLedger(raw: string, path: string): LedgerFile {
 
 export interface LedgerOptions {
   readonly path: string;
-  /** At most MONTHLY_BUDGET_USD: a run may lower the cap, never raise it. */
+  /** The cap in force for this run. Above MONTHLY_BUDGET_USD only with `raised`. */
   readonly monthlyCapUsd: number;
+  /** The cap was set on purpose (--monthly-cap), so it may be above MONTHLY_BUDGET_USD. */
+  readonly raised?: boolean;
   readonly clock: Clock;
   readonly timeZone?: string;
 }
@@ -218,7 +222,9 @@ export function openLedger(options: LedgerOptions): SpendLedger {
   const { path, clock } = options;
   const cap = options.monthlyCapUsd;
   if (!(Number.isFinite(cap) && cap > 0)) throw new Error(`the monthly cap must be a positive number of US$, got ${cap}`);
-  if (cap > MONTHLY_BUDGET_USD) throw new Error(`the monthly cap is at most US$${MONTHLY_BUDGET_USD} (D14); raising it is Federico's decision, made in MONTHLY_BUDGET_USD`);
+  if (cap > MONTHLY_BUDGET_USD && options.raised !== true) {
+    throw new Error(`a monthly cap of US$${cap} is above the default of US$${MONTHLY_BUDGET_USD} (D14); raising it for a month takes an explicit --monthly-cap`);
+  }
   const capMicros = micros(cap);
   const zone = options.timeZone ?? SPEND_TIME_ZONE;
 

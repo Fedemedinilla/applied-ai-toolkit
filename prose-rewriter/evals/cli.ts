@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...]
-//        [--limit N] [--monthly-cap USD] [--max-usd USD]
+//        [--limit N] [--margin F] [--monthly-cap USD] [--max-usd USD]
 // --live needs ANTHROPIC_API_KEY in the environment (never in a file or an argument); --dry-run needs no key.
-// Exit codes: 0 finished, 1 stopped by a cap or the budget, 3 bad usage, 4 no key or an unreadable ledger.
+// Exit codes (run.ts): 0 the gate passed (or a dry run), 1 stopped by a cap or the budget, 2 the gate
+// failed or a hard rubric blocked it, 3 bad usage, 4 no key or an unreadable ledger, 5 the gate is
+// inconclusive or could not run.
 //
 // This is the only place that reads the key and builds the live gateway of the eval runs:
 // in-memory stores seeded with the rewriter's four tasks, its provisional caps with the run's

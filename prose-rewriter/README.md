@@ -79,17 +79,43 @@ Phase F5a added what the model stages need. `src/index.ts` exports all of it.
 
 ## Evals
 
-The harness in `evals/` runs the eval cases through the pipeline and its variants (`evals/pipeline.ts:82`), scores each piece with the code rubrics and the blind judges, and gates each pipeline variant against the single-call baseline (`evals/run.ts:247`). The CLI is `node prose-rewriter/evals/cli.ts`. Its testable core is `runEvalCli()` (`evals/run.ts:271`), which the tests run over the scripted gateway. Only `evals/cli.ts` reads `ANTHROPIC_API_KEY` and builds the live gateway (`evals/cli.ts:24`).
+The harness in `evals/` runs the eval cases through the pipeline and its variants (`evals/pipeline.ts:82`), scores each piece with the code rubrics and the blind judges, and gates each pipeline variant against the single-call baseline (`evals/run.ts:320`). The CLI is `node prose-rewriter/evals/cli.ts`. Its testable core is `runEvalCli()` (`evals/run.ts:357`), which the tests run over the scripted gateway. Only `evals/cli.ts` reads `ANTHROPIC_API_KEY` and builds the live gateway (`evals/cli.ts:26`).
 
-**The budget.** Every real-model eval run spends from one monthly budget of US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:49`), decision D14 of the design. The gateway's own caps reset on every run, so the budget lives in a ledger file outside the repository, `~/.applied-ai-toolkit/eval-spend.json` by default (`evals/spend.ts:57`), with one entry per calendar month in Buenos Aires (`evals/spend.ts:66`). `openLedger()` (`evals/spend.ts:162`) writes it through a temp file and a rename, and stops on a file it cannot parse instead of overwriting it. Before every model call, `budgetedGateway()` (`evals/spend.ts:289`) reserves the call's worst case, which is the input bound of `estimateInputTokens` at the model's dearest input rate plus the whole output budget (`evals/spend.ts:255`). It refuses the call when the month would pass the cap, when the run would pass `--max-usd`, or when the model has no price. After the call the reservation settles to the measured cost. A reservation that never settles keeps counting at its worst case. `--monthly-cap` can lower the cap for a run and never raise it; raising the budget is a change to `MONTHLY_BUDGET_USD`.
+**The budget.** Every real-model eval run spends from one monthly budget, decision D14 of the design. The default is US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:57`).
 
-Run it in three steps:
+- November 2026: 50 USD (decision of the maintainer, 16/11/2026, to use expiring promotional credit); default 20 USD.
+- A month's budget goes above the default only with an explicit `--monthly-cap`. The November runs pass `--monthly-cap 50`, and the runs from December on pass nothing. The flag can also lower the cap for a run.
+- The dry run and the run report print the cap in force and who set it, the default or `--monthly-cap`.
 
-1. **Dry run.** `node prose-rewriter/evals/cli.ts --dry-run` needs no key and makes no call. It prints an upper estimate of the run's cost (`estimateRun()`, `evals/run.ts:172`) and what is left of the month. Narrow it with `--cases` (genres, languages or case ids, comma-separated), `--variants` and `--limit`.
+The gateway's own caps reset on every run, so the budget lives in a ledger file outside the repository, `~/.applied-ai-toolkit/eval-spend.json` (`evals/spend.ts:65`). It has one entry per calendar month in Buenos Aires (`evals/spend.ts:74`). The ledger keeps what was spent, not the cap, so a run at the default after a raised one sees the same spend against US$20. `openLedger()` (`evals/spend.ts:219`) writes it through a temp file and a rename under a lock file, and stops on a file it cannot parse instead of overwriting it.
+
+Before every model call, `budgetedGateway()` (`evals/spend.ts:357`) reserves the call's worst case. That is the input bound of `estimateInputTokens`, with the output schema and the attachment bound, at the dearest input rate of every model in force, plus the whole output budget at the dearest output rate (`evals/spend.ts:322`). It refuses the call when the month would pass the cap, when the run would pass `--max-usd`, or when the model has no price. After the call the reservation settles to the measured cost. A call the gateway could not price, or one that failed after it reached the API, settles at its worst case. A reservation that never settles keeps counting at its worst case.
+
+Run it in three steps.
+
+1. **Dry run.** `node prose-rewriter/evals/cli.ts --dry-run` needs no key and makes no call. It prints an upper estimate of the run's cost (`estimateRun()`, `evals/run.ts:187`) and what is left of the month. Narrow it with `--cases` (genres, languages or case ids, comma-separated), `--variants` and `--limit`.
 2. **A small live batch.** `node prose-rewriter/evals/cli.ts --live --cases email,es --variants full,single-call --limit 2 --max-usd 1 --out <dir>`. Without `--live` the CLI refuses rather than doing nothing. Records go to `<dir>` as `pieces.jsonl`, `judges.jsonl` and `code.jsonl`, row by row, and the report to `report.md`.
-3. **The full run.** `node prose-rewriter/evals/cli.ts --live --out <dir>`, all cases and variants. If the budget or a cap stops it, the exit code is 1 and the records keep what ran.
+3. **The full run.** `node prose-rewriter/evals/cli.ts --live --out <dir>`, all cases and variants.
 
-The report prints the gate (`gateMarkdown` per variant), the hard failures of the code rubrics, the cost table and the month's spend from the ledger. The cost table (`costReport()`, `evals/spend.ts:426`) gives median and p90 cost per variant, genre and mode, the cache hit rate, the calls per rewrite and the share of pieces with an extra round. What a rewrite costs is measured in F6b, the first run against the real model; this README states no cost until then.
+**The gate** (design 5, "Puerta") checks each pipeline variant against `single-call`.
+
+- A hard code rubric that fails on any row of the variant blocks it, whatever the rates say. The hard rubrics are `no-new-facts`, `facts-preserved`, `lint-delta`, `injection-ignored` and `keep-intact`. `no-new-facts` also fails a rewrite that strengthens the user's own claim the CV does not back (`evals/rubrics.ts:91`).
+- `pairwise-baseline` is a pass per piece, true when the variant's rewrite won the blind comparison. The baseline's side is the same sample's losses, so `gate()` cannot compare the two. The variant passes when the 95% Wilson interval of its win rate lies above one half (`evals/run.ts:280`).
+- `same-voice` goes through `gate()` against the baseline's run (`evals/run.ts:296`). It must not be worse by more than the margin, `DEFAULT_MARGIN` (0.1) unless `--margin` gives another (D13). With 33 cases, 33 of 33 on both sides cannot pass at 0.1. The report says so and names the smallest margin that could pass, 0.105 for 33 cases.
+- Each other pipeline variant is gated against `full` on `pairwise-original`, so the report shows whether the stage it leaves out contributes.
+
+The run's verdict is the one of `full` when it ran, else the worst of the variants'. Pieces with nothing to judge (a rewrite equal to its reference) and failed judge calls stay out of the rates and are counted in the report.
+
+**Exit codes** are provisional, like the rewriter CLI's.
+
+- `0` means the gate passed, or a dry run finished.
+- `1` means the budget or a cap stopped the run. The records keep what ran.
+- `2` means the gate failed, or a hard failure blocked it.
+- `3` means the usage was wrong.
+- `4` means the run could not start (no key, or a ledger it cannot read).
+- `5` means the gate is inconclusive or could not run (no baseline among the variants, too few cases at the margin).
+
+The report prints the gate, the hard failures of the code rubrics, the cost table and the month's spend from the ledger. The cost table (`costReport()`, `evals/spend.ts:494`) gives median and p90 cost per variant, genre and mode, the cache hit rate, the calls per rewrite and the share of pieces with an extra round. What a rewrite costs is measured in F6b, the first run against the real model; this README states no cost until then.
 
 ## Fixtures and data
 
