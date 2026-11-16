@@ -57,7 +57,10 @@ export interface PipelineVariant {
   readonly kind: 'pipeline' | 'single-call';
   /** Without S4. */
   readonly skipStyle?: boolean;
-  /** rewrite()'s strategy, for a pipeline variant. Default 'staged'. */
+  /**
+   * rewrite()'s strategy, for a pipeline variant. Default 'staged', passed to rewrite() explicitly:
+   * rewrite()'s own default is 'single', and the 'full' variant measures the staged pipeline.
+   */
   readonly strategy?: Strategy;
   /** Without style-refs' examples in the prompt. */
   readonly withoutExamples?: boolean;
@@ -256,7 +259,7 @@ export async function runPipelines(cases: readonly EvalCase[], variants: readonl
       let stop: unknown = null;
       try {
         const result: (RewriteResult & { kind: 'pipeline' }) | SingleCallResult =
-          v.kind === 'single-call' ? await singleCall(c.input, common) : { kind: 'pipeline', ...(await rewrite(c.input, { ...common, skipStyle: v.skipStyle === true, ...(v.strategy === undefined ? {} : { strategy: v.strategy }) })) };
+          v.kind === 'single-call' ? await singleCall(c.input, common) : { kind: 'pipeline', ...(await rewrite(c.input, { ...common, skipStyle: v.skipStyle === true, strategy: v.strategy ?? 'staged' })) };
         record = { ...base, status: 'done', rewritten: result.rewritten, result, usage: usage() };
       } catch (error) {
         const e = error instanceof Error ? error : new Error(String(error));

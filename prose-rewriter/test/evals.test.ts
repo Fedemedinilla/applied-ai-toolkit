@@ -43,7 +43,7 @@ describe('rewrite() options for the eval variants', () => {
   it('skips S4 when skipStyle is set, and still runs it by default', async () => {
     const expected = MAIL.replace(SINERGIAS, FIXED);
     const skipped = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })], 'rewrite.judge': [factVerdict(expected)] });
-    const result = await rewrite(mail(MAIL), { gateway: skipped.gateway, refs: REFS, skipStyle: true });
+    const result = await rewrite(mail(MAIL), { gateway: skipped.gateway, refs: REFS, skipStyle: true, strategy: 'staged' });
     skipped.assertDone();
     expect(tasksOf(skipped)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.judge']);
     expect(result.rewritten).toBe(expected);
@@ -54,7 +54,7 @@ describe('rewrite() options for the eval variants', () => {
       'rewrite.style': [edits()],
       'rewrite.judge': [factVerdict(expected)],
     });
-    await rewrite(mail(MAIL), { gateway: full.gateway, refs: REFS, skipStyle: false });
+    await rewrite(mail(MAIL), { gateway: full.gateway, refs: REFS, skipStyle: false, strategy: 'staged' });
     full.assertDone();
     expect(tasksOf(full)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
   });

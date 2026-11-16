@@ -1,5 +1,6 @@
 /**
- * rewrite(input, { gateway }) (design 4.11): the stages S0 to S7 of design 4.4, in order.
+ * rewrite(input, { gateway }) (design 4.11): the stages S0 to S7 of design 4.4, in order, as the
+ * 'staged' strategy runs them.
  *
  * 1. S0 and S1 (stages/analyse.ts); S1b returns before any model call.
  * 2. S2 plan and S3 edit (stages/model.ts), then placement, S5 in code and S6 (stages/check.ts)
@@ -18,7 +19,7 @@
  * 6. S7 assemble: the diff from the accepted edits, the changes, the fact report and the
  *    invariant O ⊆ R ⊆ O ∪ C, lint before and after, the flags, the status and the usage.
  *
- * With RewriteOptions.strategy 'single', steps 2 to 4 are one call that plans and edits
+ * With RewriteOptions.strategy 'single', the default (DEFAULT_STRATEGY), steps 2 to 4 are one call that plans and edits
  * (stages/model.ts singleStage); its edits go through the same placement, S5 in code and S6, then
  * steps 5 and 6 run as above. No S4 and no extra round: one call, two when its reply cannot be
  * read and is asked for again (below), plus the judge's.
@@ -49,7 +50,7 @@ import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/ana
 import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, recheckDrops, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
 import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, STAGE_ATTEMPTS, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
-import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
+import { Change, DEFAULT_STRATEGY, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
 const EMPTY_REFS = { principles: [], sources: [], examples: [] } as const;
 
@@ -175,7 +176,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   };
 
   let extraInvented = false;
-  if (options.strategy === 'single') {
+  if ((options.strategy ?? DEFAULT_STRATEGY) === 'single') {
     // S2 and S3 in one call; its edits go through the same placement, S5 in code and S6. No S4 and
     // no extra round: the strategy is one call (two with the retry of an unreadable reply) plus the judge's.
     check(propose((await readable(() => singleStage(m, a.lint.findings))) ?? [], 'edit', 1));

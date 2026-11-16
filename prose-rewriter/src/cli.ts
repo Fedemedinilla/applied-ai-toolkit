@@ -42,7 +42,7 @@ export interface Args {
   readonly mode?: Mode;
   readonly keep: string[];
   readonly strict: boolean;
-  /** rewrite()'s strategy; left out when not given, so rewrite() applies its default. */
+  /** rewrite()'s strategy; left out when not given, so rewrite() applies its default, 'single' (DEFAULT_STRATEGY). */
   readonly strategy?: Strategy;
   readonly json: boolean;
   readonly draft: string;

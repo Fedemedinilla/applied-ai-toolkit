@@ -98,7 +98,7 @@ describe('parseArgs', () => {
 });
 
 describe('parseArgs: --strategy', () => {
-  it('reads --strategy single or staged, and leaves it out when not given (rewrite() defaults to staged)', () => {
+  it('reads --strategy single or staged, and leaves it out when not given (rewrite() defaults to single)', () => {
     expect(parseArgs([...BASE, '--strategy', 'single', 'draft.txt'])).toMatchObject({ strategy: 'single' });
     expect(parseArgs([...BASE, '--strategy=staged', 'draft.txt'])).toMatchObject({ strategy: 'staged' });
     expect(parseArgs([...BASE, 'draft.txt'])).not.toHaveProperty('strategy');
@@ -181,7 +181,7 @@ describe('runCli: the API key', () => {
   });
 
   it('passes the trimmed key to the gateway factory', async () => {
-    const r = await run([...BASE, 'draft.txt'], { 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED })] }, { apiKey: ' sk-fixture ' });
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], { 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED })] }, { apiKey: ' sk-fixture ' });
     expect(r.code).toBe(EXIT.ok);
     expect(r.keys).toEqual(['sk-fixture']);
   });
@@ -191,7 +191,7 @@ describe('runCli: output and exit codes', () => {
   const OK: Script = { 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED })] };
 
   it('prints the text, the changes with their reasons, the facts and the status; exit 0 on ok', async () => {
-    const r = await run([...BASE, 'draft.txt'], OK);
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], OK);
     expect(r.code).toBe(EXIT.ok);
     expect(r.out.startsWith(CHAT.replace(SINERGIAS, FIXED))).toBe(true);
     expect(r.out).toMatch(/Changes/);
@@ -204,7 +204,7 @@ describe('runCli: output and exit codes', () => {
   });
 
   it('prints the RewriteResult with --json', async () => {
-    const r = await run([...BASE, '--json', 'draft.txt'], OK);
+    const r = await run([...BASE, '--strategy', 'staged', '--json', 'draft.txt'], OK);
     expect(r.code).toBe(EXIT.ok);
     const result = RewriteResult.parse(JSON.parse(r.out));
     expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
@@ -212,7 +212,7 @@ describe('runCli: output and exit codes', () => {
   });
 
   it('exits 1 on needs-review, with the reverted change and its reason', async () => {
-    const r = await run([...BASE, 'draft.txt'], {
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], {
       'rewrite.plan': [plan(1, 2)],
       'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'El sitio de la panadería ya carga en 1,6 s.', after: 'El sitio de la panadería, hecho en React, ya carga en 1,6 s.' })],
     });
@@ -223,14 +223,14 @@ describe('runCli: output and exit codes', () => {
 
   it('exits 2 on blocked', async () => {
     const invent = { sentenceId: 1, before: SINERGIAS, after: 'Quería contarte que el sitio está hecho en React.' };
-    const r = await run([...BASE, 'draft.txt'], { 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits(invent), edits(invent)] });
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], { 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits(invent), edits(invent)] });
     expect(r.code).toBe(EXIT.blocked);
     expect(r.out).toMatch(/Status: blocked/);
   });
 
   it('passes --keep, --to and --previous into the input', async () => {
     const r = await run(
-      [...BASE, '--keep', '¿Lo vemos el jueves?', '--to', 'to.json', '--previous', 'prev.txt', '--json', 'draft.txt'],
+      [...BASE, '--strategy', 'staged', '--keep', '¿Lo vemos el jueves?', '--to', 'to.json', '--previous', 'prev.txt', '--json', 'draft.txt'],
       { 'rewrite.plan': [plan(1, 3)], 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 3, before: 'el jueves', after: 'el viernes' })] },
       { files: { 'to.json': '{"name":"Marta","org":"Panadería Los Álamos"}', 'prev.txt': 'Hola Valeria, ¿cómo va el sitio?' } },
     );
@@ -244,7 +244,7 @@ describe('runCli: output and exit codes', () => {
 
   it('flags a claim not in the CV in the text output (D7)', async () => {
     const draft = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. Hice 30 sitios así en 2024. ¿Lo vemos el jueves?';
-    const r = await run([...BASE, 'claim.txt'], OK, { files: { 'claim.txt': draft } });
+    const r = await run([...BASE, '--strategy', 'staged', 'claim.txt'], OK, { files: { 'claim.txt': draft } });
     expect(r.out).toMatch(/Flags/);
     expect(r.out).toContain('not-in-cv');
   });
@@ -268,7 +268,7 @@ describe('runCli: output and exit codes', () => {
   });
 
   it('reports any other failure by its name only', async () => {
-    const r = await run([...BASE, 'draft.txt'], { 'rewrite.plan': [plan(1)] });
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], { 'rewrite.plan': [plan(1)] });
     expect(r.code).toBe(EXIT.failed);
     expect(r.err).toBe('rewrite failed: UnscriptedCallError\n');
   });
@@ -284,8 +284,16 @@ describe('runCli: output and exit codes', () => {
     expect(result.usage.calls).toBe(1);
   });
 
+  it('runs the single strategy when --strategy is not given', async () => {
+    const r = await run([...BASE, '--json', 'draft.txt'], { 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED })] });
+    expect(r.calls.map((c) => c.task)).toEqual(['rewrite.edit']);
+    expect(r.calls[0]?.request.promptVersion).toMatch(/^rewrite-single@/);
+    expect(r.code).toBe(EXIT.ok);
+    expect(RewriteResult.parse(JSON.parse(r.out)).rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+  });
+
   it('gives every call of one run the same fresh jobId, for the per-job cap', async () => {
-    const r = await run([...BASE, 'draft.txt'], OK);
+    const r = await run([...BASE, '--strategy', 'staged', 'draft.txt'], OK);
     const ids = new Set(r.calls.map((c) => c.request.jobId));
     expect(ids.size).toBe(1);
     expect([...ids][0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
