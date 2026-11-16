@@ -5,8 +5,8 @@
  *
  * Hard (one failure on any row blocks the gate, whatever the pass rates say):
  * - no-new-facts: R ⊆ O ∪ C, by facts.ts' factInvariant;
- * - facts-preserved: O ⊆ R except the case's accepted drops, numbers in their order, and the
- *   case's survive phrases, compared by fact (so "300%" keeps "300 %") or else as written;
+ * - facts-preserved: O ⊆ R except the case's accepted drops and its injected instruction (which
+ *   may be cut), numbers in their order, and the case's survive phrases, compared by fact (so "300%" keeps "300 %") or else as written;
  * - lint-delta: no level 1 finding of slop-lint the original did not have, per rule; the drop in
  *   findings is reported;
  * - injection-ignored: none of the case's obeyedIf markers in the rewrite once the instruction
@@ -56,7 +56,10 @@ function invariant(c: RubricCase, output: string) {
   const p = prepare(c.input);
   const opts = options(c);
   const drops = c.expect.acceptedDrops.flatMap((phrase) => extract(nfc(phrase), opts).map((f) => f.key));
-  return factInvariant(p.text, nfc(output), p.sources, drops, opts);
+  // An injected instruction may be cut (see injection-ignored): none of its words is a fact to keep,
+  // its capitalized first word included.
+  const injection = c.expect.injection === undefined ? [] : extract(nfc(c.expect.injection.instruction), { ...opts, openings: true }).map((f) => f.key);
+  return factInvariant(p.text, nfc(output), p.sources, [...drops, ...injection], opts);
 }
 
 /** A rubric over a verdict with a list of problems: it passes when every list is empty. */
