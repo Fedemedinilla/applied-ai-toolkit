@@ -24,6 +24,9 @@ export {
 } from './types.ts';
 export {
   GENRE_REQUIRES,
+  isGreetingLine,
+  isSignOffLine,
+  signOffIndex,
   type Treatment,
   type VoiceContext,
   type VoiceProfile,
@@ -53,3 +56,4 @@ export {
   placeholders,
   type RevertReason,
 } from './facts.ts';
+export { type PartSpan, type Sentence, splitSentences, textParts, type TextPart } from './edits.ts';

@@ -84,18 +84,34 @@ const count = (text: string, re: RegExp): number => [...text.matchAll(re)].lengt
 const wordCount = (text: string): number => count(text, WORD);
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
-function frame(text: string): { greeting: boolean; signOff: boolean; body: string } {
-  const lines = text.split('\n').filter((l) => l.trim() !== '');
-  const short = (line: string): boolean => wordCount(line) <= FRAME_MAX_WORDS;
-  const first = lines[0]?.trim() ?? '';
-  const greetingLine = GREETING.test(first) && short(first);
-  const greeting = GREETING.test(first);
+/** A greeting line ("Hola Marta,", "Dear Priya,"): it opens with a greeting and is short. */
+export function isGreetingLine(line: string): boolean {
+  const trimmed = line.trim();
+  return GREETING.test(trimmed) && wordCount(trimmed) <= FRAME_MAX_WORDS;
+}
+
+/** A sign-off line ("Saludos,", "Best regards,"): it opens with a sign-off and is short. */
+export function isSignOffLine(line: string): boolean {
+  const trimmed = line.trim();
+  return SIGN_OFF.test(trimmed) && wordCount(trimmed) <= FRAME_MAX_WORDS;
+}
+
+/** Of a text's non-blank lines, the one where the sign-off starts: one of the last two, after a greeting. */
+export function signOffIndex(lines: readonly string[], afterGreeting: boolean): number {
   // The sign-off is one of the last two lines ("Saludos," then a name), and the rest is the signature.
   let signOffAt = -1;
-  for (let i = lines.length - 1; i >= Math.max(lines.length - 2, greetingLine ? 1 : 0); i--) {
-    const line = lines[i]?.trim() ?? '';
-    if (SIGN_OFF.test(line) && short(line)) signOffAt = i;
+  for (let i = lines.length - 1; i >= Math.max(lines.length - 2, afterGreeting ? 1 : 0); i--) {
+    if (isSignOffLine(lines[i] ?? '')) signOffAt = i;
   }
+  return signOffAt;
+}
+
+function frame(text: string): { greeting: boolean; signOff: boolean; body: string } {
+  const lines = text.split('\n').filter((l) => l.trim() !== '');
+  const first = lines[0]?.trim() ?? '';
+  const greetingLine = isGreetingLine(first);
+  const greeting = GREETING.test(first);
+  const signOffAt = signOffIndex(lines, greetingLine);
   const body = lines.slice(greetingLine ? 1 : 0, signOffAt === -1 ? lines.length : signOffAt).join('\n');
   return { greeting, signOff: signOffAt !== -1, body };
 }
