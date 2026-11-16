@@ -1,0 +1,10 @@
+{
+  "name": "style-refs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The writing references of prose-rewriter: sources, principles, excerpts and examples, with their validator. Not published.",
+  "type": "module",
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}
