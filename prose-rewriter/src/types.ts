@@ -36,6 +36,17 @@ export function defaultMode(genre: Genre): Mode {
   return genre === 'whatsapp' ? 'minimo' : 'pulido';
 }
 
+/**
+ * The register a genre is rewritten in when the input sets none (design 4.3 leaves it "según el
+ * género"). PROVISIONAL: it follows the register of style-refs' examples for each genre (formal
+ * cover letter, neutral email and follow-up, casual WhatsApp), so the prompt finds examples by
+ * default. The evals of F6 may change it.
+ */
+export function defaultRegister(genre: Genre): Register {
+  const registers: Readonly<Record<Genre, Register>> = { 'cover-letter': 'formal', email: 'neutral', 'follow-up': 'neutral', whatsapp: 'casual' };
+  return registers[genre];
+}
+
 const Text = z.string().min(1);
 
 export const RewriteInput = z
@@ -144,6 +155,8 @@ export const RewriteResult = z.strictObject({
   status: z.enum(['ok', 'needs-review', 'blocked']),
   /** costUsd is null when the gateway has no price for a model: never an invented number. */
   usage: z.strictObject({ calls: z.number().int().nonnegative(), costUsd: z.number().nonnegative().nullable() }),
+  /** A note for the user about the whole result, such as the early exit's "No encontré nada para cambiar" (S1b). */
+  message: Text.optional(),
 });
 export type RewriteResult = z.infer<typeof RewriteResult>;
 
