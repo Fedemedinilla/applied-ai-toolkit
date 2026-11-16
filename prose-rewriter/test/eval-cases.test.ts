@@ -124,6 +124,21 @@ describe('parseCaseFile', () => {
     expect(() => parseCaseFile(file([{ ...inflated, expect: { claim: { phrase: 'Lideré un equipo de 15 personas.', strengthenedIf: ['equipo'] } } }]), cv)).toThrow(/strengthenedIf/);
     expect(() => parseCaseFile(file([{ ...ok, kind: 'trap', trap: 'inflated-claim' }]), cv)).toThrow(/inflated-claim trap needs a claim/);
   });
+
+  it('refuses a claim the CV backs, a marker the CV or another case already states, and a claim on any other case', () => {
+    const inflated = { ...ok, kind: 'trap', trap: 'inflated-claim', input: { ...ok.input, text: 'Hola. Lideré un equipo de 15 personas. Saludos.' } };
+    const claim = { phrase: 'Lideré un equipo de 15 personas.', strengthenedIf: ['más de 15'] };
+    expect(parseCaseFile(file([{ ...inflated, expect: { claim } }]), cv)[0]!.expect.claim).toEqual(claim);
+    // The CV states the claim: it is not inflated.
+    expect(() => parseCaseFile(file([{ ...inflated, cvAppend: '\nLideré un equipo de 15 personas.', expect: { claim } }]), cv)).toThrow(/claim phrase/);
+    // A marker the CV states ("CV de prueba."), not the text.
+    expect(() => parseCaseFile(file([{ ...inflated, expect: { claim: { ...claim, strengthenedIf: ['prueba'] } } }]), cv)).toThrow(/strengthenedIf/);
+    // A marker matched without case: "Lideré" opens the sentence as "lideré" would mid-sentence.
+    expect(() => parseCaseFile(file([{ ...inflated, expect: { claim: { ...claim, strengthenedIf: ['LIDERÉ'] } } }]), cv)).toThrow(/strengthenedIf/);
+    const plain = { phrase: 'te escribo', strengthenedIf: ['más de 15'] };
+    expect(() => parseCaseFile(file([{ ...ok, expect: { claim: plain } }]), cv)).toThrow(/only that trap has one/);
+    expect(() => parseCaseFile(file([{ ...ok, kind: 'trap', trap: 'legit-emoji', expect: { claim: plain } }]), cv)).toThrow(/only that trap has one/);
+  });
 });
 
 describe('the code rubrics', () => {
@@ -209,6 +224,11 @@ describe('the code rubrics', () => {
     expect(inflated.pass).toBe(false);
     expect(inflated.detail).toMatch(/strengthened: más de/);
     expect(score(c, c.input.text.replace('transformé por completo', 'revolucioné'))['no-new-facts']!.pass).toBe(false);
+    // A marker that opens a sentence is capitalized: matched without case all the same.
+    const opening = score(c, c.input.text.replace('Soy una profesional apasionada y orientada a resultados.', 'Revolucioné su manera de vender.'))['no-new-facts']!;
+    expect(opening.pass).toBe(false);
+    expect(opening.detail).toMatch(/strengthened: revolucion/);
+    expect(score(c, c.input.text.replace('Soy una profesional', 'Más de 15 clientes me eligen. Soy una profesional'))['no-new-facts']!.detail).toMatch(/strengthened: más de 15/);
     // Cutting the claim is not strengthening it; facts-preserved is what fails then.
     const cut = score(c, c.input.text.replace(' En la Ferretería Quintana lideré un equipo de 15 desarrolladores y transformé por completo su negocio digital.', ''));
     expect(cut['no-new-facts']!.pass).toBe(true);
