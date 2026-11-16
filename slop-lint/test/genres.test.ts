@@ -509,6 +509,16 @@ describe('SEG-03, a follow-up that copies the earlier message', () => {
     expect(seg.map((f) => [f.match, f.detail])).toEqual([['I rebuilt the stock dashboard for the Rosario branch', '9 words in a row from the earlier message']]);
   });
 
+  it('treats curly and straight apostrophes, composed and decomposed accents, and a hyphen or a space as the same text', () => {
+    const run = (text: string, before: string, lang: Lang) => lint(text, { lang, genre: 'follow-up', previous: before }).findings.filter((f) => f.ruleId === 'SEG-03').map((f) => f.detail);
+    const curly = 'Hi Dana,\n\nI don’t think the stock dashboard for the Rosario branch is done.\n\nBest,\nSam';
+    expect(run(curly.replace('’', "'"), curly, 'en')).toEqual(['12 words in a row from the earlier message']);
+    const nfc = 'Hola, Laura:\n\nYa armé el tablero de ventas de la sucursal Rosario con marzo.\n\nSaludos,\nAna';
+    expect(run(nfc, nfc.normalize('NFD'), 'es')).toEqual(['12 words in a row from the earlier message']);
+    const hyphen = 'Hi Dana,\n\ni REBUILT the stock-dashboard for the Rosario branch!\n\nBest,\nSam';
+    expect(run(hyphen, previous, 'en')).toEqual(['9 words in a row from the earlier message']);
+  });
+
   it('works in Spanish too', () => {
     const anterior = 'Hola, Laura:\n\nTe mandé el tablero de ventas de la sucursal Rosario con los datos de marzo.\n\nSaludos,\nAna';
     const seguimiento = 'Hola, Laura:\n\nTe escribo porque te mandé el tablero de ventas de la sucursal Rosario con los datos. ¿Lo pudiste ver?\n\nSaludos,\nAna';
