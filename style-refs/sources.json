@@ -460,6 +460,7 @@
     "verified": "2026-11-15",
     "evidence": "REPORTADO",
     "use": "principles",
+    "attribution": "Contains public sector information licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). Adapted from the GOV.UK content and publishing guidance, Government Digital Service.",
     "note": "Principles with attribution: start with what the reader needs. The old address www.gov.uk/guidance/style-guide redirects here. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
   },
   {
@@ -510,6 +511,7 @@
     "verified": "2026-11-15",
     "evidence": "REPORTADO",
     "use": "principles",
+    "attribution": "Adapted from content of argentina.gob.ar, Presidencia de la Nación, licensed under Creative Commons Atribución 4.0 Internacional (https://creativecommons.org/licenses/by/4.0/).",
     "note": "Principles with attribution. The page showed the Creative Commons Atribución 4.0 Internacional line when fetched on 2026-11-16. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
   },
   {

@@ -27,6 +27,7 @@ const source = {
   nationality: ['gb'],
   status: { ar: 'open-licence', us: 'open-licence', eu: 'open-licence', es: 'open-licence' },
   licence: 'CC BY 4.0',
+  attribution: 'Adapted from an invented guide, CC BY 4.0.',
   url: 'https://guide.example/plain',
   verified: '2026-11-15',
   evidence: 'REPORTADO',
