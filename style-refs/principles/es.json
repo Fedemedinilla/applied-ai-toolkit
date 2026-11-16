@@ -70,7 +70,7 @@
     "variety": "rioplatense",
     "genres": ["cover-letter", "email", "follow-up", "whatsapp"],
     "registers": ["formal", "neutral", "casual"],
-    "text": "In rioplatense Spanish, speak to the reader with vos and direct verbs ('podés', 'tenés que'), as the Argentine state's own site does.",
+    "text": "In rioplatense Spanish, keep the treatment the writer used (usted or ustedes stay); when the writer addresses one person informally, use vos and its direct verbs ('podés', 'tenés que'), never tú, as the Argentine state's own site does.",
     "check": "The rewrite keeps the treatment of the original (voice-kept); no 'usted' or 'tú' forms appear where the original used vos.",
     "sources": ["argentina-gob-ar"]
   },
