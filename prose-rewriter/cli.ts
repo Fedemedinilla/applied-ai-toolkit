@@ -7,6 +7,10 @@
 // This is the only place that builds the live gateway: in-memory stores seeded with the rewriter's
 // four tasks, its provisional caps (src/tasks.ts) and the gateway's built-in prices. Everything else
 // is src/cli.ts, which the tests run over a scripted gateway.
+//
+// The stores last one run: the per-job cap binds within it, but the daily and monthly caps start
+// from zero each time, and with no userId the daily cap is skipped. They limit repeated runs only
+// over persistent stores (README, "Run it").
 import { readFileSync } from 'node:fs';
 import {
   BUILT_IN_MODELS,

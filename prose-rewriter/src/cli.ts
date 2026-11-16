@@ -49,7 +49,10 @@ export interface Args {
 const VALUE_FLAGS = ['genre', 'lang', 'variety', 'cv', 'to', 'previous', 'mode', 'keep'] as const;
 type ValueFlag = (typeof VALUE_FLAGS)[number];
 
-/** The arguments, or a message saying what is wrong. `--help` is handled by runCli. */
+/**
+ * The arguments, or a message saying what is wrong. `--help` is handled by runCli. `--` ends the
+ * options; a value option given twice is refused (only --keep repeats).
+ */
 export function parseArgs(argv: readonly string[]): Args | string {
   const values: Partial<Record<Exclude<ValueFlag, 'keep'>, string>> = {};
   const keep: string[] = [];
@@ -58,15 +61,21 @@ export function parseArgs(argv: readonly string[]): Args | string {
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] ?? '';
+    if (arg === '--') {
+      positionals.push(...argv.slice(i + 1));
+      break;
+    }
     if (arg === '--strict') strict = true;
     else if (arg === '--json') json = true;
     else if (arg.startsWith('--')) {
       const eq = arg.indexOf('=');
       const name = arg.slice(2, eq === -1 ? undefined : eq);
+      if (name === 'strict' || name === 'json') return `--${name} takes no value`;
       if (!(VALUE_FLAGS as readonly string[]).includes(name)) return `unknown option --${name}`;
       const value = eq === -1 ? argv[++i] : arg.slice(eq + 1);
       if (value === undefined || value === '') return `--${name} needs a value`;
       if (name === 'keep') keep.push(value);
+      else if (values[name as Exclude<ValueFlag, 'keep'>] !== undefined) return `--${name} is given twice`;
       else values[name as Exclude<ValueFlag, 'keep'>] = value;
     } else positionals.push(arg);
   }
@@ -190,8 +199,19 @@ function failure(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown error';
 }
 
+/** Whether --help or -h stands as an option of its own: not as the value of an option, nor after --. */
+function wantsHelp(argv: readonly string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] ?? '';
+    if (arg === '--') return false;
+    if (arg === '--help' || arg === '-h') return true;
+    if (arg.startsWith('--') && !arg.includes('=') && (VALUE_FLAGS as readonly string[]).includes(arg.slice(2))) i++;
+  }
+  return false;
+}
+
 export async function runCli(argv: readonly string[], deps: CliDeps): Promise<number> {
-  if (argv.includes('--help') || argv.includes('-h')) {
+  if (wantsHelp(argv)) {
     deps.stdout(`${USAGE}\n`);
     return EXIT.ok;
   }
