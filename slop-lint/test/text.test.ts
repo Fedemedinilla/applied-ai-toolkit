@@ -20,6 +20,40 @@ describe('splitSentences', () => {
     expect(texts('Trabajé para EE.UU. desde 2021. Me gustó.')).toHaveLength(2);
   });
 
+  it.each([
+      'Está en la pág. 4 del informe.',
+      'Son aprox. 30 horas por semana.',
+      'Hay varias, p. ej. Astro y Next.',
+      'Hay varias, p.ej. Astro y Next.',
+      'Es el N.º 4 de la lista.',
+      'Hablé con el Sr. Pérez, la Sra. Gómez y la Dra. Ruiz.',
+      'Usamos Astro, Supabase, etc. para todo el sitio.',
+      'Trabajé con clientes de EE.UU. y de Europa.',
+      'Trabajé con clientes de EE. UU. y de Europa.',
+      'Lo llamamos plan B. y funcionó.',
+      'Escribí el informe con J. Pérez.',
+      'I met Dr. Smith and Mr. Jones.',
+      'Use a tool, e.g. Astro, or a framework, i.e. Next.',
+      'Astro vs. Next is the question.',
+      'I worked in the U.S. for two years.',
+      'J. R. R. Tolkien wrote it.',
+      'I wrote it with J. Smith.',
+  ])('keeps "%s" as one sentence across its abbreviations', (t) => {
+    expect(texts(t)).toEqual([t]);
+  });
+
+  it.each([
+    ['Usamos Astro, Supabase, etc.', 'Después fuimos al cine.'],
+    ['Trabajé con clientes de EE.UU.', 'Después volví.'],
+    ['Trabajé con clientes de EE. UU.', 'Ahora estoy en Europa.'],
+    ['Tenemos un plan B.', 'Si falla, seguimos.'],
+    ['We tried Astro, Next, etc.', 'Then we chose Astro.'],
+    ['I work for Acme Inc.', 'The team is small.'],
+    ['Probamos Astro, Next, etc.', '¿Cuál elegimos?'],
+  ])('ends "%s" at its abbreviation when "%s" starts in uppercase', (first, second) => {
+    expect(texts(`${first} ${second}`)).toEqual([first, second]);
+  });
+
   it('treats a line break as a boundary unless the next line continues in lowercase', () => {
     expect(texts('Dear Ms. Reyes,\nI am applying.')).toEqual(['Dear Ms. Reyes,', 'I am applying.']);
     expect(texts('I built the dashboard that\nthe managers review.')).toEqual(['I built the dashboard that\nthe managers review.']);
