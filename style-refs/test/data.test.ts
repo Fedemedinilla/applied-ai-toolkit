@@ -49,6 +49,7 @@ describe('the data on disk', () => {
     const data = onDisk();
     expect(Object.keys(data.principles).sort()).toEqual(['principles/en.json', 'principles/es.json']);
     expect(Object.keys(data.excerpts).sort()).toEqual(['excerpts/en.json', 'excerpts/es.json']);
+    expect(Object.keys(data.examples).sort()).toEqual(['examples/en.json', 'examples/es.json']);
     expect(validateRefs(data)).toEqual([]);
   });
 });
@@ -81,18 +82,47 @@ describe('validateRefs', () => {
     ]);
   });
 
-  it('refuses an example that is not marked fictional or sits in the wrong genre file', () => {
-    const example = { id: 'one', genre: 'email', lang: 'en', before: 'a', after: 'b', notes: 'c', fictional: true };
-    expect(validateRefs({ ...empty, examples: { 'examples/email.en.json': [example] } })).toEqual([]);
-    const problems = validateRefs({ ...empty, examples: { 'examples/whatsapp.en.json': [{ ...example, fictional: false }] } });
+  it('refuses an example that is not marked fictional or sits in the file of another language', () => {
+    const example = { id: 'one', genre: 'email', lang: 'en', register: 'neutral', before: 'a', after: 'b', notes: 'c', fictional: true };
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [example] } })).toEqual([]);
+    const problems = validateRefs({ ...empty, examples: { 'examples/en.json': [{ ...example, fictional: false }] } });
     expect(problems.map((p) => p.path)).toEqual(['0.fictional']);
-    const misplaced = validateRefs({ ...empty, examples: { 'examples/whatsapp.en.json': [example] } });
-    expect(misplaced.map((p) => p.message)).toEqual(['genre email in the whatsapp file']);
+    const misplaced = validateRefs({ ...empty, examples: { 'examples/es.json': [example] } });
+    expect(misplaced.map((p) => p.message)).toEqual(['lang en in the es file']);
+  });
+
+  it('refuses an example without its register', () => {
+    const { register: _register, ...example } = { id: 'one', genre: 'email', lang: 'en', register: 'neutral', before: 'a', after: 'b', notes: 'c', fictional: true };
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [example] } }).map((p) => p.path)).toEqual(['0.register']);
+  });
+
+  it('needs the previous message of a follow-up, and only of a follow-up', () => {
+    const followUp = { id: 'one', genre: 'follow-up', lang: 'en', register: 'neutral', before: 'a', after: 'b', notes: 'c', fictional: true };
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [followUp] } }).map((p) => `${p.path}: ${p.message}`)).toEqual([
+      '0.previousMessage: a follow-up example carries the message it follows',
+    ]);
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [{ ...followUp, previousMessage: 'Earlier.' }] } })).toEqual([]);
+    const email = { ...followUp, genre: 'email', previousMessage: 'Earlier.' };
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [email] } }).map((p) => `${p.path}: ${p.message}`)).toEqual([
+      '0.previousMessage: only a follow-up example carries a previous message',
+    ]);
+  });
+
+  it('needs the variety of a Spanish example, and refuses one on an English example', () => {
+    const es = { id: 'one', genre: 'whatsapp', lang: 'es', register: 'casual', before: 'a', after: 'b', notes: 'c', fictional: true };
+    expect(validateRefs({ ...empty, examples: { 'examples/es.json': [es] } }).map((p) => `${p.path}: ${p.message}`)).toEqual([
+      '0.variety: a Spanish example names its variety, so slop-lint checks it as written',
+    ]);
+    expect(validateRefs({ ...empty, examples: { 'examples/es.json': [{ ...es, variety: 'rioplatense' }] } })).toEqual([]);
+    const en = { ...es, lang: 'en', variety: 'rioplatense' };
+    expect(validateRefs({ ...empty, examples: { 'examples/en.json': [en] } }).map((p) => `${p.path}: ${p.message}`)).toEqual([
+      '0.variety: a variety of Spanish on an en example',
+    ]);
   });
 
   it('refuses a data file outside the layout', () => {
-    const problems = validateRefs({ ...empty, examples: { 'examples/linkedin.en.json': [] }, principles: { 'principles/pt.json': [] } });
-    expect(problems.map((p) => p.file).sort()).toEqual(['examples/linkedin.en.json', 'principles/pt.json']);
+    const problems = validateRefs({ ...empty, examples: { 'examples/linkedin.en.json': [], 'examples/email.en.json': [] }, principles: { 'principles/pt.json': [] } });
+    expect(problems.map((p) => p.file).sort()).toEqual(['examples/email.en.json', 'examples/linkedin.en.json', 'principles/pt.json']);
   });
 
   it('names the four genres of the design', () => {

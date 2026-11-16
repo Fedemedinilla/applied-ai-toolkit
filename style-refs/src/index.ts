@@ -161,12 +161,21 @@ export const Excerpt = z.strictObject({
 });
 export type Excerpt = z.infer<typeof Excerpt>;
 
-/** A before and after pair we wrote, over a fictional CV. These are the only few-shot examples. */
+/**
+ * A before and after pair we wrote, over a fictional CV. These are the only few-shot examples. The
+ * register lets a prompt pick only the pairs of its own register; a follow-up carries the message it
+ * follows, since that is half of what the rewrite reads. The after passes slop-lint for its genre
+ * with no level 1 finding (prose-rewriter/test/examples.test.ts runs it: style-refs imports no library).
+ */
 export const Example = z.strictObject({
   id: Id,
   genre: z.enum(GENRES),
   lang: z.enum(LANGS),
+  /** Required on a Spanish example, so slop-lint reads its voseo or tuteo as written. */
   variety: z.enum(VARIETIES).optional(),
+  register: z.enum(REGISTERS),
+  /** Only for a follow-up: the earlier message, as the recipient received it. */
+  previousMessage: z.string().min(1).optional(),
   before: z.string().min(1),
   after: z.string().min(1),
   notes: z.string().min(1),
@@ -191,13 +200,14 @@ export interface RefsProblem {
   readonly message: string;
 }
 
-const EXAMPLE_FILE = /^examples\/(cover-letter|email|follow-up|whatsapp)\.(es|en)\.json$/;
-const LANG_FILE = /^(principles|excerpts)\/(es|en)\.json$/;
+/** One file per layer and language; an example names its genre itself. */
+const LANG_FILE = /^(principles|excerpts|examples)\/(es|en)\.json$/;
 
 /**
  * Checks every data file against its shape, then the links between them: unique ids, each
- * principle and excerpt citing a source that exists, each entry in the file of its language (and
- * genre, for examples). Returns the problems; an empty list means the data is usable.
+ * principle and excerpt citing a source that exists, each entry in the file of its language, a
+ * Spanish example with its variety and a follow-up with its previous message. Returns the
+ * problems; an empty list means the data is usable.
  */
 export function validateRefs(data: RefsData): RefsProblem[] {
   const problems: RefsProblem[] = [];
@@ -266,16 +276,19 @@ export function validateRefs(data: RefsData): RefsProblem[] {
     });
   }
   for (const [file, value] of Object.entries(data.examples)) {
-    const match = EXAMPLE_FILE.exec(file);
-    if (match === null) {
-      problems.push({ file, path: '', message: 'an examples file is examples/<genre>.<es|en>.json' });
+    const lang = LANG_FILE.exec(file)?.[2];
+    if (!file.startsWith('examples/') || lang === undefined) {
+      problems.push({ file, path: '', message: 'an examples file is examples/<es|en>.json' });
       continue;
     }
     const entries = parse(Example, file, value);
     unique(file, entries);
     entries.forEach((e, i) => {
-      if (e.genre !== match[1]) problems.push({ file, path: `${i}.genre`, message: `genre ${e.genre} in the ${match[1]} file` });
-      if (e.lang !== match[2]) problems.push({ file, path: `${i}.lang`, message: `lang ${e.lang} in the ${match[2]} file` });
+      if (e.lang !== lang) problems.push({ file, path: `${i}.lang`, message: `lang ${e.lang} in the ${lang} file` });
+      if (e.lang === 'es' && e.variety === undefined) problems.push({ file, path: `${i}.variety`, message: 'a Spanish example names its variety, so slop-lint checks it as written' });
+      if (e.lang !== 'es' && e.variety !== undefined) problems.push({ file, path: `${i}.variety`, message: `a variety of Spanish on an ${e.lang} example` });
+      if (e.genre === 'follow-up' && e.previousMessage === undefined) problems.push({ file, path: `${i}.previousMessage`, message: 'a follow-up example carries the message it follows' });
+      if (e.genre !== 'follow-up' && e.previousMessage !== undefined) problems.push({ file, path: `${i}.previousMessage`, message: 'only a follow-up example carries a previous message' });
     });
   }
   return problems;
