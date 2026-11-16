@@ -106,6 +106,7 @@ export {
   type UserClaim,
 } from './rubric.ts';
 export {
+  EDIT_EXTRA_SENTENCES,
   EditOutput,
   PLAN_ACTIONS,
   type PlanAction,

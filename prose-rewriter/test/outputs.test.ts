@@ -20,7 +20,7 @@ describe('the plan output (S2)', () => {
   it('asks for a missing fact only with a labelled [COMPLETAR: ...]', () => {
     const item = { sentenceId: 2, action: 'make-specific', reason: 'falta la fecha de la propuesta' };
     expect(ok(PlanOutput, { items: [{ ...item, request: '[COMPLETAR: fecha de la propuesta]' }] }).ok).toBe(true);
-    for (const request of ['[COMPLETAR]', '[COMPLETAR: ]', '[COMPLETAR:]', 'fecha de la propuesta', '[COMPLETAR: fecha] y algo más']) {
+    for (const request of ['[COMPLETAR]', '[COMPLETAR: ]', '[COMPLETAR:]', 'fecha de la propuesta', '[COMPLETAR: fecha] y algo más', '[COMPLETAR:\u200B]', '[COMPLETAR:\u00AD]', '[COMPLETAR: ...]', '[COMPLETAR: fe\u200Bcha]']) {
       expect(ok(PlanOutput, { items: [{ ...item, request }] }).ok, request).toBe(false);
     }
   });
@@ -49,6 +49,40 @@ describe('the edit output (S3)', () => {
     expect((error as ResponseError).problems).toEqual([{ path: 'edits.0.after', code: 'custom' }]);
     expect(fake.calls[0]?.sent).not.toBeNull();
     expect(ok(EditOutput, bare).ok).toBe(false);
+  });
+});
+
+describe('what an edit may write', () => {
+  const style = styleOutput(['es-lead-with-the-point']);
+  const both = (after: string, before = edit.before) => [
+    ok(EditOutput, { edits: [{ ...edit, before, after }] }).ok,
+    ok(style, { edits: [{ ...edit, before, after, principleId: 'es-lead-with-the-point' }] }).ok,
+  ];
+
+  it('refuses a bare or unlabelled marker hidden with an invisible character', () => {
+    for (const after of ['Quiero el [COMPLETAR\u200B].', 'Quiero el [\u200BCOMPLETAR].', 'Quiero el [COMPLETAR: ...].', 'Quiero el [COMPLETAR:\u00AD].']) {
+      expect(both(after), after).toEqual([false, false]);
+    }
+    expect(both('Quiero sumarme el [COMPLETAR: fecha de inicio].')).toEqual([true, true]);
+  });
+
+  it('refuses a placeholder slop-lint reports as FMT-04, unless the quoted text already had it', () => {
+    for (const after of ['Quiero sumarme a [Nombre de la empresa].', 'Hablamos el {{fecha}}.', 'Hablamos el [Fecha de la llamada].']) {
+      expect(both(after), after).toEqual([false, false]);
+    }
+    expect(both('Quiero sumarme a [Nombre de la empresa].', 'Me encantaría sumarme a [Nombre de la empresa].')).toEqual([true, true]);
+  });
+
+  it('stays within its sentence: at most one sentence more than the text it replaces', () => {
+    expect(both('Estimado equipo. Escribo para postularme. Tengo cinco años con Astro. Saludos.', 'Hola.')).toEqual([false, false]);
+    expect(both('Gracias. Quiero sumarme.', 'Me encantaría sumarme.')).toEqual([true, true]);
+    expect(both('Uno. Dos. Tres.', 'Uno y dos. Tres.')).toEqual([true, true]);
+  });
+
+  it('names the field and never the text when it refuses one', () => {
+    const result = ok(EditOutput, { edits: [{ ...edit, before: 'Hola.', after: 'Estimado equipo. Escribo para postularme. Tengo cinco años con Astro.' }] });
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).not.toContain('Astro');
   });
 });
 

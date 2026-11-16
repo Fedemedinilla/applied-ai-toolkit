@@ -8,6 +8,9 @@
  * travel as `{ edits: [...] }`.
  */
 import { z } from 'zod';
+import { rawMatches, RULES } from '../../slop-lint/src/lint.ts';
+import type { PatternRule } from '../../slop-lint/src/types.ts';
+import { splitSentences } from './edits.ts';
 import { Edit } from './types.ts';
 
 /**
@@ -17,8 +20,63 @@ import { Edit } from './types.ts';
 export const PLAN_ACTIONS = ['cut', 'make-specific', 'remove-formula', 'keep'] as const;
 export type PlanAction = (typeof PLAN_ACTIONS)[number];
 
-/** A labelled marker and nothing else: `[COMPLETAR: what is missing]` (design 4.6 step 5). */
-const LABELLED_PLACEHOLDER = /^\[COMPLETAR:\s*[^\]\s][^\]]*\]$/;
+/** Format characters (zero-width spaces, soft hyphens, joiners): a model does not see them, a regex does. */
+const FORMAT_CHARS = /\p{Cf}/gu;
+const visible = (s: string): string => s.replace(FORMAT_CHARS, '');
+
+/**
+ * A labelled marker and nothing else: `[COMPLETAR: what is missing]` (design 4.6 step 5). The
+ * label holds a letter or a digit, so "...", a space or an invisible character is not a label.
+ */
+const LABELLED_PLACEHOLDER = /^\[COMPLETAR:\s*(?=[^\]]*[\p{L}\p{N}])[^\]\s][^\]]*\]$/u;
+const isLabelledRequest = (s: string): boolean => !/\p{Cf}/u.test(s) && LABELLED_PLACEHOLDER.test(s);
+
+/** Every COMPLETAR marker in a text, labelled or not, as the reader sees it. */
+const ANY_COMPLETAR = /\[\s*COMPLETAR\b[^\]]*\]/giu;
+const LABELLED_IN_TEXT = /^\[COMPLETAR:\s*(?=[^\]]*[\p{L}\p{N}])[^\]\s][^\]]*\]$/u;
+
+const FMT_04 = RULES.find((r): r is PatternRule => r.id === 'FMT-04' && r.kind === 'pattern');
+if (FMT_04 === undefined) throw new Error('slop-lint has no FMT-04 pattern rule');
+
+/** The FMT-04 matches of a text in either language: placeholders and chat residue, which S6 would revert. */
+function fmt04(text: string): string[] {
+  return (['es', 'en'] as const).flatMap((lang) => rawMatches(FMT_04 as PatternRule, text, lang).map((m) => text.slice(m.start, m.end)));
+}
+
+/**
+ * PROVISIONAL. How many sentences an edit's `after` may hold beyond its `before`: one, so an edit
+ * may split a sentence in two (a style edit for rhythm) but not turn one into a whole text. The
+ * design says an edit stays inside one sentence (4.4 S3), or one paragraph in `reescritura`, and
+ * gives no number; the evals of F6 confirm or change it.
+ */
+export const EDIT_EXTRA_SENTENCES = 1;
+
+const sentenceCount = (s: string): number => (s.trim() === '' ? 0 : splitSentences(s, 'en').length);
+
+/**
+ * What a model's edit may write, beyond the Edit schema: no marker without a real label, even one
+ * hidden with a format character; no placeholder or chat residue slop-lint reports as FMT-04 that
+ * the quoted text did not already have; and no more than EDIT_EXTRA_SENTENCES sentences beyond
+ * the quote. The messages are fixed, so a refusal names the field and never the text.
+ */
+function modelEditProblem(e: { readonly before: string; readonly after: string }): string | null {
+  const after = visible(e.after);
+  if ([...after.matchAll(ANY_COMPLETAR)].some((m) => !LABELLED_IN_TEXT.test(m[0]))) return 'a placeholder needs a label: [COMPLETAR: ...]';
+  const had = new Set(fmt04(visible(e.before)));
+  if (fmt04(after).some((m) => !had.has(m))) return 'an edit may not add a placeholder or chat residue';
+  if (sentenceCount(e.after) > sentenceCount(e.before) + EDIT_EXTRA_SENTENCES) return 'an edit stays inside its sentence';
+  return null;
+}
+
+/** One problem per edit at most, and none when the Edit schema already refused `after`. */
+function checkModelEdit(e: { readonly before: string; readonly after: string }, ctx: z.RefinementCtx): void {
+  if (typeof e.after !== 'string' || typeof e.before !== 'string' || !Edit.shape.after.safeParse(e.after).success) return;
+  const problem = modelEditProblem(e);
+  if (problem !== null) ctx.addIssue({ code: 'custom', path: ['after'], message: problem });
+}
+
+/** The Edit a model stage returns: the shared schema plus checkModelEdit(). */
+const ModelEdit = Edit.superRefine(checkModelEdit);
 
 export const PlanItem = z.strictObject({
   sentenceId: z.number().int().nonnegative(),
@@ -27,7 +85,7 @@ export const PlanItem = z.strictObject({
   /** The slop-lint finding the item answers, when it answers one. */
   ruleId: z.string().min(1).optional(),
   /** A fact the text needs and neither the text nor the CV gives, asked for with its label. */
-  request: z.string().regex(LABELLED_PLACEHOLDER, 'a request is one labelled [COMPLETAR: ...]').optional(),
+  request: z.string().refine(isLabelledRequest, 'a request is one labelled [COMPLETAR: ...]').optional(),
 });
 export type PlanItem = z.infer<typeof PlanItem>;
 
@@ -35,8 +93,12 @@ export type PlanItem = z.infer<typeof PlanItem>;
 export const PlanOutput = z.strictObject({ items: z.array(PlanItem) });
 export type PlanOutput = z.infer<typeof PlanOutput>;
 
-/** S3: the existing Edit schema, so a bare [COMPLETAR] is refused here as everywhere else. */
-export const EditOutput = z.strictObject({ edits: z.array(Edit) });
+/**
+ * S3: the existing Edit schema, so a bare [COMPLETAR] is refused here as everywhere else, with the
+ * checks of checkModelEdit(). The number of edits is not capped here: it follows the plan, which
+ * the stage that calls the model knows.
+ */
+export const EditOutput = z.strictObject({ edits: z.array(ModelEdit) });
 export type EditOutput = z.infer<typeof EditOutput>;
 
 /**
@@ -53,6 +115,6 @@ export function styleOutput(principleIds: readonly string[]) {
   const [first, ...rest] = principleIds;
   const principleId = first === undefined ? z.string().min(1) : z.enum([first, ...rest]);
   const max = first === undefined ? 0 : STYLE_MAX_EDITS;
-  return z.strictObject({ edits: z.array(Edit.extend({ principleId })).max(max) });
+  return z.strictObject({ edits: z.array(Edit.extend({ principleId }).superRefine(checkModelEdit)).max(max) });
 }
 export type StyleOutput = z.infer<ReturnType<typeof styleOutput>>;
