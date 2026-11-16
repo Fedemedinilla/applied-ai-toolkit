@@ -50,6 +50,11 @@ describe('the excerpts on disk', () => {
     }
   });
 
+  it('date each source by the text quoted: Franklin by Bigelow\'s English text of 1868, not the French edition of 1791', () => {
+    expect(byId.get('franklin-autobiography')?.published).toBe(1868);
+    expect(byId.get('franklin-autobiography')?.note).toContain('1791');
+  });
+
   it('carry none of the marks the hosts add: no italics underscores, no footnote brackets', () => {
     for (const e of all) expect(e.text, e.id).not.toMatch(/[_[\]]/);
   });

@@ -247,7 +247,7 @@
     "kind": "literary",
     "author": "Benjamin Franklin",
     "work": "Autobiography",
-    "published": 1791,
+    "published": 1868,
     "authorDied": 1790,
     "lang": "en",
     "originalLang": "en",
@@ -265,7 +265,7 @@
     "verified": "2026-11-15",
     "evidence": "REPORTADO",
     "use": "excerpts",
-    "note": "Clarity, never the eighteenth-century spelling. Published after the author died, first in French. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+    "note": "Clarity, never the eighteenth-century spelling. The year is that of the English text quoted: John Bigelow's edition of 1868, as reprinted by Henry Holt in 1916 (Frank Woodworth Pine, ed., Gutenberg ebook 20203). The first edition, in French, came out in Paris in 1791, after the author died. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
   },
   {
     "id": "lincoln-gettysburg",
