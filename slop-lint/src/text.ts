@@ -10,7 +10,7 @@ export interface Span {
 /** Abbreviations whose period never ends a sentence, lowercased and without the final period. */
 const ABBREVIATIONS = new Set([
   'sr', 'sra', 'sres', 'srta', 'dr', 'dra', 'lic', 'ing', 'prof', 'arq', 'cdor', 'cra',
-  'mr', 'mrs', 'ms', 'st', 'vs', 'e.g', 'i.e', 'approx', 'aprox', 'nro', 'núm', 'av', 'pág', 'págs',
+  'mr', 'mrs', 'ms', 'st', 'vs', 'e.g', 'i.e', 'nro', 'núm', 'av', 'pág', 'págs',
   'ej', 'cf', 'rr', 'ee',
 ]);
 
@@ -20,11 +20,17 @@ const ABBREVIATIONS = new Set([
  * and stays inside it otherwise. Read as ends, a capitalized word after them mid-sentence (a proper
  * noun after "etc.") is cut, which is rarer than a sentence that ends on them.
  */
-const CLOSING_ABBREVIATIONS = new Set(['etc', 'inc', 'ltd', 'jr', 'hh', 'uu']);
+const CLOSING_ABBREVIATIONS = new Set(['etc', 'inc', 'ltd', 'jr', 'hh', 'uu', 'aprox', 'approx']);
 
-/** Lowercase words after which a capital letter and a period are a person's initial ("con J. Pérez"). */
-const BEFORE_INITIAL = new Set([
-  'con', 'de', 'por', 'para', 'según', 'y', 'e', 'with', 'by', 'from', 'to', 'for', 'and', 'of',
+/**
+ * Nouns that name a thing with a single capital letter ("plan B.", "vitamina C."), lowercased: after
+ * one of them the letter closes like "etc.". After any other word a capital and a period are an
+ * initial ("el señor J. Pérez"), because a name always continues in uppercase and cannot be told
+ * apart from a new sentence.
+ */
+const LETTER_NAMES = new Set([
+  'plan', 'vitamina', 'vitamin', 'tipo', 'type', 'opción', 'option', 'grupo', 'group', 'clase',
+  'class', 'categoría', 'category', 'fase', 'phase', 'anexo', 'appendix', 'modelo', 'model',
 ]);
 
 /** What the opening punctuation of a sentence may be: «Después», "Then", ¿Cuál?, (Then). */
@@ -48,8 +54,8 @@ function isUppercaseLetter(ch: string | undefined): boolean {
  * Letters joined by periods hold when they hold a lowercase letter ("e.g.", "p.ej.") or are single
  * letters ("J.R.", "U.S.", which often comes before a capitalized noun, as in "U.S. Army"); groups
  * of two capitals ("EE.UU.", "RR.HH.") close. A single capital is an initial and holds ("J.",
- * "John F. Kennedy", "con J. Pérez") unless a lowercase word that does not lead into a name comes
- * before it: then it is a letter used as a name ("plan B.", "vitamina C.") and closes.
+ * "John F. Kennedy", "el señor J. Pérez") unless one of LETTER_NAMES comes before it: then it is a
+ * letter used as a name ("plan B.", "vitamina C.") and closes.
  */
 function abbreviationKind(token: string, previousWord: string): 'holds' | 'closes' | 'none' {
   const bare = token.replace(/\.$/u, '').toLowerCase();
@@ -59,8 +65,7 @@ function abbreviationKind(token: string, previousWord: string): 'holds' | 'close
     return /\p{Ll}/u.test(token) || /^(?:\p{L}\.)+\p{L}$/u.test(token) ? 'holds' : 'closes';
   }
   if (/^\p{Lu}$/u.test(token)) {
-    const nameLetter = isLowercaseLetter(previousWord[0]) && !BEFORE_INITIAL.has(previousWord.toLowerCase());
-    return nameLetter ? 'closes' : 'holds';
+    return LETTER_NAMES.has(previousWord.toLowerCase()) ? 'closes' : 'holds';
   }
   return 'none';
 }
@@ -90,7 +95,8 @@ function nextNonSpace(text: string, from: number): number {
  * A sentence ends at . ! ? or … followed by whitespace, unless the next word starts
  * in lowercase or the period closes an abbreviation (abbreviationKind): one that never
  * ends a sentence ("Sr.", "pág.", "p. ej.", "e.g.", "U.S.", an initial), or one that
- * can ("etc.", "EE. UU.", "Inc.", "plan B.") and is not followed by a word in uppercase. A line break also ends a sentence, so salutations, signatures and
+ * can ("etc.", "aprox.", "EE. UU.", "Inc.", "plan B.") and is not followed by a word
+ * in uppercase. A line break also ends a sentence, so salutations, signatures and
  * one-paragraph-per-line text split where a reader would split them, unless the next
  * line starts in lowercase (a hard-wrapped paragraph).
  */
