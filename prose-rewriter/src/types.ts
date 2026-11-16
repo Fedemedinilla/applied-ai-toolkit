@@ -190,7 +190,7 @@ export type Strategy = (typeof STRATEGIES)[number];
  * The strategy rewrite() and the CLI use when none is given. 'single' since 16/11/2026, a decision
  * taken on F6b's fourth real-model run (33 fictional cases): against the original it scored about
  * as well as 'staged' (20/23 against 21/24), kept the voice a little more often (21/23 against
- * 20/24), had no hard failure, and cost a third to a half as much per rewrite (README, "Measured").
+ * 20/24), had no hard failure, and cost 13% to 61% of the staged median per rewrite, by genre (README, "Measured").
  */
 export const DEFAULT_STRATEGY: Strategy = 'single';
 
