@@ -159,6 +159,9 @@ describe('the Argentine authors give no excerpts while the paid public domain is
       'sources.json 0.paidPublicDomain: an Argentine author needs paidPublicDomain (Decreto-ley 1224/58)',
     ]);
   });
+  it('lets the excerpt through once the flag is cleared, as the README says a reading of the decree may do', () => {
+    expect(messages(withExcerpt({ ...argentine, paidPublicDomain: 'cleared' }, spanish))).toEqual([]);
+  });
   it('counts an author of two nationalities, one of them Argentine', () => {
     expect(messages(withExcerpt({ ...argentine, nationality: ['uy', 'ar'] }, spanish))).toHaveLength(1);
   });
@@ -178,6 +181,11 @@ describe('an excerpt is short, verbatim from Gutenberg or Wikisource, and never 
       `excerpts/en.json 0.text: 3 sentences; the cap is ${EXCERPT_MAX_SENTENCES}`,
     ]);
   });
+  it('counts a last sentence with no closing punctuation', () => {
+    expect(messages(withExcerpt(work, { ...excerpt, text: 'One. Two. three' }))).toEqual([
+      `excerpts/en.json 0.text: 3 sentences; the cap is ${EXCERPT_MAX_SENTENCES}`,
+    ]);
+  });
   it(`refuses more than ${EXCERPT_MAX_WORDS} words`, () => {
     const long = `${Array.from({ length: EXCERPT_MAX_WORDS + 1 }, () => 'word').join(' ')}.`;
     expect(messages(withExcerpt(work, { ...excerpt, text: long }))).toEqual([
@@ -192,11 +200,26 @@ describe('an excerpt is short, verbatim from Gutenberg or Wikisource, and never 
     expect(messages(withExcerpt(work, { ...excerpt, text: 'This eBook is for the use of anyone, from Project  Gutenberg.' }))).toEqual([
       'excerpts/en.json 0.text: names Project Gutenberg; its licence lets the text go only without that name',
     ]);
+    for (const text of ['FROM PROJECT GUTENBERG.', 'See gutenberg.org for more.']) {
+      expect(messages(withExcerpt(work, { ...excerpt, text })), text).toEqual([
+        'excerpts/en.json 0.text: names Project Gutenberg; its licence lets the text go only without that name',
+      ]);
+    }
   });
   it('refuses a text fetched from a host other than Gutenberg or Wikisource', () => {
     expect(messages(withExcerpt(work, { ...excerpt, url: 'https://www.cervantesvirtual.com/obra/1' }))).toEqual([
       'excerpts/en.json 0.url: www.cervantesvirtual.com is not gutenberg.org or wikisource.org',
     ]);
+  });
+  it('refuses a lookalike host that only contains or ends in the name of one', () => {
+    for (const host of ['gutenberg.org.evil.example', 'notgutenberg.org', 'evilwikisource.org', 'notwikisource.org']) {
+      expect(messages(withExcerpt(work, { ...excerpt, url: `https://${host}/x` })), host).toContain(
+        `excerpts/en.json 0.url: ${host} is not gutenberg.org or wikisource.org`,
+      );
+      expect(messages({ ...empty, sources: [{ ...work, url: `https://${host}/x` }] }), host).toEqual([
+        `sources.json 0.url: ${host} is not gutenberg.org or wikisource.org`,
+      ]);
+    }
   });
   it('refuses a literary source hosted elsewhere, unless it is excluded', () => {
     expect(messages({ ...empty, sources: [{ ...work, url: 'https://www.cervantesvirtual.com/obra/1' }] })).toEqual([
@@ -208,6 +231,9 @@ describe('an excerpt is short, verbatim from Gutenberg or Wikisource, and never 
     const { fetched: _f, url: _u, ...bare } = excerpt;
     expect(validateRefs(withExcerpt(work, bare)).map((p) => p.path)).toEqual(['0.url', '0.fetched']);
     expect(messages(withExcerpt({ ...work, lang: 'es', originalLang: 'es' }))).toEqual(['excerpts/en.json 0.lang: the source plain-work is read in es']);
+  });
+  it('refuses an excerpt filed under the other language', () => {
+    expect(messages({ ...empty, sources: [work], excerpts: { 'excerpts/es.json': [excerpt] } })).toEqual(['excerpts/es.json 0.lang: lang en in the es file']);
   });
 });
 
