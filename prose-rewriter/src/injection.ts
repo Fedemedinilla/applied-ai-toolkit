@@ -20,6 +20,7 @@ export const DATA_TAGS = ['texto', 'perfil'] as const satisfies readonly DataSou
 /** Patterns are case-insensitive and Unicode-aware; `(?!\p{L})` ends a word that may end in an accent. */
 const P = (source: string): RegExp => new RegExp(source, 'giu');
 const END = '(?![\\p{L}\\p{N}])';
+const ROLE_TAGS = 'system|assistant|user|human|instructions?';
 
 /**
  * Each pattern needs an instruction verb with an object that only a prompt has ("lo anterior",
@@ -31,21 +32,27 @@ const PATTERNS: readonly RegExp[] = [
   P(`(?<!\\p{L})(?:ignor[aá]|ignoren|ignorad|olvid[aá]|olviden|olvidad|descart[aá]|pas[aá] por alto)\\s+(?:todo\\s+)?(?:lo\\s+anterior|lo\\s+de\\s+arriba|lo\\s+que\\s+te\\s+(?:dijeron|pidieron|indicaron)|(?:todas\\s+)?las\\s+(?:instrucciones|indicaciones|reglas)(?:\\s+(?:anteriores|previas|de\\s+arriba))?)${END}`),
   P(`(?<!\\p{L})a\\s+partir\\s+de\\s+ahora,?\\s+(?:sos|eres|serás|vas\\s+a\\s+ser|actu[aá]|respond[eé]|ten[eé]s\\s+que)${END}`),
   P(`(?<!\\p{L})nuevas\\s+(?:instrucciones|indicaciones|reglas)\\s*:`),
-  P(`(?<!\\p{L})(?:prompt|instrucciones|mensaje)\\s+del\\s+sistema${END}`),
+  // "el prompt del sistema" only as the object of a request: a CV can say it wrote one.
+  P(`(?<=(?<!\\p{L})(?:mostr[aá](?:me)?|revel[aá](?:me)?|repet[ií](?:me)?|imprim[ií](?:me)?|dec[ií]me|dime|pas[aá]me|ignor[aá]|olvid[aá])\\s+(?:el|tu|tus|las|los)\\s+)(?:prompt|instrucciones|mensaje)\\s+del\\s+sistema${END}`),
   // English: "ignore previous instructions", "disregard all prior rules", "forget everything above".
   P(`\\b(?:ignore|disregard|forget|override)\\s+(?:all\\s+|any\\s+|the\\s+|your\\s+)*(?:previous|prior|above|earlier|preceding|former)\\s+(?:instructions?|prompts?|rules|directions|directives)\\b`),
   P(`\\b(?:ignore|disregard|forget)\\s+(?:everything|all)\\s+(?:above|before|previously|you(?:'ve|\\s+have|\\s+were)\\s+(?:been\\s+)?told)\\b`),
   P(`\\bfrom\\s+now\\s+on,?\\s+you\\s+(?:are|will|must|should|have\\s+to)\\b`),
   P(`\\bnew\\s+(?:instructions|rules)\\s*:`),
-  P(`\\bsystem\\s+prompt\\b`),
+  // "system prompt" only as the object of a request ("print your system prompt"), not "I wrote the system prompt".
+  P(`(?<=\\b(?:print|show|reveal|repeat|disclose|output|display|ignore|override|forget|tell|give|send)\\s+(?:me\\s+|us\\s+)?(?:your|the|this)\\s+)system\\s+prompt\\b`),
   P(`\\b(?:reveal|disclose|repeat)\\s+(?:to\\s+me\\s+)?(?:your|the)\\s+(?:instructions|prompt|rules)\\b`),
-  // Role tags and role lines of chat formats.
-  P(`<\\s*\\/?\\s*(?:system|assistant|user|human|instructions?)\\s*>`),
+  // Role tags of chat formats: a closing tag, an opening tag at a line start, or one its closing tag follows.
+  // An opening tag named in a sentence ("el rol <system> y <user>") is a mention.
+  P(`<\\s*\\/\\s*(?:${ROLE_TAGS})\\s*>`),
+  new RegExp(`^[ \\t]*<\\s*(?:${ROLE_TAGS})\\s*>`, 'gimu'),
+  P(`<\\s*(${ROLE_TAGS})\\s*>(?=[\\s\\S]*<\\s*\\/\\s*\\1\\s*>)`),
   P(`<\\|im_(?:start|end)\\|>`),
   P(`\\[\\/?INST\\]`),
   P(`<<\\/?SYS>>`),
   // A role label at the start of a line ("System:", "Assistant:"); multiline, so ^ is a line start.
-  new RegExp(`^[ \\t]*(?:system|assistant|human|sistema|asistente)[ \\t]*:`, 'gimu'),
+  // "Sistema:" and "Asistente:" are left out: a Spanish CV labels its stack and a job title that way.
+  new RegExp(`^[ \\t]*(?:system|assistant|human)[ \\t]*:`, 'gimu'),
   // A tag of the data blocks themselves: the data trying to close its block or open another.
   P(`<\\s*\\/?\\s*(?:${DATA_TAGS.join('|')})\\s*>`),
 ];
