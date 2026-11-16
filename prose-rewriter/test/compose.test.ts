@@ -282,3 +282,47 @@ describe('a judge reply S5 cannot read (F6b eval run)', () => {
     expectSound(i, result);
   });
 });
+
+// F6b review: the extra S3 round on en-follow-up-light. S3 makes two edits in the first sentence
+// (the opener of the run's own S4 edit, "I just wanted to follow up" to "I am following up", and a
+// second one); S4 quotes across both, so they merge into one style edit. "passionate about"
+// (LEX-03) is left, so the extra round runs, and its edit quotes the first S3 edit.
+describe('the extra round on an S3 edit a style edit holds', () => {
+  const i = input('en-follow-up-light');
+  const id = at(i.text, 'en', 'I just wanted to follow up');
+  const e1 = { sentenceId: id, before: 'I just wanted to follow up', after: 'I am following up', reason: 'Throat-clearing opener.', ruleId: 'LEX-03' };
+  const e2 = { sentenceId: id, before: 'for your help desk', after: 'for the help desk', reason: 'Plainer.', ruleId: 'LEX-03' };
+  const style = { sentenceId: id, before: 'I am following up on the proposal I sent for the help desk', after: 'I am following up on my help desk proposal', reason: 'Shorter.', principleId: 'en-omit-needless-words' };
+  const run = async (p2: typeof e1, expected: string) => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(4)],
+      'rewrite.edit': [{ data: { edits: [e1, e2] } }, { data: { edits: [p2] } }],
+      'rewrite.style': [{ data: { edits: [style] } }],
+      'rewrite.judge': [verdict(expected, 'en')],
+    });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    return result;
+  };
+
+  it('replaces that S3 edit only, and the other S3 edits the style edit held come back', async () => {
+    const p2 = { ...e1, after: 'Following up', reason: 'Lead with the point.' };
+    const expected = i.text.replace(e1.before, p2.after).replace(e2.before, e2.after);
+    const result = await run(p2, expected);
+    expect(result.rewritten).toBe(expected);
+    expect(result.changes.find((c) => c.after === e2.after)).toMatchObject({ status: 'applied' });
+    expect(result.changes.find((c) => c.after === e1.after)).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/replaced by/) });
+    expect(result.changes.filter((c) => c.status === 'reverted').map((c) => c.revertReason)).not.toContainEqual(expect.stringMatching(/merged into/));
+    expectSound(i, result);
+  });
+
+  it('brings the style edit back, with what it held, when the extra-round edit does not stand', async () => {
+    const p2 = { ...e1, after: 'Following up from Freshdesk', reason: 'Name the tool.' };
+    const expected = i.text.replace('I just wanted to follow up on the proposal I sent for your help desk', style.after);
+    const result = await run(p2, expected);
+    expect(result.rewritten).toBe(expected);
+    expect(result.changes.find((c) => c.stage === 'style')).toMatchObject({ status: 'applied' });
+    expect(result.changes.find((c) => c.after === e2.after)).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/merged into/) });
+    expectSound(i, result);
+  });
+});

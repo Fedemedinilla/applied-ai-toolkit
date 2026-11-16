@@ -96,6 +96,8 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     // An extra-round edit with the sentence and quote of a live edit replaces it; if the new one
     // is not applied, the old one is placed and checked again.
     const replaced = new Map<Proposal, Proposal>();
+    // A style edit replaced because it held the quoted S3 edit: the other S3 edits it held.
+    const released = new Map<Proposal, Proposal[]>();
     for (const p2 of round2) {
       // Or a style edit holding it: the model quotes its own S3 edit, which a style edit merged.
       const quote = p2.edit.before.normalize('NFC');
@@ -105,14 +107,37 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
       p1.status = 'reverted';
       p1.reason = `replaced by ${p2.id} in the extra round`;
       replaced.set(p1, p2);
+      if (p1.before === quote) continue;
+      // The new edit replaces one S3 edit inside the style edit; the others passed every check and
+      // stand again on their own, as the extra round was told (they were not in its not-applied list).
+      const held = proposals.filter((h) => h.mergedInto === p1.id);
+      for (const h of held) {
+        delete h.mergedInto;
+        if (h.before === quote) h.reason = `replaced by ${p2.id} in the extra round`;
+        else {
+          h.status = 'live';
+          delete h.reason;
+        }
+      }
+      released.set(p1, held);
     }
+    const freed = [...released.values()].flat().filter((h) => h.status === 'live');
+    if (freed.length > 0) check(freed);
     check(round2);
     const back = [...replaced].filter(([, p2]) => p2.status !== 'live').map(([p1]) => p1);
     for (const p1 of back) {
+      // The style edit comes back whole: the S3 edits it held step aside into it again.
+      for (const h of released.get(p1) ?? []) {
+        h.status = 'reverted';
+        h.reason = `merged into ${p1.id}`;
+        h.mergedInto = p1.id;
+      }
       p1.status = 'live';
       delete p1.reason;
     }
     if (back.length > 0) check(back);
+    const again = restoreMerged(proposals, back);
+    if (again.length > 0) check(again);
     extraInvented = round2.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
   }
 
