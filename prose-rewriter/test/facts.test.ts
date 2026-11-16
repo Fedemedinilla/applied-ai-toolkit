@@ -474,3 +474,12 @@ describe('a surname with a verb ending at the start of a sentence', () => {
     expect(checkEdit(edit, { O: 'Ramos me pasó tu contacto.', C: { cv: '' }, sentences: ['Ramos me pasó tu contacto.'], lang: 'es' })).toMatchObject({ status: 'reverted', reason: 'lost' });
   });
 });
+
+describe('a name right after an emoji', () => {
+  // The emoji break made "Me" after "Sofi 🙌" a first word (F6b run); a name there must stay a name.
+  it('reports a lost name after an emoji, even one that is also a common word', () => {
+    const lost = (O: string, R: string) => factInvariant(O, R, { cv: '' }, [], ES).missing.map((f) => f.text);
+    expect(lost('Gracias 🙌 Rosa me recomendó. Me gusta el rosa.', 'Gracias 🙌 Me recomendaron. Me gusta el rosa.')).toEqual(['Rosa']);
+    expect(lost('Gracias 🙌 Lemos me recomendó.', 'Gracias 🙌 Me recomendaron.')).toEqual(['Lemos']);
+  });
+});

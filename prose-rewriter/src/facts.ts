@@ -399,15 +399,21 @@ const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(
  */
 const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+/gmu;
 
-/** The sentences of a text with their offsets, split at each SENTENCE_BREAK. */
-function sentenceSpans(text: string): Array<{ start: number; text: string }> {
-  const out: Array<{ start: number; text: string }> = [];
+/**
+ * The sentences of a text with their offsets, split at each SENTENCE_BREAK. `afterEmoji` marks one
+ * that starts after an emoji on the same line, where a capital may still be a name's ("Gracias 🙌
+ * Rosa me recomendó"): extract() reads its first word as a name unless it reads as an ordinary word.
+ */
+function sentenceSpans(text: string): Array<{ start: number; text: string; afterEmoji: boolean }> {
+  const out: Array<{ start: number; text: string; afterEmoji: boolean }> = [];
   let start = 0;
+  let afterEmoji = false;
   for (const m of text.matchAll(SENTENCE_BREAK)) {
-    out.push({ start, text: text.slice(start, m.index) });
+    out.push({ start, text: text.slice(start, m.index), afterEmoji });
     start = m.index + m[0].length;
+    afterEmoji = !m[0].includes('\n') && /\p{Extended_Pictographic}\uFE0F?$/u.test(text.slice(0, m.index));
   }
-  out.push({ start, text: text.slice(start) });
+  out.push({ start, text: text.slice(start), afterEmoji });
   return out.filter((s) => s.text.trim() !== '');
 }
 
@@ -551,8 +557,11 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     const start = sentence.start + m.index;
     if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
     const key = wordKey(word);
-    if (known.has(key)) take('proper-noun', start, word, key);
-    else if (options.openings === true && isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)))) {
+    const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)));
+    // After an emoji, a word that does not read as an ordinary one is a name, as it was before the
+    // emoji break: matched with its capital, so "el rosa" does not stand in for "Rosa".
+    if (known.has(key) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
+    else if (options.openings === true && possible) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
       claimed.push([start, start + word.length]);
     }
