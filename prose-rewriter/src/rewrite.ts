@@ -23,7 +23,9 @@
  */
 import { diffHunks } from './edits.ts';
 import { factInvariant, factReport, type Fact } from './facts.ts';
+import { restoreData } from './injection.ts';
 import { gatewayModelClient } from './model-client.ts';
+import { editProblem } from './outputs.ts';
 import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
@@ -47,12 +49,19 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   const proposals: Proposal[] = [];
   const propose = (edits: readonly Edit[], stage: Proposal['stage'], round: Proposal['round']): Proposal[] => {
     // Ids count across the stages in the order made: planReverts reverts last made first.
-    const fresh = edits.map((edit, i): Proposal => ({ id: `e${proposals.length + i + 1}`, edit, stage, round, status: 'live' }));
+    const fresh = edits.map((raw, i): Proposal => {
+      // The model saw the data through wrapData(), so a quote of a neutralized tag comes back as one.
+      const edit = { ...raw, before: restoreData(raw.before), after: restoreData(raw.after) };
+      const id = `e${proposals.length + i + 1}`;
+      const problem = editProblem(edit);
+      if (problem === null) return { id, edit, stage, round, status: 'live' };
+      return { id, edit, stage, round, status: 'refused', reason: `schema: ${problem}`, before: edit.before.normalize('NFC'), after: edit.after.normalize('NFC') };
+    });
     proposals.push(...fresh);
     return fresh;
   };
   const check = (fresh: Proposal[]): void => {
-    place(a, units, proposals, fresh);
+    place(a, units, proposals, fresh.filter((p) => p.status === 'live'));
     checkFacts(a, units, proposals, fresh);
     relintAndVoice(a, units, proposals, fresh);
   };
@@ -115,23 +124,22 @@ function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals
       : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack
         ? 'needs-review'
         : 'ok';
-  const changes: Change[] = proposals.flatMap((p) => {
-    if (p.span === undefined || p.before === undefined || p.after === undefined) return [];
+  const changes: Change[] = proposals.map((p) => {
     const e = p.edit;
-    return [
-      Change.parse({
-        id: p.id,
-        span: p.span,
-        before: p.before,
-        after: p.after,
-        reason: e.reason,
-        ...(e.ruleId === undefined ? {} : { ruleId: e.ruleId }),
-        ...(e.principleId === undefined ? {} : { principleId: e.principleId }),
-        stage: p.stage,
-        status: p.status === 'live' ? 'applied' : 'reverted',
-        ...(p.status === 'live' || p.reason === undefined ? {} : { revertReason: p.reason }),
-      }),
-    ];
+    // An edit code could not place points at the sentence it named (nowhere, if there is none).
+    const unit = units.find((u) => u.id === e.sentenceId);
+    return Change.parse({
+      id: p.id,
+      span: p.span ?? (unit === undefined ? { start: 0, end: 0 } : { start: unit.start, end: unit.end }),
+      before: p.before ?? e.before.normalize('NFC'),
+      after: p.after ?? e.after.normalize('NFC'),
+      reason: e.reason,
+      ...(e.ruleId === undefined ? {} : { ruleId: e.ruleId }),
+      ...(e.principleId === undefined ? {} : { principleId: e.principleId }),
+      stage: p.stage,
+      status: p.status === 'live' ? 'applied' : 'reverted',
+      ...(p.status === 'live' || p.reason === undefined ? {} : { revertReason: p.reason }),
+    });
   });
   const lang = a.input.lang;
   const flags: Flag[] = [...a.flags, ...outcome.judged.flags, ...invariant.missing.map((f): Flag => ({ kind: 'missing-fact', message: MISSING[lang](f) }))];

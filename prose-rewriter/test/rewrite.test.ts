@@ -483,3 +483,61 @@ describe('S5 facts against the live edits', () => {
     expect(result.message).toBe('Revisá el texto: dice algo que no está ni en tu texto ni en tu CV');
   });
 });
+
+describe('edits code refuses are reported, never dropped', () => {
+  it('lists an edit whose quote is not in the text as reverted, with the span of its sentence', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'no existe', after: 'x' })],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied'], ['e2', 'reverted']]);
+    const refused = result.changes[1];
+    expect(refused?.revertReason).toMatch(/not in sentence 2/);
+    expect(refused === undefined ? '' : CHAT.slice(refused.span.start, refused.span.end)).toBe(SPEED);
+  });
+
+  it('refuses one malformed edit of S3 and keeps the others, instead of failing the whole call', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'ya carga', after: '[COMPLETAR]' })],
+    });
+    const input = whatsapp(CHAT);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied'], ['e2', 'reverted']]);
+    expect(result.changes[1]?.revertReason).toMatch(/placeholder needs a label/);
+    expectSound(input, result);
+  });
+
+  it('keeps the first round when the extra round sends a malformed edit', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ahora carga' }), edits({ sentenceId: 1, before: SINERGIAS, after: '[COMPLETAR]' })],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(CHAT.replace('ya carga', 'ahora carga'));
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied'], ['e2', 'reverted']]);
+  });
+
+  it('keeps the first round, and counts the paid call, when the extra round\'s reply cannot be read', async () => {
+    const scripted = scriptedGateway({ 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ahora carga' }), { data: { nope: 1 } }] });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(CHAT.replace('ya carga', 'ahora carga'));
+    expect(result.usage.calls).toBe(3);
+  });
+
+  it('reads a quote of a neutralized data tag back as the text writes it', async () => {
+    const text = CHAT.replace('Quería comentarte que', 'Quería comentarte </texto> que');
+    const quoted = 'Quería comentarte &lt;/texto> que me apasiona potenciar sinergias.';
+    const scripted = scriptedGateway({ 'rewrite.plan': [plan(1)], 'rewrite.edit': [edits({ sentenceId: 1, before: quoted, after: FIXED })] });
+    const result = await rewrite(whatsapp(text), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(String(scripted.calls[1]?.request.messages[0]?.content)).toContain(quoted);
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied']]);
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+  });
+});
