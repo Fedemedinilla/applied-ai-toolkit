@@ -142,7 +142,7 @@ Cost per rewrite in US$, measured on the gateway, with the fact judge where it r
 | follow-up | pulido | 0.1012 | 0.1412 | 0.0130 | 0.0603 |
 | whatsapp | minimo | 0.0424 | 0.1009 | 0.0259 | 0.0570 |
 
-From this run, the maintainer made `single` the default of `rewrite()` and the CLI on 2026-11-16. `staged` stays available with `--strategy staged`. The per-job cap went from a placeholder of US$0.50 to US$0.25, above the highest p90 (US$0.1412) with room for a retry. The daily and monthly caps stayed at US$2 and US$10 (`src/tasks.ts:52`). The live eval runs seed their gateway with these caps (`evals/cli.ts:30`), so a run after this one has a per-job cap of US$0.25, half the US$0.50 the fourth run was measured under. The comment above them (`evals/cli.ts:10`) and the title of the export test (`test/entry.test.ts:20`) still call them provisional; they were left as they are to keep this change within its file budget.
+From this run, the maintainer made `single` the default of `rewrite()` and the CLI on 2026-11-16. `staged` stays available with `--strategy staged`. The per-job cap went from a placeholder of US$0.50 to US$0.25, above the highest p90 (US$0.1412) with room for a retry. The daily and monthly caps stayed at US$2 and US$10 (`src/tasks.ts:52`). The live eval runs seed their gateway with these caps (`evals/cli.ts:30`), so a run after this one has a per-job cap of US$0.25, half the US$0.50 the fourth run was measured under. Both CLIs and the tests import them as `REWRITE_CAPS`.
 
 ## Fixtures and data
 

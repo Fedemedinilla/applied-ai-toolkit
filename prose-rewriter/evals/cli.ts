@@ -7,14 +7,14 @@
 // inconclusive or could not run.
 //
 // This is the only place that reads the key and builds the live gateway of the eval runs:
-// in-memory stores seeded with the rewriter's four tasks, its provisional caps with the run's
+// in-memory stores seeded with the rewriter's four tasks, its caps (measured in F6) with the run's
 // monthly cap in place of the deploy's, and the gateway's built-in prices. Those stores last one
 // run; the budget across runs is the spend ledger (evals/spend.ts). Everything else is
 // evals/run.ts, which the tests run over a scripted gateway.
 import { homedir } from 'node:os';
 import { BUILT_IN_MODELS, createClaudeClient, createGateway, createMemoryStores, jsonLinesLog, systemClock, type Gateway } from '../../gateway/src/index.ts';
 import { loadRefs } from '../src/cli.ts';
-import { PROVISIONAL_CAPS, TASK_CONFIGS } from '../src/tasks.ts';
+import { REWRITE_CAPS, TASK_CONFIGS } from '../src/tasks.ts';
 import { loadCases } from './cases.ts';
 import { runEvalCli } from './run.ts';
 
@@ -27,7 +27,7 @@ function liveGateway(apiKey: string, monthlyCapUsd: number): Gateway<string> {
   const stores = createMemoryStores({
     clock: systemClock,
     tasks: Object.values(TASK_CONFIGS),
-    globalCaps: { ...PROVISIONAL_CAPS, monthlyUsd: monthlyCapUsd },
+    globalCaps: { ...REWRITE_CAPS, monthlyUsd: monthlyCapUsd },
     prices: BUILT_IN_MODELS.map(({ id, price }) => ({ model: id, ...price })),
   });
   return createGateway({

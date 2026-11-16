@@ -17,10 +17,10 @@ describe('the public entry', () => {
     expect(typeof (entry as Record<string, unknown>)[name]).toBe('function');
   });
 
-  it('exports the four gateway tasks and their provisional caps', () => {
+  it('exports the four gateway tasks and their measured caps', () => {
     expect(entry.REWRITE_TASKS).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
     expect(Object.keys(entry.TASK_CONFIGS)).toEqual([...entry.REWRITE_TASKS]);
-    expect(entry.PROVISIONAL_CAPS).toHaveProperty('monthlyUsd');
+    expect(entry.REWRITE_CAPS).toHaveProperty('monthlyUsd');
   });
 
   it('exports the prompt rules and the output schemas of S2 to S4', () => {

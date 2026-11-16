@@ -23,7 +23,7 @@ import {
   type Gateway,
 } from '../gateway/src/index.ts';
 import { loadRefs, runCli } from './src/cli.ts';
-import { PROVISIONAL_CAPS, TASK_CONFIGS } from './src/tasks.ts';
+import { REWRITE_CAPS, TASK_CONFIGS } from './src/tasks.ts';
 
 /** Whole call, store reads included. A plan or edit over a long letter can take a while. */
 const CALL_TIMEOUT_MS = 120_000;
@@ -34,7 +34,7 @@ function liveGateway(apiKey: string): Gateway {
   const stores = createMemoryStores({
     clock: systemClock,
     tasks: Object.values(TASK_CONFIGS),
-    globalCaps: { ...PROVISIONAL_CAPS },
+    globalCaps: { ...REWRITE_CAPS },
     prices: BUILT_IN_MODELS.map(({ id, price }) => ({ model: id, ...price })),
   });
   return createGateway({
