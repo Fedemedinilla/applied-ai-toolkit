@@ -89,10 +89,23 @@ describe('parseArgs', () => {
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--keep', '', 'draft.txt'], /--keep needs a value/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--json=1', 'draft.txt'], /--json takes no value/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--mode', 'minimo', '--mode', 'pulido', 'draft.txt'], /--mode is given twice/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--strategy', 'fast', 'draft.txt'], /--strategy must be staged or single/],
   ])('refuses %j', (argv, message) => {
     const args = parseArgs(argv);
     expect(typeof args).toBe('string');
     expect(args).toMatch(message);
+  });
+});
+
+describe('parseArgs: --strategy', () => {
+  it('reads --strategy single or staged, and leaves it out when not given (rewrite() defaults to staged)', () => {
+    expect(parseArgs([...BASE, '--strategy', 'single', 'draft.txt'])).toMatchObject({ strategy: 'single' });
+    expect(parseArgs([...BASE, '--strategy=staged', 'draft.txt'])).toMatchObject({ strategy: 'staged' });
+    expect(parseArgs([...BASE, 'draft.txt'])).not.toHaveProperty('strategy');
+  });
+
+  it('names the flag in the usage line', () => {
+    expect(USAGE).toContain('[--strategy staged|single]');
   });
 });
 
@@ -258,6 +271,17 @@ describe('runCli: output and exit codes', () => {
     const r = await run([...BASE, 'draft.txt'], { 'rewrite.plan': [plan(1)] });
     expect(r.code).toBe(EXIT.failed);
     expect(r.err).toBe('rewrite failed: UnscriptedCallError\n');
+  });
+
+  it('runs one call that plans and edits with --strategy single, through the same checks', async () => {
+    const invent = { sentenceId: 2, before: 'El sitio de la panadería ya carga en 1,6 s.', after: 'El sitio de la panadería, hecho en React, ya carga en 1,6 s.' };
+    const r = await run([...BASE, '--strategy', 'single', '--json', 'draft.txt'], { 'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, invent)] });
+    expect(r.calls.map((c) => c.task)).toEqual(['rewrite.edit']);
+    expect(r.calls[0]?.request.promptVersion).toMatch(/^rewrite-single@/);
+    expect(r.code).toBe(EXIT.needsReview);
+    const result = RewriteResult.parse(JSON.parse(r.out));
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+    expect(result.usage.calls).toBe(1);
   });
 
   it('gives every call of one run the same fresh jobId, for the per-job cap', async () => {
