@@ -35,7 +35,7 @@ import { defaultMode, type Mode, type Register, type RewriteInput } from './type
 import { GENRE_REQUIRES, voicePromptLines, voiceProfile } from './voice.ts';
 
 /** Bumped whenever the rules, the layout or a stage's task change. */
-export const PROMPT_VERSION = '1';
+export const PROMPT_VERSION = '2';
 
 /** style-refs' data as the caller loaded and parsed it. */
 export interface PromptRefs {
@@ -232,7 +232,11 @@ const EDIT_TASK = [
   'An edit stays inside one sentence. Set "drop" only when the edit removes a fact on purpose and the fact stays in another sentence.',
 ].join('\n');
 
-/** S3: one edit per item of the plan. */
+/** reescritura only (design 4.4): an edit may cover a paragraph instead of a sentence. */
+const PARAGRAPH_EDITS =
+  'In reescritura, an edit may instead reword the paragraph that starts at its sentenceId: quote "before" exactly from that sentence to the end of its paragraph (its line), and keep every fact of it.';
+
+/** S3: one edit per item of the plan; in reescritura, one per paragraph at most. */
 export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<typeof EditOutput> {
   const sentences = splitSentences(c.input.text, c.input.lang);
   const items = plan.items.map((i) => {
@@ -243,11 +247,12 @@ export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<type
   // The plan is model output that read the user's text: it goes in a data block like the text, so
   // a line it carries can neither close a block nor pass for a section of rules.
   const planBlock = items.length === 0 ? 'None.' : wrapData('texto', items.join('\n'));
+  const mode = c.input.mode ?? defaultMode(c.input.genre);
   return {
     task: 'rewrite.edit',
     promptVersion: `rewrite-edit@${PROMPT_VERSION}`,
     system: systemBlocks(c),
-    messages: conversation(EDIT_TASK, [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', planBlock]),
+    messages: conversation(mode === 'reescritura' ? `${EDIT_TASK}\n${PARAGRAPH_EDITS}` : EDIT_TASK, [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', planBlock]),
     schema: EditOutput,
   };
 }
