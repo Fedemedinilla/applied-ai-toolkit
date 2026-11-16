@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ApiError, BUILT_IN_MODELS, CapError, pricesInForce, RequestError, ResponseError, type Gateway, type Price } from '../../gateway/src/index.ts';
+import { DEFAULT_MARGIN } from '../../evals/src/index.ts';
 import type { PieceRecord } from '../evals/pipeline.ts';
 import {
   budgetedGateway,
@@ -505,7 +506,18 @@ describe('the gate report (design 5, "Puerta")', () => {
   it('warns when the case set is too small for same-voice to pass at the margin, even at 100% on both sides', () => {
     const r = gateReport([...versus('full', 33, 30), ...sameVoice(33)], [], variants('full', 'single-call'));
     expect(r.markdown).toMatch(/cannot pass with 33 scored cases/);
+    // The report names the smallest margin that could pass with these cases.
+    expect(r.markdown).toMatch(/smallest margin that could pass is 0\.105/);
     expect(r.state).toBe('inconclusive');
+  });
+
+  it('passes same-voice on 33 cases at a margin given to gate(), and applies it to the ablations too', () => {
+    const judges = [...versus('full', 33, 30), ...sameVoice(33), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 33, 30), ...judged('same-voice', 'no-style', 33, 33)];
+    const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'), { margin: 0.11 });
+    expect(r.state).toBe('pass');
+    expect(r.markdown).not.toMatch(/cannot pass/);
+    expect(r.markdown).toMatch(/Ablation: no-style against full\n\nNo evidence that the stage no-style leaves out contributes \(pass\)/);
+    expect(r.markdown).toMatch(/Margin: 11\.0 points/);
   });
 
   it('is inconclusive with no baseline among the variants', () => {
@@ -577,6 +589,10 @@ describe('the eval CLI', () => {
     expect(parseEvalArgs(['--live', '--max-usd', '1', '--out', '--dry-run'])).toMatch(/--out needs a value/);
     expect(parseEvalArgs(['--dry-run', '--variants', '--live'])).toMatch(/--variants needs a value/);
     expect(parseEvalArgs(['--dry-run', '--monthly-cap', '21'])).toMatch(/at most 20/);
+    expect(parseEvalArgs(['--dry-run', '--margin', '1'])).toMatch(/--margin needs a fraction from 0 to below 1/);
+    expect(parseEvalArgs(['--dry-run', '--margin', 'x'])).toMatch(/--margin needs a fraction/);
+    expect(parseEvalArgs(['--dry-run', '--margin', '0.11'])).toMatchObject({ margin: 0.11 });
+    expect(parseEvalArgs(['--dry-run'])).toMatchObject({ margin: DEFAULT_MARGIN });
   });
 
   it('refuses an empty list after --variants or --cases instead of running none or all', async () => {

@@ -25,7 +25,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { z } from 'zod';
-import { appendJsonl, decide, freshOutput, gate, gateMarkdown, GateRefusal, RUN_FORMAT, summarize, wilson, type StoredRun } from '../../evals/src/index.ts';
+import { appendJsonl, decide, DEFAULT_MARGIN, differenceInterval, freshOutput, gate, gateMarkdown, GateRefusal, RUN_FORMAT, summarize, wilson, type StoredRun } from '../../evals/src/index.ts';
 import { BUILT_IN_MODELS, CapError, estimateInputTokens, pricesInForce, type Gateway, type GatewayRequest, type Price } from '../../gateway/src/index.ts';
 import type { PromptRefs } from '../src/prompt.ts';
 import { judgeRuns as factJudgeRuns, rewriteRubric } from '../src/rubric.ts';
@@ -53,7 +53,7 @@ import {
 export const EVAL_EXIT = { ok: 0, stopped: 1, blocked: 2, usage: 3, failed: 4, inconclusive: 5 } as const;
 
 export const EVAL_USAGE =
-  'usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...] [--limit N] ' +
+  'usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...] [--limit N] [--margin F] ' +
   `[--monthly-cap USD (default and most ${MONTHLY_BUDGET_USD})] [--max-usd USD]`;
 
 export interface EvalArgs {
@@ -64,11 +64,13 @@ export interface EvalArgs {
   readonly limit: number | null;
   readonly monthlyCap: number;
   readonly maxUsd: number | null;
+  /** The margin gate() takes for same-voice and the ablations (D13). Default DEFAULT_MARGIN. */
+  readonly margin: number;
   readonly out: string | null;
 }
 
 // No flag names the ledger: a run pointed at another file would start the month at zero (D14).
-const VALUE_FLAGS = ['variants', 'cases', 'limit', 'monthly-cap', 'max-usd', 'out'] as const;
+const VALUE_FLAGS = ['variants', 'cases', 'limit', 'monthly-cap', 'max-usd', 'margin', 'out'] as const;
 type ValueFlag = (typeof VALUE_FLAGS)[number];
 const BOOLEAN_FLAGS = ['dry-run', 'live', 'help'] as const;
 
@@ -112,6 +114,11 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
   if (typeof cap === 'string') return cap;
   if (typeof maxUsd === 'string') return maxUsd;
   if (cap !== null && cap > MONTHLY_BUDGET_USD) return `--monthly-cap is at most ${MONTHLY_BUDGET_USD} (D14); raising the budget is Federico's decision, made in code`;
+  let margin = DEFAULT_MARGIN;
+  if (values.margin !== undefined) {
+    margin = Number(values.margin);
+    if (!(Number.isFinite(margin) && margin >= 0 && margin < 1)) return `--margin needs a fraction from 0 to below 1, got ${JSON.stringify(values.margin)}`;
+  }
   const variants = values.variants === undefined ? null : list(values.variants);
   const cases = values.cases === undefined ? null : list(values.cases);
   if (variants?.length === 0) return '--variants needs at least one variant id';
@@ -129,6 +136,7 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
     limit,
     monthlyCap: cap ?? MONTHLY_BUDGET_USD,
     maxUsd,
+    margin,
     out: values.out ?? null,
   };
 }
@@ -277,12 +285,15 @@ function beatsBaseline(run: StoredRun, variant: string): { state: Exclude<GateVe
   };
 }
 
+/** The smallest margin, rounded up to three decimals, at which n of n against n of n passes decide(). */
+const smallestMargin = (n: number): string => (Math.ceil(-differenceInterval(n, n, n, n).lower * 1000) / 1000).toFixed(3);
+
 /** gate() over the pieces with something to judge: a text equal to its reference, or a failed judge call, is left out and counted. */
-function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefined): { state: Exclude<GateVerdict, 'blocked'>; markdown: string } {
+function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefined, margin: number): { state: Exclude<GateVerdict, 'blocked'>; markdown: string } {
   if (baseline === undefined || candidate === undefined) return { state: 'inconclusive', markdown: 'Not gated: no judged pieces on one side.' };
   let result;
   try {
-    result = gate(baseline, candidate, { allowMissing: true });
+    result = gate(baseline, candidate, { allowMissing: true, margin });
   } catch (error) {
     if (!(error instanceof GateRefusal)) throw error;
     return { state: 'inconclusive', markdown: `Not gated: ${error.message}.` };
@@ -290,7 +301,7 @@ function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefi
   const n = Math.min(result.baseline.scored, result.candidate.scored);
   const small =
     result.state === 'inconclusive' && decide(n, n, n, n, result.margin) !== 'pass'
-      ? `\n\nThis gate cannot pass with ${n} scored cases at a margin of ${result.margin}, even at 100% on both sides: grow the case set (D3) or change the margin (D13).`
+      ? `\n\nThis gate cannot pass with ${n} scored cases at a margin of ${result.margin}, even at 100% on both sides; the smallest margin that could pass is ${smallestMargin(n)}: grow the case set (D3) or pass --margin (D13).`
       : '';
   return { state: result.state, markdown: `${gateMarkdown(result)}${small}` };
 }
@@ -302,8 +313,14 @@ function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefi
  * tells whether the stage it leaves out contributes. The run's state is full's when full ran,
  * else the worst of the variants'.
  */
-export function gateReport(judges: readonly JudgeRecord[], code: readonly CodeRecord[], variants: readonly PipelineVariant[]): { markdown: string; state: GateVerdict } {
+export function gateReport(
+  judges: readonly JudgeRecord[],
+  code: readonly CodeRecord[],
+  variants: readonly PipelineVariant[],
+  options: { readonly margin?: number } = {},
+): { markdown: string; state: GateVerdict } {
   if (!variants.some((v) => v.id === BASELINE)) return { markdown: '### Eval gate\n\nNo gate: no baseline among the variants (add single-call to --variants).', state: 'inconclusive' };
+  const margin = options.margin ?? DEFAULT_MARGIN;
   const runs = judgeRuns(judges);
   const hard = hardFailures(code);
   const sections: string[] = [];
@@ -312,7 +329,7 @@ export function gateReport(judges: readonly JudgeRecord[], code: readonly CodeRe
     if (v.id === BASELINE) continue;
     const blocking = hard.filter((r) => r.variant === v.id).length;
     const beats = beatsBaseline(runs.get(`pairwise-baseline/${v.id}`) ?? { format: RUN_FORMAT, rubric: { name: 'pairwise-baseline', version: '1' }, label: v.id, results: [], tables: [] }, v.id);
-    const voice = notWorse(runs.get(`same-voice/${BASELINE}`), runs.get(`same-voice/${v.id}`));
+    const voice = notWorse(runs.get(`same-voice/${BASELINE}`), runs.get(`same-voice/${v.id}`), margin);
     const state: GateVerdict = blocking > 0 ? 'blocked' : worstOf([beats.state, voice.state]);
     states.set(v.id, state);
     const head = blocking > 0 ? `blocked by ${blocking} hard failure${blocking === 1 ? '' : 's'} (listed below)` : state;
@@ -321,7 +338,7 @@ export function gateReport(judges: readonly JudgeRecord[], code: readonly CodeRe
   if (variants.some((v) => v.id === SHIPPED)) {
     for (const v of variants) {
       if (v.id === BASELINE || v.id === SHIPPED) continue;
-      const ablation = notWorse(runs.get(`pairwise-original/${SHIPPED}`), runs.get(`pairwise-original/${v.id}`));
+      const ablation = notWorse(runs.get(`pairwise-original/${SHIPPED}`), runs.get(`pairwise-original/${v.id}`), margin);
       const reading =
         ablation.state === 'fail'
           ? `${v.id} is worse than ${SHIPPED}: the stage ${v.id} leaves out contributes.`
@@ -420,7 +437,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
   for (const r of code) appendJsonl(paths.code, r);
   const hard = hardFailures(code);
   const run = budget.run();
-  const verdict = gateReport(judges, code, variants);
+  const verdict = gateReport(judges, code, variants, { margin: args.margin });
   const report = [
     stopped === null ? null : `Stopped: ${stopped.message}. The records hold what ran before it.`,
     verdict.markdown,
