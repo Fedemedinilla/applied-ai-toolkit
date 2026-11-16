@@ -49,7 +49,7 @@ export function taskConfig(task: RewriteTask): TaskConfig {
  *
  * 33 cases is a small sample (D3 is open): the caps are revised when the case set grows.
  */
-export const PROVISIONAL_CAPS: GlobalCaps = {
+export const REWRITE_CAPS: GlobalCaps = {
   perJobUsd: 0.25,
   dailyPerUserUsd: 2,
   monthlyUsd: 10,

@@ -32,7 +32,7 @@ import {
   type MemoryStores,
   type TaskConfig,
 } from '../../gateway/src/index.ts';
-import { PROVISIONAL_CAPS, TASK_CONFIGS } from '../src/tasks.ts';
+import { REWRITE_CAPS, TASK_CONFIGS } from '../src/tasks.ts';
 
 export const USER = '00000000-0000-4000-8000-0000000000f1';
 /** After the registry's prices take effect (2026-11-03). */
@@ -181,7 +181,7 @@ export function scriptedGateway(script: Script, options: ScriptedOptions = {}): 
   const clock = steppingClock();
   const stores = createMemoryStores({
     tasks: options.tasks ?? Object.values(TASK_CONFIGS),
-    globalCaps: { ...(options.caps ?? PROVISIONAL_CAPS) },
+    globalCaps: { ...(options.caps ?? REWRITE_CAPS) },
     accounts: { [USER]: { perJobUsd: null, dailyPerUserUsd: null } },
     prices: BUILT_IN_MODELS.map(({ id, price }) => ({ model: id, ...price })),
     clock,

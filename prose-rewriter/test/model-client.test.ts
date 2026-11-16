@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { CapError, GlobalCaps, TaskConfig } from '../../gateway/src/index.ts';
 import { gatewayModelClient } from '../src/model-client.ts';
-import { callSettings, PROVISIONAL_CAPS, REWRITE_TASKS, TASK_CONFIGS, taskConfig } from '../src/tasks.ts';
+import { callSettings, REWRITE_CAPS, REWRITE_TASKS, TASK_CONFIGS, taskConfig } from '../src/tasks.ts';
 import { ScriptMismatchError, scriptedGateway, UnscriptedCallError, USER } from './scripted-gateway.ts';
 
 const PROMPT_VERSION = 'rewrite-judge@test';
@@ -43,10 +43,10 @@ describe('the rewrite tasks', () => {
   });
 
   it('has the caps measured in F6, which the gateway accepts', () => {
-    expect(GlobalCaps.parse(PROVISIONAL_CAPS)).toEqual(PROVISIONAL_CAPS);
-    expect(PROVISIONAL_CAPS).toEqual({ perJobUsd: 0.25, dailyPerUserUsd: 2, monthlyUsd: 10 });
+    expect(GlobalCaps.parse(REWRITE_CAPS)).toEqual(REWRITE_CAPS);
+    expect(REWRITE_CAPS).toEqual({ perJobUsd: 0.25, dailyPerUserUsd: 2, monthlyUsd: 10 });
     // Above the highest p90 per rewrite measured in run 4 (US$0.1412, staged follow-up).
-    expect(PROVISIONAL_CAPS.perJobUsd).toBeGreaterThan(0.1412);
+    expect(REWRITE_CAPS.perJobUsd).toBeGreaterThan(0.1412);
   });
 
   it('builds the evals call settings from the task config, with no output format', () => {
