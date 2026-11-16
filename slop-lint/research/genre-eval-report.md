@@ -82,7 +82,7 @@ Only the rules that fired or that a label names, per genre.
 | email | SIN-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | SIN-02 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | SIN-EN-06 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
-| follow-up | ESP-02 | 2 | text | 2 | 1 | 2 | 0.67 (2/3) | 0.50 (2/4) | 0.06 (1/16) |
+| follow-up | ESP-02 | 2 | text | 2 | 1 | 0 | 0.67 (2/3) | 1.00 (2/2) | 0.06 (1/18) |
 | follow-up | EST-04 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/142) |
 | follow-up | LEX-01 | 1 | sentence | 3 | 0 | 0 | 1.00 (3/3) | 1.00 (3/3) | 0.00 (0/141) |
 | follow-up | LEX-03 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/142) |

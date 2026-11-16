@@ -6,10 +6,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENRES, GUESS_CUTS, guessGenreWith, resolveRules, SPLIT_PART_IDS, type GuessCuts } from '../src/genres.ts';
+import { GENRE_PROFILES, GENRES, GUESS_CUTS, guessGenreWith, resolveRules, SPLIT_PART_IDS, type GuessCuts } from '../src/genres.ts';
 import { lint } from '../src/lint.ts';
 import { GENRE_RULES, RULES } from '../src/rules.ts';
 import { DOCUMENT_SCOPE_IDS } from '../src/structural.ts';
+import { isProse, splitSentences, words } from '../src/text.ts';
 import type { Genre, Lang, Level, Variety } from '../src/types.ts';
 
 export type LabeledGenre = Exclude<Genre, 'cover-letter'>;
@@ -102,6 +103,12 @@ export function validateSet(raw: unknown, file: string): string[] {
     if (item.previous !== undefined && (raw.genre !== 'follow-up' || typeof item.previous !== 'string' || item.previous.trim() === '')) err(at, '"previous" is a non-empty string, and only in follow-up');
     if (item.textRules !== undefined && (!isStringArray(item.textRules) || item.textRules.some((r) => !DOCUMENT_SCOPE_IDS.has(r)))) {
       err(at, `"textRules" may only hold ${[...DOCUMENT_SCOPE_IDS].join(', ')}`);
+    }
+    // ESP-02 measures nothing under its genre's words per anchor, so a label that expects it there could never be met.
+    if (isStringArray(item.textRules) && item.textRules.includes('ESP-02') && typeof item.text === 'string' && (LABELED_GENRES as readonly unknown[]).includes(raw.genre)) {
+      const floor = GENRE_PROFILES[raw.genre as LabeledGenre].thresholds.wordsPerAnchor;
+      const prose = splitSentences(item.text).filter(isProse).reduce((n, s) => n + words(s.text).length, 0);
+      if (prose < floor) err(at, `ESP-02 cannot report a text with ${prose} words of prose; it needs ${floor}`);
     }
     if (!Array.isArray(item.sentences) || item.sentences.length === 0) return err(at, '"sentences" must be a non-empty array');
     let slopSentences = 0;
