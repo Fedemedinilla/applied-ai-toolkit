@@ -30,7 +30,7 @@ import type { JudgeRecord } from '../evals/judges.ts';
 import type { CodeRecord } from '../evals/rubrics.ts';
 import { JUDGE_MAX_TOKENS, JUDGE_RUBRICS } from '../evals/judges.ts';
 import { VARIANTS } from '../evals/pipeline.ts';
-import { rewriteRubric } from '../src/rubric.ts';
+import { judgeLines, rewriteRubric } from '../src/rubric.ts';
 import { STAGE_MAX_TOKENS } from '../src/stages/model.ts';
 import { TASK_CONFIGS } from '../src/tasks.ts';
 import { estimateInputTokens } from '../../gateway/src/index.ts';
@@ -768,6 +768,31 @@ describe('the eval CLI', () => {
     expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');
     expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.006);
     expect(h.out.join('') + h.err.join('')).not.toContain(SECRET);
+  });
+
+  it('--live gates with the --margin it was given', async () => {
+    const SINERGIAS = 'Quería comentarte que me apasiona potenciar sinergias.';
+    const fixed = (after: string) => ({ data: { edits: [{ sentenceId: 2, before: SINERGIAS, after, reason: 'fix' }] } });
+    const piped = SLOP.input.text.replace(SINERGIAS, 'Quería contarte que el sitio está listo.');
+    const verdict = (v: object) => ({ text: JSON.stringify({ ...v, note: '' }) });
+    const scripted = scriptedGateway({
+      'rewrite.plan': [{ data: { items: [{ sentenceId: 2, action: 'remove-formula', reason: 'set phrase', ruleId: 'LEX-01' }] } }],
+      // full's S3, then the single-call baseline's one call.
+      'rewrite.edit': [fixed('Quería contarte que el sitio está listo.'), fixed('Quería avisarte que el sitio está listo.')],
+      'rewrite.style': [{ data: { edits: [] } }],
+      'rewrite.judge': [
+        // full's fact judge, nothing invented.
+        { text: JSON.stringify({ lines: judgeLines(piped, 'es').map((l) => ({ line: l.line, support: 'no-claim', note: '' })), note: '' }) },
+        ...Array.from({ length: 3 }, () => verdict({ choice: 'A' })),
+        ...Array.from({ length: 2 }, () => verdict({ same: true })),
+        ...Array.from({ length: 2 }, () => verdict({ fits: true })),
+        ...Array.from({ length: 2 }, () => verdict({ contaminated: false })),
+      ],
+    });
+    const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [SLOP] });
+    expect(await runEvalCli(['--live', '--variants', 'full,single-call', '--out', join(h.dir, 'run'), '--margin', '0.5'], h.deps)).not.toBe(EVAL_EXIT.usage);
+    scripted.assertDone();
+    expect(h.out.join('')).toMatch(/same-voice: full against single-call\n\n### Eval gate: \w+[\s\S]*?Margin: 50\.0 points/);
   });
 
   it('--live stops on the budget and says so, with what it recorded', async () => {
