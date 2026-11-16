@@ -3,6 +3,7 @@
  * prompt.ts and the output schema of outputs.ts:
  *
  * - S2 plan: what to fix per sentence, from S1's findings; it writes no text;
+ * - S2 and S3 in one call, for the 'single' strategy: the plan is not written, only the edits;
  * - S3 edit: one edit per item of the plan, and at most one extra round (S6) with the level 1
  *   findings that remain, whose history is rebuilt from the edits kept from what the first round
  *   parsed, never from the raw reply (design 4.9). The gateway parses only the replies' shape
@@ -21,7 +22,7 @@ import type { Finding } from '../../../slop-lint/src/types.ts';
 import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
 import { EditReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
-import { editPrompt, planPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
+import { editPrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
 import type { Edit } from '../types.ts';
 
 /**
@@ -88,6 +89,14 @@ async function call<S extends z.ZodType>(m: ModelStages, p: StagePrompt<S>, mess
 /** S2. */
 export async function planStage(m: ModelStages, findings: readonly Finding[]): Promise<PlanOutput> {
   return call(m, planPrompt(m.prompt, findings));
+}
+
+/**
+ * S2 and S3 in one call (RewriteOptions.strategy 'single', and the single-call baseline of the
+ * evals): the edits as parsed, with no cap, since there is no plan to count them against.
+ */
+export async function singleStage(m: ModelStages, findings: readonly Finding[]): Promise<Edit[]> {
+  return (await call(m, { ...singleCallPrompt(m.prompt, findings), schema: EditReply })).edits;
 }
 
 /**

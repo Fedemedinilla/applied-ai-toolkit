@@ -18,6 +18,10 @@
  * 6. S7 assemble: the diff from the accepted edits, the changes, the fact report and the
  *    invariant O ⊆ R ⊆ O ∪ C, lint before and after, the flags, the status and the usage.
  *
+ * With RewriteOptions.strategy 'single', steps 2 to 4 are one call that plans and edits
+ * (stages/model.ts singleStage); its edits go through the same placement, S5 in code and S6, then
+ * steps 5 and 6 run as above. No S4 and no extra round: at most one call plus the judge's.
+ *
  * Status (design 4.4 and 4.6 step 4):
  * - 'blocked': the rewrite still states a fact outside O ∪ C, or the extra round's edits invented
  *   a fact again: the invention persisted after the extra round;
@@ -35,7 +39,7 @@ import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
-import { editStage, extraEditStage, metered, planStage, sentenceAt, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
+import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
 const EMPTY_REFS = { principles: [], sources: [], examples: [] } as const;
@@ -72,74 +76,84 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     relintAndVoice(a, units, proposals, fresh);
   };
 
-  const plan = await planStage(m, a.lint.findings);
-  const first = await editStage(m, plan);
-  const round1 = propose(first.edits, 'edit', 1);
-  check(round1);
-  if (a.mode !== 'minimo' && options.skipStyle !== true) {
-    const current = currentText(a, units, proposals);
-    const styled = await styleStage(m, current.sentences.filter((s) => s.text.trim() !== ''));
-    const composed = propose(styled ?? [], 'style', 1);
-    composeStyle(a, units, proposals, current, composed);
-    check(composed);
-    const back = restoreMerged(proposals, composed);
-    if (back.length > 0) check(back);
-  }
+  /** S2, S3 and its checks, S4 and the extra round; true when the extra round invented a fact again. */
+  const staged = async (): Promise<boolean> => {
+    const plan = await planStage(m, a.lint.findings);
+    const first = await editStage(m, plan);
+    const round1 = propose(first.edits, 'edit', 1);
+    check(round1);
+    if (a.mode !== 'minimo' && options.skipStyle !== true) {
+      const current = currentText(a, units, proposals);
+      const styled = await styleStage(m, current.sentences.filter((s) => s.text.trim() !== ''));
+      const composed = propose(styled ?? [], 'style', 1);
+      composeStyle(a, units, proposals, current, composed);
+      check(composed);
+      const back = restoreMerged(proposals, composed);
+      if (back.length > 0) check(back);
+    }
+
+    const remaining = remainingLevelOne(a, rendered(a, units, proposals), liveEdits(a, units, proposals));
+    if (remaining.length > 0) {
+      // History in the model's own words; the proposals hold the same edits with data tags restored.
+      // An edit merged into a style edit is applied, inside it.
+      const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live' && round1[i]?.mergedInto === undefined);
+      const round2 = propose(await extraEditStage(m, first, remaining, notApplied), 'edit', 2);
+      // An extra-round edit with the sentence and quote of a live edit replaces it; if the new one
+      // is not applied, the old one is placed and checked again.
+      const replaced = new Map<Proposal, Proposal>();
+      // A style edit replaced because it held the quoted S3 edit: the other S3 edits it held.
+      const released = new Map<Proposal, Proposal[]>();
+      for (const p2 of round2) {
+        // Or a style edit holding it: the model quotes its own S3 edit, which a style edit merged.
+        const quote = p2.edit.before.normalize('NFC');
+        const holds = (q: Proposal): boolean => q.before === quote || proposals.some((h) => h.mergedInto === q.id && h.before === quote);
+        const p1 = proposals.find((q) => q.status === 'live' && q.round === 1 && q.edit.sentenceId === p2.edit.sentenceId && holds(q));
+        if (p2.status !== 'live' || p1 === undefined) continue;
+        p1.status = 'reverted';
+        p1.reason = `replaced by ${p2.id} in the extra round`;
+        replaced.set(p1, p2);
+        if (p1.before === quote) continue;
+        // The new edit replaces one S3 edit inside the style edit; the others passed every check and
+        // stand again on their own, as the extra round was told (they were not in its not-applied list).
+        const held = proposals.filter((h) => h.mergedInto === p1.id);
+        for (const h of held) {
+          delete h.mergedInto;
+          if (h.before === quote) h.reason = `replaced by ${p2.id} in the extra round`;
+          else {
+            h.status = 'live';
+            delete h.reason;
+          }
+        }
+        released.set(p1, held);
+      }
+      const freed = [...released.values()].flat().filter((h) => h.status === 'live');
+      if (freed.length > 0) check(freed);
+      check(round2);
+      const back = [...replaced].filter(([, p2]) => p2.status !== 'live').map(([p1]) => p1);
+      for (const p1 of back) {
+        // The style edit comes back whole: the S3 edits it held step aside into it again.
+        for (const h of released.get(p1) ?? []) {
+          h.status = 'reverted';
+          h.reason = `merged into ${p1.id}`;
+          h.mergedInto = p1.id;
+        }
+        p1.status = 'live';
+        delete p1.reason;
+      }
+      if (back.length > 0) check(back);
+      const again = restoreMerged(proposals, back);
+      if (again.length > 0) check(again);
+      return round2.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
+    }
+    return false;
+  };
 
   let extraInvented = false;
-  const remaining = remainingLevelOne(a, rendered(a, units, proposals), liveEdits(a, units, proposals));
-  if (remaining.length > 0) {
-    // History in the model's own words; the proposals hold the same edits with data tags restored.
-    // An edit merged into a style edit is applied, inside it.
-    const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live' && round1[i]?.mergedInto === undefined);
-    const round2 = propose(await extraEditStage(m, first, remaining, notApplied), 'edit', 2);
-    // An extra-round edit with the sentence and quote of a live edit replaces it; if the new one
-    // is not applied, the old one is placed and checked again.
-    const replaced = new Map<Proposal, Proposal>();
-    // A style edit replaced because it held the quoted S3 edit: the other S3 edits it held.
-    const released = new Map<Proposal, Proposal[]>();
-    for (const p2 of round2) {
-      // Or a style edit holding it: the model quotes its own S3 edit, which a style edit merged.
-      const quote = p2.edit.before.normalize('NFC');
-      const holds = (q: Proposal): boolean => q.before === quote || proposals.some((h) => h.mergedInto === q.id && h.before === quote);
-      const p1 = proposals.find((q) => q.status === 'live' && q.round === 1 && q.edit.sentenceId === p2.edit.sentenceId && holds(q));
-      if (p2.status !== 'live' || p1 === undefined) continue;
-      p1.status = 'reverted';
-      p1.reason = `replaced by ${p2.id} in the extra round`;
-      replaced.set(p1, p2);
-      if (p1.before === quote) continue;
-      // The new edit replaces one S3 edit inside the style edit; the others passed every check and
-      // stand again on their own, as the extra round was told (they were not in its not-applied list).
-      const held = proposals.filter((h) => h.mergedInto === p1.id);
-      for (const h of held) {
-        delete h.mergedInto;
-        if (h.before === quote) h.reason = `replaced by ${p2.id} in the extra round`;
-        else {
-          h.status = 'live';
-          delete h.reason;
-        }
-      }
-      released.set(p1, held);
-    }
-    const freed = [...released.values()].flat().filter((h) => h.status === 'live');
-    if (freed.length > 0) check(freed);
-    check(round2);
-    const back = [...replaced].filter(([, p2]) => p2.status !== 'live').map(([p1]) => p1);
-    for (const p1 of back) {
-      // The style edit comes back whole: the S3 edits it held step aside into it again.
-      for (const h of released.get(p1) ?? []) {
-        h.status = 'reverted';
-        h.reason = `merged into ${p1.id}`;
-        h.mergedInto = p1.id;
-      }
-      p1.status = 'live';
-      delete p1.reason;
-    }
-    if (back.length > 0) check(back);
-    const again = restoreMerged(proposals, back);
-    if (again.length > 0) check(again);
-    extraInvented = round2.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
-  }
+  if (options.strategy === 'single') {
+    // S2 and S3 in one call; its edits go through the same placement, S5 in code and S6. No S4 and
+    // no extra round: the strategy is one call plus the judge's.
+    check(propose(await singleStage(m, a.lint.findings), 'edit', 1));
+  } else extraInvented = await staged();
 
   let judged = { fellBack: false, reverted: 0, unread: false, flags: [] as Flag[] };
   if (judgeRuns(a.input)) {

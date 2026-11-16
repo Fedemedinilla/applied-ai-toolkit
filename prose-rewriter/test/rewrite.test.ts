@@ -788,3 +788,119 @@ describe('S5 per edit, losses across edits', () => {
     expectSound(input, result);
   });
 });
+
+// ---------------------------------------------------------------------------
+// strategy 'single': one call plans and edits, then the same S5, S6 and S7 (F6b run 3)
+// ---------------------------------------------------------------------------
+
+describe("strategy 'single': one call, the same guards", () => {
+  type Case = { id: string; input: RewriteInput };
+  const caseOf = (lang: 'es' | 'en', id: string): Case => {
+    const file = JSON.parse(readFileSync(new URL(`../evals/cases/${lang}.json`, import.meta.url), 'utf8')) as { cases: Case[] };
+    const found = file.cases.find((c) => c.id === id);
+    if (found === undefined) throw new Error(`no eval case ${id}`);
+    return found;
+  };
+  /** A fictional eval case with its fictional CV, as the eval runs it. */
+  const evalInput = (lang: 'es' | 'en', id: string): RewriteInput => ({ ...caseOf(lang, id).input, profile: { cvMarkdown: lang === 'es' ? CV_ES : CV_EN } });
+  const verdictIn = (lang: 'es' | 'en', rewritten: string, invented: readonly number[] = []) => ({
+    text: JSON.stringify({
+      lines: judgeLines(rewritten, lang).map((l) => ({ line: l.line, support: invented.includes(l.line) ? 'invented' : 'no-claim', note: invented.includes(l.line) ? 'not in the CV' : '' })),
+      note: '',
+    }),
+  });
+
+  // es-email-heavy, the single-call piece of run 3: its subject edit invented "Mantenimiento" and
+  // lost "Propuesta", and the unguarded baseline shipped it. The edits rebuild that piece's text.
+  const SUBJECT = { sentenceId: 0, before: 'Propuesta de valor para potenciar su presencia digital', after: 'Mantenimiento del sitio de la cooperativa' };
+  const ES_REST = [
+    { sentenceId: 2, before: 'Espero que este mensaje te encuentre muy bien.', after: '' },
+    { sentenceId: 3, before: 'Me pongo en contacto con vos porque me apasiona aportar valor agregado y potenciar sinergias en un mundo cada vez más digital.', after: 'Te escribo porque quiero trabajar en el sitio de la cooperativa.' },
+    { sentenceId: 4, before: 'Soy una profesional proactiva y orientada a resultados.', after: 'Soy desarrolladora web y trabajo por cuenta propia desde marzo de 2023.' },
+    { sentenceId: 6, before: 'Sin lugar a dudas, puedo llevar el sitio de la cooperativa al siguiente nivel.', after: 'Puedo hacer lo mismo con el sitio de la cooperativa.' },
+    { sentenceId: 7, before: 'Quedo a tu entera disposición ante cualquier consulta.', after: 'Si te interesa, escribime y coordinamos una llamada.' },
+  ];
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+
+  it('makes one call that plans and edits, then the judge: no plan, no style, no extra round', async () => {
+    const input = evalInput('es', 'es-email-heavy');
+    const expected = applyAll(input.text, ES_REST);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.edit', 'rewrite.judge']);
+    expect(scripted.calls[0]?.request.promptVersion).toMatch(/^rewrite-single@/);
+    expect(result.usage.calls).toBe(2);
+    expect(result.rewritten).toBe(expected);
+    expect(result.changes.every((c) => c.stage === 'edit' && c.status === 'applied')).toBe(true);
+    expect(result.status).toBe('ok');
+    expectSound(input, result);
+  });
+
+  it('reverts the edit that invents a fact and loses another (es-email-heavy, run 3)', async () => {
+    const input = evalInput('es', 'es-email-heavy');
+    const expected = applyAll(input.text, ES_REST);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(expected);
+    expect(result.rewritten).toContain('Propuesta de valor');
+    expect(result.rewritten).not.toContain('Mantenimiento');
+    expect(result.changes.find((c) => c.after === SUBJECT.after)).toMatchObject({ status: 'reverted', stage: 'edit', revertReason: expect.stringMatching(/Mantenimiento/) });
+    expect(result.status).toBe('needs-review');
+    expectSound(input, result);
+  });
+
+  it('reverts the edit that drops a real name (en-follow-up-heavy, run 3: "Kestrel Books")', async () => {
+    const input = evalInput('en', 'en-follow-up-heavy');
+    const KESTREL = {
+      sentenceId: 2,
+      before: 'I just wanted to circle back and touch base regarding my previous message, as I am truly passionate about the opportunity to leverage synergies with Kestrel Books.',
+      after: 'Have you had a chance to read the proposal I sent for setting up your help desk?',
+    };
+    const rest = [
+      { sentenceId: 1, before: 'I hope this email finds you well.', after: '' },
+      { sentenceId: 3, before: 'I am confident that together we can take your customer experience to the next level.', after: 'At Brightwell Parcels I cut the median first reply time on the help desk from 9 hours to 3 hours with a set of 14 macros.' },
+      { sentenceId: 4, before: 'Please do not hesitate to reach out if you have any questions.', after: 'I can answer any questions you have.' },
+    ];
+    const expected = applyAll(input.text, rest);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(rest[0]!, KESTREL, ...rest.slice(1))], 'rewrite.judge': [verdictIn('en', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(expected);
+    expect(result.rewritten).toContain('Kestrel Books');
+    expect(result.changes.find((c) => c.after === KESTREL.after)).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/Kestrel/) });
+    expectSound(input, result);
+  });
+
+  it('runs the judge and its second verdict, and no extra round even when a level 1 finding remains', async () => {
+    const invented = MAIL.replace('me apasiona potenciar sinergias', 'lideré el equipo del sitio');
+    const scripted = scriptedGateway({
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'me apasiona potenciar sinergias', after: 'lideré el equipo del sitio' })],
+      'rewrite.judge': [verdict(invented, [3]), verdict(MAIL)],
+    });
+    const input = mail(MAIL);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.edit', 'rewrite.judge', 'rewrite.judge']);
+    expect(result.usage.calls).toBe(3);
+    expect(result.rewritten).toBe(MAIL);
+    expect(result.changes[0]).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/judge/) });
+    expect(result.lint.after.findings.some((f) => f.level === 1)).toBe(true);
+    expect(result.status).toBe('needs-review');
+    expectSound(input, result);
+  });
+
+  it('makes one call on a WhatsApp in minimo, where D10 skips the judge, and keeps S6 and keep', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 3, before: 'el jueves', after: 'el viernes' })],
+    });
+    const input = whatsapp(CHAT, { keep: ['¿Lo vemos el jueves?'] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.edit']);
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+    expect(result.changes.map((c) => c.status)).toEqual(['applied', 'reverted', 'reverted']);
+    expectSound(input, result);
+  });
+});

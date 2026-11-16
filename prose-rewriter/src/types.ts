@@ -173,7 +173,17 @@ export interface RewriteOptions {
   readonly jobId?: string | null;
   /** Skips S4 in every mode: the "without S4" ablation of the evals (design 5). Default false. */
   readonly skipStyle?: boolean;
+  /**
+   * 'staged' (the default): S2 plan and S3 edit, S4 style and at most one extra S3 round.
+   * 'single': one call plans and edits (the prompt of the single-call baseline, design 4.10), and
+   * its edits pass the same S5, the fact judge, S6 and S7; no S4 and no extra round. At most one
+   * call plus the judge's. F6b measures it against both (decided 16/11/2026).
+   */
+  readonly strategy?: Strategy;
 }
+
+export const STRATEGIES = ['staged', 'single'] as const;
+export type Strategy = (typeof STRATEGIES)[number];
 
 /**
  * The fact judge of section 4.6 runs evals' line-by-line judge through this interface, built over
