@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { canonicalNumber, checkEdit, extract, factInvariant, factReport, inventory, placeholders, type FactSources } from '../src/facts.ts';
+import { splitSentences } from '../src/edits.ts';
 import { specifics } from '../src/specifics.ts';
 import { FactReport } from '../src/types.ts';
 
@@ -367,5 +368,73 @@ describe('factReport', () => {
       notInCv: ['25'],
       placeholders: ['[COMPLETAR: desde cuándo]'],
     });
+  });
+});
+
+describe('ordinary words at the start of a sentence (F6b eval run)', () => {
+  // The first real-model run reverted edits that removed slop because a capitalized first word was
+  // read as a name: "loses Quedo without drop" 30 times, "loses Me", "loses Unlocking", "adds
+  // Cualquier". Every text below is the run's own, from the fictional eval cases.
+  const C_HEAVY_ES: FactSources = { cv: CV_ES, recipient: ['Martín Ocampo', 'Cooperativa La Huella'] };
+  const check = (O: string, C: FactSources, before: string, after: string, lang: 'es' | 'en' = 'es') => {
+    const sentences = splitSentences(O, lang).map((s) => s.text);
+    const sentenceId = sentences.findIndex((s) => s.includes(before));
+    expect(sentenceId, before).toBeGreaterThanOrEqual(0);
+    return checkEdit({ sentenceId, before, after, reason: 'test' }, { O, C, sentences, lang });
+  };
+
+  it('accepts a closing formula replaced by a concrete offer (Quedo)', () => {
+    const O = 'Estimada Lucía:\n\nRehice el sitio de la Panadería Los Álamos en Astro: la página principal pasó de 4,1 s a 1,6 s de carga. Estoy convencida de que mi perfil encaja perfectamente con los valores de Estudio Lumen.\n\nQuedo a la espera de su respuesta.\n\nSaludos cordiales,\nValeria Sosa Pereyra';
+    const C = { cv: CV_ES, recipient: ['Lucía Ferrero', 'Estudio Lumen'] };
+    expect(check(O, C, 'Quedo a la espera de su respuesta.', 'Si le sirve, le muestro los proyectos en una llamada breve.').status).toBe('accepted');
+  });
+
+  it('accepts a stock opener cut after an emoji (Me) and a follow-up opener rewritten (Solo)', () => {
+    const O = 'Gracias por recomendarme con la gente de la librería, Sofi 🙌 Me apasiona este tipo de proyectos y quedo a tu entera disposición. Te aviso cómo me va!';
+    expect(check(O, { cv: CV_ES, recipient: ['Sofía'] }, ' Me apasiona este tipo de proyectos y quedo a tu entera disposición.', '').status).toBe('accepted');
+    const F = 'Hola Martín,\n\nEspero que este mensaje te encuentre muy bien. Solo quería hacer un seguimiento de mi mensaje anterior, ya que me apasiona la posibilidad de potenciar sinergias con la cooperativa y aportar valor agregado a su presencia digital.\n\nSaludos,\nValeria';
+    const before = 'Solo quería hacer un seguimiento de mi mensaje anterior, ya que me apasiona la posibilidad de potenciar sinergias con la cooperativa y aportar valor agregado a su presencia digital.';
+    const after = 'Te pasé el presupuesto para mantener el sitio de la cooperativa [COMPLETAR: cuándo lo enviaste] y quería saber si lo pudiste ver.';
+    expect(check(F, C_HEAVY_ES, before, after).status).toBe('accepted');
+  });
+
+  it('accepts a new first word that is an ordinary word (Cualquier, Pudiste, Hablamos)', () => {
+    const W = 'Hola Sofi! Soy una profesional proactiva y orientada a resultados. Hago sitios en WordPress y en Astro. Quedo a tu entera disposición!';
+    expect(check(W, { cv: CV_ES, recipient: ['Sofía'] }, 'Quedo a tu entera disposición!', 'Cualquier cosa avisame!').status).toBe('accepted');
+    const E = 'Hola Martín,\n\nMantengo tres sitios WordPress con copias semanales y actualizaciones mensuales.\n\nQuedo a tu entera disposición ante cualquier consulta.\n\nSaludos,\nValeria';
+    const before = 'Quedo a tu entera disposición ante cualquier consulta.';
+    expect(check(E, C_HEAVY_ES, before, '¿Pudiste ver el presupuesto? [COMPLETAR: qué necesitás que Martín te responda sobre el presupuesto, por ejemplo si lo aprueban, y para cuándo]').status).toBe('accepted');
+    expect(check(E, C_HEAVY_ES, before, '¿Hablamos [COMPLETAR: qué próximo paso proponés y cuándo, por ejemplo una llamada y los días que podés]?').status).toBe('accepted');
+  });
+
+  it('accepts a slop subject line rewritten after its label (Unlocking)', () => {
+    const O = 'Subject: Unlocking world-class support for Kestrel Books\n\nHi Tom,\n\nI use Zendesk every day and wrote 60 help articles for Brightwell Parcels.\n\nBest,\nDaniel';
+    const after = 'Support engineer writing about [COMPLETAR: the reason for writing to Kestrel Books, such as a specific opening or a question]';
+    expect(check(O, { cv: CV_EN, recipient: ['Tom Hale', 'Kestrel Books'] }, 'Unlocking world-class support for Kestrel Books', after, 'en').status).toBe('accepted');
+  });
+
+  it('holds the invariant for the single-call rewrites the rubric failed', () => {
+    const O = 'Hola Sofi! Espero que estés muy bien. Me pongo en contacto con vos porque me apasiona aportar valor agregado y potenciar sinergias en un mundo cada vez más digital. Soy una profesional proactiva y orientada a resultados. Hago sitios en WordPress y en Astro. Quedo a tu entera disposición!';
+    const R = 'Hola Sofi! Espero que estés muy bien. Te escribo porque [COMPLETAR: qué le querés pedir o contar a Sofi]. Soy desarrolladora web freelance. Hago sitios en WordPress y en Astro. Cualquier cosa avisame!';
+    const result = factInvariant(O, R, { cv: CV_ES, recipient: ['Sofía'] }, [], ES);
+    expect(result.missing.map((f) => f.text)).toEqual([]);
+    expect(result.extra.map((f) => f.text)).toEqual([]);
+  });
+
+  it('still protects a real name at the start of a sentence', () => {
+    // Kestrel is a name because C writes it capitalized mid-sentence, whatever the first word looks like.
+    const C = { cv: 'I wrote help articles for Kestrel Books in 2024.' };
+    expect(check('Kestrel Books is hiring a support engineer.', C, 'Kestrel Books is hiring', 'The shop is hiring', 'en')).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(check('Solo uso Supabase. Supabase guarda los pedidos.', { cv: '' }, 'Supabase guarda', 'Una base guarda')).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(factInvariant('Kestrel Books is hiring.', 'The shop is hiring.', C, [], EN).missing.map((f) => f.key)).toEqual(['kestrel', 'books']);
+  });
+});
+
+describe('lower-case evidence for a first word', () => {
+  it('does not take a URL or an email as the word in lower case', () => {
+    const O = 'Contoso me pidió el sitio. Escribime a ana@contoso.example o a https://contoso.example.';
+    const sentences = ['Contoso me pidió el sitio.', 'Escribime a ana@contoso.example o a https://contoso.example.'];
+    const edit = { sentenceId: 0, before: 'Contoso me pidió', after: 'Me pidieron', reason: 'test' };
+    expect(checkEdit(edit, { O, C: { cv: '' }, sentences, lang: 'es' })).toMatchObject({ status: 'reverted', reason: 'lost' });
   });
 });

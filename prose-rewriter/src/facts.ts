@@ -46,6 +46,12 @@ export interface ExtractOptions {
   readonly knownNames?: ReadonlySet<string>;
   /** Also read an unknown capitalized first word as a possible name (Fact.opening). */
   readonly openings?: boolean;
+  /**
+   * Keys of words the texts in play (O, C, the other side of an edit) write in lower case. A
+   * sentence's first word with one of these keys, and no name reading, is an ordinary word there
+   * too, not a possible name. The words the text itself writes in lower case always count.
+   */
+  readonly ordinaryWords?: ReadonlySet<string>;
 }
 
 /** What C is made of, kept apart so the inventory can tell a CV fact from one about the recipient. */
@@ -141,6 +147,7 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'son', 'está', 'están', 'hay', 'fue', 'era', 'sé', 'hice', 'hago', 'armo', 'uso', 'llevo', 'ofrezco', 'adjunto', 'escribo', 'envío', 'mando',
     'paso', 'cuento', 'agradezco', 'espero', 'creo', 'pienso', 'necesito', 'vivo', 'sigo', 'tenés', 'podés', 'querés', 'mirá', 'fijate',
     'avisame', 'contame', 'escribime', 'decime', 'recibe', 'tiene', 'puede', 'hace', 'sirve', 'incluye', 'permite',
+    'solo', 'sólo', 'cualquier', 'cualquiera', 'quedo',
   ]),
   en: new Set([
     'the', 'a', 'an', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that',
@@ -153,8 +160,11 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'may', 'might', 'must', 'let', 'one', 'just', 'only', 'even', 'again', 'yours', 'sure', 'happy', 'glad', 'looking', 'attached',
   ]),
 };
-/** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
-const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
+/**
+ * Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Hablamos",
+ * "Pudiste", "Built", "Leading", "Quickly".
+ */
+const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente|[aei]mos|[ai]ste)$/iu, en: /(?:ed|ing|ly)$/iu };
 const FIRST_PERSON_EN = new Set(['I', "I'm", "I've", "I'd", "I'll", 'I’m', 'I’ve', 'I’d', 'I’ll']);
 /** The first word of a sentence, as slop-lint's words() reads words. */
 const FIRST_WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/u;
@@ -384,11 +394,19 @@ const NUMERIC_KINDS: ReadonlySet<FactKind> = new Set(['number', 'amount', 'date'
 
 const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(/['’]s$/u, '').replace(/\s+/gu, ' ');
 
-/** The sentences of a text with their offsets: a break after . ! ? … and a space, or a line break. */
+/**
+ * Where a sentence ends: after . ! ? … and a space, at a line break, after an emoji and a space
+ * ("Sofi 🙌 Me apasiona"), and after a label of one or two words that opens a line ("Subject:
+ * Unlocking ...", "Asunto: Propuesta ..."). The word after each of these is a sentence's first word,
+ * whose capital says nothing.
+ */
+const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+/gmu;
+
+/** The sentences of a text with their offsets, split at each SENTENCE_BREAK. */
 function sentenceSpans(text: string): Array<{ start: number; text: string }> {
   const out: Array<{ start: number; text: string }> = [];
   let start = 0;
-  for (const m of text.matchAll(/(?<=[.!?…])\s+|\n+/gu)) {
+  for (const m of text.matchAll(SENTENCE_BREAK)) {
     out.push({ start, text: text.slice(start, m.index) });
     start = m.index + m[0].length;
   }
@@ -523,10 +541,12 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   }
 
   // slop-lint skips a sentence's first word, since a capital there says nothing. It is a name when
-  // the text, O, C or the other side of an edit names it elsewhere, and with `openings`, a possible
-  // name when it is not a frequent opener and has no verb or adverb ending.
+  // the text, O, C or the other side of an edit names it elsewhere (capitalized mid-sentence, or an
+  // anchor). Otherwise it is an ordinary word when those texts write it in lower case, and with
+  // `openings`, a possible name when it is also not a frequent opener and has no verb or adverb ending.
   const known = new Set(options.knownNames ?? []);
   for (const f of facts) if (WORD_KINDS.has(f.kind) && f.opening === undefined) known.add(f.key);
+  const ordinary = new Set([...(options.ordinaryWords ?? []), ...lowerWordsOf(text)]);
   for (const sentence of sentenceSpans(text)) {
     const m = FIRST_WORD.exec(sentence.text);
     if (m === null) continue;
@@ -535,7 +555,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
     const key = wordKey(word);
     if (known.has(key)) take('proper-noun', start, word, key);
-    else if (options.openings === true && isPossibleName(word, lang)) {
+    else if (options.openings === true && !ordinary.has(key) && isPossibleName(word, lang)) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
       claimed.push([start, start + word.length]);
     }
@@ -549,6 +569,18 @@ function isPossibleName(word: string, lang: Lang): boolean {
   if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;
   if (lang === 'es' && (MONTHS_ES.includes(lower) || lower === 'setiembre')) return false;
   return true;
+}
+
+/**
+ * The keys of the words a text writes in lower case, to read them as ordinary words at a sentence
+ * start too. URLs, emails and placeholders are left out: "ana@contoso.example" does not make
+ * "Contoso" an ordinary word.
+ */
+function lowerWordsOf(text: string): Set<string> {
+  const out = new Set<string>();
+  const prose = text.replace(PLACEHOLDER_ANY, ' ').replace(URL_LIKE, ' ').replace(EMAIL, ' ');
+  for (const m of prose.matchAll(new RegExp(FIRST_WORD.source, 'gu'))) if (/^\p{Ll}/u.test(m[0])) out.add(wordKey(m[0]));
+  return out;
 }
 
 /** The keys of the names, acronyms, tools and anchors the texts state, to read them at a sentence start too. */
@@ -672,8 +704,8 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
     return { status: 'reverted', reason: 'not-found', facts: [], message: `"${edit.before}" is not in sentence ${edit.sentenceId}.` };
   }
   const after = sentence.slice(0, at) + edit.after + sentence.slice(at + edit.before.length);
-  const known = namesOf([context.O, sourcesText(context.C), sentence, after], context);
-  const read = { ...context, knownNames: known, openings: true };
+  const texts = [context.O, sourcesText(context.C), sentence, after];
+  const read = { ...context, knownNames: namesOf(texts, context), ordinaryWords: lowerWordsOf(texts.join('\n')), openings: true };
   const allBefore = extract(sentence, read);
   const allAfter = extract(after, read);
   const beforeFacts = unique(allBefore);
@@ -733,7 +765,8 @@ export function factInvariant(
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
   const C = poolOf(sourcesText(sources), options);
-  const read = { ...options, knownNames: namesOf([original, rewritten, C.text], options), openings: true };
+  const texts = [original, rewritten, C.text];
+  const read = { ...options, knownNames: namesOf(texts, options), ordinaryWords: lowerWordsOf(texts.join('\n')), openings: true };
   const inO = extract(original, read);
   const inR = extract(rewritten, read);
   const isNumber = (f: Fact): boolean => NUMERIC_KINDS.has(f.kind);
