@@ -81,15 +81,15 @@ Phase F5a added what the model stages need. `src/index.ts` exports all of it.
 
 The harness in `evals/` runs the eval cases through the pipeline and its variants (`evals/pipeline.ts:82`), scores each piece with the code rubrics and the blind judges, and gates each pipeline variant against the single-call baseline (`evals/run.ts:320`). The CLI is `node prose-rewriter/evals/cli.ts`. Its testable core is `runEvalCli()` (`evals/run.ts:357`), which the tests run over the scripted gateway. Only `evals/cli.ts` reads `ANTHROPIC_API_KEY` and builds the live gateway (`evals/cli.ts:26`).
 
-**The budget.** Every real-model eval run spends from one monthly budget, decision D14 of the design. The default is US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:57`).
+**The budget.** Every real-model eval run spends from one monthly budget, decision D14 of the design. The default is US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:59`).
 
 - November 2026: 50 USD (decision of the maintainer, 16/11/2026, to use expiring promotional credit); default 20 USD.
 - A month's budget goes above the default only with an explicit `--monthly-cap`. The November runs pass `--monthly-cap 50`, and the runs from December on pass nothing. The flag can also lower the cap for a run.
 - The dry run and the run report print the cap in force and who set it, the default or `--monthly-cap`.
 
-The gateway's own caps reset on every run, so the budget lives in a ledger file outside the repository, `~/.applied-ai-toolkit/eval-spend.json` (`evals/spend.ts:65`). It has one entry per calendar month in Buenos Aires (`evals/spend.ts:74`). The ledger keeps what was spent, not the cap, so a run at the default after a raised one sees the same spend against US$20. `openLedger()` (`evals/spend.ts:219`) writes it through a temp file and a rename under a lock file, and stops on a file it cannot parse instead of overwriting it.
+The gateway's own caps reset on every run, so the budget lives in a ledger file outside the repository, `~/.applied-ai-toolkit/eval-spend.json` (`evals/spend.ts:67`). It has one entry per calendar month in Buenos Aires (`evals/spend.ts:62`). The ledger keeps what was spent, not the cap, so a run at the default after a raised one sees the same spend against US$20. `openLedger()` (`evals/spend.ts:221`) writes it through a temp file and a rename under a lock file, and stops on a file it cannot parse instead of overwriting it.
 
-Before every model call, `budgetedGateway()` (`evals/spend.ts:357`) reserves the call's worst case. That is the input bound of `estimateInputTokens`, with the output schema and the attachment bound, at the dearest input rate of every model in force, plus the whole output budget at the dearest output rate (`evals/spend.ts:322`). It refuses the call when the month would pass the cap, when the run would pass `--max-usd`, or when the model has no price. After the call the reservation settles to the measured cost. A call the gateway could not price, or one that failed after it reached the API, settles at its worst case. A reservation that never settles keeps counting at its worst case.
+Before every model call, `budgetedGateway()` (`evals/spend.ts:359`) reserves the call's worst case. That is the input bound of `estimateInputTokens`, with the output schema and the attachment bound, at the dearest input rate of every model in force, plus the whole output budget at the dearest output rate (`evals/spend.ts:324`). It refuses the call when the month would pass the cap, when the run would pass `--max-usd`, or when the model has no price. After the call the reservation settles to the measured cost. A call the gateway could not price, or one that failed after it reached the API, settles at its worst case. A reservation that never settles keeps counting at its worst case.
 
 Run it in three steps.
 
@@ -115,7 +115,7 @@ The run's verdict is the one of `full` when it ran, else the worst of the varian
 - `4` means the run could not start (no key, or a ledger it cannot read).
 - `5` means the gate is inconclusive or could not run (no baseline among the variants, too few cases at the margin).
 
-The report prints the gate, the hard failures of the code rubrics, the cost table and the month's spend from the ledger. The cost table (`costReport()`, `evals/spend.ts:494`) gives median and p90 cost per variant, genre and mode, the cache hit rate, the calls per rewrite and the share of pieces with an extra round. What a rewrite costs is measured in F6b, the first run against the real model; this README states no cost until then.
+The report prints the gate, the hard failures of the code rubrics, the cost table and the month's spend from the ledger. The cost table (`costReport()`, `evals/spend.ts:496`) gives median and p90 cost per variant, genre and mode, the cache hit rate, the calls per rewrite and the share of pieces with an extra round. What a rewrite costs is measured in F6b, the first run against the real model; this README states no cost until then.
 
 ## Fixtures and data
 
