@@ -17,6 +17,29 @@ export type DataSource = 'texto' | 'perfil';
 /** The tags of the data blocks of the prompt. */
 export const DATA_TAGS = ['texto', 'perfil'] as const satisfies readonly DataSource[];
 
+/**
+ * How a data tag can be written so that a model still reads it as one: its `<` as the ASCII sign,
+ * a fullwidth or small variant, or an HTML entity (named or numeric, decimal or hex, escaped any
+ * number of times); its `/` as a fullwidth or division slash; its letters as Cyrillic or Greek
+ * look-alikes or fullwidth forms. Matched case-insensitively, so the capitals come with them.
+ */
+const LEAD = String.raw`<|\uFF1C|\uFE64|&(?:amp;)*(?:lt|#0*60|#x0*3c|#0*65308|#x0*ff1c|#0*65124|#x0*fe64);`;
+const SLASH = String.raw`[\/\uFF0F\u2215\u2044]`;
+const CLOSE = String.raw`(?:>|\uFF1E|\uFE65|&(?:amp;)*(?:gt|#0*62|#x0*3e);)`;
+const LOOKS: Readonly<Record<string, string>> = {
+  t: 't\u0442\uFF54',
+  e: 'e\u0435\u0451\uFF45',
+  x: 'x\u0445\u03C7\uFF58',
+  o: 'o\u043E\u03BF\uFF4F',
+  p: 'p\u0440\u03C1\uFF50',
+  r: 'r\uFF52',
+  f: 'f\uFF46',
+  i: 'i\u0456\u03B9\uFF49',
+  l: 'l\u04CF\uFF4C',
+};
+/** A data tag's name, letter by letter, with look-alikes and `between` allowed between the letters. */
+const tagName = (name: string, between: string): string => [...name].map((c) => `[${LOOKS[c] ?? c}]`).join(between);
+
 /** Patterns are case-insensitive and Unicode-aware; `(?!\p{L})` ends a word that may end in an accent. */
 const P = (source: string): RegExp => new RegExp(source, 'giu');
 const END = '(?![\\p{L}\\p{N}])';
@@ -53,8 +76,9 @@ const PATTERNS: readonly RegExp[] = [
   // A role label at the start of a line ("System:", "Assistant:"); multiline, so ^ is a line start.
   // "Sistema:" and "Asistente:" are left out: a Spanish CV labels its stack and a job title that way.
   new RegExp(`^[ \\t]*(?:system|assistant|human)[ \\t]*:`, 'gimu'),
-  // A tag of the data blocks themselves: the data trying to close its block or open another.
-  P(`<\\s*\\/?\\s*(?:${DATA_TAGS.join('|')})\\s*>`),
+  // A tag of the data blocks themselves, in any of the forms a model reads as one (LEAD): the data
+  // trying to close its block or open another.
+  P(`(?:${LEAD})\\s*(?:${SLASH})?\\s*(?:${DATA_TAGS.map((t) => tagName(t, '')).join('|')})\\s*${CLOSE}`),
 ];
 
 interface Hit {
@@ -123,30 +147,38 @@ export function injectionFlags(text: string, source: DataSource, lang: Lang = 'e
 
 /**
  * The start of a data tag, open or closed, with any spacing or invisible format character
- * (`<texto`, `</ perfil`, `<\u200B/texto`), or the same
- * already written with escaped brackets (`&lt;/texto`, `&amp;lt;/texto`). Escaping the escaped form
- * too is what makes the neutralization reversible.
+ * (`<texto`, `</ perfil`, `<\u200B/texto`), in any of the forms of LEAD, SLASH and LOOKS
+ * (`\uFF1C/texto`, `&#60;/texto`, `</t\u0435xto`), or already written with escaped brackets
+ * (`&lt;/texto`, `&amp;lt;/texto`). Escaping the escaped forms too is what makes the
+ * neutralization reversible.
  */
 const GAP = String.raw`[\s\p{Cf}]*`;
-/** A tag name with any format character between its letters ("te\u00ADxto"), which a model reads as the name. */
-const spelled = (name: string): string => [...name].join(String.raw`\p{Cf}*`);
 const TAG_START = new RegExp(
-  `(<|&(?:amp;)*lt;)(?=${GAP}\\/?${GAP}(?:${DATA_TAGS.map(spelled).join('|')})(?!\\p{Cf}*[\\p{L}\\p{N}]))`,
+  `(${LEAD})(?=${GAP}(?:${SLASH})?${GAP}(?:${DATA_TAGS.map((t) => tagName(t, String.raw`\p{Cf}*`)).join('|')})(?!\\p{Cf}*[\\p{L}\\p{N}]))`,
   'giu',
 );
 
+/** A bracket that is not ASCII is written as its hex entity, which restore() reads back. */
+const BRACKET_ENTITY: Readonly<Record<string, string>> = { '<': '&lt;', '\uFF1C': '&#xff1c;', '\uFE64': '&#xfe64;' };
+const ENTITY_BRACKET: Readonly<Record<string, string>> = { '&lt;': '<', '&#xff1c;': '\uFF1C', '&#xfe64;': '\uFE64' };
+
 function neutralize(text: string): string {
-  return text.replace(TAG_START, (lead: string) => (lead === '<' ? '&lt;' : `&amp;${lead.slice(1)}`));
+  return text.replace(TAG_START, (lead: string) => BRACKET_ENTITY[lead] ?? `&amp;${lead.slice(1)}`);
 }
 
 function restore(text: string): string {
-  return text.replace(TAG_START, (lead: string) => (lead.toLowerCase() === '&lt;' ? '<' : `&${lead.slice('&amp;'.length)}`));
+  return text.replace(TAG_START, (lead: string) => {
+    const bracket = ENTITY_BRACKET[lead.toLowerCase()];
+    if (bracket !== undefined) return bracket;
+    return lead.toLowerCase().startsWith('&amp;') ? `&${lead.slice('&amp;'.length)}` : lead;
+  });
 }
 
 /**
  * Puts `text` in a labelled block for the prompt. The `<` of every data tag inside the text (of
- * either block, open or closed, in any case or spacing) is written `&lt;`, so the data cannot
- * close its block or open another one. Nothing else changes: ordinary markup and angle brackets
+ * either block, open or closed, in any case or spacing, with look-alike characters or as an
+ * entity) is written as an entity (`&lt;`, or `&amp;` before an entity already there), so the data
+ * cannot close its block or open another one. Nothing else changes: ordinary markup and angle brackets
  * stay as they are. A model that quotes a neutralized tag back quotes `&lt;`; unwrapData() and
  * restoreData() turn it back.
  */
