@@ -10,7 +10,12 @@
  *   month in Buenos Aires. Amounts are whole micro-dollars, the precision of the gateway's
  *   costUsd, so sums do not drift. Every operation reads the file again and writes it whole
  *   through a temp file and a rename, so a crash leaves the old file or the new one, never half.
- *   A file it cannot parse is an error, never overwritten: the budget fails closed.
+ *   A reservation and a settlement each hold a lock file next to the ledger (created with O_EXCL)
+ *   from the read to the rename, so two runs at once (two terminals, a run next to a CI job)
+ *   neither pass the cap together nor overwrite each other's spend. A lock older than
+ *   LOCK_STALE_MS was left by a run that died holding it and is taken over; a lock that stays
+ *   fresh past LOCK_WAIT_MS refuses the call. A file it cannot parse is an error, never
+ *   overwritten: the budget fails closed.
  * - budgetedGateway(): before every call it reserves the call's worst case (estimateInputTokens of
  *   the request at the highest input rate of the model, plus maxTokens at its output rate) and
  *   refuses the call if the month's spend plus that reservation would pass the cap, or the run's
@@ -23,7 +28,7 @@
  * first one instead of failing every later piece the same way.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { z } from 'zod';
@@ -98,7 +103,54 @@ interface LedgerFile {
   months: Record<string, MonthEntry>;
 }
 
-const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+/** A lock this old was left by a process that died holding it: one ledger write takes milliseconds. */
+export const LOCK_STALE_MS = 10_000;
+/** How long a reservation or a settlement waits for another run's lock before it gives up. */
+export const LOCK_WAIT_MS = 5_000;
+
+const sleep = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+/** Runs `fn` while holding `${path}.lock`. Synchronous, like the ledger operations it wraps. */
+function withLock<T>(path: string, fn: () => T): T {
+  const lock = `${path}.lock`;
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      const fd = openSync(lock, 'wx', 0o600);
+      try {
+        writeSync(fd, `${process.pid}\n`);
+      } finally {
+        closeSync(fd);
+      }
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    let age: number;
+    try {
+      age = Date.now() - statSync(lock).mtimeMs;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (age > LOCK_STALE_MS) {
+      rmSync(lock, { force: true });
+      continue;
+    }
+    if (Date.now() > deadline) throw new Error(`spend ledger ${path} is locked by another run (${lock}); retry when it ends, or delete the lock file if no run is going`);
+    sleep(2 + Math.floor(Math.random() * 8));
+  }
+  try {
+    return fn();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
+const isCount =(v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 
 function parseLedger(raw: string, path: string): LedgerFile {
   const bad = (why: string): never => {
@@ -206,27 +258,31 @@ export function openLedger(options: LedgerOptions): SpendLedger {
     },
     reserve(worstUsd) {
       if (!(Number.isFinite(worstUsd) && worstUsd >= 0)) throw new Error(`a reservation is a US$ amount from 0 up, got ${worstUsd}`);
-      const file = read();
-      const month = spendMonth(clock.now(), zone);
-      const e = entry(file, month);
-      const spent = e.settledMicros + openMicros(e);
-      const m = micros(worstUsd);
-      if (spent + m > capMicros) {
-        throw new SpendRefusal('monthly', usd(spent), cap, `Refused: the call's worst case of US$${usd(m)} would take ${month} past the monthly budget of US$${cap} (US$${usd(spent)} spent or reserved)`);
-      }
-      const id = randomUUID();
-      e.open[id] = { micros: m, at: clock.now().toISOString() };
-      write(file);
-      return { id, month, micros: m };
+      return withLock(path, () => {
+        const file = read();
+        const month = spendMonth(clock.now(), zone);
+        const e = entry(file, month);
+        const spent = e.settledMicros + openMicros(e);
+        const m = micros(worstUsd);
+        if (spent + m > capMicros) {
+          throw new SpendRefusal('monthly', usd(spent), cap, `Refused: the call's worst case of US$${usd(m)} would take ${month} past the monthly budget of US$${cap} (US$${usd(spent)} spent or reserved)`);
+        }
+        const id = randomUUID();
+        e.open[id] = { micros: m, at: clock.now().toISOString() };
+        write(file);
+        return { id, month, micros: m };
+      });
     },
     settle(r, cost) {
       if (!(Number.isFinite(cost) && cost >= 0)) throw new Error(`a settled cost is a US$ amount from 0 up, got ${cost}`);
-      const file = read();
-      const e = entry(file, r.month);
-      delete e.open[r.id];
-      e.settledMicros += micros(cost);
-      e.calls += 1;
-      write(file);
+      withLock(path, () => {
+        const file = read();
+        const e = entry(file, r.month);
+        delete e.open[r.id];
+        e.settledMicros += micros(cost);
+        e.calls += 1;
+        write(file);
+      });
     },
   };
 }

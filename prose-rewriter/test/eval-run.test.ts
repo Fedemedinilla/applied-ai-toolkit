@@ -1,8 +1,10 @@
 // F6a step 3: the spend ledger, the budgeted gateway, the cost report and the eval CLI core,
 // offline, over the scripted gateway. No key, no network; every ledger lives in a temp folder.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { BUILT_IN_MODELS, CapError, pricesInForce, RequestError, type Gateway, type Price } from '../../gateway/src/index.ts';
 import type { PieceRecord } from '../evals/pipeline.ts';
@@ -10,6 +12,7 @@ import {
   budgetedGateway,
   costReport,
   costRows,
+  LOCK_STALE_MS,
   MONTHLY_BUDGET_USD,
   openLedger,
   SpendRefusal,
@@ -109,6 +112,45 @@ describe('the spend ledger', () => {
     expect(ledger.month()).toMatchObject({ month: '2026-12', spentUsd: 0 });
     expect(ledger.month(new Date('2026-11-30T12:00:00.000Z'))).toMatchObject({ month: '2026-11', spentUsd: 19.5, calls: 2 });
     expect(() => ledger.reserve(19.9)).not.toThrow();
+  });
+
+  it('holds the cap and loses no spend when several processes share the file at once', async () => {
+    // Each child reserves and settles US$0.05 until the US$1 cap refuses it, then prints how many
+    // reservations it got. Without a lock the children read the same totals, pass the cap together
+    // and overwrite each other's writes.
+    const path = tempLedger();
+    const spend = fileURLToPath(new URL('../evals/spend.ts', import.meta.url));
+    const child = [
+      `import { openLedger, SpendRefusal } from ${JSON.stringify(spend)};`,
+      `const l = openLedger({ path: ${JSON.stringify(path)}, monthlyCapUsd: 1, clock: { now: () => new Date(${JSON.stringify(NOW.toISOString())}) } });`,
+      'let n = 0;',
+      'for (;;) { let r; try { r = l.reserve(0.05); } catch (e) { if (e instanceof SpendRefusal) break; throw e; } n++; l.settle(r, 0.05); }',
+      'process.stdout.write(String(n));',
+    ].join('\n');
+    const run = (): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const p = spawn(process.execPath, ['--input-type=module', '-e', child], { stdio: ['ignore', 'pipe', 'inherit'] });
+        let out = '';
+        p.stdout.on('data', (d: Buffer) => (out += d.toString()));
+        p.on('error', reject);
+        p.on('close', (code) => (code === 0 ? resolve(Number(out)) : reject(new Error(`child exited ${code}`))));
+      });
+    const granted = (await Promise.all([run(), run(), run(), run(), run(), run()])).reduce((a, b) => a + b, 0);
+    expect(granted).toBe(20);
+    expect(openLedger({ path, monthlyCapUsd: 20, clock: fixed }).month()).toMatchObject({ spentUsd: 1, openUsd: 0, calls: 20 });
+    expect(readdirSync(dirname(path))).toEqual(['eval-spend.json']);
+  });
+
+  it('takes over a lock left by a run that died holding it', () => {
+    const path = tempLedger();
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(`${path}.lock`, '1\n');
+    const old = new Date(Date.now() - LOCK_STALE_MS - 1000);
+    utimesSync(`${path}.lock`, old, old);
+    const ledger = openLedger({ path, monthlyCapUsd: 20, clock: fixed });
+    ledger.settle(ledger.reserve(1), 1);
+    expect(ledger.month()).toMatchObject({ spentUsd: 1, calls: 1 });
+    expect(existsSync(`${path}.lock`)).toBe(false);
   });
 
   it('fails closed on a file it cannot read, and never overwrites it', () => {
