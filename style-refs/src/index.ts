@@ -77,8 +77,9 @@ export const Source = z.strictObject({
   /** The day a jurisdiction that is not free yet becomes free, e.g. Spain on 2027-01-01. */
   freeFrom: z.partialRecord(z.enum(JURISDICTIONS), IsoDate).optional(),
   /**
-   * Whether the paid public domain of Decreto-ley 1224/58 reaches this repository. Required for an
-   * Argentine author; while it is `unresolved` the author gives no excerpts (design decision D12).
+   * Whether the paid public domain of Decreto-ley 1224/58 reaches this repository. Required for a
+   * work by an Argentine author; while it is not `cleared`, no Argentine source gives excerpts
+   * (design decision D12). A guide under an open licence is not in the public domain, so it needs none.
    */
   paidPublicDomain: z.enum(['unresolved', 'cleared']).optional(),
   licence: z.string().min(1),
@@ -257,7 +258,7 @@ function sourceProblems(s: Source): Local[] {
   const translated = s.originalLang !== s.lang;
   if (translated && s.translator === undefined) out.push({ path: 'translator', message: `a translation from ${s.originalLang} needs its translator and the year they died` });
   if (!translated && s.translator !== undefined) out.push({ path: 'translator', message: 'the work is read in its original language, so it has no translator' });
-  if (s.nationality.includes('ar') && s.paidPublicDomain === undefined) out.push({ path: 'paidPublicDomain', message: 'an Argentine author needs paidPublicDomain (Decreto-ley 1224/58)' });
+  if (s.kind === 'literary' && s.nationality.includes('ar') && s.paidPublicDomain === undefined) out.push({ path: 'paidPublicDomain', message: 'an Argentine author needs paidPublicDomain (Decreto-ley 1224/58)' });
   for (const place of JURISDICTIONS) {
     const from = s.freeFrom?.[place];
     if (from !== undefined && FREE.has(s.status[place])) out.push({ path: `freeFrom.${place}`, message: `free from ${from}, so ${place} cannot be ${s.status[place]} yet` });

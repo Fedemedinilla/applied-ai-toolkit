@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { EXCERPT_MAX_SENTENCES, EXCERPT_MAX_WORDS, validateRefs, type RefsData } from '../src/index.ts';
+import { EXCERPT_MAX_SENTENCES, EXCERPT_MAX_WORDS, Source, validateRefs, type RefsData } from '../src/index.ts';
 
 // The rules of design section 4.8, "Qué controla licensing.test.ts", tried on inline fixtures that
 // break one rule each. The data on disk is checked against the same rules in the last block.
@@ -191,5 +193,80 @@ describe('an excerpt is short, verbatim from Gutenberg or Wikisource, and never 
     const { fetched: _f, url: _u, ...bare } = excerpt;
     expect(validateRefs(withExcerpt(work, bare)).map((p) => p.path)).toEqual(['0.url', '0.fetched']);
     expect(messages(withExcerpt({ ...work, lang: 'es', originalLang: 'es' }))).toEqual(['excerpts/en.json 0.lang: the source plain-work is read in es']);
+  });
+});
+
+describe('the Argentine rule reaches works, not open-licence guides', () => {
+  it('asks no paid public domain flag of an Argentine guide', () => {
+    const guide = { ...work, kind: 'guide', authorDied: null, nationality: ['ar'], lang: 'es', originalLang: 'es', use: 'principles', url: 'https://www.argentina.gob.ar/acerca' };
+    expect(messages({ ...empty, sources: [guide] })).toEqual([]);
+  });
+});
+
+describe('sources.json against the author table and register guides of design 4.8', () => {
+  const sources = (JSON.parse(readFileSync(join(import.meta.dirname, '..', 'sources.json'), 'utf8')) as unknown[]).map((s) => Source.parse(s));
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const get = (id: string): Source => {
+    const s = byId.get(id);
+    if (s === undefined) throw new Error(`sources.json has no ${id}`);
+    return s;
+  };
+
+  it('lists every author and guide of the tables, excluded ones included', () => {
+    expect(sources.map((s) => s.id).sort()).toEqual([
+      'andis-lenguaje-claro', 'argentina-gob-ar', 'arlt-aguafuertes', 'azorin', 'baroja', 'bierce-write-it-right',
+      'chekhov-garnett-lady-with-the-dog', 'ec-how-to-write-clearly', 'federal-plain-language', 'franklin-autobiography',
+      'galdos-fortunata-y-jacinta', 'govuk-style-guide', 'lincoln-gettysburg', 'mansilla-ranqueles', 'orwell-politics',
+      'quiroga-cuentos-1917', 'quiroga-decalogo', 'red-lenguaje-claro-es', 'sarmiento-facundo', 'strunk-elements-1920',
+      'strunk-white-1959', 'twain-cooper-offences',
+    ]);
+  });
+
+  it('records the excluded works as excluded, so nothing can cite them', () => {
+    const excluded = sources.filter((s) => s.use === 'excluded').map((s) => s.id).sort();
+    expect(excluded).toEqual(['azorin', 'baroja', 'orwell-politics', 'strunk-white-1959']);
+    expect(get('orwell-politics').status.us).toBe('protected');
+  });
+
+  it('keeps the Argentine authors to principles while Decreto-ley 1224/58 is unresolved', () => {
+    const argentine = sources.filter((s) => s.kind === 'literary' && s.nationality.includes('ar'));
+    expect(argentine.map((s) => s.id).sort()).toEqual(['arlt-aguafuertes', 'mansilla-ranqueles', 'quiroga-cuentos-1917', 'quiroga-decalogo', 'sarmiento-facundo']);
+    for (const s of argentine) {
+      expect(s.paidPublicDomain, s.id).toBe('unresolved');
+      expect(s.use, s.id).toBe('principles');
+    }
+    expect(get('arlt-aguafuertes').scope).toEqual({ genres: ['whatsapp'], registers: ['casual'] });
+  });
+
+  it('marks Spain not free until 2027-01-01 for Strunk and for Garnett', () => {
+    for (const id of ['strunk-elements-1920', 'chekhov-garnett-lady-with-the-dog']) {
+      expect(['protected', 'unverified'], id).toContain(get(id).status.es);
+      expect(get(id).freeFrom?.es, id).toBe('2027-01-01');
+    }
+    expect(get('chekhov-garnett-lady-with-the-dog').translator).toEqual({ name: 'Constance Garnett', died: 1946 });
+  });
+
+  it('keeps every [SIN VERIFICAR] cell of the tables as unverified, never as free', () => {
+    expect(get('quiroga-decalogo').status.us).toBe('unverified');
+    expect(get('quiroga-decalogo').published).toBeNull();
+    expect(get('strunk-elements-1920').status.es).toBe('unverified');
+    const plain = get('federal-plain-language').status;
+    expect([plain.us, plain.ar, plain.eu, plain.es]).toEqual(['public-domain', 'unverified', 'unverified', 'unverified']);
+    for (const id of ['ec-how-to-write-clearly', 'red-lenguaje-claro-es']) {
+      expect(Object.values(get(id).status), id).toEqual(['unverified', 'unverified', 'unverified', 'unverified']);
+      expect(get(id).use, id).toBe('link-only');
+    }
+    expect(get('andis-lenguaje-claro').use).toBe('link-only');
+  });
+
+  it('tags every status as REPORTADO, since none was checked against each law', () => {
+    expect(sources.filter((s) => s.evidence !== 'REPORTADO').map((s) => s.id)).toEqual([]);
+  });
+
+  it('gives excerpts only from works in the public domain in the US, read from Gutenberg or Wikisource', () => {
+    for (const s of sources.filter((x) => x.use === 'excerpts')) {
+      expect(s.status.us, s.id).toBe('public-domain');
+      expect(s.url, s.id).toMatch(/^https:\/\/([a-z]+\.)?(gutenberg\.org|wikisource\.org)\//);
+    }
   });
 });
