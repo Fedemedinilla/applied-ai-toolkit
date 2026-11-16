@@ -134,7 +134,7 @@ Each entry gives the page, a quote under 30 words, and the tag. Only pages that 
 - **Style guides.** The Microsoft and Google style guides were not searched for email openings, and no Fundéu, RAE, Microsoft or Google page on follow-up formulas was found.
 - **Surveys with figures.** No outreach survey with reply rates by phrase or by length was opened, so there is no number.
 - **WhatsApp length for people.** Only the API cap above. The 360dialog figure of under 1,600 characters showed only in a search snippet.
-- **Wikipedia for follow-ups.** The part of "Signs of AI writing" that was read (its first 100,000 characters) has no follow-up phrases, so it is no source for SEG-01 or SEG-02.
+- **Wikipedia for follow-ups.** On 16 November 2026 the whole of "Signs of AI writing" (250,972 characters) was read through the summarizing fetch tool in three parts, from offsets 0, 100,000 and 200,000; the quotes above come from the second part. No part has follow-up phrases, so the page is no source for SEG-01 or SEG-02. The tool said it shortened the first part, so a phrase in that part could have been missed.
 <!-- slop-lint-enable -->
 
 ## What this note did not cover
