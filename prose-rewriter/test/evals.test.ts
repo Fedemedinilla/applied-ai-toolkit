@@ -102,8 +102,29 @@ const byId = (id: string) => {
 };
 
 describe('the pipeline variants (design 5, "F6 suma")', () => {
-  it('lists the full pipeline, the ablations, the single-call baseline and another model on rewrite.edit', () => {
-    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'edit-sonnet-5-5']);
+  it('lists the full pipeline, the ablations, the single-call baseline, the guarded single call and another model on rewrite.edit', () => {
+    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'single-guarded', 'edit-sonnet-5-5']);
+  });
+
+  it('runs single-guarded as rewrite() with one call: the edit the unguarded baseline ships is reverted', async () => {
+    const invent = { sentenceId: 2, before: SINERGIAS, after: 'Quería contarte que el sitio está hecho en React.' };
+    const reply = () => ({ 'rewrite.edit': [edits(invent, { sentenceId: 3, before: 'ya carga', after: 'ahora carga' })], 'rewrite.judge': [factVerdict(MAIL.replace('ya carga', 'ahora carga'))] });
+    const guarded = scriptedGateway(reply());
+    const [g] = await runPipelines(CASES, [byId('single-guarded')], { gateway: guarded.gateway, refs: REFS });
+    guarded.assertDone();
+    expect(tasksOf(guarded)).toEqual(['rewrite.edit', 'rewrite.judge']);
+    expect(guarded.calls[0]?.request.promptVersion).toBe(`rewrite-single@${PROMPT_VERSION}`);
+    expect(g?.usage).toMatchObject({ calls: 2, extraRound: false });
+    expect(g?.status === 'done' ? [g.result.kind, g.rewritten] : g?.error).toEqual(['pipeline', MAIL.replace('ya carga', 'ahora carga')]);
+    const bare = scriptedGateway({ 'rewrite.edit': reply()['rewrite.edit'] });
+    const [b] = await runPipelines(CASES, [byId('single-call')], { gateway: bare.gateway, refs: REFS });
+    expect(b?.status === 'done' ? b.rewritten : b?.error).toContain('React');
+  });
+
+  it('refuses a pipeline knob the single strategy has no stage for', () => {
+    expect(() => pipelineVariant({ id: 'x', kind: 'pipeline', strategy: 'single', skipStyle: true })).toThrow(/no plan or style stage/);
+    expect(() => pipelineVariant({ id: 'x', kind: 'pipeline', strategy: 'single', tasks: { 'rewrite.plan': { model: 'claude-opus-5-5', effort: 'medium' } } })).toThrow(/no plan or style stage/);
+    expect(() => pipelineVariant({ id: 'x', kind: 'single-call', strategy: 'single' })).toThrow(/strategy/);
   });
 
   it('refuses a variant that overrides the judge, a repeated id or a repeated case before any call', async () => {

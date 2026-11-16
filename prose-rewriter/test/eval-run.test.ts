@@ -516,6 +516,17 @@ describe('the dry run estimate', () => {
     expect(est.worstUsd).toBeGreaterThan(outputs);
   });
 
+  it('counts one call, the fact judge and its second verdict for single-guarded, and one call for single-call', async () => {
+    const guarded = await estimateRun([SLOP], variant('single-guarded'), REFS, PRICES);
+    // The single call, the fact judge twice, then the judging rubrics (no baseline: no pairwise-baseline).
+    expect(guarded.calls).toBe(3 + JUDGE_RUBRICS.length - 1);
+    const bare = await estimateRun([SLOP], variant('single-call'), REFS, PRICES);
+    expect(bare.calls).toBe(1 + JUDGE_RUBRICS.length - 1);
+    const full = await estimateRun([SLOP], variant('full'), REFS, PRICES);
+    expect(bare.worstUsd).toBeLessThan(guarded.worstUsd);
+    expect(guarded.worstUsd).toBeLessThan(full.worstUsd);
+  });
+
   it('warns when the worst case is more than the month has left or more than --max-usd', async () => {
     const h = harness(never);
     const seed = openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed });

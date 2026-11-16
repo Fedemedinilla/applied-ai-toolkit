@@ -82,7 +82,7 @@ Phase F5a added what the model stages need. `src/index.ts` exports all of it.
 
 ## Evals
 
-The harness in `evals/` runs the eval cases through the pipeline and its variants (`evals/pipeline.ts:82`), scores each piece with the code rubrics and the blind judges, and gates each pipeline variant against the single-call baseline (`evals/run.ts:320`). The CLI is `node prose-rewriter/evals/cli.ts`. Its testable core is `runEvalCli()` (`evals/run.ts:357`), which the tests run over the scripted gateway. Only `evals/cli.ts` reads `ANTHROPIC_API_KEY` and builds the live gateway (`evals/cli.ts:26`).
+The harness in `evals/` runs the eval cases through the pipeline and its variants (`evals/pipeline.ts:91`), scores each piece with the code rubrics and the blind judges, and gates each pipeline variant against the single-call baseline (`evals/run.ts:324`). `single-call` makes the one call and applies its edits with no check. `single-guarded` is `rewrite()` with strategy `single`. It makes the same call, then runs S5, the judge, S6 and S7, so the two differ only in the guards. The CLI is `node prose-rewriter/evals/cli.ts`. Its testable core is `runEvalCli()` (`evals/run.ts:361`), which the tests run over the scripted gateway. Only `evals/cli.ts` reads `ANTHROPIC_API_KEY` and builds the live gateway (`evals/cli.ts:26`).
 
 **The budget.** Every real-model eval run spends from one monthly budget, decision D14 of the design. The default is US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:59`).
 
@@ -103,8 +103,8 @@ Run it in three steps.
 **The gate** (design 5, "Puerta") checks each pipeline variant against `single-call`.
 
 - A hard code rubric that fails on any row of the variant blocks it, whatever the rates say. The hard rubrics are `no-new-facts`, `facts-preserved`, `lint-delta`, `injection-ignored` and `keep-intact`. `no-new-facts` also fails a rewrite that strengthens the user's own claim the CV does not back (`evals/rubrics.ts:91`).
-- `pairwise-baseline` is a pass per piece, true when the variant's rewrite won the blind comparison. The baseline's side is the same sample's losses, so `gate()` cannot compare the two. The variant passes when the 95% Wilson interval of its win rate lies above one half (`evals/run.ts:280`).
-- `same-voice` goes through `gate()` against the baseline's run (`evals/run.ts:296`). It must not be worse by more than the margin, `DEFAULT_MARGIN` (0.1) unless `--margin` gives another (D13). With 33 cases, 33 of 33 on both sides cannot pass at 0.1. The report says so and names the smallest margin that could pass, 0.105 for 33 cases.
+- `pairwise-baseline` is a pass per piece, true when the variant's rewrite won the blind comparison. The baseline's side is the same sample's losses, so `gate()` cannot compare the two. The variant passes when the 95% Wilson interval of its win rate lies above one half (`evals/run.ts:284`).
+- `same-voice` goes through `gate()` against the baseline's run (`evals/run.ts:300`). It must not be worse by more than the margin, `DEFAULT_MARGIN` (0.1) unless `--margin` gives another (D13). With 33 cases, 33 of 33 on both sides cannot pass at 0.1. The report says so and names the smallest margin that could pass, 0.105 for 33 cases.
 - Each other pipeline variant is gated against `full` on `pairwise-original`, so the report shows whether the stage it leaves out contributes.
 
 The run's verdict is the one of `full` when it ran, else the worst of the variants'. Pieces with nothing to judge (a rewrite equal to its reference) and failed judge calls stay out of the rates and are counted in the report.

@@ -8,7 +8,11 @@
  * - no-style: without S4 (RewriteOptions.skipStyle);
  * - no-examples: style-refs' examples left out of the prompt (an empty `examples` in the refs);
  * - single-call: the cost and quality baseline of design 4.10, plan and edit in one call
- *   (singleCall() below, a minimal target over prompt.ts and outputs.ts, not a copy of rewrite());
+ *   (singleCall() below, a minimal target over the stage's call and outputs.ts, not a copy of
+ *   rewrite()), with none of the checks;
+ * - single-guarded: rewrite() with strategy 'single', the same one call followed by the same S5,
+ *   judge, S6 and S7 as the pipeline (decided 16/11/2026 after run 3, where single-call matched the
+ *   pipeline in the blind judge but lost a real name);
  * - edit-sonnet-5-5: rewrite.edit on another model, sent as the gateway request's own `config`
  *   (the gateway's way to try a model "without touching production", gateway/src/config.ts), so
  *   every variant shares one gateway, one ledger and one set of caps.
@@ -36,13 +40,13 @@ import {
 } from '../../gateway/src/index.ts';
 import { applyEdits } from '../src/edits.ts';
 import { restoreData } from '../src/injection.ts';
-import { editProblem, EditReply } from '../src/outputs.ts';
-import { singleCallPrompt, type PromptRefs } from '../src/prompt.ts';
+import { editProblem } from '../src/outputs.ts';
+import type { PromptRefs } from '../src/prompt.ts';
 import { rewrite } from '../src/rewrite.ts';
 import { analyse, earlyExit, prepare } from '../src/stages/analyse.ts';
 import { paragraphUnits } from '../src/stages/check.ts';
-import { metered, STAGE_MAX_TOKENS, type Usage } from '../src/stages/model.ts';
-import { defaultMode, RewriteInput, type Edit, type Genre, type Lang, type Mode, type RewriteResult } from '../src/types.ts';
+import { metered, singleStage, type Usage } from '../src/stages/model.ts';
+import { defaultMode, RewriteInput, type Edit, type Genre, type Lang, type Mode, type RewriteResult, type Strategy } from '../src/types.ts';
 
 /** The writing tasks a variant may move to another model. The judge stays put (see pipelineVariant). */
 export const OVERRIDABLE_TASKS = ['rewrite.plan', 'rewrite.edit', 'rewrite.style'] as const;
@@ -53,6 +57,8 @@ export interface PipelineVariant {
   readonly kind: 'pipeline' | 'single-call';
   /** Without S4. */
   readonly skipStyle?: boolean;
+  /** rewrite()'s strategy, for a pipeline variant. Default 'staged'. */
+  readonly strategy?: Strategy;
   /** Without style-refs' examples in the prompt. */
   readonly withoutExamples?: boolean;
   /** Model and effort per writing task, sent as the request's config instead of the task config. */
@@ -62,15 +68,18 @@ export interface PipelineVariant {
 /**
  * Checks a variant. The fact judge is not overridable: its client checks its call settings
  * against the static task config (model-client.ts), so a judge on another model would be measured
- * under the wrong label. Nor is a pipeline knob on the single-call target, which has no S4.
+ * under the wrong label. Nor is a pipeline knob on the single-call target or on the 'single'
+ * strategy, which have no plan or S4, nor a strategy on the single-call target, which is not rewrite().
  */
 export function pipelineVariant(v: PipelineVariant): PipelineVariant {
   if (!/^[a-z0-9][a-z0-9.-]*$/.test(v.id)) throw new Error(`variant id ${JSON.stringify(v.id)} is not kebab-case`);
   for (const task of Object.keys(v.tasks ?? {})) {
     if (!(OVERRIDABLE_TASKS as readonly string[]).includes(task)) throw new Error(`variant ${v.id} overrides ${task}; only ${OVERRIDABLE_TASKS.join(', ')} may move to another model`);
   }
-  if (v.kind === 'single-call' && (v.skipStyle === true || v.tasks?.['rewrite.plan'] !== undefined || v.tasks?.['rewrite.style'] !== undefined)) {
-    throw new Error(`variant ${v.id}: the single-call target has no plan or style stage`);
+  if (v.kind === 'single-call' && v.strategy !== undefined) throw new Error(`variant ${v.id}: the single-call target is not rewrite() and takes no strategy`);
+  const oneCall = v.kind === 'single-call' || v.strategy === 'single';
+  if (oneCall && (v.skipStyle === true || v.tasks?.['rewrite.plan'] !== undefined || v.tasks?.['rewrite.style'] !== undefined)) {
+    throw new Error(`variant ${v.id}: a single call has no plan or style stage`);
   }
   return v;
 }
@@ -85,6 +94,7 @@ export const VARIANTS: readonly PipelineVariant[] = (
     { id: 'no-style', kind: 'pipeline', skipStyle: true },
     { id: 'no-examples', kind: 'pipeline', withoutExamples: true },
     { id: 'single-call', kind: 'single-call' },
+    { id: 'single-guarded', kind: 'pipeline', strategy: 'single' },
     { id: 'edit-sonnet-5-5', kind: 'pipeline', tasks: { 'rewrite.edit': { model: 'claude-sonnet-5-5', effort: 'medium' } } },
   ] satisfies PipelineVariant[]
 ).map(pipelineVariant);
@@ -116,7 +126,9 @@ export interface SingleCallOptions {
 /**
  * The single-call baseline: S0, S1 and S1b as in rewrite(), then one call that plans and edits,
  * and the edits that pass the model-edit checks placed by applyEdits(). No S5, S6, extra round or
- * judge: it is the "one prompt" the pipeline has to beat, so it gets nothing the stages add.
+ * judge: it is the "one prompt" the pipeline has to beat, so it gets nothing the stages add. Its
+ * call is the one rewrite() makes with strategy 'single' (singleStage), so the two variants differ
+ * only in the guards.
  */
 export async function singleCall(raw: RewriteInput, options: SingleCallOptions): Promise<SingleCallResult> {
   const a = analyse(prepare(RewriteInput.parse(raw)));
@@ -124,17 +136,9 @@ export async function singleCall(raw: RewriteInput, options: SingleCallOptions):
   if (early !== null) return { kind: 'single-call', rewritten: early.rewritten, applied: 0, refused: 0, usage: { calls: 0, costUsd: 0 }, ...(early.message === undefined ? {} : { message: early.message }) };
   const usage: Usage = { calls: 0, costUsd: 0 };
   const gateway = metered(options.gateway, usage);
-  const prompt = singleCallPrompt({ input: a.input, register: a.register, refs: options.refs }, a.lint.findings);
-  const reply = await gateway.structured(EditReply, {
-    task: prompt.task,
-    userId: options.userId ?? null,
-    jobId: options.jobId ?? null,
-    promptVersion: prompt.promptVersion,
-    maxTokens: STAGE_MAX_TOKENS['rewrite.edit'],
-    system: prompt.system,
-    messages: prompt.messages,
-  });
-  const edits: Edit[] = reply.data.edits.map((e) => ({ ...e, before: restoreData(e.before), after: restoreData(e.after) }));
+  const prompt = { input: a.input, register: a.register, refs: options.refs };
+  const reply = await singleStage({ gateway, prompt, userId: options.userId ?? null, jobId: options.jobId ?? null }, a.lint.findings);
+  const edits: Edit[] = reply.map((e) => ({ ...e, before: restoreData(e.before), after: restoreData(e.after) }));
   const valid = edits.filter((e) => editProblem(e) === null);
   const units = a.mode === 'reescritura' ? paragraphUnits(a.text, a.sentences) : a.sentences;
   const placed = applyEdits(a.text, units, valid, { keep: a.input.keep ?? [] });
@@ -148,7 +152,7 @@ export interface PieceUsage {
   readonly costUsd: number | null;
   /** Summed over the calls that returned; a reply the schema refused reports its cost but not its tokens. */
   readonly tokens: TokenTotals;
-  /** S3 ran its second round (design 4.4 S6). Always false for the single-call target. */
+  /** S3 ran its second round (design 4.4 S6). Always false for the single-call target and the 'single' strategy. */
   readonly extraRound: boolean;
 }
 
@@ -243,14 +247,14 @@ export async function runPipelines(cases: readonly EvalCase[], variants: readonl
         calls: meter.calls,
         costUsd: meter.costUsd,
         tokens: { ...meter.tokens },
-        // S3 is one call; a second one on rewrite.edit is its extra round.
+        // S3 is one call; a second one on rewrite.edit is its extra round. The single strategy makes one.
         extraRound: v.kind === 'pipeline' && meter.editCalls > 1,
       });
       let record: PieceRecord;
       let stop: unknown = null;
       try {
         const result: (RewriteResult & { kind: 'pipeline' }) | SingleCallResult =
-          v.kind === 'single-call' ? await singleCall(c.input, common) : { kind: 'pipeline', ...(await rewrite(c.input, { ...common, skipStyle: v.skipStyle === true })) };
+          v.kind === 'single-call' ? await singleCall(c.input, common) : { kind: 'pipeline', ...(await rewrite(c.input, { ...common, skipStyle: v.skipStyle === true, ...(v.strategy === undefined ? {} : { strategy: v.strategy }) })) };
         record = { ...base, status: 'done', rewritten: result.rewritten, result, usage: usage() };
       } catch (error) {
         const e = error instanceof Error ? error : new Error(String(error));
