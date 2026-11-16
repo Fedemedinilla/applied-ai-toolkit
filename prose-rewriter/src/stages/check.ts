@@ -17,7 +17,7 @@
  */
 import { judgeWith } from '../../../evals/src/index.ts';
 import { applyEdits, renderEdits, type AppliedEdit, type Sentence, type TextRange } from '../edits.ts';
-import { checkEdit, type EditCheck } from '../facts.ts';
+import { checkEdit, factInvariant, type EditCheck } from '../facts.ts';
 import { factSheet, planReverts, rewritePiece, rewriteRubric, type RevertPlan } from '../rubric.ts';
 import type { Edit, Flag, JudgeClient } from '../types.ts';
 import { voiceViolations } from '../voice.ts';
@@ -101,28 +101,64 @@ export function place(a: Analysis, units: readonly Sentence[], proposals: readon
 }
 
 /**
- * S5 in code: checkEdit() on each new live proposal, inside its unit of the original. The other
- * sentences that unit covers count as gone while it is checked, so a drop is only accepted when
- * the fact stays outside the reworded paragraph.
+ * S5 in code (design 4.6 step 2), on each new live proposal in the order made, against the
+ * proposals already checked and still live, never the original alone:
+ *
+ * - checkEdit() inside the edit's unit of the original; a drop stands only if the fact stays in
+ *   the rest of the text as those proposals leave it (the unit's other sentences count as gone).
+ *   Two drops that each point at the other sentence cannot both stand: the second one checked
+ *   sees the first applied;
+ * - then O ⊆ R ⊆ O ∪ C on those proposals with and without this one: an edit that leaves the text
+ *   stating a fact neither O nor C states, or a number more often than O states it, is reverted
+ *   on its own, so the invention never reaches S7.
  */
-export function checkFacts(a: Analysis, units: readonly Sentence[], fresh: readonly Proposal[]): void {
+export function checkFacts(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], fresh: readonly Proposal[]): void {
+  const pending = new Set(fresh);
   for (const p of fresh) {
+    pending.delete(p);
     if (p.status !== 'live' || p.before === undefined || p.after === undefined) continue;
     const unit = units.find((u) => u.id === p.edit.sentenceId);
     if (unit === undefined) continue;
-    const sentences = a.sentences.map((s) => (s.id === unit.id ? unit.text : s.start >= unit.start && s.end <= unit.end ? '' : s.text));
+    const others = proposals.filter((q) => q !== p && q.status === 'live' && !pending.has(q));
     const check = checkEdit({ ...p.edit, before: p.before, after: p.after }, {
       O: a.text,
       C: a.sources,
-      sentences,
+      sentences: unitAndRest(a, units, unit, others),
       ...a.extractOptions,
     });
     p.check = check;
     if (check.status === 'reverted') {
       p.status = 'reverted';
       p.reason = `facts: ${check.message}`;
+      continue;
+    }
+    const extra = (set: readonly Proposal[]) => factInvariant(a.text, rendered(a, units, set), a.sources, [], a.extractOptions).extra;
+    const withIt = extra([...others, p]);
+    const added = new Set(surplus(extra(others).map((f) => f.key), withIt.map((f) => f.key)));
+    if (added.size > 0) {
+      const facts = withIt.filter((f) => added.has(f.key));
+      const list = [...new Set(facts.map((f) => f.text))].join(', ');
+      p.check = { status: 'reverted', reason: 'invented', facts, message: `with it the text states ${list} beyond what the text and the CV state` };
+      p.status = 'reverted';
+      p.reason = `facts: ${p.check.message}`;
     }
   }
+}
+
+/**
+ * The sentences checkEdit() reads for an edit on `unit`: the unit itself at its id, and, at an
+ * index no sentence has, the rest of the text with `others` applied and the unit cut out. Every
+ * other index is blank, so "elsewhere" is exactly that rest.
+ */
+function unitAndRest(a: Analysis, units: readonly Sentence[], unit: Sentence, others: readonly Proposal[]): string[] {
+  const outside = others.filter((q) => q.span !== undefined && (q.span.end <= unit.start || q.span.start >= unit.end));
+  const placed = liveEdits(a, units, outside);
+  const text = renderEdits(a.text, placed);
+  const start = unit.start + placed.filter((e) => e.span.end <= unit.start).reduce((shift, e) => shift + e.after.length - e.before.length, 0);
+  const sentences = a.sentences.map(() => '');
+  sentences[unit.id] = unit.text;
+  sentences.push(`${text.slice(0, start)}\n${text.slice(start + unit.text.length)}`);
+  return sentences;
 }
 
 const levelOne = (a: Analysis, text: string): string[] =>
