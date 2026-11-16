@@ -1,7 +1,8 @@
 /**
- * The public entry of prose-rewriter. Phase F0 published the contract; F4 adds the pure core
- * (voice profile, facts, edits, injection). rewrite() itself comes in F5, with the stages through
- * the gateway.
+ * The public entry of prose-rewriter. Phase F0 published the contract; F4 publishes the pure core:
+ * the voice profile (voice.ts), the fact check (facts.ts), the sentences, edits and diff
+ * (edits.ts) and the injection guard (injection.ts). No model, no gateway and no I/O in any of
+ * them. rewrite() comes in F5, with the stages S0 to S7 through the gateway and the CLI.
  */
 export {
   Change,
@@ -73,3 +74,11 @@ export {
   textParts,
   type TextRange,
 } from './edits.ts';
+export {
+  DATA_TAGS,
+  type DataSource,
+  injectionFlags,
+  restoreData,
+  unwrapData,
+  wrapData,
+} from './injection.ts';
