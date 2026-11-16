@@ -5,7 +5,7 @@
     "lang": "es",
     "variety": "rioplatense",
     "register": "formal",
-    "before": "Estimados:\n\nMe dirijo a ustedes con el fin de postularme a la búsqueda de desarrolladora web. Soy una profesional apasionada, proactiva y orientada a resultados, con amplia experiencia en el desarrollo de soluciones innovadoras que agregan valor. En el mundo actual, la transformación digital es fundamental, y estoy convencida de que mi perfil es ideal para potenciar sus proyectos.\n\nSin otro particular, quedo a la espera de su respuesta.\n\nSaludos cordiales,\nValeria Sosa",
+    "before": "Estimados:\n\nMe dirijo a ustedes con el fin de postularme a la búsqueda de desarrolladora web con Astro de Estudio Ñandú. Soy una profesional apasionada, proactiva y orientada a resultados, con amplia experiencia en el desarrollo de soluciones innovadoras que agregan valor. En el mundo actual, la transformación digital es fundamental, y estoy convencida de que mi perfil es ideal para potenciar sus proyectos.\n\nSin otro particular, quedo a la espera de su respuesta.\n\nSaludos cordiales,\nValeria Sosa",
     "after": "Hola, equipo de Estudio Ñandú:\n\nMe postulo a la búsqueda de desarrolladora web con Astro. Desde marzo de 2023 trabajo por cuenta propia. Rehice en Astro el sitio de la Panadería Los Álamos y la página principal pasó de 4,1 s a 1,6 s de carga en un celular de gama baja, medido con la misma herramienta antes y después. Para la Ferretería Quintana armé un formulario de pedidos con Supabase que recibe unos 40 pedidos por semana.\n\nTambién mantengo tres sitios WordPress, con copias semanales y actualizaciones mensuales. Antes, en el Estudio Contable Ruiz y Asociados, migré los mails de 12 personas a un dominio propio sin perder correo.\n\nSi les sirve, les muestro los dos proyectos en una llamada corta.\n\nValeria Sosa",
     "notes": "The before presents itself with adjectives and closing formulas. The after says which search it answers and gives the CV results with their numbers and how they were measured. No fact goes beyond the CV; the studio is invented, like the CV.",
     "fictional": true
@@ -16,9 +16,9 @@
     "lang": "es",
     "variety": "rioplatense",
     "register": "neutral",
-    "before": "Hola Martín, ¿cómo estás? Espero que muy bien. Te escribo para presentarme y comentarte que me encantaría poder colaborar con ustedes en lo que necesiten. Cuento con amplia experiencia y sólidos conocimientos en diversas tecnologías de vanguardia, lo cual me permite brindar soluciones integrales de calidad. Si tienes un momento, quedo a tu entera disposición.\n\nSaludos,\nValeria",
+    "before": "Hola Martín, ¿cómo estás? Espero que muy bien. Te escribo para presentarme y comentarte que me encantaría poder colaborar con ustedes en el mantenimiento de WordPress o en lo que necesiten, si es que toman desarrolladoras freelance. Cuento con amplia experiencia y sólidos conocimientos en diversas tecnologías de vanguardia, lo cual me permite brindar soluciones integrales de calidad. Si tienes un momento el jueves o el viernes, quedo a tu entera disposición.\n\nSaludos,\nValeria",
     "after": "Hola, Martín:\n\nTe escribo para preguntarte si en la agencia toman desarrolladoras freelance para mantenimiento de WordPress. Hoy mantengo tres sitios con copias semanales y actualizaciones mensuales, y desde marzo de 2023 trabajo por cuenta propia con Astro y Supabase.\n\nSi tenés algún proyecto así, ¿hablamos el jueves o el viernes?\n\nValeria Sosa",
-    "notes": "The before slips into tuteo in a rioplatense text and asks for nothing. The after asks a concrete question in its first sentence, gives the CV fact behind it and offers two days.",
+    "notes": "The before slips into tuteo in a rioplatense text and hides its question in an offer to collaborate. The after asks that question in its first sentence, gives the CV fact behind it and keeps the two days the writer offered.",
     "fictional": true
   },
   {
@@ -27,9 +27,9 @@
     "lang": "es",
     "variety": "rioplatense",
     "register": "neutral",
-    "previousMessage": "Hola, Martín:\n\nTe escribo para preguntarte si en la agencia toman desarrolladoras freelance para mantenimiento de WordPress. Hoy mantengo tres sitios con copias semanales y actualizaciones mensuales.\n\nValeria Sosa Pereyra",
+    "previousMessage": "Hola, Martín:\n\nTe escribo para preguntarte si en la agencia toman desarrolladoras freelance para mantenimiento de WordPress. Hoy mantengo tres sitios con copias semanales y actualizaciones mensuales.\n\nValeria Sosa",
     "before": "Hola Martín! Perdón que te moleste de nuevo, solo quería saber si pudiste leer mi mail anterior. Quedo atenta a cualquier novedad, cualquier cosa me avisás! Muchas gracias de antemano!!\n\nSaludos,\nValeria",
-    "after": "Hola, Martín:\n\nEl martes te pregunté si la agencia toma desarrolladoras freelance para mantenimiento de WordPress. Si ahora no hay nada, ¿me avisás y te vuelvo a escribir en unos meses? Si hay algo, te paso el detalle de los tres sitios que mantengo.\n\nValeria Sosa",
+    "after": "Hola, Martín:\n\nHace unos días te pregunté si la agencia toma desarrolladoras freelance para mantenimiento de WordPress. Si ahora no hay nada, ¿me avisás y te vuelvo a escribir en unos meses? Si hay algo, te paso el detalle de los tres sitios que mantengo.\n\nValeria Sosa",
     "notes": "The before apologises and asks for news without saying what the earlier message asked. The after recalls it in one line and leaves two answers that are easy to give.",
     "fictional": true
   },
