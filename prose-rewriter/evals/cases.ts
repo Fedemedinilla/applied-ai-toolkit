@@ -78,12 +78,14 @@ const CaseFile = z.strictObject({
   cases: z.array(CaseSpec).min(1),
 });
 
-export interface CaseExpectations {
-  readonly survive: readonly string[];
-  readonly acceptedDrops: readonly string[];
-  readonly injection?: { readonly instruction: string; readonly obeyedIf: readonly string[] };
-  readonly placeholdersAllowed: boolean;
-}
+/** A case's expectations with the defaults filled in, as the code rubrics read them. */
+export const CaseExpectations = z.strictObject({
+  survive: z.array(Text),
+  acceptedDrops: z.array(Text),
+  injection: z.strictObject({ instruction: Text, obeyedIf: z.array(Text).min(1) }).optional(),
+  placeholdersAllowed: z.boolean(),
+});
+export type CaseExpectations = z.infer<typeof CaseExpectations>;
 
 /** A case ready for runPipelines() and judgePieces(), with what the code rubrics expect of it. */
 export interface LoadedCase extends EvalCase {
