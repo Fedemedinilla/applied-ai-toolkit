@@ -1,7 +1,7 @@
 // The rewriter's own fact rubric (design 4.6 step 3): the judge reads the rewrite line by line
 // against the CV (the fact sheet) and the user's original text (the brief). Its replies come from a
-// script through a real gateway, so the call shape, the line rule and the revert plan are tested
-// offline. The CV and every text here are fictional (evals/cases/cv/en.md).
+// script through a real gateway, as text replies since the judge makes text calls, so the call
+// shape, the line rule and the revert plan are tested offline. The CV and every text here are fictional (evals/cases/cv/en.md).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { JudgeError, judgeWith, LineSupport } from '../../evals/src/index.ts';
@@ -97,7 +97,7 @@ describe('the judge through the gateway', () => {
   it('returns a verdict that covers every line', async () => {
     const { text } = rewriteWith([{ before: 'I would like to help your team.', after: 'I want to help your team.' }]);
     const count = judgeLines(text, 'en').length;
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ data: verdict(Array<LineSupport>(count).fill('no-claim')) }] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: JSON.stringify(verdict(Array<LineSupport>(count).fill('no-claim'))) }] });
     const client = gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
     const judged = await judgeWith(rewriteRubric, client, rewritePiece({ original: ORIGINAL, rewritten: text, lang: 'en' }), factSheet({ cvMarkdown: CV }), 1, settings);
     expect(judged.lines).toHaveLength(count);
@@ -110,7 +110,7 @@ describe('the judge through the gateway', () => {
     const count = judgeLines(text, 'en').length;
     const missing = verdict(Array<LineSupport>(count).fill('no-claim'));
     missing.lines.splice(1, 1);
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ data: missing }] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: JSON.stringify(missing) }] });
     const client = gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
     const judged = judgeWith(rewriteRubric, client, rewritePiece({ original: ORIGINAL, rewritten: text, lang: 'en' }), factSheet({ cvMarkdown: CV }), 1, settings);
     await expect(judged).rejects.toBeInstanceOf(JudgeError);
@@ -122,7 +122,7 @@ describe('the judge through the gateway', () => {
     const count = judgeLines(text, 'en').length;
     const twice = verdict(Array<LineSupport>(count).fill('no-claim'));
     twice.lines[1] = { ...twice.lines[0]!, line: 1 };
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ data: twice }] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: JSON.stringify(twice) }] });
     const client = gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
     await expect(
       judgeWith(rewriteRubric, client, rewritePiece({ original: ORIGINAL, rewritten: text, lang: 'en' }), factSheet({ cvMarkdown: CV }), 1, settings),
@@ -140,7 +140,7 @@ describe('planReverts', () => {
     const lines = judgeLines(text, 'en');
     const invented = lineOf(text, 'team of 12');
     const supports = lines.map((l) => (l.line === invented ? 'invented' : 'no-claim') as LineSupport);
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ data: verdict(supports, { [invented]: 'the CV names no team of 12' }) }] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: JSON.stringify(verdict(supports, { [invented]: 'the CV names no team of 12' })) }] });
     const client = gatewayModelClient(scripted.gateway, { task: 'rewrite.judge', userId: USER, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
     const judged = await judgeWith(rewriteRubric, client, rewritePiece({ original: ORIGINAL, rewritten: text, lang: 'en' }), factSheet({ cvMarkdown: CV }), 1, rewriteRubric.call);
 
