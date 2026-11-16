@@ -4,8 +4,9 @@
  *
  * - S2 plan: what to fix per sentence, from S1's findings; it writes no text;
  * - S3 edit: one edit per item of the plan, and at most one extra round (S6) with the level 1
- *   findings that remain, whose history is rebuilt from what the first round parsed, never from
- *   the raw reply (design 4.9);
+ *   findings that remain, whose history is rebuilt from the edits kept from what the first round
+ *   parsed, never from the raw reply (design 4.9). The gateway parses only the replies' shape
+ *   (EditReply, styleReply); rewrite() runs the per-edit checks, so one bad edit is refused alone;
  * - S4 style: edits that cite a principle, at most STYLE_MAX_EDITS (outputs.ts). Skipped in
  *   `minimo`, and when the prompt shows no principle to cite, since then the only valid reply is
  *   no edit and the call would buy nothing.
