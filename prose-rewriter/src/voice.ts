@@ -21,17 +21,33 @@ const words = (list: readonly string[]): RegExp => new RegExp(`${B}(?:${list.joi
  * Local copies of slop-lint's VOSEO and TUTEO (slop-lint/src/rules.ts), plus the pronouns. slop-lint
  * exports them from rules.ts only, which is not on the public surface prose-rewriter may import
  * (import-fences/repo.config.ts, LIBRARY_USES), so they are copied here instead of fenced through.
+ * The tuteo forms that are also voseo without its accent ("sabes", "haces", "necesitas") are kept
+ * apart in AMBIGUOUS: a profile has to read a rioplatense WhatsApp written without tildes.
  */
 const VOSEO = words([
   'querés', 'podés', 'tenés', 'sabés', 'sos', 'hacés', 'decís', 'venís', 'pensás', 'necesitás',
   'contame', 'escribime', 'mirá', 'fijate', 'avisame', 'decime', 'vos',
 ]);
 const TUTEO = words([
-  'quieres', 'puedes', 'tienes', 'sabes', 'eres', 'haces', 'dices', 'vienes', 'piensas', 'necesitas',
+  'quieres', 'puedes', 'tienes', 'eres', 'dices', 'vienes', 'piensas',
   'cuéntame', 'escríbeme', 'fíjate', 'avísame', 'dime', 'tú', 'contigo',
 ]);
-/** Only the pronoun: the third-person verb forms of usted are the same as he or she, so they say nothing. */
-const USTED = words(['usted']);
+/**
+ * Forms that are tuteo with their accent left out and voseo without it ("sabes" is "sabés"
+ * written the way a WhatsApp often is). They count for the treatment the rest of the text shows,
+ * and for tuteo only in a text that writes its accents.
+ */
+const AMBIGUOUS = words(['sabes', 'haces', 'necesitas']);
+/**
+ * Usted: the pronoun, and the formulas a formal letter uses without it ("Le escribo", "Quedo a su
+ * disposición", "consultarle"). The bare third-person verb forms are the same as he or she, so
+ * they say nothing.
+ */
+const USTED = words([
+  'usted', 'le escribo', 'le consulto', 'le comento', 'le agradezco', 'le agradecer[ií]a', 'le saludo', 'le saluda', 'le env[ií]o',
+  'le adjunto', 'le pido', 'su disposici[oó]n', 'su respuesta', 'su consulta', 'su atenci[oó]n', 'disculpe', 'no dude',
+  '(?:consultar|escribir|enviar|comentar|agradecer|contactar|informar|saludar|preguntar|pedir|adjuntar|mandar)le',
+]);
 const CHE = words(['che']);
 /** Pictographs, without ©, ® and ™, which a business text writes as signs, not as emoji. */
 const EMOJI = /(?![©®™])\p{Extended_Pictographic}/gu;
@@ -134,8 +150,14 @@ function treatmentOf(voseo: number, tuteo: number, usted: number): Treatment {
 export function voiceProfile(source: string, lang: Lang): VoiceProfile {
   const text = source.normalize('NFC');
   const es = lang === 'es';
-  const voseo = es ? count(text, VOSEO) : 0;
-  const tuteo = es ? count(text, TUTEO) : 0;
+  const accents = count(text, ACCENT);
+  const sure = { voseo: es ? count(text, VOSEO) : 0, tuteo: es ? count(text, TUTEO) : 0 };
+  const ambiguous = es ? count(text, AMBIGUOUS) : 0;
+  // An unaccented "sabes" follows the unambiguous forms; alone, it is tuteo only where the writer uses accents.
+  const toVoseo = sure.voseo > 0 && sure.tuteo === 0;
+  const toTuteo = (sure.tuteo > 0 && sure.voseo === 0) || (sure.voseo === 0 && sure.tuteo === 0 && accents > 0);
+  const voseo = sure.voseo + (toVoseo ? ambiguous : 0);
+  const tuteo = sure.tuteo + (toTuteo ? ambiguous : 0);
   const usted = es ? count(text, USTED) : 0;
   const { greeting, signOff, body } = frame(text);
   const lengths = sentenceLengths(body);
@@ -151,7 +173,7 @@ export function voiceProfile(source: string, lang: Lang): VoiceProfile {
       usted,
       invertedMarks: count(text, /[¿¡]/gu),
       closingMarks: count(text, /[?!]/gu),
-      accents: count(text, ACCENT),
+      accents,
       emoji: count(text, EMOJI),
       che: es ? count(text, CHE) : 0,
       contractions: es ? 0 : count(text, CONTRACTION),
@@ -235,13 +257,12 @@ export function voiceViolations(original: string, rewritten: string, context: Vo
     if (before === 0 && after > 0) found.push({ kind, message });
   };
   if (context.lang === 'es') {
-    // A new treatment only counts against a text that addressed the reader: "none" has no voice to break.
-    if (o.treatment !== 'none') {
-      for (const t of ['voseo', 'tuteo', 'usted'] as const) {
-        if (o.counts[t] === 0 && r.counts[t] > 0) {
-          found.push({ kind: 'treatment', message: `The original uses ${o.treatment}; the rewrite adds ${t}.` });
-          break;
-        }
+    // A treatment the original does not use is added voice, also in a text that addressed no one.
+    for (const t of ['voseo', 'tuteo', 'usted'] as const) {
+      if (o.counts[t] === 0 && r.counts[t] > 0) {
+        const before = o.treatment === 'none' ? 'The original addresses no one directly' : `The original uses ${o.treatment}`;
+        found.push({ kind: 'treatment', message: `${before}; the rewrite adds ${t}.` });
+        break;
       }
     }
     added('inverted-marks', o.counts.invertedMarks, r.counts.invertedMarks, 'The original does not use ¿ or ¡; the rewrite adds them.');
