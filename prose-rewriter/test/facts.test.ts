@@ -438,3 +438,24 @@ describe('lower-case evidence for a first word', () => {
     expect(checkEdit(edit, { O, C: { cv: '' }, sentences, lang: 'es' })).toMatchObject({ status: 'reverted', reason: 'lost' });
   });
 });
+
+describe('a name at the start of a sentence that is also a common word', () => {
+  // A word written in lower case somewhere (O, C, R or the edit) said nothing about the same word
+  // capitalized at a sentence start: "Mark referred me" and "hit the mark" are two words.
+  it('reports a lost name although O or C writes the same word in lower case', () => {
+    const lost = (O: string, R: string, C: FactSources, opts: { lang: 'es' | 'en' }) => factInvariant(O, R, C, [], opts).missing.map((f) => f.text);
+    expect(lost('Hi. Mark referred me.', 'Hi. A colleague referred me.', { cv: 'Left a mark on the team.' }, EN)).toEqual(['Mark']);
+    expect(lost('Hi. Mark referred me. I hit the mark on every launch.', 'Hi. A colleague referred me. I shipped every launch.', { cv: '' }, EN)).toEqual(['Mark']);
+    expect(lost('Hola. Luz me pasó tu contacto. Hago fotos con luz natural.', 'Hola. Me pasaron tu contacto. Hago fotos.', { cv: '' }, ES)).toEqual(['Luz']);
+  });
+
+  it('reports an invented name although the rewrite also writes the word in lower case', () => {
+    const added = (O: string, R: string, opts: { lang: 'es' | 'en' }) => factInvariant(O, R, { cv: '' }, [], opts).extra.map((f) => f.text);
+    expect(added('Hi. Your team referred me. Let me know.', 'Hi. Hope referred me. I hope we can talk.', EN)).toEqual(['Hope']);
+    expect(added('Hola. Me pasaron tu contacto.', 'Hola. Paz me pasó tu contacto. Lo dejo en paz.', ES)).toEqual(['Paz']);
+    expect(added('Hola. Me pasaron tu contacto.', 'Hola. Sol me pasó tu contacto. Trabajo de sol a sol.', ES)).toEqual(['Sol']);
+    const O = 'Hi. Your team referred me.';
+    const edit = { sentenceId: 1, before: 'Your team referred me.', after: 'Hope referred me, and I hope we talk.', reason: 'test' };
+    expect(checkEdit(edit, { O, C: { cv: '' }, sentences: ['Hi.', 'Your team referred me.'], lang: 'en' })).toMatchObject({ status: 'reverted', reason: 'invented' });
+  });
+});
