@@ -182,7 +182,7 @@ export function systemBlocks(c: PromptContext): string[] {
 }
 
 /** The text as numbered sentences, as Edit.sentenceId and PlanItem.sentenceId count them. */
-function textBlock(sentences: readonly Sentence[]): string {
+function textBlock(sentences: readonly Pick<Sentence, 'id' | 'text'>[]): string {
   return ['TEXT (one sentence per line; the number in brackets is its sentenceId and is not part of the text)', wrapData('texto', sentences.map((s) => `[${s.id}] ${s.text}`).join('\n'))].join('\n');
 }
 
@@ -257,18 +257,28 @@ export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<type
   };
 }
 
-/** S4: style edits, each citing a principle shown in block 1. `principleIds` are the ones it may cite. */
-export function stylePrompt(c: PromptContext): StagePrompt<ReturnType<typeof styleOutput>> & { readonly principleIds: readonly string[] } {
-  const sentences = splitSentences(c.input.text, c.input.lang);
+/** S4's own version: its TEXT became the text S3 left (F6b), a change of its task alone. */
+const STYLE_PROMPT_VERSION = '3';
+
+/**
+ * S4: style edits, each citing a principle shown in block 1. `principleIds` are the ones it may cite.
+ * `sentences` is the text as S3's edits left it, numbered with the original's sentenceIds (a
+ * sentence S3 removed is left out); by default, the input's own sentences.
+ */
+export function stylePrompt(
+  c: PromptContext,
+  sentences: readonly Pick<Sentence, 'id' | 'text'>[] = splitSentences(c.input.text, c.input.lang),
+): StagePrompt<ReturnType<typeof styleOutput>> & { readonly principleIds: readonly string[] } {
   const principleIds = lessons(c, 'do').map((p) => p.id);
   const task = [
     'TASK: style',
-    `Propose at most ${STYLE_MAX_EDITS} edits for rhythm, a verb before an abstract noun, economy and a direct opening. Each edit cites in "principleId" the id of one PRINCIPLE above, quotes "before" exactly from its sentence (without its number) and stays inside that sentence.`,
+    'The TEXT below is the text after the edit step: its edits are already in it. Edit that text as it is.',
+    `Propose at most ${STYLE_MAX_EDITS} edits for rhythm, a verb before an abstract noun, economy and a direct opening. Each edit cites in "principleId" the id of one PRINCIPLE above, quotes "before" exactly from its sentence as shown (without its number) and stays inside that sentence.`,
     'Change no fact. If no edit is worth making, reply with no edits.',
   ].join('\n');
   return {
     task: 'rewrite.style',
-    promptVersion: `rewrite-style@${PROMPT_VERSION}`,
+    promptVersion: `rewrite-style@${STYLE_PROMPT_VERSION}`,
     system: systemBlocks(c),
     messages: conversation(task, [textBlock(sentences), ...keepBlock(c.input)]),
     schema: styleOutput(principleIds),

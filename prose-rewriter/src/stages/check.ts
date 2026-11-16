@@ -26,7 +26,8 @@ import { lintAs, type Analysis } from './analyse.ts';
 /** One edit a model proposed, with what happened to it. `id` orders them: e1, e2, ... as made. */
 export interface Proposal {
   readonly id: string;
-  readonly edit: Edit;
+  /** As the model wrote it; for a style edit S4 wrote on the text S3 left, the edit of the original composeStyle() made of it. */
+  edit: Edit;
   readonly stage: 'edit' | 'style';
   /** 1 for S3 and S4, 2 for S3's extra round. */
   readonly round: 1 | 2;
@@ -38,6 +39,8 @@ export interface Proposal {
   after?: string;
   /** Why it was refused or reverted. */
   reason?: string;
+  /** The composed style edit that holds this one (stages/compose.ts); it comes back if that one is not applied. */
+  mergedInto?: string;
   /** checkEdit's verdict: invented and lost facts, and the keys of an accepted drop. */
   check?: EditCheck;
 }

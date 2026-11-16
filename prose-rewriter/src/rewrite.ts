@@ -2,9 +2,13 @@
  * rewrite(input, { gateway }) (design 4.11): the stages S0 to S7 of design 4.4, in order.
  *
  * 1. S0 and S1 (stages/analyse.ts); S1b returns before any model call.
- * 2. S2 plan, S3 edit and, outside `minimo` and unless `skipStyle` is set, S4 style (stages/model.ts). Every edit quotes the
- *    original text, so all of them are placed, checked and reverted against the same text.
- * 3. Placement, S5 in code and S6 (stages/check.ts) on the edits of S3 and S4.
+ * 2. S2 plan and S3 edit (stages/model.ts), then placement, S5 in code and S6 (stages/check.ts)
+ *    on S3's edits.
+ * 3. Outside `minimo` and unless `skipStyle` is set, S4 style on the text S3's checked edits left
+ *    (design 4.4: S3, then S4). stages/compose.ts turns each style edit into an edit of the
+ *    original, merged with the S3 edits it touches, so every edit kept quotes the original and is
+ *    placed, checked and reverted against the same text; placement, S5 in code and S6 run on the
+ *    merged edit, and if it does not stand the S3 edits it held come back.
  * 4. If level 1 findings remain, exactly one extra S3 round with them as a list, through the same
  *    placement, S5 and S6.
  * 5. S5's judge (D10: by default on email, follow-up and cover letter; on WhatsApp in `minimo`
@@ -28,6 +32,7 @@ import { gatewayModelClient } from './model-client.ts';
 import { editProblem } from './outputs.ts';
 import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
+import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
 import { editStage, extraEditStage, metered, planStage, sentenceAt, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
@@ -69,20 +74,32 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   const plan = await planStage(m, a.lint.findings);
   const first = await editStage(m, plan);
   const round1 = propose(first.edits, 'edit', 1);
-  const styled = a.mode === 'minimo' || options.skipStyle === true ? null : await styleStage(m);
-  check([...round1, ...propose(styled ?? [], 'style', 1)]);
+  check(round1);
+  if (a.mode !== 'minimo' && options.skipStyle !== true) {
+    const current = currentText(a, units, proposals);
+    const styled = await styleStage(m, current.sentences.filter((s) => s.text.trim() !== ''));
+    const composed = propose(styled ?? [], 'style', 1);
+    composeStyle(a, units, proposals, current, composed);
+    check(composed);
+    const back = restoreMerged(proposals, composed);
+    if (back.length > 0) check(back);
+  }
 
   let extraInvented = false;
   const remaining = remainingLevelOne(a, rendered(a, units, proposals), liveEdits(a, units, proposals));
   if (remaining.length > 0) {
     // History in the model's own words; the proposals hold the same edits with data tags restored.
-    const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live');
+    // An edit merged into a style edit is applied, inside it.
+    const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live' && round1[i]?.mergedInto === undefined);
     const round2 = propose(await extraEditStage(m, first, remaining, notApplied), 'edit', 2);
     // An extra-round edit with the sentence and quote of a live edit replaces it; if the new one
     // is not applied, the old one is placed and checked again.
     const replaced = new Map<Proposal, Proposal>();
     for (const p2 of round2) {
-      const p1 = proposals.find((q) => q.status === 'live' && q.round === 1 && q.edit.sentenceId === p2.edit.sentenceId && q.before === p2.edit.before.normalize('NFC'));
+      // Or a style edit holding it: the model quotes its own S3 edit, which a style edit merged.
+      const quote = p2.edit.before.normalize('NFC');
+      const holds = (q: Proposal): boolean => q.before === quote || proposals.some((h) => h.mergedInto === q.id && h.before === quote);
+      const p1 = proposals.find((q) => q.status === 'live' && q.round === 1 && q.edit.sentenceId === p2.edit.sentenceId && holds(q));
       if (p2.status !== 'live' || p1 === undefined) continue;
       p1.status = 'reverted';
       p1.reason = `replaced by ${p2.id} in the extra round`;

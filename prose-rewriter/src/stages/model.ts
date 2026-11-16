@@ -7,7 +7,8 @@
  *   findings that remain, whose history is rebuilt from the edits kept from what the first round
  *   parsed, never from the raw reply (design 4.9). The gateway parses only the replies' shape
  *   (EditReply, styleReply); rewrite() runs the per-edit checks, so one bad edit is refused alone;
- * - S4 style: edits that cite a principle, at most STYLE_MAX_EDITS (outputs.ts). Skipped in
+ * - S4 style: edits that cite a principle, at most STYLE_MAX_EDITS (outputs.ts), on the text as
+ *   S3's checked edits left it (stages/compose.ts maps them back to the original). Skipped in
  *   `minimo`, and when the prompt shows no principle to cite, since then the only valid reply is
  *   no edit and the call would buy nothing.
  *
@@ -155,9 +156,9 @@ export async function extraEditStage(m: ModelStages, first: EditRound, remaining
   }
 }
 
-/** S4, or null when it does not run (see the header). */
-export async function styleStage(m: ModelStages): Promise<Edit[] | null> {
-  const prompt = stylePrompt(m.prompt);
+/** S4 on the text as S3 left it (`sentences`, by the original's sentenceIds), or null when it does not run (see the header). */
+export async function styleStage(m: ModelStages, sentences: readonly Pick<Sentence, 'id' | 'text'>[]): Promise<Edit[] | null> {
+  const prompt = stylePrompt(m.prompt, sentences);
   if (prompt.principleIds.length === 0) return null;
   return (await call(m, { ...prompt, schema: styleReply(prompt.principleIds) })).edits;
 }
