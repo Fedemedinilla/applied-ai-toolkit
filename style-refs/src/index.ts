@@ -6,7 +6,8 @@
  *
  * Phase F0 of the design shipped the shapes and empty data. Phase F3 adds the licensing rules of
  * design section 4.8 to validateRefs (test/licensing.test.ts tries each one): an excerpt only from a
- * work in the public domain in the United States, where GitHub serves the repository; no excerpt
+ * work in the public domain in the United States, where GitHub serves the repository, and published
+ * in US_FREE_THROUGH or earlier, from the ebook its source names; no excerpt
  * of an Argentine author while the paid public domain of Decreto-ley 1224/58 is unresolved; a cap
  * of two sentences and a word count; text only from Gutenberg or Wikisource, never naming Project
  * Gutenberg; a translation only with its translator's year of death.
@@ -54,6 +55,12 @@ export type Variety = (typeof VARIETIES)[number];
 /** Design decision D11: an excerpt is at most two sentences and this many words. */
 export const EXCERPT_MAX_SENTENCES = 2;
 export const EXCERPT_MAX_WORDS = 45;
+
+/**
+ * The last year of publication that is free in the United States: since 2026-01-01, what was published
+ * in 1930 or earlier (design 4.8, after Duke CSPD). It moves one year each January; raise it then.
+ */
+export const US_FREE_THROUGH = 1930;
 
 /** Excerpt text comes only from these hosts (and their subdomains), without what they add to it. */
 export const TEXT_HOSTS = ['gutenberg.org', 'wikisource.org'] as const;
@@ -333,12 +340,23 @@ function sourceProblems(s: Source): Local[] {
   if (open && (s.use === 'principles' || s.use === 'excerpts') && s.attribution === undefined) {
     out.push({ path: 'attribution', message: `an open licence asks for attribution, and this source gives ${s.use} without one` });
   }
+  if (s.use === 'excerpts' && (s.published === null || s.published > US_FREE_THROUGH)) {
+    const year = s.published === null ? 'its year is unverified' : `it is ${s.published}`;
+    out.push({ path: 'published', message: `a source for excerpts must be published in ${US_FREE_THROUGH} or earlier to be free in the US, and ${year}` });
+  }
   if (s.use === 'excerpts' && s.status.us !== 'public-domain') out.push({ path: 'use', message: `a source for excerpts must be public-domain in the US, and it is ${s.status.us}` });
   if (s.kind === 'literary' && s.use !== 'excluded') {
     const { host, allowed } = textHost(s.url);
     if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
   }
   return out;
+}
+
+/** The ebook number of a gutenberg.org URL (/ebooks/N, /cache/epub/N/, /files/N/), or undefined. */
+function gutenbergEbook(url: string): string | undefined {
+  const u = new URL(url);
+  if (!textHost(url).host.endsWith('gutenberg.org')) return undefined;
+  return /^\/(?:ebooks|cache\/epub|files)\/(\d+)(?:[./]|$)/.exec(u.pathname)?.[1];
 }
 
 /** Sentences end at . ! ? or an ellipsis, before a space or the end; a closing quote may follow. */
@@ -376,5 +394,11 @@ function excerptProblems(e: Excerpt, source: Source | undefined): Local[] {
   if (/gutenberg/i.test(e.text)) out.push({ path: 'text', message: 'names Project Gutenberg; its licence lets the text go only without that name' });
   const { host, allowed } = textHost(e.url);
   if (!allowed) out.push({ path: 'url', message: `${host} is not ${TEXT_HOSTS.join(' or ')}` });
+  // A Gutenberg excerpt is checked against the ebook its source names, not a neighbour's text.
+  const ebook = gutenbergEbook(e.url);
+  const sourceEbook = source === undefined ? undefined : gutenbergEbook(source.url);
+  if (ebook !== undefined && sourceEbook !== undefined && ebook !== sourceEbook) {
+    out.push({ path: 'url', message: `Gutenberg ebook ${ebook}, and the source ${source?.id} is ebook ${sourceEbook}` });
+  }
   return out;
 }

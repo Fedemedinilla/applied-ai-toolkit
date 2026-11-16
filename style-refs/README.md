@@ -28,6 +28,7 @@ npm run check                # tsc --noEmit, strict
 `validateRefs()` enforces them and `test/licensing.test.ts` breaks each one on purpose:
 
 - An excerpt comes only from a source marked `excerpts` and in the public domain in the United States. An open licence is not enough, and `unverified` is not free.
+- That source was published in 1930 or earlier (`US_FREE_THROUGH`, what the United States frees as of 2026-01-01; it moves one year each January), and an unknown year counts as not free. A Gutenberg excerpt comes from the ebook its source names.
 - No excerpt of an Argentine author while the paid public domain of Decreto-ley 1224/58 is unresolved (design decision D12). Quiroga, Arlt, Mansilla and Sarmiento give principles in our own words; Arlt only for the casual register of WhatsApp.
 - A translation needs its translator and the year they died.
 - An excerpt has at most two sentences and 45 words (D11), its text comes from gutenberg.org or wikisource.org without what they add, and it never names Project Gutenberg, whose licence allows the text to travel only without that name.
