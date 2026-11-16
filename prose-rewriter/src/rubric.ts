@@ -23,6 +23,7 @@ import {
   type BlindContent,
   type BlindPiece,
   type JudgeRubric,
+  type ModelClient,
 } from '../../evals/src/index.ts';
 import { renderEdits, splitSentences, type AppliedEdit, type TextRange } from './edits.ts';
 import { wrapData } from './injection.ts';
@@ -30,7 +31,7 @@ import { callSettings } from './tasks.ts';
 import { defaultMode, Lang, type Flag, type RewriteInput } from './types.ts';
 
 /** Bumped whenever the instructions, the labels or the prompt layout change. */
-export const REWRITE_RUBRIC_VERSION = '1';
+export const REWRITE_RUBRIC_VERSION = '2';
 /** The gateway's promptVersion for the judge's calls: a fixed constant, never built from the input. */
 export const REWRITE_JUDGE_PROMPT_VERSION = `rewrite-judge@${REWRITE_RUBRIC_VERSION}`;
 
@@ -47,15 +48,43 @@ For every numbered line of REWRITE, decide where its content comes from:
 
 When you mark a line "invented", say in its note which claim nothing backs. Judge only what is written. Every line gets exactly one entry.
 
-Reply with one JSON object and nothing else, in this shape:
+Reply with one JSON object and nothing else: no code fence, no text before or after it. Use this shape:
 {"lines":[{"line":1,"support":"no-claim","note":""}],"note":""}
-"lines" has one entry per numbered line, from 1 to the last. "note" is one sentence on the text as a whole, or empty.`;
+"lines" has one entry per numbered line, from 1 to the last, and every entry has all three keys: "line", "support" and "note". A line's "note" is "" unless the line is "invented". The last "note" is one sentence on the text as a whole, or "". Write both notes even when they are empty.`;
 
+/**
+ * The judge's call has no structured output (gatewayModelClient refuses one), so only the prompt
+ * holds the shape. A note is the one part a reply can leave out without changing the verdict: an
+ * empty note reads as "". The first real-model run lost four pieces to a missing note.
+ */
 export const RewriteVerdict = z.strictObject({
-  lines: z.array(z.strictObject({ line: z.number().int().min(1), support: LineSupport, note: z.string() })),
-  note: z.string(),
+  lines: z.array(z.strictObject({ line: z.number().int().min(1), support: LineSupport, note: z.string().default('') })),
+  note: z.string().default(''),
 });
 export type RewriteVerdict = z.infer<typeof RewriteVerdict>;
+
+/**
+ * The JSON of a judge reply: the reply itself, or the object a code fence or a sentence around it
+ * holds, from its first brace to its last (the first real-model run lost a piece to a reply that
+ * was "not JSON"). A reply with no object is returned as it came, and evals' parser refuses it.
+ */
+export function judgeReplyJson(reply: string): string {
+  const text = reply.trim();
+  if (text.startsWith('{')) return text;
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
+}
+
+/** The judge client with each reply's text reduced to its JSON (judgeReplyJson). */
+export function jsonJudgeClient(client: ModelClient): ModelClient {
+  return {
+    async create(request) {
+      const reply = await client.create(request);
+      return { ...reply, text: judgeReplyJson(reply.text) };
+    },
+  };
+}
 
 /** One line of the rewrite as the judge sees it: numbered from 1, with its span in the rewritten text. */
 export interface JudgeLine extends TextRange {
