@@ -164,3 +164,18 @@ describe('the new phrases accept any run of whitespace between their words', () 
     });
   }
 });
+
+describe('REG-02 reads "encantaría" with the accent dropped or decomposed', () => {
+  // WhatsApp and quick follow-ups often drop the accent, and pasted text can arrive in NFD.
+  for (const [name, text] of [
+    ['without the accent', 'Me encantaria tener la oportunidad de charlar.'],
+    ['in NFD', 'Me encantaría tener la oportunidad de charlar.'],
+  ] as const) {
+    for (const genre of GENRES) {
+      it(`${name}, in ${genre}`, () => {
+        const result = lint(text, { lang: 'es', genre });
+        expect(result.findings.filter((f) => f.ruleId === 'REG-02')).toHaveLength(1);
+      });
+    }
+  }
+});

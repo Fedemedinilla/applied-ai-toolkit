@@ -926,14 +926,16 @@ const spanishGrammar: PatternRule[] = [
         'la posición de',
         'hac(?:er|e) sentido',
         'agregar valor',
-        String.raw`me\s+encantaría\s+tener\s+la\s+oportunidad\s+de`,
+        String.raw`me\s+encantar[ií]\p{M}*a\s+tener\s+la\s+oportunidad\s+de`,
       ]),
     },
     flags: 'giu',
     message: 'Calque from English job-search vocabulary.',
     suggestion: '"Postularme", "el puesto", "tener sentido".',
     source: { evidence: ['CONSENSO'], ref: 'Section 11, item 4', section: '13.2' },
-    deviation: '"Me encantaría tener la oportunidad de" is matched as section 11, item 4 writes it, with no other inflection: the report gives none.',
+    deviation:
+      '"Me encantaría tener la oportunidad de" is matched as section 11, item 4 writes it, with no other inflection: the report gives none. ' +
+      'The accent on "encantaría" may be dropped or decomposed (NFD), a spelling variant, not an inflection.',
     examples: [
       { lang: 'es', fire: 'Quiero aplicar a la posición.', pass: 'Me postulo al puesto.' },
       { lang: 'es', fire: 'Me encantaría tener la oportunidad de conversar.', pass: 'Me encantaría conversar el jueves.' },
