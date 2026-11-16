@@ -210,6 +210,7 @@ export default defineConfig({
         'gateway/examples/live-call.ts',
         'evals/scripts/cli.ts',
         'content-forge/cli.ts',
+        'prose-rewriter/cli.ts',
         'apps/caja/server/env.ts',
         'apps/chat-widget/server/env.ts',
         'apps/salon-assistant/server/env.ts',
