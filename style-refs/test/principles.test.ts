@@ -194,6 +194,12 @@ describe('the principles on disk', () => {
     expect(lunfardo?.genres).not.toContain('whatsapp');
   });
 
+  it('never tells a formal prompt to switch to vos: a lesson on treatment keeps the one the writer used', () => {
+    const treatment = lessons.filter((p) => p.registers.includes('formal') && /\bvos\b/.test(p.text));
+    expect(treatment.length).toBeGreaterThan(0);
+    for (const p of treatment) expect(p.text, p.id).toMatch(/keep the treatment the writer used/i);
+  });
+
   it('cites only sources that may give principles', () => {
     for (const p of principles) {
       for (const id of p.sources) expect(['principles', 'excerpts'], `${p.id} ${id}`).toContain(byId.get(id)?.use);
