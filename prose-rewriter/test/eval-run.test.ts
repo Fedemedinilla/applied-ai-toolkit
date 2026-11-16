@@ -506,14 +506,36 @@ describe('the dry run estimate', () => {
     expect(est.calls).toBe(JUDGE_RUBRICS.length + (JUDGE_RUBRICS.length - 1));
   });
 
-  it('counts the stages, the fact judge and its second verdict of a piece that calls the model', async () => {
+  it('counts every call a piece may make: each stage and its retry, the extra round, and both fact verdicts with their retries', async () => {
     const est = await estimateRun([SLOP], variant('full'), REFS, PRICES);
-    // S2, S3, S4, the extra round of S3, the fact judge twice, then the judging rubrics.
-    expect(est.calls).toBe(6 + JUDGE_RUBRICS.length - 1);
-    const stages = [STAGE_MAX_TOKENS['rewrite.plan'], STAGE_MAX_TOKENS['rewrite.edit'], STAGE_MAX_TOKENS['rewrite.style'], STAGE_MAX_TOKENS['rewrite.edit'], rewriteRubric.call.max_tokens, rewriteRubric.call.max_tokens];
+    // S2, S3 and S4 twice each (a reply that cannot be read is asked for once more), the extra
+    // round once, the fact judge's two verdicts twice each (judgeStage retries an unreadable one),
+    // then the judging rubrics.
+    expect(est.calls).toBe(2 + 2 + 2 + 1 + 4 + JUDGE_RUBRICS.length - 1);
+    const judge = rewriteRubric.call.max_tokens;
+    const stages = [
+      ...[STAGE_MAX_TOKENS['rewrite.plan'], STAGE_MAX_TOKENS['rewrite.edit'], STAGE_MAX_TOKENS['rewrite.style']].flatMap((t) => [t, t]),
+      STAGE_MAX_TOKENS['rewrite.edit'],
+      judge,
+      judge,
+      judge,
+      judge,
+    ];
     // Every output budget is billed at least once at the dearest output rate in force.
     const outputs = (stages.reduce((a, b) => a + b, 0) + (JUDGE_RUBRICS.length - 1) * JUDGE_MAX_TOKENS) * 50 / 1e6;
     expect(est.worstUsd).toBeGreaterThan(outputs);
+  });
+
+  it('counts the call and its retry and both fact verdicts with their retries for single-guarded, and one call for single-call', async () => {
+    const guarded = await estimateRun([SLOP], variant('single-guarded'), REFS, PRICES);
+    // The single call twice, the fact judge's two verdicts twice each, then the judging rubrics
+    // (no baseline: no pairwise-baseline).
+    expect(guarded.calls).toBe(2 + 4 + JUDGE_RUBRICS.length - 1);
+    const bare = await estimateRun([SLOP], variant('single-call'), REFS, PRICES);
+    expect(bare.calls).toBe(1 + JUDGE_RUBRICS.length - 1);
+    const full = await estimateRun([SLOP], variant('full'), REFS, PRICES);
+    expect(bare.worstUsd).toBeLessThan(guarded.worstUsd);
+    expect(guarded.worstUsd).toBeLessThan(full.worstUsd);
   });
 
   it('warns when the worst case is more than the month has left or more than --max-usd', async () => {

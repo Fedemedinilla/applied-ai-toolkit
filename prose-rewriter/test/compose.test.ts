@@ -105,7 +105,7 @@ describe('S4 after S3 (F6b eval run)', () => {
       'rewrite.style': [reply(i.text, 'es', ES_S4)],
       'rewrite.judge': [verdict(expected, 'es')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     expect(result.changes.find((c) => c.stage === 'style' && c.after === style.after)).toMatchObject({ status: 'applied' });
     expect(result.changes.filter((c) => /overlaps/.test(c.revertReason ?? ''))).toEqual([]);
@@ -125,7 +125,7 @@ describe('S4 after S3 (F6b eval run)', () => {
       'rewrite.style': [{ data: { edits: [{ sentenceId: at(i.text, 'en', s3.before), before: EN_S3_TEXT, after: styled, reason: 'Lead with the proposal, not the date.', principleId: 'en-lead-with-the-point' }] } }],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     const stylePrompt = JSON.stringify(scripted.calls.find((c) => c.task === 'rewrite.style')?.request.messages);
     expect(stylePrompt).toContain(EN_S3_TEXT);
@@ -148,7 +148,7 @@ describe('S4 after S3 (F6b eval run)', () => {
       'rewrite.style': [{ data: { edits: [{ sentenceId: at(i.text, 'en', s3.before), before: 'your help desk', after: 'your Freshdesk help desk', reason: 'Name the tool.', principleId: 'en-specific-concrete' }] } }],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     expect(result.rewritten).toBe(expected);
     expect(result.changes.find((c) => c.stage === 'style')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/Freshdesk/) });
@@ -177,7 +177,7 @@ describe('S4 after S3 (F6b eval run)', () => {
       ],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     expect(result.rewritten).toBe(expected);
     expect(result.changes.find((c) => c.stage === 'style' && c.after === 'the proposal to set up')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/overlaps/) });
@@ -207,7 +207,7 @@ describe('the S5 judge reply (F6b eval run)', () => {
       'rewrite.edit': [reply(i.text, 'es', ES_FOLLOW_S3), { data: { edits: [] } }],
       'rewrite.judge': judge,
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true, strategy: 'staged' });
     scripted.assertDone();
     return result;
   };
@@ -240,7 +240,7 @@ describe('a judge reply S5 cannot read (F6b eval run)', () => {
       'rewrite.edit': [reply(i.text, 'es', ES_FOLLOW_S3), { data: { edits: [] } }],
       'rewrite.judge': judge,
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true, strategy: 'staged' });
     scripted.assertDone();
     return { result, judgeCalls: scripted.calls.filter((c) => c.task === 'rewrite.judge').length };
   };
@@ -300,7 +300,7 @@ describe('the extra round on an S3 edit a style edit holds', () => {
       'rewrite.style': [{ data: { edits: [style] } }],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     return result;
   };
@@ -342,7 +342,7 @@ describe('a style edit widened to place it once in the original', () => {
       'rewrite.style': [{ data: { edits: style } }],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    return rewrite(i, { gateway: scripted.gateway, refs: REFS });
+    return rewrite(i, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
   };
 
   it('merges the other style edits of its sentence instead of refusing them as overlaps', async () => {
@@ -377,7 +377,7 @@ describe('an edit refused as an overlap', () => {
       'rewrite.edit': [{ data: { edits: [lost, close] } }, { data: { edits: [late] } }],
       'rewrite.judge': [verdict(expected, 'en')],
     });
-    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true, strategy: 'staged' });
     scripted.assertDone();
     expect(result.changes.find((c) => c.after === late.after)).toMatchObject({ status: 'reverted', revertReason: 'the edit overlaps e2, accepted before it' });
   });

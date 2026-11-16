@@ -173,7 +173,26 @@ export interface RewriteOptions {
   readonly jobId?: string | null;
   /** Skips S4 in every mode: the "without S4" ablation of the evals (design 5). Default false. */
   readonly skipStyle?: boolean;
+  /**
+   * 'single' (the default, DEFAULT_STRATEGY): one call plans and edits (the prompt of the
+   * single-call baseline, design 4.10), and its edits pass the same S5, the fact judge, S6 and S7;
+   * no S4 and no extra round. One call, two when its reply cannot be read and is asked for again,
+   * plus the judge's.
+   * 'staged': S2 plan and S3 edit, S4 style and at most one extra S3 round.
+   */
+  readonly strategy?: Strategy;
 }
+
+export const STRATEGIES = ['staged', 'single'] as const;
+export type Strategy = (typeof STRATEGIES)[number];
+
+/**
+ * The strategy rewrite() and the CLI use when none is given. 'single' since 16/11/2026, a decision
+ * taken on F6b's fourth real-model run (33 fictional cases): against the original it scored about
+ * as well as 'staged' (20/23 against 21/24), kept the voice a little more often (21/23 against
+ * 20/24), had no hard failure, and cost 13% to 61% of the staged median per rewrite, by genre (README, "Measured").
+ */
+export const DEFAULT_STRATEGY: Strategy = 'single';
 
 /**
  * The fact judge of section 4.6 runs evals' line-by-line judge through this interface, built over

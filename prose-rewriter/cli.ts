@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Usage: node prose-rewriter/cli.ts --genre cover-letter|email|follow-up|whatsapp --lang es|en [--variety rioplatense|neutral]
-//        --cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--json] <draft file>
+//        --cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--strategy staged|single] [--json] <draft file>
+// --strategy defaults to single, the guarded one-call strategy (decided 16/11/2026, README "Measured").
 // Needs ANTHROPIC_API_KEY in the environment (never in a file or an argument), unless the draft has nothing to change.
 // Exit codes: 0 ok, 1 needs-review, 2 blocked, 3 bad usage or an unreadable file, 4 no API key or a failed model call.
 //
 // This is the only place that builds the live gateway: in-memory stores seeded with the rewriter's
-// four tasks, its provisional caps (src/tasks.ts) and the gateway's built-in prices. Everything else
+// four tasks, its caps measured in F6 (src/tasks.ts) and the gateway's built-in prices. Everything else
 // is src/cli.ts, which the tests run over a scripted gateway.
 //
 // The stores last one run: the per-job cap binds within it, but the daily and monthly caps start

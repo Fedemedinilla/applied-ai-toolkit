@@ -2,7 +2,9 @@
  * The model stages of design 4.4, each one structured call through the gateway with the prompt of
  * prompt.ts and the output schema of outputs.ts:
  *
- * - S2 plan: what to fix per sentence, from S1's findings; it writes no text;
+ * - S2 plan: what to fix per sentence, from S1's findings; it writes no text. The gateway parses
+ *   PlanReply, and a request that says more than its labelled marker keeps the marker;
+ * - S2 and S3 in one call, for the 'single' strategy: the plan is not written, only the edits;
  * - S3 edit: one edit per item of the plan, and at most one extra round (S6) with the level 1
  *   findings that remain, whose history is rebuilt from the edits kept from what the first round
  *   parsed, never from the raw reply (design 4.9). The gateway parses only the replies' shape
@@ -20,8 +22,8 @@ import { ResponseError, type CallMeta, type Conversation, type Gateway } from '.
 import type { Finding } from '../../../slop-lint/src/types.ts';
 import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
-import { EditReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
-import { editPrompt, planPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
+import { EditReply, planFromReply, PlanReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
+import { editPrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
 import type { Edit } from '../types.ts';
 
 /**
@@ -29,6 +31,9 @@ import type { Edit } from '../types.ts';
  * gateway's limit without streaming (16 000), not measurements. F6 measures the real replies.
  */
 export const STAGE_MAX_TOKENS = { 'rewrite.plan': 4000, 'rewrite.edit': 6000, 'rewrite.style': 4000 } as const;
+
+/** How many times rewrite() makes a stage's call: once, and once more when the reply cannot be read. */
+export const STAGE_ATTEMPTS = 2;
 
 /** What RewriteResult.usage reports: costUsd turns null once any call has no price. */
 export interface Usage {
@@ -87,7 +92,15 @@ async function call<S extends z.ZodType>(m: ModelStages, p: StagePrompt<S>, mess
 
 /** S2. */
 export async function planStage(m: ModelStages, findings: readonly Finding[]): Promise<PlanOutput> {
-  return call(m, planPrompt(m.prompt, findings));
+  return planFromReply(await call(m, { ...planPrompt(m.prompt, findings), schema: PlanReply }));
+}
+
+/**
+ * S2 and S3 in one call (RewriteOptions.strategy 'single', and the single-call baseline of the
+ * evals): the edits as parsed, with no cap, since there is no plan to count them against.
+ */
+export async function singleStage(m: ModelStages, findings: readonly Finding[]): Promise<Edit[]> {
+  return (await call(m, { ...singleCallPrompt(m.prompt, findings), schema: EditReply })).edits;
 }
 
 /**
@@ -115,7 +128,7 @@ export async function editStage(m: ModelStages, plan: PlanOutput): Promise<EditR
 }
 
 /** The extra round's promptVersion: a fixed constant, like every other. */
-const EXTRA_SUFFIX = '+extra';
+export const EXTRA_SUFFIX = '+extra';
 
 const EXTRA_TASK = [
   'TASK: edit, second round',

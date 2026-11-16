@@ -9,8 +9,10 @@
  * - --dry-run builds no gateway and makes no call. It runs the pipelines over a probe that records
  *   each piece's first request and stops it, and adds up an estimate of the worst case: every
  *   model call the piece may make (design 4.10 step 1: S2, S3, S4, the extra round, the judge and
- *   its second verdict, then the judging rubrics), each at the dearest input rate and its whole
- *   output budget. A later call's input is bounded by the first one's plus every output before it.
+ *   its second verdict, then the judging rubrics; with strategy 'single', the one call in place of
+ *   S2 to the extra round), with the retries rewrite() makes of a reply it cannot read (S2, S3, S4
+ *   and the single call once more each, each verdict once more), each at the dearest input rate
+ *   and its whole output budget. A later call's input is bounded by the first one's plus every output before it.
  *   That bound is an estimate, not a guarantee: the guarantee is the per-call reservation of the
  *   live run (spend.ts).
  * - --live spends from the monthly budget through the budgeted gateway, writes pieces, judge
@@ -29,7 +31,8 @@ import { appendJsonl, decide, DEFAULT_MARGIN, differenceInterval, freshOutput, g
 import { BUILT_IN_MODELS, CapError, estimateInputTokens, pricesInForce, type Gateway, type GatewayRequest, type Price } from '../../gateway/src/index.ts';
 import type { PromptRefs } from '../src/prompt.ts';
 import { judgeRuns as factJudgeRuns, rewriteRubric } from '../src/rubric.ts';
-import { STAGE_MAX_TOKENS } from '../src/stages/model.ts';
+import { MAX_VERDICTS, VERDICT_ATTEMPTS } from '../src/stages/check.ts';
+import { STAGE_ATTEMPTS, STAGE_MAX_TOKENS } from '../src/stages/model.ts';
 import { TASK_CONFIGS } from '../src/tasks.ts';
 import { defaultMode, Genre, Lang } from '../src/types.ts';
 import type { LoadedCase } from './cases.ts';
@@ -216,12 +219,27 @@ export async function estimateRun(cases: readonly LoadedCase[], variants: readon
     first = null;
     const model = (task: 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style'): string => v.tasks?.[task]?.model ?? TASK_CONFIGS[task].model;
     const seq: Array<{ model: string; maxTokens: number; extra?: number }> = [];
-    if (!early && v.kind === 'single-call') seq.push({ model: model('rewrite.edit'), maxTokens: STAGE_MAX_TOKENS['rewrite.edit'] });
-    if (!early && v.kind === 'pipeline') {
-      seq.push({ model: model('rewrite.plan'), maxTokens: STAGE_MAX_TOKENS['rewrite.plan'] }, { model: model('rewrite.edit'), maxTokens: STAGE_MAX_TOKENS['rewrite.edit'] });
-      if (v.skipStyle !== true && (c.input.mode ?? defaultMode(c.input.genre)) !== 'minimo') seq.push({ model: model('rewrite.style'), maxTokens: STAGE_MAX_TOKENS['rewrite.style'] });
-      seq.push({ model: model('rewrite.edit'), maxTokens: STAGE_MAX_TOKENS['rewrite.edit'] });
-      if (factJudgeRuns(c.input)) for (let i = 0; i < 2; i++) seq.push({ model: TASK_CONFIGS['rewrite.judge'].model, maxTokens: rewriteRubric.call.max_tokens });
+    const times = (n: number, call: { model: string; maxTokens: number }): void => {
+      for (let i = 0; i < n; i++) seq.push(call);
+    };
+    // rewrite() asks a stage once more when its reply cannot be read; the extra round is not retried.
+    const stage = (task: 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style', attempts = STAGE_ATTEMPTS): void => times(attempts, { model: model(task), maxTokens: STAGE_MAX_TOKENS[task] });
+    // The fact judge's two verdicts, each asked for once more when it cannot be read.
+    const factJudge = (): void => {
+      if (factJudgeRuns(c.input)) times(MAX_VERDICTS * VERDICT_ATTEMPTS, { model: TASK_CONFIGS['rewrite.judge'].model, maxTokens: rewriteRubric.call.max_tokens });
+    };
+    // The single-call baseline is not rewrite(): one call, no retry.
+    if (!early && v.kind === 'single-call') stage('rewrite.edit', 1);
+    if (!early && v.kind === 'pipeline' && v.strategy === 'single') {
+      // One call that plans and edits, then the fact judge: no S4, no extra round.
+      stage('rewrite.edit');
+      factJudge();
+    } else if (!early && v.kind === 'pipeline') {
+      stage('rewrite.plan');
+      stage('rewrite.edit');
+      if (v.skipStyle !== true && (c.input.mode ?? defaultMode(c.input.genre)) !== 'minimo') stage('rewrite.style');
+      stage('rewrite.edit', 1);
+      factJudge();
     }
     for (const rubric of JUDGE_RUBRICS) {
       if (rubric.name === 'pairwise-baseline' && (v.id === BASELINE || !hasBaseline)) continue;

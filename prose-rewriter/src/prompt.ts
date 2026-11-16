@@ -293,9 +293,10 @@ const SINGLE_TASK = [
 ].join('\n');
 
 /**
- * The single-call baseline of design 4.10 (an eval target, not a stage): S2 and S3 in one call,
- * with the same system blocks, text, keep phrases and findings as the plan prompt and the edit
- * output of S3. It runs on rewrite.edit, so it costs one call of the edit model.
+ * The single-call baseline of design 4.10: S2 and S3 in one call, with the same system blocks,
+ * text, keep phrases and findings as the plan prompt and the edit output of S3. It runs on
+ * rewrite.edit, so it costs one call of the edit model. The evals' unguarded baseline and
+ * rewrite()'s 'single' strategy both send it (stages/model.ts singleStage).
  */
 export function singleCallPrompt(c: PromptContext, findings: readonly Finding[]): StagePrompt<typeof EditOutput> {
   const sentences = splitSentences(c.input.text, c.input.lang);

@@ -24,13 +24,13 @@ import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts
 import type { PromptRefs } from './prompt.ts';
 import { rewrite } from './rewrite.ts';
 import { analyse, earlyExit, prepare } from './stages/analyse.ts';
-import { Genre, Lang, Mode, RewriteInput, type RewriteResult, Variety } from './types.ts';
+import { Genre, Lang, Mode, RewriteInput, STRATEGIES, type RewriteResult, type Strategy, Variety } from './types.ts';
 
 export const EXIT = { ok: 0, needsReview: 1, blocked: 2, usage: 3, failed: 4 } as const;
 
 export const USAGE =
   'usage: node prose-rewriter/cli.ts --genre cover-letter|email|follow-up|whatsapp --lang es|en [--variety rioplatense|neutral] ' +
-  '--cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--json] <draft file>';
+  '--cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--strategy staged|single] [--json] <draft file>';
 
 export interface Args {
   readonly genre: Genre;
@@ -42,11 +42,13 @@ export interface Args {
   readonly mode?: Mode;
   readonly keep: string[];
   readonly strict: boolean;
+  /** rewrite()'s strategy; left out when not given, so rewrite() applies its default, 'single' (DEFAULT_STRATEGY). */
+  readonly strategy?: Strategy;
   readonly json: boolean;
   readonly draft: string;
 }
 
-const VALUE_FLAGS = ['genre', 'lang', 'variety', 'cv', 'to', 'previous', 'mode', 'keep'] as const;
+const VALUE_FLAGS = ['genre', 'lang', 'variety', 'cv', 'to', 'previous', 'mode', 'strategy', 'keep'] as const;
 type ValueFlag = (typeof VALUE_FLAGS)[number];
 
 /**
@@ -87,6 +89,8 @@ export function parseArgs(argv: readonly string[]): Args | string {
   if (!variety.success) return '--variety must be rioplatense or neutral';
   const mode = Mode.optional().safeParse(values.mode);
   if (!mode.success) return '--mode must be minimo, pulido or reescritura';
+  const strategy = z.enum(STRATEGIES).optional().safeParse(values.strategy);
+  if (!strategy.success) return '--strategy must be staged or single';
   if (values.cv === undefined) return '--cv is required';
   if (positionals.length === 0) return 'the draft file is missing';
   if (positionals.length > 1) return 'give exactly one draft file';
@@ -100,6 +104,7 @@ export function parseArgs(argv: readonly string[]): Args | string {
     ...(mode.data === undefined ? {} : { mode: mode.data }),
     keep,
     strict,
+    ...(strategy.data === undefined ? {} : { strategy: strategy.data }),
     json,
     draft: positionals[0] ?? '',
   };
@@ -244,7 +249,7 @@ export async function runCli(argv: readonly string[], deps: CliDeps): Promise<nu
   }
   try {
     // One jobId per run, so the per-job cap covers the calls of this rewrite.
-    return print(await rewrite(input, { gateway: deps.gateway(key), refs: deps.refs(), jobId: randomUUID() }));
+    return print(await rewrite(input, { gateway: deps.gateway(key), refs: deps.refs(), jobId: randomUUID(), ...(args.strategy === undefined ? {} : { strategy: args.strategy }) }));
   } catch (error) {
     deps.stderr(`rewrite failed: ${failure(error)}\n`);
     return EXIT.failed;

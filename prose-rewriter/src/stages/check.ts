@@ -39,7 +39,11 @@ export interface Proposal {
   after?: string;
   /** Why it was refused or reverted. */
   reason?: string;
-  /** The composed style edit that holds this one (stages/compose.ts); it comes back if that one is not applied. */
+  /**
+   * The composed style edit that holds this one (stages/compose.ts); it comes back if that one is
+   * not applied and the checks still run. Once it is reverted where none run again (the judge),
+   * rewrite() clears this and the reason says the edit stays out.
+   */
   mergedInto?: string;
   /** checkEdit's verdict: invented and lost facts, and the keys of an accepted drop. */
   check?: EditCheck;
@@ -161,6 +165,26 @@ export function checkFacts(a: Analysis, units: readonly Sentence[], proposals: r
 }
 
 /**
+ * The live edits whose drop S5 accepted, checked again against the live edits as they are now,
+ * in the order made, until none is reverted. A drop stands only if its fact stays elsewhere; when
+ * the edit that kept it there is reverted later (by S6, the extra round or the judge), the drop
+ * would lose the fact. Returns the edits reverted.
+ *
+ * Why: in run 3 (es-cover-letter-heavy) S4 sent again, with drop, a deletion S3 had lost a name
+ * with; it stood because an S3 edit also named it, and the judge reverted that edit afterwards.
+ */
+export function recheckDrops(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[]): Proposal[] {
+  const reverted: Proposal[] = [];
+  for (;;) {
+    const drops = proposals.filter((p) => p.status === 'live' && p.check?.status === 'accepted' && p.check.dropped.length > 0);
+    checkFacts(a, units, proposals, drops);
+    const gone = drops.filter((p) => p.status !== 'live');
+    if (gone.length === 0) return reverted;
+    reverted.push(...gone);
+  }
+}
+
+/**
  * The sentences checkEdit() reads for an edit on `unit`: the unit itself at its id, and, at an
  * index no sentence has, the rest of the text with `others` applied and the unit cut out. Every
  * other index is blank, so "elsewhere" is exactly that rest.
@@ -245,6 +269,11 @@ const UNREAD = {
  * cleared stay. Either way the result asks for a review. Any other error (a cap, the API) still
  * fails the rewrite.
  */
+/** How many times one verdict is asked for: once, and once more when the reply cannot be read. */
+export const VERDICT_ATTEMPTS = 2;
+/** The verdicts judgeStage asks for at most: the first, and the second when the first reverted something. */
+export const MAX_VERDICTS = 2;
+
 export async function judgeStage(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], client: JudgeClient): Promise<JudgeOutcome> {
   const sheet = factSheet({ ...a.input.profile, recipient: a.input.recipient });
   const order = proposals.map((p) => p.id);
@@ -264,19 +293,21 @@ export async function judgeStage(a: Analysis, units: readonly Sentence[], propos
       const verdict = await judgeWith(rewriteRubric, reader, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
       return planReverts({ original: a.text, rewritten, lang: a.input.lang, verdict, edits, order: order.filter((id) => edits.some((e) => e.id === id)), round: kind });
     };
-    let made: RevertPlan;
-    try {
-      made = await plan().catch((error: unknown) => {
-        if (error instanceof JudgeError) return plan();
-        throw error;
-      });
-    } catch (error) {
-      if (!(error instanceof JudgeError)) throw error;
-      // On the first verdict nothing was cleared; on the second, what is live the first one cleared.
-      if (kind === 'first') revert(edits.map((e) => e.id), UNREAD_REASON);
-      return null;
+    let made: RevertPlan | null = null;
+    for (let attempt = 1; made === null; attempt++) {
+      try {
+        made = await plan();
+      } catch (error) {
+        if (!(error instanceof JudgeError)) throw error;
+        if (attempt < VERDICT_ATTEMPTS) continue;
+        // On the first verdict nothing was cleared; on the second, what is live the first one cleared.
+        if (kind === 'first') revert(edits.map((e) => e.id), UNREAD_REASON);
+        return null;
+      }
     }
     revert(made.revert, kind === 'first' ? 'judge: the sentence claimed something the CV and the text do not back' : 'judge: still invented on the second verdict; back to the original');
+    // A drop that stood on a line the judge just took back no longer stands.
+    if (made.revert.length > 0) recheckDrops(a, units, proposals);
     return made;
   };
   const unread = { kind: 'not-in-cv', message: UNREAD[a.input.lang] } as const satisfies Flag;

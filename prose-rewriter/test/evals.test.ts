@@ -11,6 +11,7 @@ import { PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from 
 import { rewrite } from '../src/rewrite.ts';
 import { judgeLines } from '../src/rubric.ts';
 import { RewriteInput } from '../src/types.ts';
+import { ResponseError } from '../../gateway/src/index.ts';
 import { scriptedGateway } from './scripted-gateway.ts';
 
 const ROOT = new URL('../../', import.meta.url);
@@ -42,7 +43,7 @@ describe('rewrite() options for the eval variants', () => {
   it('skips S4 when skipStyle is set, and still runs it by default', async () => {
     const expected = MAIL.replace(SINERGIAS, FIXED);
     const skipped = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })], 'rewrite.judge': [factVerdict(expected)] });
-    const result = await rewrite(mail(MAIL), { gateway: skipped.gateway, refs: REFS, skipStyle: true });
+    const result = await rewrite(mail(MAIL), { gateway: skipped.gateway, refs: REFS, skipStyle: true, strategy: 'staged' });
     skipped.assertDone();
     expect(tasksOf(skipped)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.judge']);
     expect(result.rewritten).toBe(expected);
@@ -53,7 +54,7 @@ describe('rewrite() options for the eval variants', () => {
       'rewrite.style': [edits()],
       'rewrite.judge': [factVerdict(expected)],
     });
-    await rewrite(mail(MAIL), { gateway: full.gateway, refs: REFS, skipStyle: false });
+    await rewrite(mail(MAIL), { gateway: full.gateway, refs: REFS, skipStyle: false, strategy: 'staged' });
     full.assertDone();
     expect(tasksOf(full)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
   });
@@ -102,8 +103,29 @@ const byId = (id: string) => {
 };
 
 describe('the pipeline variants (design 5, "F6 suma")', () => {
-  it('lists the full pipeline, the ablations, the single-call baseline and another model on rewrite.edit', () => {
-    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'edit-sonnet-5-5']);
+  it('lists the full pipeline, the ablations, the single-call baseline, the guarded single call and another model on rewrite.edit', () => {
+    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'single-guarded', 'edit-sonnet-5-5']);
+  });
+
+  it('runs single-guarded as rewrite() with one call: the edit the unguarded baseline ships is reverted', async () => {
+    const invent = { sentenceId: 2, before: SINERGIAS, after: 'Quería contarte que el sitio está hecho en React.' };
+    const reply = () => ({ 'rewrite.edit': [edits(invent, { sentenceId: 3, before: 'ya carga', after: 'ahora carga' })], 'rewrite.judge': [factVerdict(MAIL.replace('ya carga', 'ahora carga'))] });
+    const guarded = scriptedGateway(reply());
+    const [g] = await runPipelines(CASES, [byId('single-guarded')], { gateway: guarded.gateway, refs: REFS });
+    guarded.assertDone();
+    expect(tasksOf(guarded)).toEqual(['rewrite.edit', 'rewrite.judge']);
+    expect(guarded.calls[0]?.request.promptVersion).toBe(`rewrite-single@${PROMPT_VERSION}`);
+    expect(g?.usage).toMatchObject({ calls: 2, extraRound: false });
+    expect(g?.status === 'done' ? [g.result.kind, g.rewritten] : g?.error).toEqual(['pipeline', MAIL.replace('ya carga', 'ahora carga')]);
+    const bare = scriptedGateway({ 'rewrite.edit': reply()['rewrite.edit'] });
+    const [b] = await runPipelines(CASES, [byId('single-call')], { gateway: bare.gateway, refs: REFS });
+    expect(b?.status === 'done' ? b.rewritten : b?.error).toContain('React');
+  });
+
+  it('refuses a pipeline knob the single strategy has no stage for', () => {
+    expect(() => pipelineVariant({ id: 'x', kind: 'pipeline', strategy: 'single', skipStyle: true })).toThrow(/no plan or style stage/);
+    expect(() => pipelineVariant({ id: 'x', kind: 'pipeline', strategy: 'single', tasks: { 'rewrite.plan': { model: 'claude-opus-5-5', effort: 'medium' } } })).toThrow(/no plan or style stage/);
+    expect(() => pipelineVariant({ id: 'x', kind: 'single-call', strategy: 'single' })).toThrow(/strategy/);
   });
 
   it('refuses a variant that overrides the judge, a repeated id or a repeated case before any call', async () => {
@@ -187,10 +209,34 @@ describe('runPipelines', () => {
     expect(r?.usage).toMatchObject({ calls: 4, extraRound: true });
   });
 
+  it('does not mark the extra round when a stage reply is asked for again', async () => {
+    // F6b review: a retry of an unreadable reply is a second rewrite.edit call, not S3's extra round.
+    const expected = MAIL.replace(SINERGIAS, FIXED);
+    const unreadable = { data: { edits: [{ sentenceId: 1 }] } };
+    const fixed = edits({ sentenceId: 2, before: SINERGIAS, after: FIXED });
+    const guarded = scriptedGateway({ 'rewrite.edit': [unreadable, fixed], 'rewrite.judge': [factVerdict(expected)] });
+    const [g] = await runPipelines(CASES, [byId('single-guarded')], { gateway: guarded.gateway, refs: REFS });
+    guarded.assertDone();
+    expect(tasksOf(guarded)).toEqual(['rewrite.edit', 'rewrite.edit', 'rewrite.judge']);
+    expect(g?.status === 'done' ? g.rewritten : g?.error).toBe(expected);
+    expect(g?.usage).toMatchObject({ calls: 3, extraRound: false });
+    const staged = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [unreadable, fixed], 'rewrite.judge': [factVerdict(expected)] });
+    const [s] = await runPipelines(CASES, [byId('no-style')], { gateway: staged.gateway, refs: REFS });
+    staged.assertDone();
+    expect(tasksOf(staged)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.edit', 'rewrite.judge']);
+    expect(s?.usage).toMatchObject({ calls: 4, extraRound: false });
+  });
+
   it('records a failed piece and goes on; a cap stops the run after recording it', async () => {
-    // A plan the schema refuses fails the piece; the run goes on to the next variant.
-    const scripted = scriptedGateway({ 'rewrite.plan': [{ data: { items: 'none' } }], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })] });
-    const records = await runPipelines(CASES, [byId('full'), byId('single-call')], { gateway: scripted.gateway, refs: REFS });
+    // A plan the model refuses fails the piece; the run goes on to the next variant. (A reply the
+    // schema refuses does not fail it: rewrite() asks once more and then asks for a review.)
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })] });
+    const refusal = new ResponseError('refusal', 'refused', { usageId: 'u1', requestId: null, modelResponded: 'claude-sonnet-5-5', stopReason: 'refusal', costUsd: 0 });
+    const refusing: typeof scripted.gateway = {
+      ...scripted.gateway,
+      structured: (schema, request) => (request.task === 'rewrite.plan' ? Promise.reject(refusal) : scripted.gateway.structured(schema, request)),
+    };
+    const records = await runPipelines(CASES, [byId('full'), byId('single-call')], { gateway: refusing, refs: REFS });
     scripted.assertDone();
     expect(records.map((r) => [r.variant, r.status, r.usage.calls])).toEqual([['full', 'failed', 1], ['single-call', 'done', 1]]);
     expect(records[0]?.status === 'failed' ? records[0].error : '').toMatch(/^ResponseError/);
