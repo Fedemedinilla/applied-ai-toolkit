@@ -253,6 +253,62 @@ describe('the budgeted gateway', () => {
     expect(unpriced.ledger.month()).toMatchObject({ spentUsd: worst(), calls: 1 });
   });
 
+  it('bills a failure it cannot place at its worst case, and a cap the gateway hit before sending at zero', async () => {
+    const unknown = over(fakeInner(() => Promise.reject(new Error('socket hang up'))));
+    await expect(unknown.budget.gateway.text(judgeRequest())).rejects.toThrow(/socket hang up/);
+    expect(unknown.ledger.month()).toMatchObject({ spentUsd: worst(), openUsd: 0, calls: 1 });
+    expect(unknown.budget.run()).toMatchObject({ spentUsd: worst(), openUsd: 0, calls: 1 });
+    const capped = over(fakeInner(() => Promise.reject(new CapError('cap_monthly_global', 1, 1))));
+    await expect(capped.budget.gateway.text(judgeRequest())).rejects.toBeInstanceOf(CapError);
+    expect(capped.ledger.month()).toMatchObject({ spentUsd: 0, openUsd: 0, calls: 1 });
+  });
+
+  /** A gateway whose structured calls (plain and streamed) answer with `answer`, recording the month's open reservation during the call. */
+  const structuredInner = (answer: () => Promise<{ meta: { costUsd: number | null } }>, seen: () => void = () => undefined): Gateway<string> =>
+    ({
+      structured: async () => {
+        seen();
+        return answer();
+      },
+      structuredStream: () => {
+        seen();
+        const final = answer();
+        final.catch(() => undefined);
+        return { started: Promise.resolve(), final };
+      },
+      text: () => Promise.reject(new Error('not scripted')),
+    }) as unknown as Gateway<string>;
+  const Verdict = z.object({ verdict: z.boolean(), note: z.string() });
+
+  it('reserves a structured call with its output schema and attachment bound in the input', async () => {
+    const request = { ...judgeRequest(), attachmentTokenBound: 5000 };
+    const expected = worstCaseUsd('claude-sonnet-5-5', requestInputTokens(request, Verdict), 1000, PRICES)!;
+    expect(expected).toBeGreaterThan(worstCaseUsd('claude-sonnet-5-5', requestInputTokens(judgeRequest(), null), 1000, PRICES)!);
+    for (const streamed of [false, true]) {
+      let open = -1;
+      const box: { ledger?: ReturnType<typeof openLedger> } = {};
+      const { ledger, budget } = over(structuredInner(async () => ({ meta: { costUsd: 0.001 } }), () => (open = box.ledger!.month().openUsd)));
+      box.ledger = ledger;
+      await (streamed ? budget.gateway.structuredStream(Verdict, request).final : budget.gateway.structured(Verdict, request));
+      expect(open, streamed ? 'streamed' : 'plain').toBe(expected);
+      expect(ledger.month()).toMatchObject({ spentUsd: 0.001, openUsd: 0, calls: 1 });
+    }
+  });
+
+  it('bills a streamed call like a plain one: unpriced success and a failure after the API at the worst case, a failure before it at zero', async () => {
+    const w = worstCaseUsd('claude-sonnet-5-5', requestInputTokens(judgeRequest(), Verdict), 1000, PRICES)!;
+    const failure = { code: 'timeout' as const, status: null, apiType: null, retryAfterSec: null, requestId: null };
+    const unpriced = over(structuredInner(async () => ({ meta: { costUsd: null } })));
+    await unpriced.budget.gateway.structuredStream(Verdict, judgeRequest()).final;
+    expect(unpriced.ledger.month()).toMatchObject({ spentUsd: w, openUsd: 0, calls: 1 });
+    const reached = over(structuredInner(() => Promise.reject(new ApiError(failure, 'usage-row-3'))));
+    await expect(reached.budget.gateway.structuredStream(Verdict, judgeRequest()).final).rejects.toBeInstanceOf(ApiError);
+    expect(reached.ledger.month()).toMatchObject({ spentUsd: w, openUsd: 0, calls: 1 });
+    const never = over(structuredInner(() => Promise.reject(new ApiError(failure, null))));
+    await expect(never.budget.gateway.structuredStream(Verdict, judgeRequest()).final).rejects.toBeInstanceOf(ApiError);
+    expect(never.ledger.month()).toMatchObject({ spentUsd: 0, openUsd: 0, calls: 1 });
+  });
+
 
   const setup = (script: Parameters<typeof scriptedGateway>[0], options: { cap?: number; maxRunUsd?: number | null; prices?: ReadonlyMap<string, Price>; path?: string } = {}) => {
     const scripted = scriptedGateway(script);
