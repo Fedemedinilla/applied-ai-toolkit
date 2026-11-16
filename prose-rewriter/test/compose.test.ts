@@ -226,3 +226,59 @@ describe('the S5 judge reply (F6b eval run)', () => {
     expect(result.status).toBe('ok');
   });
 });
+
+describe('a judge reply S5 cannot read (F6b eval run)', () => {
+  const i = input('es-follow-up-heavy');
+  const [opener, promise] = ES_FOLLOW_S3 as [Proposed, Proposed];
+  const both = i.text.replace(opener.before, '').replace(promise.before, '');
+  // The run's two errors, as replies: a line without its support, and prose.
+  const wrongShape: ScriptedReply = { text: JSON.stringify({ lines: judgeLines(both, 'es').map((l) => ({ line: l.line, note: '' })), note: '' }) };
+  const prose: ScriptedReply = { text: 'Every line of the rewrite is backed by the draft.' };
+  const run = async (...judge: ScriptedReply[]) => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(6)],
+      'rewrite.edit': [reply(i.text, 'es', ES_FOLLOW_S3), { data: { edits: [] } }],
+      'rewrite.judge': judge,
+    });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    return { result, judgeCalls: scripted.calls.filter((c) => c.task === 'rewrite.judge').length };
+  };
+
+  it('asks once more, and a readable second reply judges as usual', async () => {
+    const { result, judgeCalls } = await run(wrongShape, verdict(both, 'es'));
+    expect(judgeCalls).toBe(2);
+    expect(result.rewritten).toBe(both);
+    expect(result.status).toBe('ok');
+  });
+
+  it('reverts every edit it could not judge after the retry, and asks for a review instead of failing the piece', async () => {
+    const { result, judgeCalls } = await run(wrongShape, prose);
+    expect(judgeCalls).toBe(2);
+    expect(result.rewritten).toBe(i.text);
+    expect(result.status).toBe('needs-review');
+    const edits = result.changes.filter((c) => c.stage === 'edit' && (c.before === opener.before || c.before === promise.before));
+    expect(edits).toHaveLength(2);
+    for (const c of edits) expect(c).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^judge: no readable verdict/) });
+    expect(result.flags.filter((f) => f.kind === 'not-in-cv' && /verificar|check/i.test(f.message))).toHaveLength(1);
+    expectSound(i, result);
+  });
+
+  it('keeps what the first verdict cleared when the second verdict cannot be read', async () => {
+    // The first verdict marks the line the promise was cut next to; only that edit goes back.
+    const first: ScriptedReply = {
+      text: JSON.stringify({
+        lines: judgeLines(both, 'es').map((l) => ({ line: l.line, support: l.text.startsWith('Quedo') ? 'invented' : 'no-claim', note: '' })),
+        note: '',
+      }),
+    };
+    const { result, judgeCalls } = await run(first, prose, wrongShape);
+    expect(judgeCalls).toBe(3);
+    expect(result.rewritten).toBe(i.text.replace(opener.before, ''));
+    expect(result.status).toBe('needs-review');
+    expect(result.changes.find((c) => c.before === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
+    expect(result.changes.find((c) => c.before === promise.before && c.stage === 'edit')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^judge: the sentence claimed/) });
+    expect(result.flags.filter((f) => f.kind === 'not-in-cv' && /verificar|check/i.test(f.message))).toHaveLength(1);
+    expectSound(i, result);
+  });
+});

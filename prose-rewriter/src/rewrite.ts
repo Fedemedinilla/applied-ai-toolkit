@@ -23,6 +23,7 @@
  *   a fact again: the invention persisted after the extra round;
  * - 'needs-review': the invariant fails otherwise, or a fallback happened: an edit was reverted
  *   for inventing (in code or by the judge), which hands the sentence back as the user wrote it;
+ *   or a verdict could not be read even on the retry, and the edits it did not clear went back;
  * - 'ok' otherwise.
  */
 import { diffHunks } from './edits.ts';
@@ -115,7 +116,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     extraInvented = round2.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
   }
 
-  let judged = { fellBack: false, reverted: 0, flags: [] as Flag[] };
+  let judged = { fellBack: false, reverted: 0, unread: false, flags: [] as Flag[] };
   if (judgeRuns(a.input)) {
     // Always over the metered gateway: the judge's calls pass the same caps and the same ledger.
     const client = gatewayModelClient(gateway, { task: 'rewrite.judge', userId, jobId, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
@@ -143,7 +144,7 @@ function remainingLevelOne(a: Analysis, rewritten: string, live: ReturnType<type
 interface Outcome {
   readonly usage: Usage;
   readonly extraInvented: boolean;
-  readonly judged: { readonly fellBack: boolean; readonly reverted: number; readonly flags: readonly Flag[] };
+  readonly judged: { readonly fellBack: boolean; readonly reverted: number; readonly unread: boolean; readonly flags: readonly Flag[] };
 }
 
 const MISSING = { es: (f: Fact) => `El texto reescrito perdió «${f.text}».`, en: (f: Fact) => `The rewrite lost "${f.text}".` } as const;
@@ -159,7 +160,7 @@ function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals
   const status =
     invariant.extra.length > 0 || outcome.extraInvented
       ? 'blocked'
-      : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack
+      : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack || outcome.judged.unread
         ? 'needs-review'
         : 'ok';
   const changes: Change[] = proposals.map((p) => {

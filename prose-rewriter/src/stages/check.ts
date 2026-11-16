@@ -15,7 +15,7 @@
  * In `reescritura` an edit may cover a paragraph: the unit an edit quotes from runs from its
  * sentence to the end of its line in the same part (paragraphUnits).
  */
-import { judgeWith } from '../../../evals/src/index.ts';
+import { JudgeError, judgeWith } from '../../../evals/src/index.ts';
 import { applyEdits, renderEdits, type AppliedEdit, type Sentence, type TextRange } from '../edits.ts';
 import { checkEdit, factInvariant, type EditCheck, type Fact } from '../facts.ts';
 import { factSheet, jsonJudgeClient, planReverts, rewritePiece, rewriteRubric, type RevertPlan } from '../rubric.ts';
@@ -220,38 +220,73 @@ export interface JudgeOutcome {
   readonly fellBack: boolean;
   /** Edits the judge reverted. */
   readonly reverted: number;
+  /** A verdict could not be read even on the retry, so the text was not fully judged. */
+  readonly unread: boolean;
   readonly flags: Flag[];
 }
+
+const UNREAD_REASON = 'judge: no readable verdict after a retry; an edit the judge did not clear is not kept';
+const UNREAD = {
+  es: 'No pude verificar contra tu CV todo lo que dice el texto. Los cambios que no llegué a verificar quedaron como los escribiste.',
+  en: 'I could not check everything the text says against your CV. The changes I could not check are back as you wrote them.',
+} as const;
 
 /**
  * S5 the judge (design 4.6 step 3). The first verdict reverts the edits touching an invented line,
  * last made first; when it reverted any, a second verdict on what is left reverts the edits still
  * touching an invented line, and those lines fall back to the original with a flag. An invented
  * line no edit touches is the user's own claim: flagged, never changed (D7).
+ *
+ * A reply judgeWith cannot read (not JSON, the wrong shape, a line missing) is asked for once
+ * more. If the second reply cannot be read either, no unjudged edit is kept: on the first verdict
+ * every live edit is reverted, since none was cleared; on the second, the edits the first verdict
+ * cleared stay. Either way the result asks for a review. Any other error (a cap, the API) still
+ * fails the rewrite.
  */
 export async function judgeStage(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], client: JudgeClient): Promise<JudgeOutcome> {
   const sheet = factSheet({ ...a.input.profile, recipient: a.input.recipient });
   const order = proposals.map((p) => p.id);
   const reader = jsonJudgeClient(client);
-  const round = async (kind: 'first' | 'final'): Promise<RevertPlan> => {
-    const edits = liveEdits(a, units, proposals);
-    const rewritten = renderEdits(a.text, edits);
-    const verdict = await judgeWith(rewriteRubric, reader, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
-    const plan = planReverts({ original: a.text, rewritten, lang: a.input.lang, verdict, edits, order: order.filter((id) => edits.some((e) => e.id === id)), round: kind });
-    for (const id of plan.revert) {
+  const revert = (ids: readonly string[], reason: string): void => {
+    for (const id of ids) {
       const p = proposals.find((x) => x.id === id);
       if (p === undefined) continue;
       p.status = 'reverted';
-      p.reason = kind === 'first' ? 'judge: the sentence claimed something the CV and the text do not back' : 'judge: still invented on the second verdict; back to the original';
+      p.reason = reason;
     }
-    return plan;
   };
+  const round = async (kind: 'first' | 'final'): Promise<RevertPlan | null> => {
+    const edits = liveEdits(a, units, proposals);
+    const rewritten = renderEdits(a.text, edits);
+    const plan = async (): Promise<RevertPlan> => {
+      const verdict = await judgeWith(rewriteRubric, reader, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
+      return planReverts({ original: a.text, rewritten, lang: a.input.lang, verdict, edits, order: order.filter((id) => edits.some((e) => e.id === id)), round: kind });
+    };
+    let made: RevertPlan;
+    try {
+      made = await plan().catch((error: unknown) => {
+        if (error instanceof JudgeError) return plan();
+        throw error;
+      });
+    } catch (error) {
+      if (!(error instanceof JudgeError)) throw error;
+      // On the first verdict nothing was cleared; on the second, what is live the first one cleared.
+      if (kind === 'first') revert(edits.map((e) => e.id), UNREAD_REASON);
+      return null;
+    }
+    revert(made.revert, kind === 'first' ? 'judge: the sentence claimed something the CV and the text do not back' : 'judge: still invented on the second verdict; back to the original');
+    return made;
+  };
+  const unread = { kind: 'not-in-cv', message: UNREAD[a.input.lang] } as const satisfies Flag;
   const first = await round('first');
-  if (first.revert.length === 0) return { fellBack: false, reverted: 0, flags: first.userClaims.map((c) => c.flag) };
+  if (first === null) return { fellBack: false, reverted: proposals.filter((p) => p.reason === UNREAD_REASON).length, unread: true, flags: [unread] };
+  if (first.revert.length === 0) return { fellBack: false, reverted: 0, unread: false, flags: first.userClaims.map((c) => c.flag) };
   const final = await round('final');
+  if (final === null) return { fellBack: false, reverted: first.revert.length, unread: true, flags: [...first.userClaims.map((c) => c.flag), unread] };
   return {
     fellBack: final.fallback.length > 0,
     reverted: first.revert.length + final.revert.length,
+    unread: false,
     flags: [...final.userClaims.map((c) => c.flag), ...final.fallback.map((f) => f.flag)],
   };
 }
