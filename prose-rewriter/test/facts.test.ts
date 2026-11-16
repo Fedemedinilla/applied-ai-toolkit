@@ -137,6 +137,55 @@ describe('checkEdit', () => {
   });
 });
 
+describe('names at the start of a sentence', () => {
+  // extractAnchors skips a sentence's first word, so a name there needs its own reading: a name
+  // known from elsewhere in O, C or the sentence is a name there too, and an unknown capitalized
+  // opening word that is not a frequent opener is read as a possible name.
+  const one = (O: string, C: FactSources, lang: 'es' | 'en' = 'es') => ({ O, C, sentences: [O], lang });
+  const edit = (before: string, after: string) => ({ sentenceId: 0, before, after, reason: 'test' });
+
+  it('reverts a name invented as the first word of the sentence', () => {
+    const r = checkEdit(edit('Armé', 'Google me pidió que armara'), one('Armé el formulario.', { cv: '' }));
+    expect(r).toMatchObject({ status: 'reverted', reason: 'invented' });
+    expect(r.status === 'reverted' && r.facts.map((f) => f.key)).toEqual(['google']);
+    expect(checkEdit(edit('I built', 'Google hired me to build'), one('I built the form.', { cv: '' }, 'en'))).toMatchObject({ status: 'reverted', reason: 'invented' });
+    const contoso = one('Contoso me pidió el sitio.', { cv: 'Trabajé para Contoso.' });
+    expect(checkEdit(edit('Contoso me pidió', 'Google y Contoso me pidieron'), contoso)).toMatchObject({ status: 'reverted', reason: 'invented' });
+  });
+
+  it('reverts an edit that loses a name from the first word of the sentence', () => {
+    expect(checkEdit(edit('Supabase guarda', 'Una base guarda'), one('Supabase guarda los pedidos.', C_ES))).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(checkEdit(edit('Supabase guarda', 'Una base guarda'), one('Supabase guarda los pedidos.', { cv: '' }))).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(checkEdit(edit('Contoso me pidió', 'Me pidieron'), one('Contoso me pidió el sitio.', { cv: '' }))).toMatchObject({ status: 'reverted', reason: 'lost' });
+  });
+
+  it('reads a known name at the start of a sentence, and leaves frequent openers and verbs alone', () => {
+    expect(keys('Supabase guarda los pedidos. Uso Supabase.')).toEqual(['supabase', 'supabase']);
+    expect(keys('Armé el formulario. Quiero sumar pagos.')).toEqual([]);
+    expect(checkEdit(edit('Me gustaría mucho poder sumar', 'Quiero sumar'), one('Me gustaría mucho poder sumar pagos.', { cv: '' })).status).toBe('accepted');
+    expect(checkEdit(edit('Armé', 'Yo armé'), one('Armé el formulario.', { cv: '' })).status).toBe('accepted');
+  });
+
+  it('breaks the invariant for a name invented or lost at the start of a sentence', () => {
+    expect(factInvariant('Armé el formulario.', 'Google me contrató. Armé el formulario.', { cv: '' }, [], ES).extra.map((f) => f.key)).toEqual(['google']);
+    expect(factInvariant('I built the form.', 'Google hired me. I built the form.', { cv: 'x' }, [], EN).holds).toBe(false);
+    expect(factInvariant('Contoso me pidió el sitio.', 'Me pidieron el sitio.', { cv: '' }, [], ES).missing.map((f) => f.key)).toEqual(['contoso']);
+  });
+});
+
+describe('names are matched as names', () => {
+  // A name in R is backed only by the same name in O or C, capitalized: the same words in lower
+  // case are ordinary words.
+  it('does not take common words in lower case for an invented company', () => {
+    expect(factInvariant('Hice una tienda en la nube.', 'Hice la tienda de Tienda Nube.', { cv: '' }, [], ES).extra.map((f) => f.key)).toEqual(['tienda', 'nube']);
+    const banco = factInvariant('Armé el sitio.', 'Armé el sitio para Banco Nación.', { cv: 'Trabajé en un banco de la nación.' }, [], ES);
+    expect(banco.extra.map((f) => f.key)).toEqual(['banco', 'nación']);
+    const O = 'Armé el sitio.';
+    const r = checkEdit({ sentenceId: 0, before: 'el sitio', after: 'el sitio para Banco Nación', reason: 'test' }, { O, C: { cv: 'Trabajé en un banco de la nación.' }, sentences: [O], lang: 'es' });
+    expect(r).toMatchObject({ status: 'reverted', reason: 'invented' });
+  });
+});
+
 describe('factInvariant', () => {
   const O = 'Migré los mails de 12 personas. Armé un formulario que recibe muchos pedidos.';
 
