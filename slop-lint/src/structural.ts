@@ -1,6 +1,6 @@
 import { TUTEO, VOSEO } from './rules.ts';
 import { compile } from './regex.ts';
-import { isProse, words, type Span } from './text.ts';
+import { isProse, splitSentences, words, type Span } from './text.ts';
 import type { Lang, Variety } from './types.ts';
 
 /** A raw hit from a structural check, before lint() attaches the rule's metadata. */
@@ -249,10 +249,13 @@ const checks: Record<string, Check> = {
     if (ctx.previous === undefined) return [];
     const n = COPIED_RUN + 1;
     const key = (ws: readonly Span[], i: number): string => ws.slice(i, i + n).map((w) => w.text.toLowerCase()).join(' ');
-    const before = words(ctx.previous);
+    // Only prose is compared: the greeting, the sign-off and the name both messages share are not copied text.
+    const proseWords = (sentences: readonly Span[]): Span[] =>
+      sentences.filter(isProse).flatMap((s) => words(s.text).map((w) => ({ ...w, start: s.start + w.start, end: s.start + w.end })));
+    const before = proseWords(splitSentences(ctx.previous));
     const seen = new Set<string>();
     for (let i = 0; i + n <= before.length; i++) seen.add(key(before, i));
-    const ws = words(ctx.text);
+    const ws = proseWords(ctx.sentences);
     const hits: StructuralHit[] = [];
     // Windows of n words found in the earlier message; overlapping windows join into one run.
     let i = 0;
