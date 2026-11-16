@@ -110,10 +110,10 @@ export function editCap(plan: PlanOutput): number {
   return plan.items.filter((i) => i.action !== 'keep').length;
 }
 
-/** What the first S3 round leaves for the extra one: its prompt and what was parsed from its reply. */
+/** What the first S3 round leaves for the extra one: its prompt and the edits kept from its reply, as parsed. */
 export interface EditRound {
   readonly prompt: StagePrompt<typeof EditOutput>;
-  readonly parsed: EditOutput;
+  /** Within the cap, as the model wrote them: what the extra round replays as its history. */
   readonly edits: Edit[];
 }
 
@@ -121,7 +121,7 @@ export interface EditRound {
 export async function editStage(m: ModelStages, plan: PlanOutput): Promise<EditRound> {
   const prompt = editPrompt(m.prompt, plan);
   const parsed = await call(m, { ...prompt, schema: EditReply });
-  return { prompt, parsed, edits: parsed.edits.slice(0, editCap(plan)) };
+  return { prompt, edits: parsed.edits.slice(0, editCap(plan)) };
 }
 
 /** The extra round's promptVersion: a fixed constant, like every other. */
@@ -130,13 +130,16 @@ const EXTRA_SUFFIX = '+extra';
 const EXTRA_TASK = [
   'TASK: edit, second round',
   'These slop-lint findings of level 1 remain in the text after your edits. Propose the smallest edit that solves each one, against the same numbered TEXT as before: the sentenceId and "before" quoted exactly from that sentence, "after", the reason and the ruleId.',
-  'An edit that overlaps one of your earlier edits is refused, so quote a part of the sentence your earlier edits left alone.',
+  'An edit that overlaps one of your earlier edits is refused, so quote a part of the sentence your earlier edits left alone. A finding marked "inside your earlier edit" sits in text that edit wrote: to fix it, propose an edit with the same sentenceId and "before" as that earlier edit; it replaces it.',
+  'The earlier edits listed as NOT APPLIED were refused or reverted: the text they quoted is as the user wrote it, and free to edit.',
 ].join('\n');
 
 /** A finding that remains, with the sentence of the original it sits in (null: the whole text). */
 export interface Remaining {
   readonly finding: Finding;
   readonly sentenceId: number | null;
+  /** The finding sits in text a live edit wrote. */
+  readonly insideEdit: boolean;
 }
 
 /**
@@ -144,15 +147,15 @@ export interface Remaining {
  * reply as the assistant turn, and a user turn with the findings as a list: it still ends on a
  * user turn, so there is no prefill.
  */
-export async function extraEditStage(m: ModelStages, first: EditRound, remaining: readonly Remaining[]): Promise<Edit[]> {
-  const lines = remaining.map(({ finding: f, sentenceId }) => `[${sentenceId ?? 'whole text'}] ${f.ruleId} (level ${f.level}): «${f.match}»: ${f.message}`);
+export async function extraEditStage(m: ModelStages, first: EditRound, remaining: readonly Remaining[], notApplied: readonly Edit[]): Promise<Edit[]> {
+  const lines = remaining.map(
+    ({ finding: f, sentenceId, insideEdit }) => `[${sentenceId ?? 'whole text'}] ${f.ruleId} (level ${f.level}): «${f.match}»: ${f.message}${insideEdit ? ' (inside your earlier edit)' : ''}`,
+  );
   const [opening] = first.prompt.messages;
   if (opening === undefined) throw new Error('the first edit round has no user turn');
-  const messages: Conversation = [
-    opening,
-    { role: 'assistant', content: JSON.stringify(first.parsed) },
-    { role: 'user', content: [EXTRA_TASK, '', 'FINDINGS (slop-lint, by sentenceId)', wrapData('texto', lines.join('\n'))].join('\n') },
-  ];
+  const task = [EXTRA_TASK, '', 'FINDINGS (slop-lint, by sentenceId)', wrapData('texto', lines.join('\n'))];
+  if (notApplied.length > 0) task.push('', 'NOT APPLIED (your earlier edits, by sentenceId)', wrapData('texto', notApplied.map((e) => `[${e.sentenceId}] «${e.before}»`).join('\n')));
+  const messages: Conversation = [opening, { role: 'assistant', content: JSON.stringify({ edits: first.edits }) }, { role: 'user', content: task.join('\n') }];
   try {
     const parsed = await call(m, { ...first.prompt, schema: EditReply, promptVersion: `${first.prompt.promptVersion}${EXTRA_SUFFIX}` }, messages);
     return parsed.edits.slice(0, remaining.length);
