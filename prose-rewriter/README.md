@@ -2,14 +2,14 @@
 
 prose-rewriter takes a text you wrote: a cover letter, an email, a follow-up or a WhatsApp message. It finds the patterns of generic text in it with slop-lint and returns the same text improved, with your CV as the only source of facts. The model never returns a whole text. It proposes edits over exact quoted spans, and code applies them, checks each one against the facts of your text and your CV, and reverts any edit that adds a fact or loses one.
 
-This folder is at phase F0 of its design. It holds the contract of `rewrite()` as zod schemas (`src/types.ts`), two fictional CVs for the evals and the test that keeps real data out of the fixtures. The pure core comes in F4, and the stages through the gateway, with `rewrite()` and the CLI, in F5.
+This folder is at phase F4 of its design. It holds the contract of `rewrite()` as zod schemas (`src/types.ts`), the pure core that checks a model's edits, two fictional CVs for the evals and the test that keeps real data out of the fixtures. The stages through the gateway, with `rewrite()` and the CLI, come in F5.
 
 ## Run it
 
 Offline, no key, from the repository root:
 
 ```sh
-npx vitest run prose-rewriter   # the contract and the fixture checks
+npx vitest run prose-rewriter   # the contract, the pure core and the fixture checks
 npm run check                   # tsc --noEmit, strict
 ```
 
@@ -19,6 +19,15 @@ npm run check                   # tsc --noEmit, strict
 - `Edit` is what a model may propose. Its `before` is quoted exactly from the text. A missing fact is asked for with a labelled marker, `[COMPLETAR: what is missing]`. The schema refuses a bare `[COMPLETAR]`, which slop-lint reports at level 1.
 - `RewriteResult` returns the text, the diff, each change with its reason and whether it was applied or reverted, the fact report, slop-lint's result before and after, the flags, a status (`ok`, `needs-review`, `blocked`) and the usage. `costUsd` is null when the gateway has no price for a model.
 - The mode defaults to `minimo` on WhatsApp and to `pulido` in the other genres.
+
+## The pure core
+
+Four modules with no model, no gateway and no I/O. `src/index.ts` exports all of them.
+
+- **Voice** (`src/voice.ts`). `voiceProfile()` (`src/voice.ts:134`) measures the text by code. It counts voseo or tuteo, ¿ and ¡, accents, emoji, sentence length and its spread, greeting and sign-off, English contractions and the initial capital. `voicePromptLines()` (`:172`) states the profile as data for the prompt. `voiceViolations()` (`:230`) reports what a rewrite adds that the original did not have, except what the genre requires (`GENRE_REQUIRES`, `:217`).
+- **Facts** (`src/facts.ts`). `extract()` (`src/facts.ts:172`) pulls normalized facts, such as numbers with units, amounts, dates, times, addresses, URLs, phones, names, acronyms, tools and the profile's anchors. `inventory()` (`:306`) labels each fact of the original by where the CV or the recipient states it and flags the ones only the user states. `checkEdit()` (`:345`) reverts an edit that invents a fact, loses one or changes a number. `factInvariant()` (`:386`) checks that the original's facts are in the rewrite and that the rewrite's facts are in the original or the CV. `factReport()` (`:407`) fills `FactReport`.
+- **Edits** (`src/edits.ts`). `splitSentences()` (`src/edits.ts:169`) numbers the sentences, with subject, greeting, body and signature kept apart by `textParts()` (`:138`). `applyEdits()` (`:279`) places each edit by its exact quote and rejects one it cannot find, an ambiguous or overlapping one, a no-op and one that touches a `keep` phrase. `revertEdit()` (`:317`) takes one accepted edit back, and `diffHunks()` (`:328`) builds the diff from the accepted edits.
+- **Injection** (`src/injection.ts`). `injectionFlags()` (`src/injection.ts:95`) flags the phrases of the text or the CV that read like an instruction to a model, in Spanish and English, with their span. `wrapData()` (`:121`) puts the data in a `<texto>` or `<perfil>` block and escapes any of those tags inside it, so the data cannot close its block; `unwrapData()` (`:131`) and `restoreData()` (`:126`) undo the escape. The flags are a heuristic. The real defence is the structured output checked with zod and every edit checked in code.
 
 ## Fixtures and data
 
