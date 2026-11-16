@@ -1,1 +1,590 @@
-[]
+[
+  {
+    "id": "quiroga-decalogo",
+    "kind": "literary",
+    "author": "Horacio Quiroga",
+    "work": "Decálogo del perfecto cuentista",
+    "published": null,
+    "authorDied": 1937,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "uy",
+      "ar"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "unverified",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "paidPublicDomain": "unresolved",
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://es.wikisource.org/wiki/Dec%C3%A1logo_del_perfecto_cuentista",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles of economy and concreteness in our own words; no excerpts (D12). Year of publication [SIN VERIFICAR], so the US status is unverified. Free in Argentina and the EU since 2008, in Spain since 2018. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "quiroga-cuentos-1917",
+    "kind": "literary",
+    "author": "Horacio Quiroga",
+    "work": "Cuentos de amor de locura y de muerte",
+    "published": 1917,
+    "authorDied": 1937,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "uy",
+      "ar"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "paidPublicDomain": "unresolved",
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/13507",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles only; no excerpts while Decreto-ley 1224/58 is unresolved (D12). Más allá (1935) stays [SIN VERIFICAR] in the US and is not listed. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "arlt-aguafuertes",
+    "kind": "literary",
+    "author": "Roberto Arlt",
+    "work": "Aguafuertes porteñas, columns in El Mundo, 1928 to 1930",
+    "published": 1928,
+    "authorDied": 1942,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "paidPublicDomain": "unresolved",
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://es.wikisource.org/wiki/Aguafuertes_porte%C3%B1as",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "scope": {
+      "genres": [
+        "whatsapp"
+      ],
+      "registers": [
+        "casual"
+      ]
+    },
+    "note": "Only for the casual rioplatense register of WhatsApp, as principles in our own words (D12). The US status covers the columns of 1928 to 1930; those of 1931 onwards are [SIN VERIFICAR]. Free in Spain since 2023. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "mansilla-ranqueles",
+    "kind": "literary",
+    "author": "Lucio V. Mansilla",
+    "work": "Una excursión a los indios ranqueles",
+    "published": 1870,
+    "authorDied": 1913,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "paidPublicDomain": "unresolved",
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/63600",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles of naturalness; no excerpts (D12). Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "sarmiento-facundo",
+    "kind": "literary",
+    "author": "Domingo Faustino Sarmiento",
+    "work": "Facundo",
+    "published": 1845,
+    "authorDied": 1888,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "paidPublicDomain": "unresolved",
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/33267",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Little use: its long periods serve only as a counterexample; no excerpts (D12). Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "galdos-fortunata-y-jacinta",
+    "kind": "literary",
+    "author": "Benito Pérez Galdós",
+    "work": "Fortunata y Jacinta",
+    "published": 1887,
+    "authorDied": 1920,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "es"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/17013",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Excerpts in neutral Spanish, sentence craft only, never the period register. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "strunk-elements-1920",
+    "kind": "literary",
+    "author": "William Strunk Jr.",
+    "work": "The Elements of Style (1918, this text the 1920 edition)",
+    "published": 1920,
+    "authorDied": 1946,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "unverified"
+    },
+    "freeFrom": {
+      "es": "2027-01-01"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/37134",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Principles in English and short excerpts. Never the Strunk and White edition of 1959. Spain: life plus 80 gives 2027-01-01; free before that by comparison of terms is [SIN VERIFICAR], so it counts as not free. Free in Argentina and the EU since 2017. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "twain-cooper-offences",
+    "kind": "literary",
+    "author": "Mark Twain",
+    "work": "Fenimore Cooper's Literary Offences",
+    "published": 1895,
+    "authorDied": 1910,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/3172",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Economy, never the dialect. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "bierce-write-it-right",
+    "kind": "literary",
+    "author": "Ambrose Bierce",
+    "work": "Write It Right: A Little Blacklist of Literary Faults",
+    "published": 1909,
+    "authorDied": 1914,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/12474",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Concision, never the tone. The year of death, 1914, is uncertain. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "franklin-autobiography",
+    "kind": "literary",
+    "author": "Benjamin Franklin",
+    "work": "Autobiography",
+    "published": 1791,
+    "authorDied": 1790,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://www.gutenberg.org/ebooks/20203",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Clarity, never the eighteenth-century spelling. Published after the author died, first in French. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "lincoln-gettysburg",
+    "kind": "literary",
+    "author": "Abraham Lincoln",
+    "work": "Gettysburg Address",
+    "published": 1863,
+    "authorDied": 1865,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "licence": "public domain where status says public-domain; see status per jurisdiction",
+    "url": "https://en.wikisource.org/wiki/Gettysburg_Address",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Economy. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "chekhov-garnett-lady-with-the-dog",
+    "kind": "literary",
+    "author": "Anton Chekhov",
+    "work": "The Lady with the Dog and Other Stories, translated by Constance Garnett",
+    "published": 1917,
+    "authorDied": 1904,
+    "lang": "en",
+    "originalLang": "ru",
+    "translator": {
+      "name": "Constance Garnett",
+      "died": 1946
+    },
+    "nationality": [
+      "ru"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "public-domain",
+      "eu": "public-domain",
+      "es": "protected"
+    },
+    "freeFrom": {
+      "es": "2027-01-01"
+    },
+    "licence": "public domain in the US, Argentina and the EU; the translation is protected in Spain until 2027-01-01",
+    "url": "https://www.gutenberg.org/ebooks/13415",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excerpts",
+    "note": "Only the Garnett translation. She died on 1946-12-17, so Spain is not free until 2027-01-01; comparison of terms after Brexit is doubtful. Free in Argentina and the EU since 2017. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "baroja",
+    "kind": "literary",
+    "author": "Pío Baroja",
+    "work": "Works",
+    "published": null,
+    "authorDied": 1956,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "es"
+    ],
+    "status": {
+      "ar": "protected",
+      "us": "unverified",
+      "eu": "protected",
+      "es": "protected"
+    },
+    "freeFrom": {
+      "ar": "2027-01-01",
+      "eu": "2027-01-01",
+      "es": "2037-01-01"
+    },
+    "licence": "protected",
+    "url": "https://es.wikisource.org/wiki/Autor:P%C3%ADo_Baroja",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excluded",
+    "note": "Excluded today. The US status depends on the work. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "azorin",
+    "kind": "literary",
+    "author": "Azorín",
+    "work": "Works",
+    "published": null,
+    "authorDied": 1967,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "es"
+    ],
+    "status": {
+      "ar": "protected",
+      "us": "unverified",
+      "eu": "protected",
+      "es": "protected"
+    },
+    "freeFrom": {
+      "ar": "2038-01-01",
+      "eu": "2038-01-01",
+      "es": "2048-01-01"
+    },
+    "licence": "protected",
+    "url": "https://es.wikisource.org/wiki/Autor:Azor%C3%ADn",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excluded",
+    "note": "Excluded. The US status depends on the work. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "orwell-politics",
+    "kind": "literary",
+    "author": "George Orwell",
+    "work": "Politics and the English Language",
+    "published": 1946,
+    "authorDied": 1950,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "gb"
+    ],
+    "status": {
+      "ar": "public-domain",
+      "us": "protected",
+      "eu": "public-domain",
+      "es": "public-domain"
+    },
+    "freeFrom": {
+      "us": "2042-01-01"
+    },
+    "licence": "protected in the US until 2042",
+    "url": "https://en.wikipedia.org/wiki/Politics_and_the_English_Language",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excluded",
+    "note": "Excluded: GitHub serves from the United States, where it is protected. Free in Argentina and the EU since 2021. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "strunk-white-1959",
+    "kind": "literary",
+    "author": "William Strunk Jr. and E. B. White",
+    "work": "The Elements of Style, 1959 edition",
+    "published": 1959,
+    "authorDied": 1985,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "protected",
+    "url": "https://en.wikipedia.org/wiki/The_Elements_of_Style",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "excluded",
+    "note": "Excluded by name in the design: only the 1918 and 1920 text of Strunk is used. The table gives no status per jurisdiction, so every cell is unverified. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "govuk-style-guide",
+    "kind": "guide",
+    "author": "Government Digital Service",
+    "work": "GOV.UK style guide",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "gb"
+    ],
+    "status": {
+      "ar": "open-licence",
+      "us": "open-licence",
+      "eu": "open-licence",
+      "es": "open-licence"
+    },
+    "licence": "Open Government Licence v3.0",
+    "url": "https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/style-guides/",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles with attribution: start with what the reader needs. The old address www.gov.uk/guidance/style-guide redirects here. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "federal-plain-language",
+    "kind": "guide",
+    "author": "US federal government (plainlanguage.gov, now digital.gov)",
+    "work": "Federal Plain Language Guidelines",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "public-domain",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "no copyright in the US (17 USC 105); outside the US [SIN VERIFICAR]",
+    "url": "https://digital.gov/guides/plain-language",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles. Free in the US by 17 USC 105; its status abroad is [SIN VERIFICAR]. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "argentina-gob-ar",
+    "kind": "guide",
+    "author": "Gobierno de la República Argentina",
+    "work": "Contenidos de argentina.gob.ar",
+    "published": null,
+    "authorDied": null,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "open-licence",
+      "us": "open-licence",
+      "eu": "open-licence",
+      "es": "open-licence"
+    },
+    "licence": "CC BY 4.0",
+    "url": "https://www.argentina.gob.ar/acerca",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles with attribution. The page showed the Creative Commons Atribución 4.0 Internacional line when fetched on 2026-11-16. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "ec-how-to-write-clearly",
+    "kind": "guide",
+    "author": "European Commission",
+    "work": "How to write clearly",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "eu"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "CC BY 4.0 by default; the colophon of this guide is [SIN VERIFICAR]",
+    "url": "https://op.europa.eu/en/publication-detail/-/publication/725b7eb0-d92e-11e5-8fea-01aa75ed71a1",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only until its colophon confirms CC BY 4.0; then it can give principles with attribution. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "red-lenguaje-claro-es",
+    "kind": "guide",
+    "author": "Red de Lenguaje Claro (Spain)",
+    "work": "Guías de lenguaje claro",
+    "published": null,
+    "authorDied": null,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "es"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "[SIN VERIFICAR]",
+    "url": "https://redlenguajeclaro.es/",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only. Licence [SIN VERIFICAR]; the address could not be reached from this session (the proxy answered 502), so it is [SIN VERIFICAR] too. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "andis-lenguaje-claro",
+    "kind": "guide",
+    "author": "Agencia Nacional de Discapacidad (ANDIS)",
+    "work": "Guía de lenguaje claro",
+    "published": null,
+    "authorDied": null,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "protected",
+      "us": "protected",
+      "eu": "protected",
+      "es": "protected"
+    },
+    "licence": "CC BY-NC-SA",
+    "url": "https://www.argentina.gob.ar/andis",
+    "verified": "2026-11-15",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only, never copied: a non-commercial licence is not free for this repository. The address is the agency page, not the guide itself; on 2026-11-16 it redirected to www.argentina.gob.ar/salud/senadis, and the address of the guide is [SIN VERIFICAR]. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  }
+]
