@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...]
-//        [--limit N] [--monthly-cap USD] [--max-usd USD] [--ledger file]
+//        [--limit N] [--monthly-cap USD] [--max-usd USD]
 // --live needs ANTHROPIC_API_KEY in the environment (never in a file or an argument); --dry-run needs no key.
 // Exit codes: 0 finished, 1 stopped by a cap or the budget, 3 bad usage, 4 no key or an unreadable ledger.
 //

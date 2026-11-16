@@ -445,6 +445,25 @@ describe('the eval CLI', () => {
     }
   });
 
+  it('keeps the ledger at one path: no flag points a run at another file with a fresh budget', async () => {
+    const h = harness(never);
+    const seed = openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed });
+    seed.settle(seed.reserve(20), 20);
+    expect(await runEvalCli(['--dry-run', '--ledger', join(h.dir, 'other.json')], h.deps)).toBe(EVAL_EXIT.usage);
+    expect(h.err.join('')).toMatch(/unknown option --ledger/);
+    expect(await runEvalCli(['--dry-run', '--variants', 'full'], h.deps)).toBe(EVAL_EXIT.ok);
+    expect(h.out.join('')).toMatch(/US\$20\.0000 of US\$20 .* US\$0\.0000 left/);
+  });
+
+  it('asks for an unreadable ledger to be repaired, not moved: a moved ledger starts the month at zero', async () => {
+    const h = harness(never);
+    mkdirSync(dirname(h.ledgerPath), { recursive: true });
+    writeFileSync(h.ledgerPath, '{bad');
+    expect(await runEvalCli(['--dry-run'], h.deps)).toBe(EVAL_EXIT.failed);
+    expect(h.err.join('')).toMatch(/repair it by hand/);
+    expect(h.err.join('')).not.toMatch(/move it/);
+  });
+
   it('--live without a key refuses before building anything', async () => {
     const h = harness(never, { apiKey: undefined });
     expect(await runEvalCli(['--live', '--out', 'x'], h.deps)).toBe(EVAL_EXIT.failed);

@@ -53,7 +53,7 @@ export const EVAL_EXIT = { ok: 0, stopped: 1, usage: 3, failed: 4 } as const;
 
 export const EVAL_USAGE =
   'usage: node prose-rewriter/evals/cli.ts (--dry-run | --live --out <dir>) [--variants id,...] [--cases genre|lang|id,...] [--limit N] ' +
-  `[--monthly-cap USD (default and most ${MONTHLY_BUDGET_USD})] [--max-usd USD] [--ledger file]`;
+  `[--monthly-cap USD (default and most ${MONTHLY_BUDGET_USD})] [--max-usd USD]`;
 
 export interface EvalArgs {
   readonly dryRun: boolean;
@@ -63,11 +63,11 @@ export interface EvalArgs {
   readonly limit: number | null;
   readonly monthlyCap: number;
   readonly maxUsd: number | null;
-  readonly ledger: string | null;
   readonly out: string | null;
 }
 
-const VALUE_FLAGS = ['variants', 'cases', 'limit', 'monthly-cap', 'max-usd', 'ledger', 'out'] as const;
+// No flag names the ledger: a run pointed at another file would start the month at zero (D14).
+const VALUE_FLAGS = ['variants', 'cases', 'limit', 'monthly-cap', 'max-usd', 'out'] as const;
 type ValueFlag = (typeof VALUE_FLAGS)[number];
 const BOOLEAN_FLAGS = ['dry-run', 'live', 'help'] as const;
 
@@ -123,7 +123,6 @@ export function parseEvalArgs(argv: readonly string[]): EvalArgs | 'help' | stri
     limit,
     monthlyCap: cap ?? MONTHLY_BUDGET_USD,
     maxUsd,
-    ledger: values.ledger ?? null,
     out: values.out ?? null,
   };
 }
@@ -229,7 +228,7 @@ export interface EvalCliDeps {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
   readonly clock: Clock;
-  /** The folder the default ledger path is under (the user's home). */
+  /** The folder the ledger is under (the user's home); the tests pass a temp folder. */
   readonly home: string;
   readonly cases: () => readonly LoadedCase[];
   readonly refs: () => PromptRefs;
@@ -288,7 +287,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
   let ledger: SpendLedger;
   let month: MonthSpend;
   try {
-    ledger = openLedger({ path: args.ledger ?? defaultLedgerPath(deps.home), monthlyCapUsd: args.monthlyCap, clock: deps.clock });
+    ledger = openLedger({ path: defaultLedgerPath(deps.home), monthlyCapUsd: args.monthlyCap, clock: deps.clock });
   } catch (error) {
     return usage((error as Error).message);
   }

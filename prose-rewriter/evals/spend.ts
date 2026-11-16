@@ -6,7 +6,7 @@
  * in-memory stores that start from zero on every run (prose-rewriter/cli.ts). So the budget lives
  * here, in a ledger file outside the repository that every run reads and writes:
  *
- * - openLedger(): a JSON file (by default ~/.applied-ai-toolkit/eval-spend.json) keyed by calendar
+ * - openLedger(): a JSON file (the CLI pins it to ~/.applied-ai-toolkit/eval-spend.json) keyed by calendar
  *   month in Buenos Aires. Amounts are whole micro-dollars, the precision of the gateway's
  *   costUsd, so sums do not drift. Every operation reads the file again and writes it whole
  *   through a temp file and a rename, so a crash leaves the old file or the new one, never half.
@@ -157,7 +157,7 @@ const isCount =(v: unknown): v is number => typeof v === 'number' && Number.isSa
 
 function parseLedger(raw: string, path: string): LedgerFile {
   const bad = (why: string): never => {
-    throw new Error(`spend ledger ${path} is not readable (${why}); fix or move it by hand, the eval runs stay stopped until then`);
+    throw new Error(`spend ledger ${path} is not readable (${why}); repair it by hand and keep it where it is (a ledger deleted or moved away starts the month at zero, and the budget with it); the eval runs stay stopped until then`);
   };
   let json: unknown;
   try {
