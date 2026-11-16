@@ -152,11 +152,20 @@ export interface PlanInput {
    * the order, which needs every id to share one prefix (applyEdits' ids within one stage).
    */
   readonly order?: readonly string[];
-  /** 'first': the verdict on the rewrite. 'final': the one re-judging after the first reverts. */
+  /**
+   * 'first': the verdict on the rewrite, with every accepted edit. 'final': the verdict on the text
+   * left after the first round's reverts, with `edits` (and `rewritten`) being only the edits
+   * still applied. A line invented in both rounds had all its edits reverted in the first, so in
+   * the final round it is already the user's own text: it comes back as a UserClaim. A Fallback
+   * is a line invented in the final round that an edit still applied touches.
+   */
   readonly round: 'first' | 'final';
 }
 
-/** A line still invented on the final round: its edits are reverted and it reads as the user wrote it. */
+/**
+ * A line invented on the final round that edits left after the first round touch: those edits are
+ * reverted too and the line reads as the user wrote it.
+ */
 export interface Fallback {
   readonly line: number;
   /** The edits that touched it, last made first; all of them are in `revert` too. */
@@ -182,17 +191,35 @@ export interface RevertPlan {
 
 /**
  * An edit touches a line when their spans overlap. An edit that deleted text has an empty span: it
- * touches a line it sits in, or one it is separated from by whitespace only, since what it removed
- * (a qualifying sentence, the end of a clause) may be what made the line true.
+ * touches the line it sits in, since what it removed (a qualifier, the end of a clause) may be
+ * what made the line true. One that deleted its whole sentence sits in no line, so it touches the
+ * lines it is separated from by whitespace only: the sentence it removed may have qualified either.
+ * A deletion at the head of a sentence ("Also, ") sits at the start of what is left of that
+ * sentence and does not reach back to the one before.
  */
-function touches(edit: AppliedEdit, line: TextRange, text: string): boolean {
+function touches(edit: AppliedEdit, line: TextRange, text: string, wholeSentence: boolean): boolean {
   const s = edit.newSpan;
   if (s.start < s.end) return s.start < line.end && line.start < s.end;
   let from = s.start;
   let to = s.start;
-  while (from > 0 && /\s/u.test(text[from - 1] ?? '')) from--;
-  while (to < text.length && /\s/u.test(text[to] ?? '')) to++;
+  if (wholeSentence) {
+    while (from > 0 && /\s/u.test(text[from - 1] ?? '')) from--;
+    while (to < text.length && /\s/u.test(text[to] ?? '')) to++;
+  }
   return from <= line.end && line.start <= to;
+}
+
+/** The ids of the edits that removed the whole of their sentence of the original. */
+function wholeSentenceDeletions(original: string, lang: Lang, edits: readonly AppliedEdit[]): Set<string> {
+  const sentences = splitSentences(original, lang);
+  return new Set(
+    edits
+      .filter((e) => {
+        const sentence = sentences[e.edit.sentenceId];
+        return e.after === '' && sentence !== undefined && e.span.start <= sentence.start && sentence.end <= e.span.end;
+      })
+      .map((e) => e.id),
+  );
 }
 
 /** A position of the rewritten text in the original's coordinates. `side` settles a deletion that sits exactly there. */
@@ -221,9 +248,9 @@ function madeOrder(edits: readonly AppliedEdit[], order: readonly string[] | und
 
 /**
  * Turns the judge's verdict into what S5 does with it. For every invented line: the edits that
- * touch it are reverted, last made first. On the final round, a line still invented also falls
- * back to its original text with a flag. An invented line that no edit touched is the user's own
- * claim: it is flagged and left as written on either round.
+ * touch it are reverted, last made first. On the final round (see PlanInput.round) such a line
+ * also falls back to its original text with a flag. An invented line that no edit touches is the
+ * user's own claim: it is flagged and left as written on either round.
  *
  * Throws JudgeError when the verdict does not account for every line of `rewritten`, and Error
  * when `edits` do not produce `rewritten` from `original`.
@@ -233,6 +260,7 @@ export function planReverts(input: PlanInput): RevertPlan {
   checkLineCoverage(input.verdict, lines.length);
   if (renderEdits(input.original, input.edits) !== input.rewritten) throw new Error('the edits do not produce the rewritten text from the original');
   const ordered = madeOrder(input.edits, input.order);
+  const whole = wholeSentenceDeletions(input.original, input.lang, input.edits);
   const byLine = new Map(lines.map((l) => [l.line, l]));
   const revert: string[] = [];
   const fallback: Fallback[] = [];
@@ -241,7 +269,7 @@ export function planReverts(input: PlanInput): RevertPlan {
     if (judged.support !== 'invented') continue;
     const line = byLine.get(judged.line);
     if (line === undefined) throw new JudgeError(`judge named line ${judged.line}, which the rewrite does not have`);
-    const touching = ordered.filter((e) => touches(e, line, input.rewritten)).reverse();
+    const touching = ordered.filter((e) => touches(e, line, input.rewritten, whole.has(e.id))).reverse();
     const start = Math.min(line.start, ...touching.map((e) => e.newSpan.start));
     const end = Math.max(line.end, ...touching.map((e) => e.newSpan.end));
     const span = { start: toOriginal(start, input.edits, 'start'), end: toOriginal(end, input.edits, 'end') };
