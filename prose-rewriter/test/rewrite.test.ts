@@ -541,3 +541,88 @@ describe('edits code refuses are reported, never dropped', () => {
     expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
   });
 });
+
+describe('the edit caps and the extra round', () => {
+  it('keeps one S3 edit per plan item, and replays only the kept edits as the extra round\'s history', async () => {
+    const kept = { sentenceId: 2, before: 'ya carga', after: 'ahora carga' };
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [edits(kept, { sentenceId: 1, before: 'me apasiona potenciar sinergias', after: 'el sitio está listo' }), edits()],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes.map((c) => [c.id, c.after, c.status])).toEqual([['e1', 'ahora carga', 'applied']]);
+    const extra = scripted.calls[2]?.request;
+    expect(JSON.parse(String(extra?.messages[1]?.content))).toEqual({ edits: [{ ...kept, reason: 'fix' }] });
+    expect(extra?.promptVersion).toBe(`${scripted.calls[1]?.request.promptVersion}+extra`);
+  });
+
+  it('tells the extra round which earlier edits were not applied', async () => {
+    const invent = { sentenceId: 2, before: SPEED, after: 'El sitio de la panadería, hecho en React, ya carga en 1,6 s.' };
+    const scripted = scriptedGateway({ 'rewrite.plan': [plan(1, 2)], 'rewrite.edit': [edits(invent), edits()] });
+    await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    const turn = String(scripted.calls[2]?.request.messages[2]?.content);
+    expect(turn).toMatch(/NOT APPLIED/);
+    expect(turn).toContain('[2] «El sitio de la panadería ya carga en 1,6 s.»');
+  });
+
+  it('keeps at most one extra-round edit per finding it was given', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [
+        edits(),
+        edits(
+          { sentenceId: 1, before: 'comentarte', after: 'contarte' },
+          { sentenceId: 2, before: 'ya carga', after: 'ahora carga' },
+          { sentenceId: 3, before: 'el jueves', after: 'el viernes' },
+          { sentenceId: 0, before: 'espero que estés bien', after: 'qué tal' },
+        ),
+      ],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    const findings = String(scripted.calls[2]?.request.messages[2]?.content).match(/^\[[^\]]+\] [A-Z]+-\d+/gmu) ?? [];
+    expect(findings.length).toBeLessThan(4);
+    expect(result.changes).toHaveLength(findings.length);
+  });
+
+  it('names the sentence of a finding that sits inside a live edit, and lets the extra round replace that edit', async () => {
+    const long = 'Quería contarte, con muchísimo entusiasmo y bastante detalle y un montón de ganas, que me interesa potenciar sinergias.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: long }), edits({ sentenceId: 1, before: SINERGIAS, after: FIXED })],
+    });
+    const input = whatsapp(CHAT);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    const turn = String(scripted.calls[2]?.request.messages[2]?.content);
+    expect(turn).toMatch(/^\[1\] LEX-01 \(level 1\): «sinergias»/mu);
+    expect(turn).not.toMatch(/^\[3\]/mu);
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+    expect(result.changes.map((c) => [c.id, c.status, c.revertReason ?? ''])).toEqual([
+      ['e1', 'reverted', 'replaced by e2 in the extra round'],
+      ['e2', 'applied', ''],
+    ]);
+    expectSound(input, result);
+  });
+
+  it('puts the replaced edit back when its replacement is not applied', async () => {
+    const long = 'Quería contarte, con muchísimo entusiasmo y bastante detalle y un montón de ganas, que me interesa potenciar sinergias.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: long }), edits({ sentenceId: 1, before: SINERGIAS, after: 'Quería contarte que el sitio está hecho en React.' })],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, long));
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied'], ['e2', 'reverted']]);
+  });
+
+  it('skips S4 when the prompt shows no principle to cite', async () => {
+    const expected = MAIL.replace(SINERGIAS, FIXED);
+    const scripted = scriptedGateway({ 'rewrite.plan': [plan(2)], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })], 'rewrite.judge': [verdict(expected)] });
+    const result = await rewrite(mail(MAIL), { gateway: scripted.gateway });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.judge']);
+    expect(result.rewritten).toBe(expected);
+  });
+});

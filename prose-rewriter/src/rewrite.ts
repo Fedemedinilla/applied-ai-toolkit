@@ -75,8 +75,26 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   let extraInvented = false;
   const remaining = remainingLevelOne(a, rendered(a, units, proposals), liveEdits(a, units, proposals));
   if (remaining.length > 0) {
-    const round2 = propose(await extraEditStage(m, first, remaining), 'edit', 2);
+    // History in the model's own words; the proposals hold the same edits with data tags restored.
+    const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live');
+    const round2 = propose(await extraEditStage(m, first, remaining, notApplied), 'edit', 2);
+    // An extra-round edit with the sentence and quote of a live edit replaces it; if the new one
+    // is not applied, the old one is placed and checked again.
+    const replaced = new Map<Proposal, Proposal>();
+    for (const p2 of round2) {
+      const p1 = proposals.find((q) => q.status === 'live' && q.round === 1 && q.edit.sentenceId === p2.edit.sentenceId && q.before === p2.edit.before.normalize('NFC'));
+      if (p2.status !== 'live' || p1 === undefined) continue;
+      p1.status = 'reverted';
+      p1.reason = `replaced by ${p2.id} in the extra round`;
+      replaced.set(p1, p2);
+    }
     check(round2);
+    const back = [...replaced].filter(([, p2]) => p2.status !== 'live').map(([p1]) => p1);
+    for (const p1 of back) {
+      p1.status = 'live';
+      delete p1.reason;
+    }
+    if (back.length > 0) check(back);
     extraInvented = round2.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
   }
 
@@ -95,11 +113,16 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
 /** The level 1 findings of the rewrite, each with the sentence of the original it sits in. */
 function remainingLevelOne(a: Analysis, rewritten: string, live: ReturnType<typeof liveEdits>): Remaining[] {
   // A position of the rewrite in the original's coordinates: undo the shift of the edits before it.
+  // A position inside an edit's new text maps to that edit's sentence.
   const toOriginal = (position: number): number =>
     position - live.filter((e) => e.newSpan.end <= position).reduce((shift, e) => shift + e.after.length - e.before.length, 0);
   return lintAs(a.input, rewritten)
     .findings.filter((f) => f.level === 1)
-    .map((finding) => ({ finding, sentenceId: sentenceAt(a.sentences, toOriginal(finding.start)) }));
+    .map((finding) => {
+      const inside = live.find((e) => e.newSpan.start <= finding.start && finding.start < e.newSpan.end);
+      if (inside !== undefined) return { finding, sentenceId: inside.edit.sentenceId, insideEdit: true };
+      return { finding, sentenceId: sentenceAt(a.sentences, toOriginal(finding.start)), insideEdit: false };
+    });
 }
 
 interface Outcome {
