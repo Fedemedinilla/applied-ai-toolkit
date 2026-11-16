@@ -434,6 +434,29 @@ describe('MAIL-01, thanks as the only closing sentence', () => {
   });
 });
 
+describe('MAIL-01 and the lines after the formula', () => {
+  const body = 'Hi Dana,\n\nI rebuilt the sales dashboard in Power BI in 2024.\n\n';
+  const match = (text: string) => lint(text, { lang: 'en', genre: 'email' }).findings.filter((f) => f.ruleId === 'MAIL-01').map((f) => f.match);
+
+  it('fires when the sign-off or the signature ends in a period', () => {
+    expect(match(`${body}Thank you for your time and consideration.\n\nKind regards, Sam.`)).toEqual(['Thank you for your time and consideration.']);
+    expect(match(`${body}Thank you for your time and consideration.\n\nBest,\nSam R. Smith.`)).toEqual(['Thank you for your time and consideration.']);
+    expect(match(`${body}Thank you for your time and consideration.\n\nBest regards,\nSam Ruiz\nData analyst, Rosario.`)).toEqual(['Thank you for your time and consideration.']);
+  });
+
+  it('fires when the formula is the sign-off line itself, with a comma, an ellipsis or no mark', () => {
+    expect(match(`${body}Thank you for your time and consideration,\nSam`)).toEqual(['Thank you for your time and consideration,']);
+    expect(match(`${body}Thank you for your time and consideration…\nSam`)).toEqual(['Thank you for your time and consideration…']);
+    expect(match(`${body}Thank you for your time and consideration\nSam`)).toEqual(['Thank you for your time and consideration']);
+  });
+
+  it('still fires with a bare name after the formula, and not when a sentence or a P.S. follows it', () => {
+    expect(match(`${body}Thank you for your time and consideration.\n\nSam`)).toEqual(['Thank you for your time and consideration.']);
+    expect(match(`${body}Thank you for your time and consideration.\nI can send the code sample on Monday.\n\nBest,\nSam`)).toEqual([]);
+    expect(match(`${body}Thank you for your time and consideration.\n\nBest,\nSam\n\nP.S. I attach the code sample here.`)).toEqual([]);
+  });
+});
+
 describe('MAIL-02, "Estimado/a" with a slash', () => {
   it('fires in email and follow-up, on every spelling of the slash, and not in a cover letter', () => {
     for (const genre of ['email', 'follow-up'] as const) {
