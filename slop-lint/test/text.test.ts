@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { countAnchors, isProse, lineColumn, lineStarts, splitSentences, words } from '../src/text.ts';
+import { extractAnchors as publicExtractAnchors } from '../src/lint.ts';
+import { countAnchors, extractAnchors, isProse, lineColumn, lineStarts, splitSentences, words } from '../src/text.ts';
 
 const texts = (t: string) => splitSentences(t).map((s) => s.text);
 
@@ -80,5 +81,39 @@ describe('words and positions', () => {
     expect(lineColumn(starts, 0)).toEqual({ line: 1, column: 1 });
     expect(lineColumn(starts, 4)).toEqual({ line: 2, column: 2 });
     expect(lineColumn(starts, 6)).toEqual({ line: 3, column: 1 });
+  });
+});
+
+describe('extractAnchors', () => {
+  it('returns the anchor terms countAnchors counts, in order', () => {
+    expect(extractAnchors('I led a team of 4 analysts.', 'en')).toEqual(['4']);
+    expect(extractAnchors('Lideré un equipo de cuatro personas.', 'es')).toEqual(['cuatro']);
+    expect(extractAnchors('Trabajo con SQL en Contoso Agro.', 'es')).toEqual(['SQL', 'Contoso', 'Agro']);
+    expect(extractAnchors('uso airflow a diario.', 'es', [' airflow '])).toEqual(['airflow']);
+    expect(extractAnchors('We report in power\nbi.', 'en', ['Power BI'])).toEqual(['power\nbi']);
+    expect(extractAnchors('Una persona proactiva.', 'es')).toEqual([]);
+  });
+
+  it('agrees with countAnchors on every case countAnchors is tested on', () => {
+    const cases: Array<[string, 'en' | 'es', string[]]> = [
+      ['I love working with the team.', 'en', []],
+      ['I led a team of 4 analysts.', 'en', []],
+      ['Lideré un equipo de cuatro personas.', 'es', []],
+      ['Trabajo con SQL en Contoso Agro.', 'es', []],
+      ['Una persona proactiva.', 'es', []],
+      ['uso dbt a diario.', 'es', []],
+      ['uso airflow a diario.', 'es', ['airflow']],
+      ['i am a proactive and passionate person.', 'en', [' ']],
+      ['We report in Power BI and SQL Server.', 'en', ['Power BI', 'SQL Server']],
+      ['We read the power bill.', 'en', ['Power BI']],
+      ['uso contoso agro (c++) a diario.', 'es', ['agro (c++)']],
+    ];
+    for (const [sentence, lang, extra] of cases) {
+      expect(extractAnchors(sentence, lang, extra)).toHaveLength(countAnchors(sentence, lang, extra));
+    }
+  });
+
+  it('is published from the entry point', () => {
+    expect(publicExtractAnchors).toBe(extractAnchors);
   });
 });
