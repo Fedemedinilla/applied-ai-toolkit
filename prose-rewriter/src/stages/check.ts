@@ -18,7 +18,7 @@
 import { judgeWith } from '../../../evals/src/index.ts';
 import { applyEdits, renderEdits, type AppliedEdit, type Sentence, type TextRange } from '../edits.ts';
 import { checkEdit, factInvariant, type EditCheck, type Fact } from '../facts.ts';
-import { factSheet, planReverts, rewritePiece, rewriteRubric, type RevertPlan } from '../rubric.ts';
+import { factSheet, jsonJudgeClient, planReverts, rewritePiece, rewriteRubric, type RevertPlan } from '../rubric.ts';
 import type { Edit, Flag, JudgeClient } from '../types.ts';
 import { voiceViolations } from '../voice.ts';
 import { lintAs, type Analysis } from './analyse.ts';
@@ -232,10 +232,11 @@ export interface JudgeOutcome {
 export async function judgeStage(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], client: JudgeClient): Promise<JudgeOutcome> {
   const sheet = factSheet({ ...a.input.profile, recipient: a.input.recipient });
   const order = proposals.map((p) => p.id);
+  const reader = jsonJudgeClient(client);
   const round = async (kind: 'first' | 'final'): Promise<RevertPlan> => {
     const edits = liveEdits(a, units, proposals);
     const rewritten = renderEdits(a.text, edits);
-    const verdict = await judgeWith(rewriteRubric, client, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
+    const verdict = await judgeWith(rewriteRubric, reader, rewritePiece({ original: a.text, rewritten, lang: a.input.lang }), sheet);
     const plan = planReverts({ original: a.text, rewritten, lang: a.input.lang, verdict, edits, order: order.filter((id) => edits.some((e) => e.id === id)), round: kind });
     for (const id of plan.revert) {
       const p = proposals.find((x) => x.id === id);

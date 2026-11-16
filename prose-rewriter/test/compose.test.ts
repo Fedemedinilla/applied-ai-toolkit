@@ -184,3 +184,45 @@ describe('S4 after S3 (F6b eval run)', () => {
     expectSound(i, result);
   });
 });
+
+// F6b: the S5 judge's reply. The same run failed five pieces outright on the judge, after paying
+// for every call before it: four "judge reply has the wrong shape: Invalid input: expected string,
+// received undefined" and one "judge reply is not JSON", all on follow-ups (es-follow-up-heavy
+// no-examples; es-follow-up-good no-style; en-follow-up-good no-style, no-examples, edit-sonnet).
+// The judge is the one model call without structured output, so nothing but its prompt holds the
+// shape. The run did not keep the raw replies: the ones below are the shapes those errors name, on
+// the run's text and the S3 edits of es-follow-up-heavy no-style, verbatim.
+const ES_FOLLOW_S3: Proposed[] = [
+  { before: 'Espero que este mensaje te encuentre muy bien.', after: '', reason: 'Fórmula de apertura que no le dice nada a Martín.', ruleId: 'LEX-01' },
+  { before: 'Sin lugar a dudas, estoy convencida de que juntos podemos llevar el sitio al siguiente nivel.', after: '', reason: 'Promesa vacía, sin un dato que la respalde.', ruleId: 'LEX-01' },
+];
+const lines = (rewritten: string, lang: 'es' | 'en') => judgeLines(rewritten, lang).map((l) => ({ line: l.line, support: 'no-claim' }));
+
+describe('the S5 judge reply (F6b eval run)', () => {
+  const i = input('es-follow-up-heavy');
+  const expected = i.text.replace((ES_FOLLOW_S3[0] as Proposed).before, '').replace((ES_FOLLOW_S3[1] as Proposed).before, '');
+  const run = async (...judge: ScriptedReply[]) => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(6)],
+      'rewrite.edit': [reply(i.text, 'es', ES_FOLLOW_S3), { data: { edits: [] } }],
+      'rewrite.judge': judge,
+    });
+    const result = await rewrite(i, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    return result;
+  };
+
+  it('reads a verdict that leaves out an empty note, on a line or on the whole text', async () => {
+    const result = await run({ text: JSON.stringify({ lines: lines(expected, 'es') }) });
+    expect(result.rewritten).toBe(expected);
+    expect(result.status).toBe('ok');
+    expectSound(i, result);
+  });
+
+  it('reads a verdict in a code fence', async () => {
+    const fenced = '```json\n' + JSON.stringify({ lines: lines(expected, 'es').map((l) => ({ ...l, note: '' })), note: '' }) + '\n```';
+    const result = await run({ text: fenced });
+    expect(result.rewritten).toBe(expected);
+    expect(result.status).toBe('ok');
+  });
+});
