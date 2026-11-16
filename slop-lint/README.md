@@ -435,7 +435,7 @@ The report sorts vocabulary into three tiers and gives every catalog rule a thre
 
 The shared budget is spent in reading order, so context words without an anchor can use it up before a Tier 2 word appears. <!-- slop-lint-disable -->In the English "before" letter, "drive" and "impactful" take the two free slots, and "dynamic", "fostering" and "align with" are reported.<!-- slop-lint-enable -->
 
-A rule can hold alternatives whose source is weaker than its own, reported at a lower severity. LEX-04 has two, <!-- slop-lint-disable -->"this matters" and "why X matters"<!-- slop-lint-enable -->, from a commercial analytics firm the report tags REPORTADO. They spend the shared Tier 2 budget like any LEX-04 word, so one of them can push a later word past the budget. Once reported, they cost the low penalty instead of the medium one. A "why X matters" whose X holds a hit of LEX-04 or of another rule is dropped, and that hit is reported as it would be without the phrase. A severity set for LEX-04 in a genre or a config applies to them too.
+A rule can hold alternatives whose source is weaker than its own, reported at a lower severity. LEX-04 has two, <!-- slop-lint-disable -->"this matters" and "why X matters"<!-- slop-lint-enable -->, from a commercial analytics firm the report tags REPORTADO. They spend the shared Tier 2 budget like any LEX-04 word, so one of them can push a later word past the budget. Once reported, they cost the low penalty instead of the medium one. A <!-- slop-lint-disable -->"why X matters"<!-- slop-lint-enable --> whose X holds a hit of LEX-04 or of another rule is dropped, and that hit is reported as it would be without the phrase. A severity set for LEX-04 in a genre or a config applies to them too.
 
 ## Design decisions
 
@@ -465,13 +465,13 @@ A rule can hold alternatives whose source is weaker than its own, reported at a 
 
 ## What the tests cover
 
-359 tests in 14 files, all offline and without an API key:
+On 2026-11-16, `npx vitest run slop-lint` ran 539 tests in 18 files, all offline and without an API key:
 
 - `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, its own source and a lower severity for a rule's weaker alternatives, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
 - `text.test.ts`: sentence splitting with abbreviations, initials, dotted abbreviations, decimals, line breaks and closing quotes; prose detection; anchor counting; offsets to line and column.
 - `cover-letters.test.ts`: the six letters of section 15 (below).
-- `widenings.test.ts`: the REG-02 and LEX-04 phrases added in 0.2.0, in every genre, with the Tier 2 budget they spend and the severity they are reported at.
+- `widenings.test.ts`: the REG-02 and LEX-04 phrases added in 0.2.0, in every genre, with the Tier 2 budget they spend and the severity they are reported at, the hits inside X they never swallow, the noun "matters" they leave alone, line breaks between their words and "encantaría" without its accent or in NFD.
 - `markdown.test.ts`: the masked copy keeps length and newlines; code blocks, inline code, tables, comments, link URLs and markers are masked; findings point into the original file; FMT-01 is skipped and the other rules still fire; list items do not merge into one sentence; EST-10 scope; inline code as an anchor; the three directives; text mode unchanged.
 - `cli.test.ts`: exit codes 0, 1 and 2, text and JSON output, stdin, `--anchors`, `--format` and the `.md` default, several files with one summary line each.
 - `output-regression.test.ts`: the text and JSON output for one file and for two, and the SARIF output for two, byte for byte against `test/golden/`, on a fixture with accents, emoji and a ZWJ sequence.
