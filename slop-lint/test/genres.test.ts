@@ -234,7 +234,15 @@ describe('Markdown in a mail', () => {
         ['FMT-01-LIST', 2, 'low'],
       ]);
       expect(parts({ ruleSettings: { 'FMT-01': 'off', 'FMT-01-LIST': { severity: 'low' } } })).toEqual({ rules: [['FMT-01-LIST', 2, 'low']], off: ['FMT-01'] });
-      expect(parts({ ruleSettings: { 'FMT-01': 'off' } })).toEqual({ rules: [], off: ['FMT-01', 'FMT-01-LIST'] });
+      expect(parts({ ruleSettings: { 'FMT-01': 'off', 'FMT-01-LIST': 'off' } })).toEqual({ rules: [], off: ['FMT-01', 'FMT-01-LIST'] });
+    });
+
+    it('lists FMT-01 once as off when the config turns the whole rule off by its catalog id, as before the split', () => {
+      expect(parts({ ruleSettings: { 'FMT-01': 'off' } })).toEqual({ rules: [], off: ['FMT-01'] });
+      for (const genre of ['email', 'follow-up'] as const) {
+        const { off } = settingsFor(validateConfig({ ruleSettings: { 'FMT-01': 'off' } }), undefined, 'config file', { genre });
+        expect(off.filter((id) => id.startsWith('FMT-01')), genre).toEqual(['FMT-01']);
+      }
     });
 
     it('keeps a top-level FMT-01-LIST setting when an override sets FMT-01', () => {
