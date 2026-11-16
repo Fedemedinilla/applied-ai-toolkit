@@ -22,18 +22,69 @@ interface Span {
 // model edits have to be the sentences slop-lint reports on, so test/sentences.test.ts compares
 // the copy with the original as text.
 
-/** Abbreviations whose period does not end a sentence, lowercased and without the final period. */
+/** Abbreviations whose period never ends a sentence, lowercased and without the final period. */
 const ABBREVIATIONS = new Set([
   'sr', 'sra', 'sres', 'srta', 'dr', 'dra', 'lic', 'ing', 'prof', 'arq', 'cdor', 'cra',
-  'mr', 'mrs', 'ms', 'st', 'jr', 'etc', 'vs', 'e.g', 'i.e', 'approx', 'nro', 'av', 'inc', 'ltd',
-  'rr', 'hh', 'ee', 'uu',
+  'mr', 'mrs', 'ms', 'st', 'vs', 'e.g', 'i.e', 'approx', 'aprox', 'nro', 'núm', 'av', 'pág', 'págs',
+  'ej', 'cf', 'rr', 'ee',
 ]);
+
+/**
+ * Abbreviations that can also close a sentence, lowercased and without the final period: their
+ * period ends the sentence when the next word starts in uppercase ("etc. Después", "EE. UU. Ahora")
+ * and stays inside it otherwise. Read as ends, a capitalized word after them mid-sentence (a proper
+ * noun after "etc.") is cut, which is rarer than a sentence that ends on them.
+ */
+const CLOSING_ABBREVIATIONS = new Set(['etc', 'inc', 'ltd', 'jr', 'hh', 'uu']);
+
+/** Lowercase words after which a capital letter and a period are a person's initial ("con J. Pérez"). */
+const BEFORE_INITIAL = new Set([
+  'con', 'de', 'por', 'para', 'según', 'y', 'e', 'with', 'by', 'from', 'to', 'for', 'and', 'of',
+]);
+
+/** What the opening punctuation of a sentence may be: «Después», "Then", ¿Cuál?, (Then). */
+const OPENERS = '¿¡«"“‘(\'';
 
 const TERMINATORS = '.!?…';
 const CLOSERS = '"”’»)\'';
 
 function isLowercaseLetter(ch: string | undefined): boolean {
   return ch !== undefined && /\p{Ll}/u.test(ch);
+}
+
+function isUppercaseLetter(ch: string | undefined): boolean {
+  return ch !== undefined && /\p{Lu}/u.test(ch);
+}
+
+/**
+ * How the period after `token` (the letters and periods before it) behaves: 'holds' never ends the
+ * sentence, 'closes' ends it only before a word in uppercase, 'none' is not an abbreviation.
+ *
+ * Letters joined by periods hold when they hold a lowercase letter ("e.g.", "p.ej.") or are single
+ * letters ("J.R.", "U.S.", which often comes before a capitalized noun, as in "U.S. Army"); groups
+ * of two capitals ("EE.UU.", "RR.HH.") close. A single capital is an initial and holds ("J.",
+ * "John F. Kennedy", "con J. Pérez") unless a lowercase word that does not lead into a name comes
+ * before it: then it is a letter used as a name ("plan B.", "vitamina C.") and closes.
+ */
+function abbreviationKind(token: string, previousWord: string): 'holds' | 'closes' | 'none' {
+  const bare = token.replace(/\.$/u, '').toLowerCase();
+  if (ABBREVIATIONS.has(bare)) return 'holds';
+  if (CLOSING_ABBREVIATIONS.has(bare)) return 'closes';
+  if (/^(?:\p{L}{1,2}\.)+\p{L}{1,2}$/u.test(token)) {
+    return /\p{Ll}/u.test(token) || /^(?:\p{L}\.)+\p{L}$/u.test(token) ? 'holds' : 'closes';
+  }
+  if (/^\p{Lu}$/u.test(token)) {
+    const nameLetter = isLowercaseLetter(previousWord[0]) && !BEFORE_INITIAL.has(previousWord.toLowerCase());
+    return nameLetter ? 'closes' : 'holds';
+  }
+  return 'none';
+}
+
+/** Whether the next word after `from` starts in uppercase, past spaces and opening punctuation. */
+function nextWordIsCapitalized(text: string, from: number): boolean {
+  let k = nextNonSpace(text, from);
+  while (k < text.length && OPENERS.includes(text[k] ?? '')) k++;
+  return isUppercaseLetter(text[k]);
 }
 
 function trimSpan(text: string, start: number, end: number): Span | null {
@@ -80,11 +131,11 @@ function splitSpans(text: string): Span[] {
         continue;
       }
       if (ch === '.') {
-        const before = /([\p{L}.]+)$/u.exec(text.slice(start, i));
-        const token = before?.[1] ?? '';
-        const bare = token.replace(/\.$/u, '').toLowerCase();
-        // A single initial ("J.") or letters joined by periods ("U.S.", "EE.UU.", "e.g.").
-        if (ABBREVIATIONS.has(bare) || /^\p{Lu}$/u.test(token) || /^(?:\p{L}{1,2}\.)+\p{L}{1,2}$/u.test(token)) {
+        const head = text.slice(start, i);
+        const token = /([\p{L}.]+)$/u.exec(head)?.[1] ?? '';
+        const previousWord = /(\p{L}+)\P{L}*$/u.exec(head.slice(0, head.length - token.length))?.[1] ?? '';
+        const kind = token === '' ? 'none' : abbreviationKind(token, previousWord);
+        if (kind === 'holds' || (kind === 'closes' && !nextWordIsCapitalized(text, j))) {
           i = j;
           continue;
         }
