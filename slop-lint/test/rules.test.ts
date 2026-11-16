@@ -64,6 +64,17 @@ describe('catalog', () => {
     }
   });
 
+  it('gives weaker alternatives their own evidence and a lower severity than the rule', () => {
+    const rank = ['low', 'medium', 'high', 'disqualify'];
+    for (const rule of PATTERN_RULES) {
+      if (rule.weaker === undefined) continue;
+      expect(rule.weaker.source.evidence.length, rule.id).toBeGreaterThan(0);
+      expect(rule.weaker.source.section, rule.id).not.toBe('');
+      for (const l of Object.keys(rule.weaker.patterns)) expect(langsOf(rule.lang) as string[], rule.id).toContain(l);
+      expect(rank.indexOf(rule.weaker.severity), rule.id).toBeLessThan(rank.indexOf(rule.severity));
+    }
+  });
+
   it('is listed in the README, rule by rule', () => {
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
     for (const rule of RULES) expect(readme, rule.id).toContain(`| ${rule.id} |`);

@@ -214,10 +214,25 @@ const lexical: PatternRule[] = [
       ref: 'Liang et al. 2024, ICML (arxiv.org/html/2403.07183v2); Kobak et al. 2025',
       section: '4.1, 12, 13.2',
     },
-    deviation: '"key" from the section 12 list only matches before a small set of abstract nouns, so "API key" does not count.',
+    weaker: {
+      label: '"this matters", "why X matters"',
+      patterns: { en: wordList(['this matters', String.raw`why (?:[\p{L}\p{N}'’-]+ ){1,3}matters`]) },
+      severity: 'low',
+      source: {
+        evidence: ['REPORTADO'],
+        ref: 'Graphite, 1 October 2026, via Metatalks: "this matters" and "why X matters" in Claude Opus 5.5 (commercial source)',
+        section: '4.1',
+      },
+    },
+    deviation:
+      '"key" from the section 12 list only matches before a small set of abstract nouns, so "API key" does not count. ' +
+      '"this matters" and "why X matters" come from a commercial source the report tags REPORTADO, so they share the ' +
+      'Tier 2 budget but are reported at low severity; X is one to three words, a bound the report does not give.',
     examples: [
       { lang: 'en', fire: 'This was a pivotal year for the team.', pass: 'I built the pivot table in an hour.' },
       { lang: 'en', fire: 'Additionally, I wrote the docs.', pass: 'I added two columns to the report.' },
+      { lang: 'en', fire: 'This matters for the March close.', pass: 'The matters on the agenda were closed.' },
+      { lang: 'en', fire: 'That is why the Rosario branch matters.', pass: 'It matters little which branch goes first.' },
     ],
   },
   {
