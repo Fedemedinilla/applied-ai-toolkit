@@ -26,12 +26,26 @@ export interface Fact {
   readonly key: string;
   readonly start: number;
   readonly end: number;
+  /**
+   * A capitalized first word of a sentence that nothing else shows to be a name: it may be a name
+   * ("Google me pidió") or an ordinary word. Only read with ExtractOptions.openings, and compared
+   * as a word in any case, so the same word in lower case anywhere backs it.
+   */
+  readonly opening?: true;
 }
 
 export interface ExtractOptions {
   readonly lang: Lang;
   /** The profile's anchors (RewriteInput.profile.anchors): terms that count as facts. */
   readonly anchors?: readonly string[];
+  /**
+   * Keys of names read elsewhere (in O, C or the other side of an edit). A sentence's first word
+   * with one of these keys is a name there too. The names the text itself states mid-sentence
+   * always count.
+   */
+  readonly knownNames?: ReadonlySet<string>;
+  /** Also read an unknown capitalized first word as a possible name (Fact.opening). */
+  readonly openings?: boolean;
 }
 
 /** What C is made of, kept apart so the inventory can tell a CV fact from one about the recipient. */
@@ -61,6 +75,45 @@ const PHONE = /\+?\d[\d ().-]{7,}\d/gu;
 const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS_EN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+/**
+ * Frequent first words of a sentence that are never a name: articles, pronouns, prepositions,
+ * conjunctions, adverbs, greetings and the verbs job-search texts open with. A capitalized first
+ * word outside these lists, and without a verb or adverb ending, is read as a possible name.
+ */
+const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
+  es: new Set([
+    'el', 'la', 'los', 'las', 'lo', 'un', 'una', 'unos', 'unas', 'yo', 'tú', 'vos', 'usted', 'ustedes', 'nosotros', 'nosotras', 'ellos', 'ellas', 'él', 'ella',
+    'me', 'te', 'se', 'nos', 'le', 'les', 'mi', 'mis', 'tu', 'tus', 'su', 'sus', 'nuestro', 'nuestra', 'nuestros', 'nuestras',
+    'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas', 'esto', 'eso', 'aquel', 'aquella', 'ante', 'bajo', 'con', 'contra', 'de', 'del',
+    'desde', 'durante', 'en', 'entre', 'hacia', 'hasta', 'mediante', 'para', 'por', 'según', 'sin', 'sobre', 'tras', 'al', 'ni', 'pero', 'sino',
+    'aunque', 'porque', 'pues', 'que', 'como', 'cuando', 'donde', 'mientras', 'si', 'sí', 'no', 'ya', 'también', 'tampoco', 'además', 'así',
+    'entonces', 'luego', 'después', 'antes', 'ahora', 'hoy', 'mañana', 'ayer', 'acá', 'aquí', 'allá', 'allí', 'ahí', 'muy', 'más', 'menos',
+    'todo', 'todos', 'toda', 'todas', 'cada', 'otro', 'otra', 'otros', 'otras', 'algo', 'alguien', 'nada', 'nadie', 'mucho', 'muchos', 'mucha',
+    'muchas', 'poco', 'pocos', 'poca', 'pocas', 'varios', 'varias', 'algún', 'alguno', 'alguna', 'algunos', 'algunas', 'ningún', 'ninguna',
+    'qué', 'cómo', 'cuándo', 'dónde', 'quién', 'quiénes', 'cuál', 'cuáles', 'cuánto', 'cuántos', 'hola', 'gracias', 'saludos', 'abrazo', 'buen',
+    'buenas', 'buenos', 'estimado', 'estimada', 'estimados', 'estimadas', 'querido', 'querida', 'perdón', 'disculpá', 'disculpe', 'ok', 'bueno',
+    'dale', 'listo', 'che', 'atentamente', 'cordialmente', 'quiero', 'quisiera', 'tengo', 'puedo', 'busco', 'trabajo', 'soy', 'estoy', 'es',
+    'son', 'está', 'están', 'hay', 'fue', 'era', 'sé', 'hice', 'hago', 'armo', 'uso', 'llevo', 'ofrezco', 'adjunto', 'escribo', 'envío', 'mando',
+    'paso', 'cuento', 'agradezco', 'espero', 'creo', 'pienso', 'necesito', 'vivo', 'sigo', 'tenés', 'podés', 'querés', 'mirá', 'fijate',
+    'avisame', 'contame', 'escribime', 'decime', 'recibe', 'tiene', 'puede', 'hace', 'sirve', 'incluye', 'permite',
+  ]),
+  en: new Set([
+    'the', 'a', 'an', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that',
+    'these', 'those', 'there', 'here', 'and', 'or', 'but', 'nor', 'so', 'yet', 'if', 'when', 'while', 'because', 'as', 'since', 'although',
+    'though', 'then', 'also', 'however', 'still', 'now', 'today', 'tomorrow', 'yesterday', 'please', 'thanks', 'thank', 'hi', 'hello', 'hey',
+    'dear', 'yes', 'no', 'not', 'in', 'on', 'at', 'by', 'for', 'from', 'to', 'with', 'without', 'of', 'about', 'after', 'before', 'during',
+    'over', 'under', 'into', 'through', 'between', 'all', 'any', 'each', 'every', 'some', 'many', 'most', 'more', 'much', 'other', 'another',
+    'both', 'few', 'several', 'what', 'who', 'which', 'where', 'why', 'how', 'ok', 'okay', 'well', 'best', 'kind', 'regards', 'sincerely',
+    'cheers', 'is', 'are', 'was', 'were', 'am', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'should',
+    'may', 'might', 'must', 'let', 'one', 'just', 'only', 'even', 'again', 'yours', 'sure', 'happy', 'glad', 'looking', 'attached',
+  ]),
+};
+/** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
+const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
+const FIRST_PERSON_EN = new Set(['I', "I'm", "I've", "I'd", "I'll", 'I’m', 'I’ve', 'I’d', 'I’ll']);
+/** The first word of a sentence, as slop-lint's words() reads words. */
+const FIRST_WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/u;
+
 const monthOf = (name: string): number => {
   const lower = name.toLowerCase();
   const es = MONTHS_ES.indexOf(lower === 'setiembre' ? 'septiembre' : lower);
@@ -140,7 +193,7 @@ function dateKey(y: number | undefined, m: number, d: number | undefined): strin
   return undefined;
 }
 
-/** Word facts are compared by key and, failing that, as a whole word anywhere in the other text. */
+/** Word facts are compared by key and, failing that, as the same word in the other text (a name, capitalized). */
 const WORD_KINDS: ReadonlySet<FactKind> = new Set(['proper-noun', 'acronym', 'tool', 'anchor']);
 /** A changed one of these is a changed number (design 4.6: "12 por 15" always reverts). */
 const NUMERIC_KINDS: ReadonlySet<FactKind> = new Set(['number', 'amount', 'date', 'time', 'phone']);
@@ -266,7 +319,41 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
       } else take('tool', start, term, wordKey(term));
     }
   }
+
+  // slop-lint skips a sentence's first word, since a capital there says nothing. It is a name when
+  // the text, O, C or the other side of an edit names it elsewhere, and with `openings`, a possible
+  // name when it is not a frequent opener and has no verb or adverb ending.
+  const known = new Set(options.knownNames ?? []);
+  for (const f of facts) if (WORD_KINDS.has(f.kind) && f.opening === undefined) known.add(f.key);
+  for (const sentence of sentenceSpans(text)) {
+    const m = FIRST_WORD.exec(sentence.text);
+    if (m === null) continue;
+    const word = m[0];
+    const start = sentence.start + m.index;
+    if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
+    const key = wordKey(word);
+    if (known.has(key)) take('proper-noun', start, word, key);
+    else if (options.openings === true && isPossibleName(word, lang)) {
+      facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
+      claimed.push([start, start + word.length]);
+    }
+  }
   return facts.sort((a, b) => a.start - b.start);
+}
+
+function isPossibleName(word: string, lang: Lang): boolean {
+  const lower = word.toLocaleLowerCase('und');
+  if ([...word].length < 2 || OPENERS[lang].has(lower) || NOT_A_NAME[lang].test(word) || NUMBER_WORDS[lower] !== undefined) return false;
+  if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;
+  if (lang === 'es' && (MONTHS_ES.includes(lower) || lower === 'setiembre')) return false;
+  return true;
+}
+
+/** The keys of the names, acronyms, tools and anchors the texts state, to read them at a sentence start too. */
+function namesOf(texts: readonly string[], options: ExtractOptions): Set<string> {
+  const out = new Set<string>();
+  for (const t of texts) for (const f of extract(t, options)) if (WORD_KINDS.has(f.kind) && f.opening === undefined) out.add(f.key);
+  return out;
 }
 
 /** A text and the keys of its facts, to ask whether it states a fact. */
@@ -278,14 +365,19 @@ const poolOf = (text: string, options: ExtractOptions): Pool => ({ text, keys: n
 const sourcesText = (c: FactSources): string => [c.cv, ...(c.recipient ?? []), ...(c.extraFacts ?? [])].join('\n');
 
 /**
- * Whether a pool states a fact: the same key, or for a name, the same word anywhere in it. The
- * second test covers a name on the first word of a sentence, which extract() does not read.
+ * Whether a pool states a fact: the same key, or the same word in its text. A name or an acronym
+ * is backed only by the word capitalized, as a name ("Banco Nación" is not "un banco de la
+ * nación"); a tool, an anchor and a possible name at a sentence start, by the word in any case.
  */
 function states(pool: Pool, fact: Fact): boolean {
   if (pool.keys.has(fact.key)) return true;
   if (!WORD_KINDS.has(fact.kind)) return false;
   const source = fact.key.split(' ').map(escape).join(String.raw`\s+`);
-  return new RegExp(`${B}${source}${E}`, 'iu').test(pool.text);
+  const asName = fact.opening === undefined && (fact.kind === 'proper-noun' || fact.kind === 'acronym');
+  for (const m of pool.text.matchAll(new RegExp(`${B}${source}${E}`, 'giu'))) {
+    if (!asName || /^\p{Lu}/u.test(m[0])) return true;
+  }
+  return false;
 }
 
 const unique = (facts: readonly Fact[]): Fact[] => {
@@ -349,8 +441,10 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
     return { status: 'reverted', reason: 'not-found', facts: [], message: `"${edit.before}" is not in sentence ${edit.sentenceId}.` };
   }
   const after = sentence.slice(0, at) + edit.after + sentence.slice(at + edit.before.length);
-  const beforeFacts = unique(extract(sentence, context));
-  const afterFacts = unique(extract(after, context));
+  const known = namesOf([context.O, sourcesText(context.C), sentence, after], context);
+  const read = { ...context, knownNames: known, openings: true };
+  const beforeFacts = unique(extract(sentence, read));
+  const afterFacts = unique(extract(after, read));
   const beforePool: Pool = { text: sentence, keys: new Set(beforeFacts.map((f) => f.key)) };
   const afterPool: Pool = { text: after, keys: new Set(afterFacts.map((f) => f.key)) };
   const lost = beforeFacts.filter((f) => !states(afterPool, f));
@@ -393,8 +487,9 @@ export function factInvariant(
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
   const C = poolOf(sourcesText(sources), options);
-  const missing = unique(extract(original, options)).filter((f) => !states(R, f) && !acceptedDrops.includes(f.key));
-  const extra = unique(extract(rewritten, options)).filter((f) => !states(O, f) && !states(C, f));
+  const read = { ...options, knownNames: namesOf([original, rewritten, C.text], options), openings: true };
+  const missing = unique(extract(original, read)).filter((f) => !states(R, f) && !acceptedDrops.includes(f.key));
+  const extra = unique(extract(rewritten, read)).filter((f) => !states(O, f) && !states(C, f));
   return { holds: missing.length === 0 && extra.length === 0, missing, extra };
 }
 
