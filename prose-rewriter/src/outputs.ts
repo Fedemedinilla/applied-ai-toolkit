@@ -108,6 +108,26 @@ export const PlanOutput = z.strictObject({ items: z.array(PlanItem) });
 export type PlanOutput = z.infer<typeof PlanOutput>;
 
 /**
+ * What S2 hands the gateway: PlanOutput with `request` as any string, described for the model,
+ * since the API's schema cannot carry the refine that holds it to one labelled marker. Why: in
+ * run 3 two plans of es-trap-number-not-in-cv, which asks for the source of a number, failed the
+ * whole piece with "The output does not satisfy the schema". planFromReply() keeps the item.
+ */
+export const PlanReply = z.strictObject({
+  items: z.array(PlanItem.extend({ request: z.string().describe('Exactly one labelled marker and nothing else: [COMPLETAR: what is missing]').optional() })),
+});
+
+/** The plan of a PlanReply: a request keeps its first labelled marker, and goes when it has none. */
+export function planFromReply(reply: z.infer<typeof PlanReply>): PlanOutput {
+  return PlanOutput.parse({
+    items: reply.items.map(({ request, ...item }) => {
+      const marker = request === undefined ? undefined : [...visible(request).matchAll(ANY_COMPLETAR)].map((m) => m[0]).find(isLabelledRequest);
+      return marker === undefined ? item : { ...item, request: marker };
+    }),
+  });
+}
+
+/**
  * S3: the existing Edit schema, so a bare [COMPLETAR] is refused here as everywhere else, with the
  * checks of checkModelEdit(). The number of edits is not capped here: it follows the plan, which
  * the stage that calls the model knows.

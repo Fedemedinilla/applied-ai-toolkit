@@ -22,14 +22,22 @@
  * (stages/model.ts singleStage); its edits go through the same placement, S5 in code and S6, then
  * steps 5 and 6 run as above. No S4 and no extra round: at most one call plus the judge's.
  *
+ * A model stage whose reply the gateway cannot read against its schema (ResponseError
+ * 'invalid_output') is asked once more; if the second reply cannot be read either, that stage
+ * makes no edit (S3 and its extra round need the plan, the extra round needs S3), the text stays
+ * as written there, and the result asks for a review with a message. A cap, an API error or any
+ * other refusal still fails the rewrite. The extra round keeps its own rule: optional, no retry.
+ *
  * Status (design 4.4 and 4.6 step 4):
  * - 'blocked': the rewrite still states a fact outside O ∪ C, or the extra round's edits invented
  *   a fact again: the invention persisted after the extra round;
  * - 'needs-review': the invariant fails otherwise, or a fallback happened: an edit was reverted
  *   for inventing (in code or by the judge), which hands the sentence back as the user wrote it;
- *   or a verdict could not be read even on the retry, and the edits it did not clear went back;
+ *   or a verdict or a stage's reply could not be read even on the retry, and what it would have
+ *   changed is as the user wrote it;
  * - 'ok' otherwise.
  */
+import { ResponseError } from '../../gateway/src/index.ts';
 import { diffHunks } from './edits.ts';
 import { factInvariant, factReport, type Fact } from './facts.ts';
 import { restoreData } from './injection.ts';
@@ -70,6 +78,21 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     proposals.push(...fresh);
     return fresh;
   };
+  /** A stage's reply, asked for once more when it cannot be read; null when the retry cannot be read either. */
+  let unread = false;
+  const readable = async <T>(stage: () => Promise<T>): Promise<T | null> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await stage();
+      } catch (error) {
+        if (!(error instanceof ResponseError && error.code === 'invalid_output')) throw error;
+        if (attempt === 2) {
+          unread = true;
+          return null;
+        }
+      }
+    }
+  };
   const check = (fresh: Proposal[]): void => {
     place(a, units, proposals, fresh.filter((p) => p.status === 'live'));
     checkFacts(a, units, proposals, fresh);
@@ -80,13 +103,13 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
 
   /** S2, S3 and its checks, S4 and the extra round; true when the extra round invented a fact again. */
   const staged = async (): Promise<boolean> => {
-    const plan = await planStage(m, a.lint.findings);
-    const first = await editStage(m, plan);
-    const round1 = propose(first.edits, 'edit', 1);
+    const plan = await readable(() => planStage(m, a.lint.findings));
+    const first = plan === null ? null : await readable(() => editStage(m, plan));
+    const round1 = propose(first?.edits ?? [], 'edit', 1);
     check(round1);
     if (a.mode !== 'minimo' && options.skipStyle !== true) {
       const current = currentText(a, units, proposals);
-      const styled = await styleStage(m, current.sentences.filter((s) => s.text.trim() !== ''));
+      const styled = await readable(() => styleStage(m, current.sentences.filter((s) => s.text.trim() !== '')));
       const composed = propose(styled ?? [], 'style', 1);
       composeStyle(a, units, proposals, current, composed);
       check(composed);
@@ -95,7 +118,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     }
 
     const remaining = remainingLevelOne(a, rendered(a, units, proposals), liveEdits(a, units, proposals));
-    if (remaining.length > 0) {
+    if (remaining.length > 0 && first !== null) {
       // History in the model's own words; the proposals hold the same edits with data tags restored.
       // An edit merged into a style edit is applied, inside it.
       const notApplied = first.edits.filter((_, i) => round1[i]?.status !== 'live' && round1[i]?.mergedInto === undefined);
@@ -154,7 +177,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   if (options.strategy === 'single') {
     // S2 and S3 in one call; its edits go through the same placement, S5 in code and S6. No S4 and
     // no extra round: the strategy is one call plus the judge's.
-    check(propose(await singleStage(m, a.lint.findings), 'edit', 1));
+    check(propose((await readable(() => singleStage(m, a.lint.findings))) ?? [], 'edit', 1));
   } else extraInvented = await staged();
 
   let judged = { fellBack: false, reverted: 0, unread: false, flags: [] as Flag[] };
@@ -164,7 +187,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     judged = await judgeStage(a, units, proposals, client);
   }
 
-  return assemble(a, units, proposals, { usage, extraInvented, judged });
+  return assemble(a, units, proposals, { usage, extraInvented, judged, unread });
 }
 
 /** The level 1 findings of the rewrite, each with the sentence of the original it sits in. */
@@ -185,10 +208,16 @@ function remainingLevelOne(a: Analysis, rewritten: string, live: ReturnType<type
 interface Outcome {
   readonly usage: Usage;
   readonly extraInvented: boolean;
+  /** A model stage's reply could not be read even on the retry. */
+  readonly unread: boolean;
   readonly judged: { readonly fellBack: boolean; readonly reverted: number; readonly unread: boolean; readonly flags: readonly Flag[] };
 }
 
 const MISSING = { es: (f: Fact) => `El texto reescrito perdió «${f.text}».`, en: (f: Fact) => `The rewrite lost "${f.text}".` } as const;
+const UNREAD_STAGE = {
+  es: 'No pude leer la respuesta de uno de los pasos, ni al pedirla de nuevo. Lo que ese paso iba a cambiar quedó como lo escribiste.',
+  en: 'I could not read the reply of one of the steps, even when I asked again. What that step would have changed is as you wrote it.',
+} as const;
 const EXTRA = { es: 'Revisá el texto: dice algo que no está ni en tu texto ni en tu CV', en: 'Check the text: it says something neither your text nor your CV states' } as const;
 
 /** S7. */
@@ -201,7 +230,7 @@ function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals
   const status =
     invariant.extra.length > 0 || outcome.extraInvented
       ? 'blocked'
-      : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack || outcome.judged.unread
+      : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack || outcome.judged.unread || outcome.unread
         ? 'needs-review'
         : 'ok';
   const changes: Change[] = proposals.map((p) => {
@@ -232,6 +261,6 @@ function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals
     flags,
     status,
     usage: { calls: outcome.usage.calls, costUsd: outcome.usage.costUsd },
-    ...(invariant.extra.length > 0 ? { message: EXTRA[lang] } : {}),
+    ...(invariant.extra.length > 0 ? { message: EXTRA[lang] } : outcome.unread ? { message: UNREAD_STAGE[lang] } : {}),
   });
 }

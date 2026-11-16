@@ -11,6 +11,7 @@ import { PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from 
 import { rewrite } from '../src/rewrite.ts';
 import { judgeLines } from '../src/rubric.ts';
 import { RewriteInput } from '../src/types.ts';
+import { ResponseError } from '../../gateway/src/index.ts';
 import { scriptedGateway } from './scripted-gateway.ts';
 
 const ROOT = new URL('../../', import.meta.url);
@@ -209,9 +210,15 @@ describe('runPipelines', () => {
   });
 
   it('records a failed piece and goes on; a cap stops the run after recording it', async () => {
-    // A plan the schema refuses fails the piece; the run goes on to the next variant.
-    const scripted = scriptedGateway({ 'rewrite.plan': [{ data: { items: 'none' } }], 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })] });
-    const records = await runPipelines(CASES, [byId('full'), byId('single-call')], { gateway: scripted.gateway, refs: REFS });
+    // A plan the model refuses fails the piece; the run goes on to the next variant. (A reply the
+    // schema refuses does not fail it: rewrite() asks once more and then asks for a review.)
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })] });
+    const refusal = new ResponseError('refusal', 'refused', { usageId: 'u1', requestId: null, modelResponded: 'claude-sonnet-5-5', stopReason: 'refusal', costUsd: 0 });
+    const refusing: typeof scripted.gateway = {
+      ...scripted.gateway,
+      structured: (schema, request) => (request.task === 'rewrite.plan' ? Promise.reject(refusal) : scripted.gateway.structured(schema, request)),
+    };
+    const records = await runPipelines(CASES, [byId('full'), byId('single-call')], { gateway: refusing, refs: REFS });
     scripted.assertDone();
     expect(records.map((r) => [r.variant, r.status, r.usage.calls])).toEqual([['full', 'failed', 1], ['single-call', 'done', 1]]);
     expect(records[0]?.status === 'failed' ? records[0].error : '').toMatch(/^ResponseError/);

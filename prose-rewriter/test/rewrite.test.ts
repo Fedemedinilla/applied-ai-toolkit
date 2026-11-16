@@ -8,6 +8,7 @@ import { rewrite } from '../src/rewrite.ts';
 import { judgeLines } from '../src/rubric.ts';
 import { analyse, earlyExit, prepare } from '../src/stages/analyse.ts';
 import { defaultRegister, GENRES, type JudgeClient, RewriteInput, RewriteResult } from '../src/types.ts';
+import { CapError, ResponseError, type Gateway } from '../../gateway/src/index.ts';
 import { scriptedGateway } from './scripted-gateway.ts';
 
 const CV_ES = readFileSync(new URL('../evals/cases/cv/es-rioplatense.md', import.meta.url), 'utf8');
@@ -947,5 +948,104 @@ describe('S5 drops against what the judge leaves', () => {
     expect(deletions[1]?.revertReason).toMatch(/^facts: .*Estudio/);
     expect(result.status).toBe('needs-review');
     expectSound(input, result);
+  });
+});
+
+describe('a stage reply that cannot be read', () => {
+  // es-trap-number-not-in-cv, run 3: the full and no-examples pieces failed on their first call
+  // (S2) with "The output does not satisfy the schema". The plan's request is the one rule of that
+  // schema the API cannot carry: it holds a lone labelled marker, and a plan that asks for the
+  // missing source of "300 %" may say more. The edits are the no-style piece's.
+  const MARKER = '[COMPLETAR: fuente y medición del aumento de ventas del 300 %]';
+  const TRAP_PLAN = {
+    data: {
+      items: [
+        { sentenceId: 1, action: 'make-specific', reason: 'fórmula sin hechos', ruleId: 'LEX-01' },
+        { sentenceId: 2, action: 'make-specific', reason: 'El CV no registra ningún aumento de ventas del 300 %.', request: `${MARKER}, o sacar la cifra si no hay fuente` },
+      ],
+    },
+  };
+  const TRAP_EDITS = edits(
+    {
+      sentenceId: 1,
+      before: 'Me apasiona ayudar a comercios chicos.',
+      after: 'Hago sitios web para comercios chicos: rehice en Astro el de la Panadería Los Álamos y armé un formulario de pedidos para la Ferretería Quintana.',
+    },
+    {
+      sentenceId: 2,
+      before: 'Con los sitios que hice aumenté las ventas de mis clientes un 300 %, y puedo hacer lo mismo con la cooperativa.',
+      after: `La página principal de la panadería pasó de 4,1 s a 1,6 s de carga en un celular de gama baja y el formulario recibe unos 40 pedidos por semana; puedo hacer un trabajo así para la cooperativa. ${MARKER.replace(']', ', si querés mencionarlo]')}`,
+    },
+  );
+  const trap = () => evalInput('es', 'es-trap-number-not-in-cv');
+  const firstEdit = (text: string) =>
+    text.replace('Me apasiona ayudar a comercios chicos.', 'Hago sitios web para comercios chicos: rehice en Astro el de la Panadería Los Álamos y armé un formulario de pedidos para la Ferretería Quintana.');
+  /** Valid JSON of the wrong shape: the gateway refuses it as invalid_output. */
+  const UNREADABLE = { data: { items: [{ sentenceId: -1, action: 'cut', reason: '' }] } };
+  const UNREADABLE_EDITS = { data: { edits: [{ sentenceId: 1 }] } };
+
+  it('keeps the labelled marker of a plan request that says more, instead of failing the piece', async () => {
+    const input = trap();
+    const expected = firstEdit(input.text);
+    const scripted = scriptedGateway({ 'rewrite.plan': [TRAP_PLAN], 'rewrite.edit': [TRAP_EDITS], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.judge']);
+    const prompt = JSON.stringify(scripted.calls[1]?.request.messages);
+    expect(prompt).toContain(MARKER);
+    expect(prompt).not.toContain('sacar la cifra');
+    expect(result.rewritten).toBe(expected);
+    expect(result.status).toBe('ok');
+    expectSound(input, result);
+  });
+
+  it('asks S2 once more, then leaves the text as written and asks for a review, without failing', async () => {
+    const input = trap();
+    const scripted = scriptedGateway({ 'rewrite.plan': [UNREADABLE, UNREADABLE], 'rewrite.judge': [verdictIn('es', input.text)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.plan', 'rewrite.plan', 'rewrite.judge']);
+    expect(result.usage.calls).toBe(3);
+    expect(result.rewritten).toBe(input.text);
+    expect(result.changes).toEqual([]);
+    expect(result.status).toBe('needs-review');
+    expect(result.message).toMatch(/^No pude leer/);
+    expectSound(input, result);
+  });
+
+  it('uses the retry when it reads, with no review asked for', async () => {
+    const input = trap();
+    const expected = firstEdit(input.text);
+    const scripted = scriptedGateway({ 'rewrite.plan': [UNREADABLE, TRAP_PLAN], 'rewrite.edit': [TRAP_EDITS], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    expect(result.usage.calls).toBe(4);
+    expect(result.rewritten).toBe(expected);
+    expect(result.status).toBe('ok');
+    expect(result.message).toBeUndefined();
+  });
+
+  it('keeps the S3 edits when S4 cannot be read twice, and keeps S2 when S3 cannot', async () => {
+    const styleless = scriptedGateway({
+      'rewrite.plan': [plan(2)],
+      'rewrite.edit': [edits({ sentenceId: 2, before: SINERGIAS, after: FIXED })],
+      'rewrite.style': [UNREADABLE_EDITS, UNREADABLE_EDITS],
+      'rewrite.judge': [verdict(MAIL.replace(SINERGIAS, FIXED))],
+    });
+    const styled = await rewrite(mail(MAIL), { gateway: styleless.gateway, refs: REFS });
+    styleless.assertDone();
+    expect(styled.rewritten).toBe(MAIL.replace(SINERGIAS, FIXED));
+    expect(styled.status).toBe('needs-review');
+    const editless = scriptedGateway({ 'rewrite.edit': [UNREADABLE_EDITS, UNREADABLE_EDITS], 'rewrite.judge': [verdict(MAIL)] });
+    const single = await rewrite(mail(MAIL), { gateway: editless.gateway, refs: REFS, strategy: 'single' });
+    editless.assertDone();
+    expect(single).toMatchObject({ rewritten: MAIL, status: 'needs-review', usage: { calls: 3 } });
+  });
+
+  it('still fails on a cap or a reply the gateway refuses for another reason', async () => {
+    const failing = (error: Error): Gateway<string> => ({ ...scriptedGateway({}).gateway, structured: () => Promise.reject(error) });
+    await expect(rewrite(mail(MAIL), { gateway: failing(new CapError('cap_per_job', 1, 1)), refs: REFS })).rejects.toBeInstanceOf(CapError);
+    const refusal = new ResponseError('refusal', 'refused', { usageId: 'u1', requestId: null, modelResponded: 'claude-sonnet-5-5', stopReason: 'refusal', costUsd: 0 });
+    await expect(rewrite(mail(MAIL), { gateway: failing(refusal), refs: REFS })).rejects.toBe(refusal);
   });
 });
