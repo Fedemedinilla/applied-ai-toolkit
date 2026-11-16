@@ -416,3 +416,70 @@ describe('modes and usage', () => {
     expect(result.usage).toEqual({ calls: 4, costUsd: null });
   });
 });
+
+describe('S5 facts against the live edits', () => {
+  it('accepts only one of two drops that each point at the other sentence', async () => {
+    const text = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio de la panadería está hecho en Astro. Ya carga en 1,6 s gracias a Astro.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2, 3)],
+      'rewrite.edit': [
+        {
+          data: {
+            edits: [
+              { sentenceId: 1, before: SINERGIAS, after: FIXED, reason: 'fix' },
+              { sentenceId: 2, before: ' está hecho en Astro', after: ' está listo', reason: 'shorter', drop: true },
+              { sentenceId: 3, before: ' gracias a Astro', after: '', reason: 'shorter', drop: true },
+            ],
+          },
+        },
+      ],
+    });
+    const input = whatsapp(text);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toContain('Astro');
+    expect(result.changes.map((c) => c.status)).toEqual(['applied', 'applied', 'reverted']);
+    expect(result.changes[2]?.revertReason).toMatch(/Astro/);
+    expectSound(input, result);
+  });
+
+  it('reverts an edit that repeats a number the text states once elsewhere, instead of blocking the result', async () => {
+    const text = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio ya carga en 1,6 s.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: 'Quería contarte que el sitio carga en 1,6 s.' }), edits()],
+    });
+    const input = whatsapp(text);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(text);
+    expect(result.changes).toEqual([expect.objectContaining({ id: 'e1', status: 'reverted', revertReason: expect.stringMatching(/1,6 s/) })]);
+    expect(result.status).toBe('needs-review');
+    expect(result.message).toBeUndefined();
+    expectSound(input, result);
+  });
+
+  it('is blocked, with the message, when a later revert leaves a fact stated more often than the text states it', async () => {
+    // e1 drops one of two "1,6 s" (the other stays) and e2 writes it again; S6 then reverts e1,
+    // which adds LEX-01, so the text states "1,6 s" three times.
+    const text = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio ya carga en 1,6 s. En el celular también carga en 1,6 s.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 3)],
+      'rewrite.edit': [
+        {
+          data: {
+            edits: [
+              { sentenceId: 3, before: 'también carga en 1,6 s', after: 'también me apasiona', reason: 'shorter', drop: true },
+              { sentenceId: 1, before: SINERGIAS, after: 'Quería contarte que el sitio carga en 1,6 s.', reason: 'fix' },
+            ],
+          },
+        },
+      ],
+    });
+    const result = await rewrite(whatsapp(text), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'reverted'], ['e2', 'applied']]);
+    expect(result.status).toBe('blocked');
+    expect(result.message).toBe('Revisá el texto: dice algo que no está ni en tu texto ni en tu CV');
+  });
+});

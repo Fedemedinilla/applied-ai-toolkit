@@ -53,7 +53,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   };
   const check = (fresh: Proposal[]): void => {
     place(a, units, proposals, fresh);
-    checkFacts(a, units, fresh);
+    checkFacts(a, units, proposals, fresh);
     relintAndVoice(a, units, proposals, fresh);
   };
 
