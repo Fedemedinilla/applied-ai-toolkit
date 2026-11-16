@@ -123,6 +123,46 @@ describe('applyEdits on characters made of several code units', () => {
   });
 });
 
+describe('keep[] phrases', () => {
+  const apply = (text: string, edits: Edit[], keep: string[]) => applyEdits(text, splitSentences(text, 'es'), edits, { keep });
+
+  it('protects a phrase the text writes with a line break or other spacing', () => {
+    expect(apply('Uso Power\nBI todos los días.', [edit(1, 'BI', 'Tableau')], ['Power BI']).rejected.map((r) => r.reason)).toEqual(['keep']);
+    expect(apply('Uso Power  BI todos los días.', [edit(0, 'BI', 'Tableau')], ['Power BI']).rejected.map((r) => r.reason)).toEqual(['keep']);
+  });
+
+  it('protects a phrase given in another normalization', () => {
+    const text = 'Trabajo con José Pérez.';
+    expect(apply(text, [edit(0, 'Pérez', 'Gómez')], ['José Pérez'.normalize('NFD')]).rejected.map((r) => r.reason)).toEqual(['keep']);
+  });
+
+  it('rejects an edit at the edge of a phrase that would glue text onto it, and accepts one that keeps it a word', () => {
+    const text = 'Uso Power BI mucho.';
+    expect(apply(text, [edit(0, ' mucho', 'X mucho')], ['Power BI']).rejected.map((r) => r.reason)).toEqual(['keep']);
+    expect(apply(text, [edit(0, 'Uso ', 'Uso')], ['Power BI']).rejected.map((r) => r.reason)).toEqual(['keep']);
+    const fine = apply(text, [edit(0, ' mucho', ' bastante'), edit(0, 'Uso ', 'Uso el ')], ['Power BI']);
+    expect(fine.rejected).toEqual([]);
+    expect(fine.text).toBe('Uso el Power BI bastante.');
+  });
+
+  it('ignores an empty or blank keep phrase instead of matching everywhere', () => {
+    const result = apply('Uso Power BI mucho.', [edit(0, 'mucho', 'bastante')], ['', '  ']);
+    expect(result.rejected).toEqual([]);
+    expect(result.text).toBe('Uso Power BI bastante.');
+  });
+});
+
+describe('render refuses overlapping accepted edits', () => {
+  it('throws in revertEdit, renderEdits and diffHunks when two accepted edits overlap', () => {
+    const { accepted } = applyEdits(TEXT, SENTENCES, [edit(1, 'Te escribo por', 'Sigo con')]);
+    const first = accepted[0] as AppliedEdit;
+    const clash: AppliedEdit = { ...first, id: 'x1', span: { start: first.span.start + 3, end: first.span.start + 10 }, before: TEXT.slice(first.span.start + 3, first.span.start + 10) };
+    expect(() => renderEdits(TEXT, [first, clash])).toThrow(/overlap/);
+    expect(() => diffHunks(TEXT, [first, clash])).toThrow(/overlap/);
+    expect(() => revertEdit(TEXT, [first, clash, { ...first, id: 'x2' }], 'x2')).toThrow(/overlap/);
+  });
+});
+
 describe('revertEdit and renderEdits', () => {
   it('reverts one edit alone and re-derives the text from the original', () => {
     const { accepted } = applyEdits(TEXT, SENTENCES, [
