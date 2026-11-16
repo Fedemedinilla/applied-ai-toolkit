@@ -1,6 +1,6 @@
 // The public entry publishes the F4 core: every pure function of voice, facts, edits and injection
 // is reachable from src/index.ts, with F5a's task configs, gateway ModelClient, prompt and output
-// schemas, and rewrite() is not there yet (it comes in F5b).
+// schemas, and F5b's rewrite().
 import { describe, expect, it } from 'vitest';
 import * as entry from '../src/index.ts';
 
@@ -12,6 +12,7 @@ describe('the public entry', () => {
     'injectionFlags', 'wrapData', 'unwrapData', 'restoreData',
     'taskConfig', 'callSettings', 'gatewayModelClient',
     'systemBlocks', 'planPrompt', 'editPrompt', 'stylePrompt', 'styleOutput',
+    'rewrite',
   ])('exports %s', (name) => {
     expect(typeof (entry as Record<string, unknown>)[name]).toBe('function');
   });
@@ -31,8 +32,7 @@ describe('the public entry', () => {
     expect(entry.EDIT_EXTRA_SENTENCES).toBeGreaterThan(0);
   });
 
-  it('exports the data tags and not rewrite() yet', () => {
+  it('exports the data tags', () => {
     expect(entry.DATA_TAGS).toEqual(['texto', 'perfil']);
-    expect('rewrite' in entry).toBe(false);
   });
 });
