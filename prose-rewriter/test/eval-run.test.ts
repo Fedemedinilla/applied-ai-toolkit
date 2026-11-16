@@ -24,7 +24,13 @@ import {
 } from '../evals/spend.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import type { LoadedCase } from '../evals/cases.ts';
-import { EVAL_EXIT, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import { EVAL_EXIT, estimateRun, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import { JUDGE_MAX_TOKENS, JUDGE_RUBRICS } from '../evals/judges.ts';
+import { VARIANTS } from '../evals/pipeline.ts';
+import { rewriteRubric } from '../src/rubric.ts';
+import { STAGE_MAX_TOKENS } from '../src/stages/model.ts';
+import { TASK_CONFIGS } from '../src/tasks.ts';
+import { estimateInputTokens } from '../../gateway/src/index.ts';
 import type { PromptRefs } from '../src/prompt.ts';
 import { RewriteInput } from '../src/types.ts';
 import { NOW, scriptedGateway } from './scripted-gateway.ts';
@@ -406,6 +412,49 @@ function harness(gateway: () => Gateway<string>, over: Partial<EvalCliDeps> = {}
 const never = (): Gateway<string> => {
   throw new Error('the live gateway must not be built');
 };
+
+describe('the dry run estimate', () => {
+  const variant = (id: string) => VARIANTS.filter((v) => v.id === id);
+  const bytes = (s: string): number => new TextEncoder().encode(s).length;
+  const judgeModel = TASK_CONFIGS['rewrite.judge'].model;
+
+  it('adds up every judging call of a piece that exits early, each input growing by the outputs before it', async () => {
+    const est = await estimateRun([CLEAN], variant('full'), REFS, PRICES);
+    // No baseline among the variants: no pairwise-baseline call.
+    const rubrics = JUDGE_RUBRICS.filter((r) => r.name !== 'pairwise-baseline');
+    const base = estimateInputTokens({ messages: [{ role: 'user', content: JSON.stringify(CLEAN.input) }] });
+    const expected = rubrics.reduce((sum, r, i) => sum + worstCaseUsd(judgeModel, base + i * JUDGE_MAX_TOKENS + bytes(r.instructions), JUDGE_MAX_TOKENS, PRICES)!, 0);
+    expect(est).toEqual({ pieces: 1, calls: rubrics.length, worstUsd: Math.round(expected * 1e6) / 1e6 });
+    expect(est.worstUsd).toBeGreaterThan(0);
+  });
+
+  it('counts pairwise-baseline once per pipeline variant and never for the baseline itself', async () => {
+    const est = await estimateRun([CLEAN], VARIANTS.filter((v) => v.id === 'full' || v.id === 'single-call'), REFS, PRICES);
+    expect(est.calls).toBe(JUDGE_RUBRICS.length + (JUDGE_RUBRICS.length - 1));
+  });
+
+  it('counts the stages, the fact judge and its second verdict of a piece that calls the model', async () => {
+    const est = await estimateRun([SLOP], variant('full'), REFS, PRICES);
+    // S2, S3, S4, the extra round of S3, the fact judge twice, then the judging rubrics.
+    expect(est.calls).toBe(6 + JUDGE_RUBRICS.length - 1);
+    const stages = [STAGE_MAX_TOKENS['rewrite.plan'], STAGE_MAX_TOKENS['rewrite.edit'], STAGE_MAX_TOKENS['rewrite.style'], STAGE_MAX_TOKENS['rewrite.edit'], rewriteRubric.call.max_tokens, rewriteRubric.call.max_tokens];
+    // Every output budget is billed at least once at the dearest output rate in force.
+    const outputs = (stages.reduce((a, b) => a + b, 0) + (JUDGE_RUBRICS.length - 1) * JUDGE_MAX_TOKENS) * 50 / 1e6;
+    expect(est.worstUsd).toBeGreaterThan(outputs);
+  });
+
+  it('warns when the worst case is more than the month has left or more than --max-usd', async () => {
+    const h = harness(never);
+    const seed = openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed });
+    seed.settle(seed.reserve(19.99), 19.99);
+    expect(await runEvalCli(['--dry-run', '--variants', 'full', '--max-usd', '0.001'], h.deps)).toBe(EVAL_EXIT.ok);
+    expect(h.out.join('')).toMatch(/more than what is left this month/);
+    expect(h.out.join('')).toMatch(/more than --max-usd 0\.001/);
+    const roomy = harness(never);
+    await runEvalCli(['--dry-run', '--variants', 'full', '--cases', 'es-whatsapp-clean'], roomy.deps);
+    expect(roomy.out.join('')).not.toMatch(/more than/);
+  });
+});
 
 describe('the eval CLI', () => {
   it('refuses to run without --live or --dry-run, building no gateway', async () => {
