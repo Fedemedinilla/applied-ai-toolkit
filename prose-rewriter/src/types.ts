@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { ModelClient } from '../../evals/src/index.ts';
 import type { Gateway } from '../../gateway/src/index.ts';
 import type { LintResult } from '../../slop-lint/src/types.ts';
+import type { PromptRefs } from './prompt.ts';
 import { GENRES } from '../../style-refs/src/index.ts';
 
 /** The genres come from style-refs, so a principle and a rewrite cannot name different lists. */
@@ -163,6 +164,18 @@ export type RewriteResult = z.infer<typeof RewriteResult>;
 /** What rewrite() is given besides the input (section 4.11): the caller injects the gateway; tests pass a fake. */
 export interface RewriteOptions {
   readonly gateway: Gateway<string>;
+  /**
+   * The fact judge's client. By default gatewayModelClient over `gateway` for the task
+   * rewrite.judge, so the judge spends under the same caps. A client passed here is counted in
+   * usage.calls, and makes usage.costUsd null, since its replies carry no price.
+   */
+  readonly judge?: JudgeClient;
+  /** style-refs' principles, sources and examples, loaded by the caller (style-refs has no I/O). Without them the prompt shows none and S4 is skipped. */
+  readonly refs?: PromptRefs;
+  /** The gateway's userId: a UUID or null, never a name or an address. Default null. */
+  readonly userId?: string | null;
+  /** The gateway's jobId, which groups the calls of one rewrite under the per-job cap. Default null. */
+  readonly jobId?: string | null;
 }
 
 /**

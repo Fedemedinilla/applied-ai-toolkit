@@ -78,18 +78,24 @@ export interface Analysis extends Prepared {
   readonly extractOptions: ExtractOptions;
 }
 
-/** S1. Adds the not-in-cv flags to S0's. */
-export function analyse(p: Prepared): Analysis {
-  const { input, text } = p;
+/** slop-lint over any text of this input (the original in S1, a rewrite in S6 and S7), with the same options. */
+export function lintAs(input: RewriteInput, text: string): LintResult {
   const { genre, lang, variety } = input;
   const previous = input.recipient?.previousMessage;
-  const result = lint(text, {
+  return lint(text, {
     lang,
     genre,
     ...(variety === undefined ? {} : { variety }),
     ...(input.profile.anchors === undefined ? {} : { anchors: input.profile.anchors }),
     ...(previous === undefined ? {} : { previous }),
   });
+}
+
+/** S1. Adds the not-in-cv flags to S0's. */
+export function analyse(p: Prepared): Analysis {
+  const { input, text } = p;
+  const { genre, lang } = input;
+  const result = lintAs(input, text);
   const extractOptions: ExtractOptions = { lang, ...(input.profile.anchors === undefined ? {} : { anchors: input.profile.anchors }) };
   const inv = inventory(text, p.sources, extractOptions);
   return {
