@@ -17,7 +17,7 @@
  */
 import { judgeWith } from '../../../evals/src/index.ts';
 import { applyEdits, renderEdits, type AppliedEdit, type Sentence, type TextRange } from '../edits.ts';
-import { checkEdit, factInvariant, type EditCheck } from '../facts.ts';
+import { checkEdit, factInvariant, type EditCheck, type Fact } from '../facts.ts';
 import { factSheet, planReverts, rewritePiece, rewriteRubric, type RevertPlan } from '../rubric.ts';
 import type { Edit, Flag, JudgeClient } from '../types.ts';
 import { voiceViolations } from '../voice.ts';
@@ -109,8 +109,9 @@ export function place(a: Analysis, units: readonly Sentence[], proposals: readon
  *   Two drops that each point at the other sentence cannot both stand: the second one checked
  *   sees the first applied;
  * - then O ⊆ R ⊆ O ∪ C on those proposals with and without this one: an edit that leaves the text
- *   stating a fact neither O nor C states, or a number more often than O states it, is reverted
- *   on its own, so the invention never reaches S7.
+ *   stating a fact neither O nor C states, or a number more often than O states it, or that takes
+ *   away the last mention of a fact of O outside an accepted drop, is reverted on its own, so the
+ *   invention or the loss never reaches S7.
  */
 export function checkFacts(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], fresh: readonly Proposal[]): void {
   const pending = new Set(fresh);
@@ -132,13 +133,22 @@ export function checkFacts(a: Analysis, units: readonly Sentence[], proposals: r
       p.reason = `facts: ${check.message}`;
       continue;
     }
-    const extra = (set: readonly Proposal[]) => factInvariant(a.text, rendered(a, units, set), a.sources, [], a.extractOptions).extra;
-    const withIt = extra([...others, p]);
-    const added = new Set(surplus(extra(others).map((f) => f.key), withIt.map((f) => f.key)));
-    if (added.size > 0) {
-      const facts = withIt.filter((f) => added.has(f.key));
-      const list = [...new Set(facts.map((f) => f.text))].join(', ');
-      p.check = { status: 'reverted', reason: 'invented', facts, message: `with it the text states ${list} beyond what the text and the CV state` };
+    const invariant = (set: readonly Proposal[]) => {
+      const drops = set.flatMap((q) => (q.check?.status === 'accepted' ? q.check.dropped.map((f) => f.key) : []));
+      return factInvariant(a.text, rendered(a, units, set), a.sources, drops, a.extractOptions);
+    };
+    const before = invariant(others);
+    const after = invariant([...others, p]);
+    const grown = (was: readonly Fact[], is: readonly Fact[]): Fact[] => {
+      const keys = new Set(surplus(was.map((f) => f.key), is.map((f) => f.key)));
+      return is.filter((f) => keys.has(f.key));
+    };
+    const list = (facts: readonly Fact[]): string => [...new Set(facts.map((f) => f.text))].join(', ');
+    const added = grown(before.extra, after.extra);
+    const lost = grown(before.missing, after.missing);
+    if (added.length > 0) p.check = { status: 'reverted', reason: 'invented', facts: added, message: `with it the text states ${list(added)} beyond what the text and the CV state` };
+    else if (lost.length > 0) p.check = { status: 'reverted', reason: 'lost', facts: lost, message: `with it the text no longer states ${list(lost)}` };
+    if (p.check.status === 'reverted') {
       p.status = 'reverted';
       p.reason = `facts: ${p.check.message}`;
     }
@@ -177,14 +187,21 @@ function surplus(before: readonly string[], after: readonly string[]): string[] 
   });
 }
 
-/** S6, on the new live proposals, last made first, each against the live set as it stands. */
+/**
+ * S6, on the new live proposals, last made first, each against the live proposals S6 already
+ * kept (and the older ones): never against new ones it has not judged yet, so two edits that add
+ * the same finding or voice trait cannot excuse each other.
+ */
 export function relintAndVoice(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], fresh: readonly Proposal[]): void {
   const context = { genre: a.input.genre, lang: a.input.lang };
+  const pending = new Set(fresh);
   for (const p of [...fresh].reverse()) {
+    pending.delete(p);
     if (p.status !== 'live') continue;
-    const withIt = rendered(a, units, proposals);
+    const base = proposals.filter((q) => q !== p && q.status === 'live' && !pending.has(q));
+    const withIt = rendered(a, units, [...base, p]);
+    const without = rendered(a, units, base);
     p.status = 'reverted';
-    const without = rendered(a, units, proposals);
     const addedRules = surplus(levelOne(a, without), levelOne(a, withIt));
     const had = new Set(voiceViolations(a.text, without, context).map((v) => v.kind));
     const voice = voiceViolations(a.text, withIt, context).filter((v) => !had.has(v.kind));

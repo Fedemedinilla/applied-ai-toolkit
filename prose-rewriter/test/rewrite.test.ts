@@ -672,3 +672,119 @@ describe('the edit caps and the extra round', () => {
     expect(result.rewritten).toBe(expected);
   });
 });
+
+describe('S5, S6, S7 and S1b: the branches the stages take', () => {
+  it('S6 reverts only the edit that adds a voice trait, not a clean edit made after it', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2)],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'reverted'], ['e2', 'applied']]);
+  });
+
+  it('S6 reverts an edit that adds one more finding of a rule the text already breaks', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(3)],
+      'rewrite.edit': [edits({ sentenceId: 3, before: '¿Lo vemos el jueves?', after: '¿Lo vemos el jueves? Me apasiona.' }), edits()],
+    });
+    const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes).toEqual([expect.objectContaining({ id: 'e1', status: 'reverted', revertReason: expect.stringMatching(/LEX-01/) })]);
+    expect(result.rewritten).toBe(CHAT);
+  });
+
+  it('S5 counts the other sentences of a reworded paragraph as gone when it checks a drop', async () => {
+    // reescritura: unit 2 runs to the end of the body line, through the 1,6 s of sentence 3.
+    const drop = { sentenceId: 2, before: `${SINERGIAS} ${SPEED}`, after: FIXED, reason: 'shorter', drop: true };
+    const s = scriptedGateway({
+      'rewrite.plan': [plan(2)],
+      'rewrite.edit': [{ data: { edits: [drop] } }, edits()],
+      'rewrite.style': [edits()],
+      'rewrite.judge': [verdict(MAIL)],
+    });
+    const result = await rewrite(mail(MAIL, { mode: 'reescritura' }), { gateway: s.gateway, refs: REFS });
+    s.assertDone();
+    expect(result.rewritten).toBe(MAIL);
+    expect(result.changes[0]).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/no other sentence/) });
+  });
+
+  it('S7 excuses an accepted drop of one of two occurrences of a number', async () => {
+    const text = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio ya carga en 1,6 s. En el celular también carga en 1,6 s.';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 3)],
+      'rewrite.edit': [
+        {
+          data: {
+            edits: [
+              { sentenceId: 1, before: SINERGIAS, after: FIXED, reason: 'fix' },
+              { sentenceId: 3, before: ' también carga en 1,6 s', after: ' también anda bien', reason: 'shorter', drop: true },
+            ],
+          },
+        },
+      ],
+    });
+    const result = await rewrite(whatsapp(text), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes.map((c) => c.status)).toEqual(['applied', 'applied']);
+    expect(result.status).toBe('ok');
+    expect(result.flags.filter((f) => f.kind === 'missing-fact')).toEqual([]);
+  });
+
+  it('the judge\'s second verdict keeps a claim no edit touches as the user\'s own, with a flag', async () => {
+    const s3 = MAIL.replace('me apasiona potenciar sinergias', 'lideré el equipo del sitio');
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(2)],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'me apasiona potenciar sinergias', after: 'lideré el equipo del sitio' })],
+      'rewrite.style': [edits()],
+      'rewrite.judge': [verdict(s3, [3]), verdict(MAIL, [4])],
+    });
+    const result = await rewrite(mail(MAIL), { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    const claim = result.flags.find((f) => /I left it as you wrote it/.test(f.message));
+    expect(claim?.span === undefined ? '' : MAIL.slice(claim.span.start, claim.span.end)).toBe(SPEED);
+  });
+
+  it('S1b treats a level 2 finding as something to change, and lints a follow-up against the earlier message', () => {
+    const previous = 'Hola Marta, te cuento que el sitio de Ferretería Norte ya está listo y carga rápido en el celular.';
+    const text = 'Hola Marta, te escribí la semana pasada: el sitio de Ferretería Norte ya está listo y carga rápido en el celular. ¿Lo vemos el jueves?';
+    const a = analyse(prepare({ ...whatsapp(text), genre: 'follow-up', mode: 'minimo', recipient: { previousMessage: previous } }));
+    expect(a.lint.findings.map((f) => [f.ruleId, f.level])).toContainEqual(['SEG-03', 2]);
+    expect(a.lint.findings.some((f) => f.level === 1)).toBe(false);
+    expect(earlyExit(a)).toBeNull();
+    // A fact the earlier message states is the recipient's, not a claim of the user alone.
+    expect(a.flags.filter((f) => f.kind === 'not-in-cv').some((f) => f.message.includes('Norte'))).toBe(false);
+  });
+});
+
+describe('S6 against the edits it already kept', () => {
+  it('reverts each of two edits that add the same voice trait, instead of letting each excuse the other', async () => {
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2, 3)],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 3, before: '¿Lo vemos', after: 'Che, ¿lo vemos' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
+    });
+    const input = whatsapp(CHAT);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'reverted'], ['e2', 'reverted'], ['e3', 'applied']]);
+    expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
+    expectSound(input, result);
+  });
+});
+
+describe('S5 per edit, losses across edits', () => {
+  it('reverts the second of two edits that each remove one of two mentions of a fact', async () => {
+    const text = 'Hola Marta, espero que estés bien. Quería comentarte que me apasiona potenciar sinergias. El sitio en Astro ya carga en 1,6 s gracias a Astro. ¿Lo vemos el jueves?';
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2, 2)],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'El sitio en Astro', after: 'El sitio' }, { sentenceId: 2, before: ' gracias a Astro', after: '' })],
+    });
+    const input = whatsapp(text);
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toContain('Astro');
+    expect(result.changes.map((c) => [c.id, c.status])).toEqual([['e1', 'applied'], ['e2', 'applied'], ['e3', 'reverted']]);
+    expectSound(input, result);
+  });
+});
