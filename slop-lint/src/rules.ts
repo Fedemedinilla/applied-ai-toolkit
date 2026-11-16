@@ -1277,7 +1277,8 @@ const mail: Rule[] = [
     source: { evidence: ['SÍNTESIS'], ref: 'Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line)', section: '12' },
     deviation:
       'The report bans the formula only as the sole closing line and gives no test for that. Here it fires when the formula, as a whole ' +
-      'sentence, is the last prose sentence of the text; a sign-off and a name after it are not prose and do not count. The report lists it ' +
+      'sentence or as the sign-off line itself, is followed only by a sign-off and a signature (whatever their punctuation), or by lines ' +
+      'that are not prose, such as a name. A sentence of prose or a P.S. after it is one more closing line, so it does not fire. The report lists it ' +
       'for cover letters; it runs in email and follow-up, where the rest of the closing line usually is.',
     falsePositives: 'A mail whose request comes before the thanks, in the sentence above it.',
     examples: [

@@ -99,8 +99,14 @@ const COPY_WORD = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
 /** WA-03: a line that opens with an emoji (or a keycap number) and goes on after a space. */
 const EMOJI_BULLET = /^[ \t]*((?:(?![©®™])\p{Extended_Pictographic}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*)[ \t]+\S/u;
 
-/** MAIL-01: the thanks formula as a whole sentence. */
-const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration[.!]$/iu;
+/** MAIL-01: the thanks formula as a whole sentence, or as the sign-off line itself (a comma, an ellipsis or no mark). */
+const SOLE_THANKS = /^(?:thank you|thanks)(?: (?:so|very) much)? for your time and consideration(?:[.!,…]|\.\.\.)?$/iu;
+
+/** MAIL-01: a sign-off line; whatever follows it is the signature, whatever its punctuation. */
+const MAIL_SIGN_OFF = /^(?:best|regards|kind regards|warm regards|best regards|best wishes|all the best|many thanks|thanks|cheers|sincerely|yours sincerely|yours truly)\b/iu;
+
+/** MAIL-01: a postscript, which is one more thing said after the thanks. */
+const POSTSCRIPT = /^p\.?[ \t]?s\b/iu;
 
 function prose(ctx: StructuralContext): Span[] {
   return ctx.sentences.filter(isProse);
@@ -245,10 +251,16 @@ const checks: Record<string, Check> = {
 
   'MAIL-01': (ctx) => {
     if (ctx.lang !== 'en') return [];
-    // The last prose sentence: a sign-off and a name are not prose, so they do not hide it.
-    const last = prose(ctx).at(-1);
-    if (last === undefined || !SOLE_THANKS.test(last.text)) return [];
-    return [{ ruleId: 'MAIL-01', start: last.start, end: last.end }];
+    // The last sentence that is the formula, and what follows it: the formula is the only closing when
+    // what follows is a sign-off and a signature, a name with no prose, or, when the formula ends in a
+    // comma, the signature under it. A sentence of prose or a P.S. after it is one more closing line.
+    const at = ctx.sentences.findLastIndex((s) => SOLE_THANKS.test(s.text));
+    const thanks = ctx.sentences[at];
+    if (thanks === undefined) return [];
+    const after = ctx.sentences.slice(at + 1);
+    if (after.some((s) => POSTSCRIPT.test(s.text))) return [];
+    const closing = thanks.text.endsWith(',') || MAIL_SIGN_OFF.test(after[0]?.text ?? '') || !after.some(isProse);
+    return closing ? [{ ruleId: 'MAIL-01', start: thanks.start, end: thanks.end }] : [];
   },
 
   'SEG-03': (ctx) => {
