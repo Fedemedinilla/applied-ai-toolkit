@@ -93,6 +93,7 @@ export type Edit = z.infer<typeof Edit>;
 export const FactReport = z.strictObject({
   kept: z.array(z.string()),
   dropped: z.array(z.string()),
+  /** In the rewrite and in none of the original, the CV or the recipient: what nothing backs. */
   added: z.array(z.string()),
   /** Taken from the CV or the recipient and not in the original: shown as "added from the CV". */
   fromCv: z.array(z.string()),

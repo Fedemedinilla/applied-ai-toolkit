@@ -33,3 +33,23 @@ export {
   type VoiceViolation,
   voiceViolations,
 } from './voice.ts';
+export {
+  canonicalNumber,
+  checkEdit,
+  type EditCheck,
+  type EditContext,
+  extract,
+  type ExtractOptions,
+  type Fact,
+  FACT_KINDS,
+  factInvariant,
+  type FactKind,
+  type FactLabel,
+  factReport,
+  type FactSources,
+  type InvariantResult,
+  inventory,
+  type LabelledFact,
+  placeholders,
+  type RevertReason,
+} from './facts.ts';
