@@ -2,7 +2,7 @@
  * rewrite(input, { gateway }) (design 4.11): the stages S0 to S7 of design 4.4, in order.
  *
  * 1. S0 and S1 (stages/analyse.ts); S1b returns before any model call.
- * 2. S2 plan, S3 edit and, outside `minimo`, S4 style (stages/model.ts). Every edit quotes the
+ * 2. S2 plan, S3 edit and, outside `minimo` and unless `skipStyle` is set, S4 style (stages/model.ts). Every edit quotes the
  *    original text, so all of them are placed, checked and reverted against the same text.
  * 3. Placement, S5 in code and S6 (stages/check.ts) on the edits of S3 and S4.
  * 4. If level 1 findings remain, exactly one extra S3 round with them as a list, through the same
@@ -69,7 +69,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   const plan = await planStage(m, a.lint.findings);
   const first = await editStage(m, plan);
   const round1 = propose(first.edits, 'edit', 1);
-  const styled = a.mode === 'minimo' ? null : await styleStage(m);
+  const styled = a.mode === 'minimo' || options.skipStyle === true ? null : await styleStage(m);
   check([...round1, ...propose(styled ?? [], 'style', 1)]);
 
   let extraInvented = false;
