@@ -54,6 +54,50 @@ describe('splitSentences', () => {
     expect(texts(`${first} ${second}`)).toEqual([first, second]);
   });
 
+  it.each([
+    'Hablé con el señor J. Pérez ayer.',
+    'Le escribí a J. Pérez ayer.',
+    'Lo escribió M. López en 2020.',
+    'La autora es J. K. Rowling.',
+    'El ingeniero M. Gómez revisó el código.',
+    'Me reuní en Rosario con la arquitecta A. Fernández.',
+    'Nadal vs. A. Murray fue la final.',
+    'I met author J. K. Rowling once.',
+    'I sent it to the author J. Smith last week.',
+  ])('keeps the initial in "%s" inside the sentence after any word', (t) => {
+    expect(texts(t)).toEqual([t]);
+  });
+
+  // A word that is not a letter after "etc." and the like: the period stays inside the sentence
+  // unless that word starts in uppercase, past opening punctuation.
+  it.each([
+    'Usamos Astro, etc. 30 horas por semana.',
+    'Usamos Astro, etc. «para» todo.',
+    'Usamos Astro, etc. (para todo) y Next.',
+    'Trabajé en RR. HH. 3 años.',
+    'Trabajé en EE. UU. 2 años.',
+    'Trabajé en Acme Inc. 3 años.',
+    'Trabajé en Acme Ltd. 3 años.',
+    'Lo firmó John Smith Jr. 2 veces.',
+    'Ver cf. Smith 2020 para más detalle.',
+    'Es el núm. 4 de la lista.',
+    'Ver págs. 4 a 6 del informe.',
+  ])('keeps "%s" as one sentence when no uppercase word follows the abbreviation', (t) => {
+    expect(texts(t)).toEqual([t]);
+  });
+
+  it.each([
+    ['Tardó una hora aprox.', 'Después siguió.'],
+    ['Trabajamos 30 horas aprox.', 'Después bajamos a 20.'],
+    ['It took an hour approx.', 'Then it ended.'],
+    ['Usamos Astro, etc.', '«Después» vino Next.'],
+    ['Usamos Astro, etc.', '(Después vino Next.)'],
+    ['I work for Acme Ltd.', 'The team is small.'],
+    ['Nos falta la vitamina C.', 'Por eso la compramos.'],
+  ])('ends "%s" before "%s", which starts in uppercase', (first, second) => {
+    expect(texts(`${first} ${second}`)).toEqual([first, second]);
+  });
+
   it('treats a line break as a boundary unless the next line continues in lowercase', () => {
     expect(texts('Dear Ms. Reyes,\nI am applying.')).toEqual(['Dear Ms. Reyes,', 'I am applying.']);
     expect(texts('I built the dashboard that\nthe managers review.')).toEqual(['I built the dashboard that\nthe managers review.']);
