@@ -138,3 +138,20 @@ describe('what each genre requires', () => {
     expect(voiceViolations(plain, tidy, { genre, lang: 'es' })).toEqual([]);
   });
 });
+
+describe('emoji and the marks of standard spelling', () => {
+  it('counts one emoji per character the reader sees, flags included, and leaves typographic symbols out', () => {
+    expect(voiceProfile('↔ ✔ ▪ 🇦🇷', 'es').counts.emoji).toBe(1);
+    expect(voiceProfile('Listo ✔️ y 👍🏽 y 1️⃣ y 👨‍👩‍👧', 'es').counts.emoji).toBe(4);
+    const whatsapp = { genre: 'whatsapp', lang: 'es' } as const;
+    expect(voiceViolations('Hola, nos vemos el lunes.', 'Hola, nos vemos el lunes 🇦🇷', whatsapp).map((v) => v.kind)).toEqual(['emoji']);
+    expect(voiceViolations('Hola, nos vemos el lunes.', 'Hola, nos vemos el lunes ✔', whatsapp)).toEqual([]);
+  });
+
+  it('lets a formal genre add the ¿ and ¡ of standard spelling, and keeps a WhatsApp without them', () => {
+    for (const genre of ['email', 'follow-up', 'cover-letter'] as const) {
+      expect(voiceViolations('hola, podés mandarlo?', 'Hola, ¿podés mandarlo?', { genre, lang: 'es' })).toEqual([]);
+    }
+    expect(voiceViolations('hola, podés mandarlo?', 'hola, ¿podés mandarlo?', { genre: 'whatsapp', lang: 'es' }).map((v) => v.kind)).toEqual(['inverted-marks']);
+  });
+});

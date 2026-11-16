@@ -49,8 +49,14 @@ const USTED = words([
   '(?:consultar|escribir|enviar|comentar|agradecer|contactar|informar|saludar|preguntar|pedir|adjuntar|mandar)le',
 ]);
 const CHE = words(['che']);
-/** Pictographs, without ©, ® and ™, which a business text writes as signs, not as emoji. */
-const EMOJI = /(?![©®™])\p{Extended_Pictographic}/gu;
+/**
+ * A character the reader sees as an emoji: one shown as emoji by default, a symbol turned into one
+ * by its variation selector, a skin tone or a joiner ("✔️", "👍🏽"), a keycap or a flag. Plain
+ * symbols ("✔", "↔", "▪") and ©, ® and ™ are marks, not emoji.
+ */
+const EMOJI = /^(?:\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|(?![©®™])\p{Extended_Pictographic}[\uFE0F\u200D\p{Emoji_Modifier}]|(?![©®™])\p{Emoji_Presentation})/u;
+const SEGMENTER = new Intl.Segmenter('und', { granularity: 'grapheme' });
+const emojiCount = (text: string): number => [...SEGMENTER.segment(text)].filter((g) => EMOJI.test(g.segment)).length;
 const ACCENT = /[áéíóúü]/giu;
 /** n't, 're, 've, 'll, 'm, 'd, and 's only after the words where it is "is" or "us", not a possessive. */
 const CONTRACTION = new RegExp(
@@ -174,7 +180,7 @@ export function voiceProfile(source: string, lang: Lang): VoiceProfile {
       invertedMarks: count(text, /[¿¡]/gu),
       closingMarks: count(text, /[?!]/gu),
       accents,
-      emoji: count(text, EMOJI),
+      emoji: emojiCount(text),
       che: es ? count(text, CHE) : 0,
       contractions: es ? 0 : count(text, CONTRACTION),
     },
@@ -233,13 +239,13 @@ export interface VoiceViolation {
 /**
  * What a genre asks for even when the writer left it out (design 4.5: "lo que el género exige, por
  * ejemplo mayúscula inicial en un mail en inglés"). A mail, a follow-up and a cover letter follow
- * standard spelling, so an initial capital and Spanish accents may be added there; a WhatsApp
+ * standard spelling, so an initial capital, Spanish accents and ¿¡ may be added there; a WhatsApp
  * keeps the writer's own.
  */
 export const GENRE_REQUIRES: Readonly<Record<Genre, readonly VoiceTrait[]>> = {
-  'cover-letter': ['initial-capital', 'accents'],
-  email: ['initial-capital', 'accents'],
-  'follow-up': ['initial-capital', 'accents'],
+  'cover-letter': ['initial-capital', 'accents', 'inverted-marks'],
+  email: ['initial-capital', 'accents', 'inverted-marks'],
+  'follow-up': ['initial-capital', 'accents', 'inverted-marks'],
   whatsapp: [],
 };
 
