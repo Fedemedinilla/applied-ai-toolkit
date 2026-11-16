@@ -2,10 +2,11 @@
  * The public entry of prose-rewriter. Phase F0 published the contract; F4 publishes the pure core:
  * the voice profile (voice.ts), the fact check (facts.ts), the sentences, edits and diff
  * (edits.ts) and the injection guard (injection.ts). No model, no gateway and no I/O in any of
- * them. F5 adds the model-facing building blocks: the four gateway tasks with their provisional
+ * them. F5a adds the model-facing building blocks: the four gateway tasks with their provisional
  * caps (tasks.ts), evals' ModelClient over the gateway (model-client.ts), which the fact judge
- * calls through, and the judge's own rubric with its revert plan and the D10 switch (rubric.ts).
- * rewrite(), with the stages S0 to S7 and the CLI, comes later in F5.
+ * calls through, the judge's own rubric with its revert plan and the D10 switch (rubric.ts), the
+ * output schemas of the plan, edit and style stages (outputs.ts) and their prompt (prompt.ts).
+ * rewrite(), with the stages S0 to S7 that put these together, and the CLI come in F5b.
  */
 export {
   Change,
@@ -104,3 +105,24 @@ export {
   RewriteVerdict,
   type UserClaim,
 } from './rubric.ts';
+export {
+  EditOutput,
+  PLAN_ACTIONS,
+  type PlanAction,
+  PlanItem,
+  PlanOutput,
+  STYLE_MAX_EDITS,
+  styleOutput,
+  type StyleOutput,
+} from './outputs.ts';
+export {
+  editPrompt,
+  HARD_RULES,
+  planPrompt,
+  type PromptContext,
+  type PromptRefs,
+  PROMPT_VERSION,
+  type StagePrompt,
+  stylePrompt,
+  systemBlocks,
+} from './prompt.ts';
