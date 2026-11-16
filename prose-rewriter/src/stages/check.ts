@@ -39,7 +39,11 @@ export interface Proposal {
   after?: string;
   /** Why it was refused or reverted. */
   reason?: string;
-  /** The composed style edit that holds this one (stages/compose.ts); it comes back if that one is not applied. */
+  /**
+   * The composed style edit that holds this one (stages/compose.ts); it comes back if that one is
+   * not applied and the checks still run. Once it is reverted where none run again (the judge),
+   * rewrite() clears this and the reason says the edit stays out.
+   */
   mergedInto?: string;
   /** checkEdit's verdict: invented and lost facts, and the keys of an accepted drop. */
   check?: EditCheck;

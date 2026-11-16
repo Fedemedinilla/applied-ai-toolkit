@@ -974,6 +974,35 @@ describe('S5 drops against what the judge leaves', () => {
     expect(result.status).toBe('needs-review');
     expectSound(input, result);
   });
+
+  it('does not leave an S3 edit "merged into" a style edit the judge took back through its drop', async () => {
+    // F6b review: S4 deletes, with drop, the sentence an S3 edit rewrote; the composed edit holds
+    // that S3 edit. The judge reverts the opening, the drop goes with it, and the S3 edit stays
+    // out (the judge never read it alone), with a reason that says so instead of "merged into".
+    const input = evalInput('es', 'es-cover-letter-heavy');
+    const TOUCH = { sentenceId: 4, before: 'Estoy convencida de que mi perfil encaja perfectamente', after: 'Creo que mi perfil encaja' };
+    const touched = LUMEN.replace(TOUCH.before, TOUCH.after);
+    const DROP = { sentenceId: 4, before: touched, after: '', reason: 'no fact', principleId: 'es-only-what-moves-the-reader', drop: true };
+    const judged = applyAll(input.text, [OPENING, ADJECTIVES, { before: LUMEN, after: '' }, CLOSING]);
+    const lineOf = (text: string, needle: string): number => judgeLines(text, 'es').find((l) => l.text.includes(needle))!.line;
+    const expected = applyAll(input.text, [ADJECTIVES, CLOSING]);
+    const scripted = scriptedGateway({
+      'rewrite.plan': [plan(1, 2, 4, 5)],
+      'rewrite.edit': [edits(OPENING, ADJECTIVES, TOUCH, CLOSING)],
+      'rewrite.style': [{ data: { edits: [DROP] } }],
+      'rewrite.judge': [verdictIn('es', judged, [lineOf(judged, 'Me postulo')]), verdictIn('es', expected)],
+    });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(expected);
+    const held = result.changes.find((c) => c.after === TOUCH.after);
+    expect(result.changes.find((c) => c.stage === 'style')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^facts: .*Estudio/) });
+    expect(held?.status).toBe('reverted');
+    expect(held?.revertReason).not.toMatch(/^merged into/);
+    expect(held?.revertReason).toMatch(/reverted/);
+    expect(result.status).toBe('needs-review');
+    expectSound(input, result);
+  });
 });
 
 describe('a stage reply that cannot be read', () => {

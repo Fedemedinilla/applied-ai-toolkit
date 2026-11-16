@@ -188,6 +188,16 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     judged = await judgeStage(a, units, proposals, client);
   }
 
+  // A composed edit reverted where nothing checks again what it held (the judge, or a drop the
+  // extra round's checks took back) leaves its S3 edits out: put back now, they would be text no
+  // check read alone. They say so instead of naming an edit that is not applied.
+  for (const p of proposals) {
+    const holder = proposals.find((q) => q.id === p.mergedInto);
+    if (holder === undefined || holder.status === 'live') continue;
+    p.reason = `held in ${holder.id}, which was reverted; not put back, since the checks after it did not read it alone`;
+    delete p.mergedInto;
+  }
+
   return assemble(a, units, proposals, { usage, extraInvented, judged, unread });
 }
 
