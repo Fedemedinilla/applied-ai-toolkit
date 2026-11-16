@@ -588,6 +588,64 @@ describe('the gate report (design 5, "Puerta")', () => {
   it('is inconclusive with no baseline among the variants', () => {
     expect(gateReport([], [], variants('full')).state).toBe('inconclusive');
   });
+
+  it('is inconclusive, not passing, when one side has no same-voice records', () => {
+    const r = gateReport([...versus('full', 800, 480), ...judged('same-voice', 'single-call', 60, 60)], [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/same-voice: full against single-call\n\nNot gated: no judged pieces on one side/);
+    expect(r.state).toBe('inconclusive');
+  });
+
+  it('is inconclusive, not failing, when no pairwise-baseline comparison was scored', () => {
+    // Every comparison had nothing to judge, or every judge call failed: no evidence either way.
+    const failed: JudgeRecord[] = judged('pairwise-baseline', 'full', 0, 0, 4).map((r, i) => (i < 2 ? r : { ...r, status: 'failed' }));
+    const r = gateReport([...failed, ...sameVoice(60)], [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/pairwise-baseline: full against single-call\n\nNot gated: no comparison with something to judge/);
+    expect(r.state).toBe('inconclusive');
+  });
+
+  it('is inconclusive on pairwise-baseline when the interval includes one half, and fail only when it lies below', () => {
+    // 392 and 400 of 800: the interval includes one half, so neither beats nor loses (exit 5, not 2).
+    expect(gateReport([...versus('full', 800, 392), ...sameVoice(60)], [], variants('full', 'single-call')).state).toBe('inconclusive');
+    expect(gateReport([...versus('full', 800, 400), ...sameVoice(60)], [], variants('full', 'single-call')).state).toBe('inconclusive');
+    expect(gateReport([...versus('full', 800, 360), ...sameVoice(60)], [], variants('full', 'single-call')).state).toBe('fail');
+  });
+
+  it('takes the worse of the two sub-gates: a fail beats an inconclusive', () => {
+    // pairwise-baseline fails; same-voice on 33 cases is inconclusive at the default margin.
+    const r = gateReport([...versus('full', 800, 300), ...sameVoice(33)], [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/pairwise-baseline: full against single-call\n\n### Eval gate: fail/);
+    expect(r.markdown).toMatch(/same-voice: full against single-call\n\n### Eval gate: inconclusive/);
+    expect(r.state).toBe('fail');
+  });
+
+  it('without full among the variants, takes the worst of the variants', () => {
+    const judges = [...versus('no-style', 800, 480), ...judged('same-voice', 'single-call', 60, 60), ...judged('same-voice', 'no-style', 60, 60)];
+    expect(gateReport(judges, [], variants('no-style', 'single-call')).state).toBe('pass');
+    expect(gateReport(judges, [hard('no-style')], variants('no-style', 'single-call')).state).toBe('blocked');
+    const close = [...versus('no-style', 800, 400), ...judged('same-voice', 'single-call', 60, 60), ...judged('same-voice', 'no-style', 60, 60)];
+    expect(gateReport(close, [], variants('no-style', 'single-call')).state).toBe('inconclusive');
+  });
+
+  it('with full among the variants, follows full even when an ablation is blocked', () => {
+    const judges = [...versus('full', 800, 480), ...versus('no-style', 800, 480), ...sameVoice(60), ...judged('same-voice', 'no-style', 60, 60)];
+    const r = gateReport(judges, [hard('no-style')], variants('full', 'no-style', 'single-call'));
+    expect(r.markdown).toMatch(/no-style against single-call: blocked by 1 hard failure/);
+    expect(r.state).toBe('pass');
+  });
+
+  it('reads an inconclusive ablation as no evidence, not as a stage that contributes', () => {
+    const judges = [...versus('full', 60, 50), ...sameVoice(60), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 60, 50), ...judged('same-voice', 'no-style', 60, 60)];
+    const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'));
+    expect(r.markdown).toMatch(/Ablation: no-style against full\n\nNo evidence that the stage no-style leaves out contributes \(inconclusive\)/);
+    expect(r.markdown).not.toMatch(/the stage no-style leaves out contributes\./);
+  });
+
+  it('names the smaller scored count in the small-set warning when the sides differ', () => {
+    // Baseline 40 scored; full 33 scored and 7 with nothing to judge, over the same 40 cases.
+    const judges = [...versus('full', 60, 50), ...judged('same-voice', 'single-call', 40, 40), ...judged('same-voice', 'full', 33, 33, 7)];
+    const r = gateReport(judges, [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/cannot pass with 33 scored cases/);
+  });
 });
 
 describe('the eval CLI', () => {
