@@ -94,6 +94,8 @@ describe('evaluate', () => {
     expect(row('LEX-03')).toMatchObject({ level: 1, scope: 'sentence', tp: 1, fp: 0, fn: 0, precision: { num: 1, den: 1 }, recall: { num: 1, den: 1 }, fpRate: { num: 0, den: 9 } });
     expect(row('LEX-04')).toMatchObject({ level: 2, tp: 0, fp: 0, fn: 1, precision: { num: 0, den: 0 }, recall: { num: 0, den: 1 } });
     expect(row('LEX-06')).toMatchObject({ level: 1, tp: 0, fp: 1, fn: 0, fpRate: { num: 1, den: 10 } });
+    // Recall divides by the labels that name the rule, tp + fn, never by the false positives.
+    expect(row('LEX-06')?.recall).toEqual({ num: 0, den: 0 });
     expect(result.rules.map((r) => r.rule)).toEqual(['LEX-03', 'LEX-04', 'LEX-06']);
   });
 
@@ -126,6 +128,72 @@ describe('evaluate', () => {
   });
 });
 
+describe('evaluate, on the formulas the report rests on', () => {
+  // Fictional: invented names and plain prose with no anchor, so ESP-02 fires where no label asks for it.
+  const A = 'We should think about the way things move along when people get together and talk about what they want to do.';
+  const B = 'They feel the same about the plans they have for the time ahead of them and about the way it all goes.';
+  const LONG = 'We should think about the way things move along when people get together and talk about what they want to do next and how they feel about the plans they have for the time ahead of them all.';
+  const plain = (text: string) => ({ text, slop: false, rules: [] });
+  const SET: LabeledSet = {
+    fictional: 'Fictional texts written for this test.',
+    genre: 'email',
+    lang: 'en',
+    items: [
+      {
+        id: 'email-en-01',
+        kind: 'slop',
+        // No space after the period: LEX-06 starts exactly where the sentence before it ends.
+        text: 'Hi Dana,\n\nThe file is ready.Honestly, the rest is too.\n\nBest,\nSam',
+        sentences: [plain('Hi Dana,'), plain('The file is ready.'), { text: 'Honestly, the rest is too.', slop: true, rules: [] }, plain('Best,'), plain('Sam')],
+      },
+      {
+        id: 'email-en-02',
+        kind: 'slop',
+        text: `Hi Dana,\n\n${LONG}\n\nBest,\nSam`,
+        sentences: [plain('Hi Dana,'), { text: LONG, slop: true, rules: ['EST-10'] }, plain('Best,'), plain('Sam')],
+      },
+      {
+        id: 'email-en-03',
+        kind: 'human',
+        // Two list items give level 2 findings in a human text.
+        text: `Hi Dana,\n\n${A} ${B}\n- sales\n- stock\n\nBest,\nSam`,
+        sentences: [plain('Hi Dana,'), plain(A), plain(B), plain('- sales'), plain('- stock'), plain('Best,'), plain('Sam')],
+      },
+    ],
+  };
+  const result = evaluate([SET]);
+
+  it('gives a finding that starts where a sentence ends to the next sentence', () => {
+    expect(result.falsePositives).toContainEqual({ genre: 'email', item: 'email-en-01', sentence: 3, rule: 'LEX-06', level: 1, onSlop: true });
+  });
+
+  it('counts an unnamed slop sentence that a rule reports', () => {
+    expect(result.coverage[0]?.unnamedSlop).toEqual({ num: 1, den: 1 });
+  });
+
+  it('marks a whole-text false positive as on slop when the text is slop', () => {
+    expect(result.falsePositives.filter((f) => f.rule === 'ESP-02')).toEqual([
+      { genre: 'email', item: 'email-en-02', sentence: 0, rule: 'ESP-02', level: 2, onSlop: true },
+      { genre: 'email', item: 'email-en-03', sentence: 0, rule: 'ESP-02', level: 2, onSlop: false },
+    ]);
+  });
+
+  it('keeps whole-text findings out of the sentences, so per level only the two list lines are human sentences at level 2', () => {
+    expect(result.levels.find((l) => l.level === 2)).toMatchObject({ precision: { num: 1, den: 3 }, fpRate: { num: 2, den: 14 } });
+  });
+
+  it('counts only level 1 findings on human texts', () => {
+    expect(result.human).toEqual([{ genre: 'email', humanTexts: 1, textsWithLevel1: 0, level1Findings: 0, rules: [] }]);
+  });
+
+  it('leaves a label of a rule the genre does not run out of the level recall', () => {
+    const set = clone();
+    // EST-06 is off in email: validateSet rejects the label, and evaluate does not count it either.
+    set.items[0]!.sentences[3]!.rules = ['EST-06'];
+    expect(evaluate([set]).levels.find((l) => l.level === 'any')?.recall).toEqual({ num: 1, den: 1 });
+  });
+});
+
 describe('guessGrid', () => {
   it('scores each pair of cuts and marks the current one', () => {
     const cases = [
@@ -140,6 +208,8 @@ describe('guessGrid', () => {
     ]);
     expect(rows[1]?.surePerGenre.whatsapp).toEqual({ num: 1, den: 1 });
     expect(rows[1]?.surePerGenre['cover-letter']).toEqual({ num: 0, den: 0 });
+    // Only the row with both of the current cuts is marked.
+    expect(guessGrid(cases, [GUESS_CUTS.shortWords], [100, GUESS_CUTS.mailWords]).map((r) => r.current)).toEqual([false, true]);
   });
 });
 
