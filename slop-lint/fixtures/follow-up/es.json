@@ -271,9 +271,6 @@
       "id": "follow-up-es-06",
       "kind": "slop",
       "text": "Hola, Martín:\n\nSolo quería hacer un seguimiento de mi mensaje anterior. Perdón por molestar, sé que estás con mil cosas.\nNo dudes en escribirme si tenés alguna consulta.\nQuedo a tu entera disposición.\n\nSaludos cordiales,\nJulia",
-      "textRules": [
-        "ESP-02"
-      ],
       "sentences": [
         {
           "text": "Hola, Martín:",
@@ -355,9 +352,6 @@
       "kind": "slop",
       "text": "Asunto: Seguimiento\n\nEstimado/a:\n\nRetomo mi mensaje anterior para reiterar mi interés. Es importante destacar que me encantaría tener la oportunidad de colaborar con ustedes.\nAgradezco de antemano su tiempo y consideración.\n\nAtentamente,\nRodrigo",
       "variety": "neutral",
-      "textRules": [
-        "ESP-02"
-      ],
       "sentences": [
         {
           "text": "Asunto: Seguimiento",
