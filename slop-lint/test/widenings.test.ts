@@ -179,3 +179,11 @@ describe('REG-02 reads "encantaría" with the accent dropped or decomposed', () 
     }
   }
 });
+
+describe('a phrase never ends inside a decomposed letter', () => {
+  // "dé" in NFD is "e" plus a combining accent; the word boundary must not split them.
+  it('leaves "oportunidad dé" in NFD alone', () => {
+    const result = lint('Me encantaría tener la oportunidad dé x', { lang: 'es' });
+    expect(result.findings.map((f) => f.ruleId)).not.toContain('REG-02');
+  });
+});

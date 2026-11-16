@@ -2,9 +2,11 @@
  * In JavaScript, \b only knows ASCII word characters, even with the u flag, so
  * /é\b/u never matches "Lideré la". These lookarounds are word boundaries that
  * understand accented letters. Section 13.2 of the report defines them the same way.
+ * E also refuses a combining mark (\p{M}), so a match never ends between a letter and the
+ * accent that follows it in NFD text ("de" + U+0301 is "dé", not "de").
  */
 export const B = String.raw`(?<![\p{L}\p{N}])`;
-export const E = String.raw`(?![\p{L}\p{N}])`;
+export const E = String.raw`(?![\p{L}\p{N}\p{M}])`;
 
 /** A case-insensitive list of words or phrases, each bounded on both sides. */
 export function wordList(alternatives: readonly string[]): string {
