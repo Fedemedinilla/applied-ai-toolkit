@@ -62,8 +62,26 @@ interface Hit {
   end: number;
 }
 
-/** Every match of every pattern, overlapping hits merged into one, in text order. */
-function hits(text: string): Hit[] {
+/**
+ * The text as the patterns read it: in NFC and without format characters (zero-width spaces,
+ * soft hyphens, joiners), which a model does not see but which split a phrase or a tag for a
+ * regular expression. `at[i]` is where the character i of the view starts in the text.
+ */
+function readable(text: string): { view: string; at: number[] } {
+  let view = '';
+  const at: number[] = [];
+  for (const { segment, index } of new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text)) {
+    const clean = segment.normalize('NFC').replace(/\p{Cf}/gu, '');
+    view += clean;
+    for (let k = 0; k < clean.length; k++) at.push(index);
+  }
+  at.push(text.length);
+  return { view, at };
+}
+
+/** Every match of every pattern, overlapping hits merged into one, in text order, in the text's own offsets. */
+function hits(source: string): Hit[] {
+  const { view: text, at } = readable(source);
   const all: Hit[] = [];
   for (const pattern of PATTERNS) {
     for (const m of text.matchAll(pattern)) {
@@ -82,7 +100,7 @@ function hits(text: string): Hit[] {
     if (last !== undefined && hit.start < last.end) last.end = Math.max(last.end, hit.end);
     else merged.push({ ...hit });
   }
-  return merged;
+  return merged.map((h) => ({ start: at[h.start] ?? source.length, end: at[h.end] ?? source.length }));
 }
 
 function message(source: DataSource, quote: string, lang: Lang): string {
@@ -104,11 +122,18 @@ export function injectionFlags(text: string, source: DataSource, lang: Lang = 'e
 }
 
 /**
- * The start of a data tag, open or closed, with any spacing (`<texto`, `</ perfil`), or the same
+ * The start of a data tag, open or closed, with any spacing or invisible format character
+ * (`<texto`, `</ perfil`, `<\u200B/texto`), or the same
  * already written with escaped brackets (`&lt;/texto`, `&amp;lt;/texto`). Escaping the escaped form
  * too is what makes the neutralization reversible.
  */
-const TAG_START = new RegExp(`(<|&(?:amp;)*lt;)(?=\\s*\\/?\\s*(?:${DATA_TAGS.join('|')})(?![\\p{L}\\p{N}]))`, 'giu');
+const GAP = String.raw`[\s\p{Cf}]*`;
+/** A tag name with any format character between its letters ("te\u00ADxto"), which a model reads as the name. */
+const spelled = (name: string): string => [...name].join(String.raw`\p{Cf}*`);
+const TAG_START = new RegExp(
+  `(<|&(?:amp;)*lt;)(?=${GAP}\\/?${GAP}(?:${DATA_TAGS.map(spelled).join('|')})(?!\\p{Cf}*[\\p{L}\\p{N}]))`,
+  'giu',
+);
 
 function neutralize(text: string): string {
   return text.replace(TAG_START, (lead: string) => (lead === '<' ? '&lt;' : `&amp;${lead.slice(1)}`));
