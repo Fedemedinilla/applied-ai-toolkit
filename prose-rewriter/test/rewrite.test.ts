@@ -999,6 +999,24 @@ describe('a stage reply that cannot be read', () => {
     expectSound(input, result);
   });
 
+  it('keeps the first labelled marker when a bare [COMPLETAR] comes before it', async () => {
+    // F6b review: a bare marker first is not a request; keeping it would fail PlanOutput, which no
+    // retry catches, and the whole rewrite with it.
+    const input = trap();
+    const expected = firstEdit(input.text);
+    const [first, second] = TRAP_PLAN.data.items;
+    const bareFirst = { data: { items: [first, { ...second, request: `Falta el dato [COMPLETAR] o bien ${MARKER}` }] } };
+    const scripted = scriptedGateway({ 'rewrite.plan': [bareFirst], 'rewrite.edit': [TRAP_EDITS], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, skipStyle: true });
+    scripted.assertDone();
+    expect(tasksOf(scripted)).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.judge']);
+    const prompt = JSON.stringify(scripted.calls[1]?.request.messages);
+    expect(prompt).toContain(MARKER);
+    expect(prompt).not.toContain('Falta el dato');
+    expect(result.rewritten).toBe(expected);
+    expect(result.status).toBe('ok');
+  });
+
   it('asks S2 once more, then leaves the text as written and asks for a review, without failing', async () => {
     const input = trap();
     const scripted = scriptedGateway({ 'rewrite.plan': [UNREADABLE, UNREADABLE], 'rewrite.judge': [verdictIn('es', input.text)] });
