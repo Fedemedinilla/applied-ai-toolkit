@@ -132,6 +132,19 @@ describe('principlesFor', () => {
     expect(principlesFor([leaked], sources, { lang: 'es', genre: 'whatsapp', register: 'formal', variety: 'rioplatense' })).toEqual([]);
     expect(principlesFor([leaked], [], { lang: 'es', genre: 'whatsapp', register: 'casual', variety: 'rioplatense' })).toEqual([]);
   });
+
+  it('drops a lesson whose source does not reach the genre, even when the register matches', () => {
+    const leaked = Principle.parse({ ...casualPrinciple, id: 'es-leaked', genres: ['whatsapp', 'email'] });
+    expect(principlesFor([leaked], sources, { lang: 'es', genre: 'email', register: 'casual', variety: 'rioplatense' })).toEqual([]);
+    expect(principlesFor([leaked], sources, { lang: 'es', genre: 'whatsapp', register: 'casual', variety: 'rioplatense' }).map((p) => p.id)).toEqual(['es-leaked']);
+  });
+
+  it('drops a lesson whose source is link-only or excluded, even when the data was not validated', () => {
+    for (const use of ['link-only', 'excluded']) {
+      const unusable = [Source.parse({ ...plainSource, use })];
+      expect(principlesFor([general], unusable, { lang: 'es', genre: 'email', register: 'neutral' }), use).toEqual([]);
+    }
+  });
 });
 
 describe('the principles on disk', () => {
