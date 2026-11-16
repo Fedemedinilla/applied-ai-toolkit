@@ -1,7 +1,9 @@
 /**
  * The public entry of evals: what an app needs to run its own target through the variant runner,
  * score the outputs with a rubric, gate a candidate run against a baseline and render the report.
- * The blinding, aggregation and red-team modules are used by scripts/ and are not published here.
+ * It also publishes blinding, the line-by-line groundedness judge with its line rule, and the
+ * red-team runner, so a library that judges or attacks its own output uses these instead of a copy
+ * that drifts from them. Aggregation (unblinding and the results table) stays with scripts/.
  */
 export {
   DUMP_NOW,
@@ -44,7 +46,20 @@ export {
   type Rubric,
   type Table,
 } from './rubric.ts';
-export { groundedness } from './judge.ts';
+export { checkLineCoverage, groundedness, judgePiece, LineSupport, type JudgedPiece, type Verdict } from './judge.ts';
+export { blind, type BlindKey, type BlindPiece, type KeyEntry, type Withheld } from './blind.ts';
+export {
+  Attack,
+  parseAttacks,
+  runAttacks,
+  type AttackRecord,
+  type ChatHandler,
+  type ChatRequest,
+  type ChatResponse,
+  type HistoryMessage,
+  type Outcome as AttackOutcome,
+  type TurnRecord,
+} from './redteam.ts';
 export { classification, classificationReport, type ClassificationOptions, type ClassificationReport, type ClassificationVerdict } from './classification.ts';
 export { extraction, extractionReport, type ExtractionReport, type ExtractionVerdict } from './extraction.ts';
 export { judgedRuns, parseRun, RUN_FORMAT, RunError, scoreItems, summarize, type RunResult, type RunSummary, type StoredRun } from './run.ts';

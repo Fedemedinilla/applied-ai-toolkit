@@ -52,7 +52,7 @@ Every script refuses to write over an existing file. A flag takes its value as t
 
 | path | what |
 |---|---|
-| `src/index.ts` | the public entry for apps: the runner, variants, the model seam, JSONL files, `wilson`, rubrics, stored runs, the gate and the report |
+| `src/index.ts` | the public entry for apps and libraries: the runner, variants, the model seam, JSONL files, `wilson`, rubrics, stored runs, the gate, the report, and also `blind`, `judgePiece`, `checkLineCoverage` and `runAttacks` with the types their signatures use |
 | `src/variants.ts` | `applyEdits`: exact-text edits on system blocks, exactly one match each |
 | `src/runner.ts` | job planning, preflight, `--dump`, the concurrent runner |
 | `src/blind.ts` | anonymize and shuffle, key kept apart, withheld rows |
@@ -279,6 +279,7 @@ All tests run offline with fake clients and no API key (`npx vitest run evals`).
 - `variants.test.ts`: exact replacement; missing, ambiguous and out-of-range targets fail; optional edits; literal `$&` and `$1`; capture groups; edit order; input not mutated, `cache_control` kept; every sample variant applies to every case and language; V0 equals production.
 - `runner.test.ts`: interleaved job order; production call settings, the edited prompt and the run's date reach the request; a missing edit stops the run with zero calls; a failed call is recorded and the run continues; the concurrency limit holds; a dump does not change with the system clock; a dump of V4 equals a dump of V0 from a product that shipped V4 a week later, and not from one that shipped V3.
 - `files.test.ts`: a JSONL error names the line of the file, blank lines counted; a leading byte order mark is dropped.
+- `index.test.ts`: blinding, the groundedness judge, the line rule and the red-team runner work when imported through the public entry.
 - `blind.test.ts`: pieces carry only case, language, date, brief and text; no variant name, token count or stop reason leaks; the key maps every piece back; the shuffle is seeded and mixes variants; failed, refused and empty rows are withheld and kept in the key.
 - `judge.test.ts`: sentence splitting; the judge request; verdicts with skipped, repeated or extra lines are rejected, as are an out-of-range quality, unknown fields and non-JSON; the two schemas agree on keys, required fields, closed objects and labels; cut and refused judge replies are rejected; consensus by strict majority with the median.
 - `aggregate.test.ts`: Wilson interval against known values; grouping with "all" rows; multi-judge majority and split counts; unknown verdicts, missing verdicts, a lost judge, a duplicate judge, a bad stored verdict, a missing piece, a withheld piece given to the judge, a failed call and uneven variant totals are refused; refusals land in `no piece` and outside the rate; Markdown output; the whole pipeline with fake models puts a scripted invention on the right variants, with no variant id or key field in any judge request; the judge's sheet carries the writer's TODAY line.
