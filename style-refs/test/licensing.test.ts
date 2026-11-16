@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { EXCERPT_MAX_SENTENCES, EXCERPT_MAX_WORDS, Source, validateRefs, type RefsData } from '../src/index.ts';
+import { EXCERPT_MAX_SENTENCES, EXCERPT_MAX_WORDS, Source, US_FREE_THROUGH, validateRefs, type RefsData } from '../src/index.ts';
 
 // The rules of design section 4.8, "Qué controla licensing.test.ts", tried on inline fixtures that
 // break one rule each. The data on disk is checked against the same rules in the last block.
@@ -122,6 +122,21 @@ describe('an excerpt comes only from a work in the public domain in the United S
       'principles/en.json 0.sources.0: plain-work is excluded',
       'excerpts/en.json 0.source: plain-work is excluded',
     ]);
+  });
+  it(`refuses an excerpt source published after ${US_FREE_THROUGH}, or in a year nobody verified`, () => {
+    expect(messages(withExcerpt({ ...work, published: US_FREE_THROUGH }))).toEqual([]);
+    expect(messages(withExcerpt({ ...work, published: US_FREE_THROUGH + 1 }))).toEqual([
+      `sources.json 0.published: a source for excerpts must be published in ${US_FREE_THROUGH} or earlier to be free in the US, and it is ${US_FREE_THROUGH + 1}`,
+    ]);
+    expect(messages(withExcerpt({ ...work, published: null }))).toEqual([
+      `sources.json 0.published: a source for excerpts must be published in ${US_FREE_THROUGH} or earlier to be free in the US, and its year is unverified`,
+    ]);
+  });
+  it('refuses a Gutenberg excerpt taken from an ebook other than its source', () => {
+    expect(messages(withExcerpt(work, { ...excerpt, url: 'https://www.gutenberg.org/cache/epub/2/pg2.txt' }))).toEqual([
+      'excerpts/en.json 0.url: Gutenberg ebook 2, and the source plain-work is ebook 1',
+    ]);
+    expect(messages(withExcerpt(work, { ...excerpt, url: 'https://www.gutenberg.org/ebooks/1.txt.utf-8' }))).toEqual([]);
   });
   it('refuses a principle that cites a link-only source', () => {
     expect(messages({ ...empty, sources: [{ ...work, use: 'link-only' }], principles: { 'principles/en.json': [principle] } })).toEqual([
