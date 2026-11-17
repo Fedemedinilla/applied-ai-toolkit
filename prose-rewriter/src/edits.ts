@@ -440,61 +440,49 @@ const BLANK = /[ \t]/u;
 /** What may follow a deleted word directly, with no space before it: closing punctuation. */
 const CLOSES_AFTER = /[,.;:!?…)\]»”]/u;
 
+/** What may come right before a deleted word, with no space after it: opening punctuation. */
+const OPENS_BEFORE = /[(\[{«“‘"'¿¡]/u;
+
 /**
- * The accepted edits with each deletion (an empty `after`) widened over the spaces it would leave
+ * The accepted edits with each deletion (an empty `after`) widened over the space it would leave
  * behind, so the text they produce never starts a line with a space, ends one with a space, or
- * keeps two spaces between sentences: the space after it when it opens a line or sits between
- * two spaces, the space before it when it closes a line or comes before closing punctuation. A
- * deletion only takes spaces no other edit holds, the space after it first, so the result does
- * not depend on the edits' order, and tidying twice changes nothing. Spans and quotes stay in the
+ * keeps two spaces between sentences. Each deletion, in text order, takes one side:
+ *   - at the start of a line, the space after it;
+ *   - otherwise, when it ends at a space, a line end or closing punctuation, the space before it;
+ *   - otherwise the space after it, when an opening mark precedes it ("(Uno. Dos.)") or the
+ *     deletion before it in a run already took the space before it.
+ * A deletion only takes spaces no other edit holds, and decides on its own sides, so restoring
+ * any one deletion of a run (the page lets the user do that) still leaves clean text, except
+ * where a run fills a whole line. Tidying twice changes nothing. Spans and quotes stay in the
  * original's coordinates, so the diff still applies; newSpan is computed again.
  *
  * Why: the model deletes a sentence by quoting it without the space after it, and the live eval
  * of 17/11 shipped "Hola Martín,\n\n Te escribo..." in 26 of 147 pieces. Kept out of applyEdits,
  * since the checks match each edit's quote against its sentence; S7 tidies the edits it ships.
+ * Each deletion decides alone (review of 17/11): a run widened as one gap glued two sentences
+ * ("Hola.Tres") when the user restored one of them.
  */
 export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]): AppliedEdit[] {
   const ordered = [...accepted].sort((a, b) => a.span.start - b.span.start);
   const spans = ordered.map((e) => ({ start: e.span.start, end: e.span.end }));
   const free = (from: number, to: number): boolean => spans.every((s) => to <= s.start || from >= s.end);
-  const plans = ordered.map((e, i) => {
-    if (e.after !== '') return undefined;
-    const { start, end } = spans[i] as TextRange;
+  for (const [i, e] of ordered.entries()) {
+    if (e.after !== '') continue;
+    const span = spans[i] as { start: number; end: number };
+    const { start, end } = span;
     let k0 = start;
     while (k0 > 0 && BLANK.test(original[k0 - 1] ?? '')) k0--;
     let k1 = end;
     while (k1 < original.length && BLANK.test(original[k1] ?? '')) k1++;
     const lineStart = k0 === 0 || original[k0 - 1] === '\n';
     const lineEnd = k1 === original.length || /[\r\n]/u.test(original[k1] ?? '');
-    return { i, start, end, k0, k1, lineStart, lineEnd };
-  });
-  // The space after first: a deletion that opens a line, or sits between two spaces mid-line.
-  const forward = new Set<number>();
-  for (const p of plans) {
-    if (p === undefined || p.k1 === p.end) continue;
-    if ((p.lineStart || (p.k0 < p.start && !p.lineEnd)) && free(p.end, p.k1)) {
-      (spans[p.i] as TextRange & { end: number }).end = p.k1;
-      forward.add(p.i);
-    }
-  }
-  // Then the space before: a deletion that closes a line, or comes right before closing punctuation.
-  // When a deletion that took the space after it sits right before, the run of deletions is one
-  // gap, and the first of them takes the space before the run.
-  for (const p of plans) {
-    if (p === undefined || forward.has(p.i)) continue;
-    if (!(p.lineEnd || p.k1 > p.end || CLOSES_AFTER.test(original[p.end] ?? ''))) continue;
-    let at = p.i;
-    for (;;) {
-      const span = spans[at] as TextRange & { start: number };
-      let k0 = span.start;
-      while (k0 > 0 && BLANK.test(original[k0 - 1] ?? '')) k0--;
-      if (k0 < span.start && free(k0, span.start)) {
-        if (k0 > 0 && original[k0 - 1] !== '\n') span.start = k0;
-        break;
-      }
-      const previous = spans.findIndex((s, j) => s.end === span.start && j !== at && ordered[j]?.after === '');
-      if (previous < 0) break;
-      at = previous;
+    const after = k1 > end && !lineEnd && free(end, k1);
+    if (lineStart) {
+      if (after) span.end = k1;
+    } else if (k0 < start && free(k0, start) && (lineEnd || k1 > end || CLOSES_AFTER.test(original[end] ?? ''))) {
+      span.start = k0;
+    } else if (after && (OPENS_BEFORE.test(original[start - 1] ?? '') || (k0 < start && !free(k0, start)))) {
+      span.end = k1;
     }
   }
   const widened = ordered.map((e, i) => {

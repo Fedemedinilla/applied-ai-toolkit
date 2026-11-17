@@ -333,6 +333,34 @@ describe('tidyDeletions', () => {
     expect(tidyText(text, [edit(0, 'Astr', '')])).toBe('Uso o mucho, y también Supabase.');
   });
 
+  // Review of 17/11: the page lets the user restore any single change, so each deletion of a run
+  // must take its own space. Restoring one of two deleted sentences must neither glue two
+  // sentences ("Hola.Tres") nor leave a space at the end or start of a line. A run that fills a
+  // whole line is left out: its two deletions share one space, which only one of them can hold.
+  it('widens each deletion of a run on its own, so restoring any one of them leaves clean text', () => {
+    const shapes: { text: string; quotes: string[] }[] = [
+      { text: 'Hola. Uno dos. Tres cuatro.\nChau.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Uno dos. Tres cuatro. Cinco.\nChau.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Hola. Uno dos. Tres cuatro. Cinco.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Hola.\n\nUno dos. Tres cuatro. Cinco.\n\nChau.', quotes: ['Tres cuatro.', 'Cinco.'] },
+      { text: '(Uno dos. Tres cuatro.) Cinco.', quotes: ['Uno dos.'] },
+      { text: 'Hola. Uno. Dos. Tres.\nChau.', quotes: ['Uno.', 'Dos.', 'Tres.'] },
+    ];
+    for (const { text, quotes } of shapes) {
+      const units = splitSentences(text, 'es');
+      const edits = quotes.map((q) => edit(units.findIndex((s) => s.text === q), q, ''));
+      const tidy = tidyDeletions(text, applyEdits(text, units, edits).accepted);
+      for (let keep = 0; keep < 1 << tidy.length; keep++) {
+        // Bit i set: the user keeps deletion i; unset: they restore it.
+        let out = text;
+        for (const [i, a] of [...tidy.entries()].reverse()) if ((keep >> i) & 1) out = out.slice(0, a.span.start) + a.after + out.slice(a.span.end);
+        const label = `${JSON.stringify(text)} keep=${keep.toString(2)}`;
+        expect(out, label).not.toMatch(/[.!?][^\s.!?)]/u);
+        expect(out, label).not.toMatch(/(?:^|\n)[ \t]|[ \t](?:\n|$)| {2}/u);
+      }
+    }
+  });
+
   it('keeps every span in the original and the diff applying to the tidy text, and tidying twice changes nothing', () => {
     for (let seed = 1; seed <= 200; seed++) {
       // Half the runs delete what each random edit quotes, so most edits are deletions.
