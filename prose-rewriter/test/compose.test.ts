@@ -99,8 +99,9 @@ describe('S4 after S3 (F6b eval run)', () => {
     const style = ES_S4[1] as Proposed;
     // S3's third edit is reverted (voice: the run's "adds usted"); S4's rewrite of that sentence then
     // stands on the sentence as the user wrote it. The other style edits quote text S3 removed or
-    // rewrote, so they no longer apply.
-    const expected = cut(cut(i.text, (ES_S3[1] as Proposed).before)
+    // rewrote, so they no longer apply. S3's subject edit applies: its "Mantenimiento" heads the
+    // subject as a noun, which the fact check read as an invented name until 17/11.
+    const expected = cut(cut(i.text.replace((ES_S3[0] as Proposed).before, (ES_S3[0] as Proposed).after), (ES_S3[1] as Proposed).before)
       .replace(style.before, style.after), (ES_S3[3] as Proposed).before)
       .replace((ES_S3[4] as Proposed).before, (ES_S3[4] as Proposed).after)
       .replace((ES_S3[5] as Proposed).before, (ES_S3[5] as Proposed).after);

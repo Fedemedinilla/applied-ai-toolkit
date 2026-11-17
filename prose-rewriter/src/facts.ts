@@ -160,6 +160,75 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'subject',
   ]),
 };
+/**
+ * The verbs, nouns and adjectives job-search texts open a sentence, a list item or a subject line
+ * with, which OPENERS and the endings below do not cover: infinitives ("Optimizar"), first persons
+ * ("Comparto"), short or irregular past forms ("Vi", "Rehice", "Built", "Got"), imperatives and
+ * the nouns that head a list item ("Soluciones a medida", "Proven track record").
+ *
+ * Why: the live eval of 17/11 and the fact-check probe read these as possible names, so a rewrite
+ * that changed or cut one was reverted as a lost or invented fact (about 420 false alarms over the
+ * 147 cases). A list, not an ending, because the endings of these words are the endings of common
+ * names too: -ar (Aguilar, Escobar, Oscar, Pilar), -er (Javier, Walter), -o (Gonzalo, Camilo),
+ * -miento (Sarmiento). Words that are also common names or surnames stay out (Will, Mark, Grant,
+ * Drew, Hope, Rosa, Paz, Luna, Claro), so a name invented at a line start is still caught.
+ */
+const ORDINARY: Readonly<Record<Lang, ReadonlySet<string>>> = {
+  es: new Set([
+    // Infinitives.
+    'optimizar', 'liderar', 'potenciar', 'mejorar', 'gestionar', 'desarrollar', 'implementar', 'diseñar', 'crear', 'ayudar', 'impulsar',
+    'transformar', 'coordinar', 'construir', 'ofrecer', 'brindar', 'aportar', 'generar', 'lograr', 'aumentar', 'reducir', 'acompañar',
+    'colaborar', 'trabajar', 'aprender', 'escalar', 'migrar', 'integrar', 'mantener', 'resolver', 'atender', 'asesorar', 'entregar',
+    'conectar', 'asegurar', 'contar', 'hablar', 'ver', 'saber', 'sumar', 'armar', 'hacer', 'llevar', 'seguir', 'crecer', 'buscar',
+    'encontrar', 'charlar', 'revisar', 'probar', 'usar', 'aplicar', 'postular', 'escribir', 'responder', 'enviar', 'mandar', 'agendar',
+    'actualizar', 'configurar', 'programar', 'documentar', 'capacitar', 'planificar', 'medir', 'cobrar', 'facturar', 'vender', 'contratar',
+    'dar', 'tener', 'poder', 'ser', 'estar', 'empezar', 'comenzar', 'terminar', 'cerrar', 'abrir', 'recibir', 'leer', 'conocer', 'entender',
+    'explorar', 'descubrir', 'innovar', 'revolucionar', 'elevar', 'fortalecer', 'fomentar', 'dirigir', 'supervisar', 'administrar',
+    // First persons, short and irregular pasts, plurals and imperatives.
+    'comparto', 'disfruto', 'ayudo', 'prefiero', 'mantengo', 'confirmo', 'desarrollo', 'gestiono', 'coordino', 'lidero', 'brindo', 'aporto',
+    'sumo', 'programo', 'conozco', 'manejo', 'domino', 'hablo', 'leo', 'aprendo', 'entiendo', 'propongo', 'recomiendo', 'valoro', 'considero',
+    'veo', 'vengo', 'vuelvo', 'estudio', 'administro', 'automatizo', 'migro', 'entrego', 'reviso', 'respondo', 'comento', 'aviso', 'retomo',
+    'consulto', 'vi', 'rehice', 'tuve', 'dije', 'pude', 'quise', 'supe', 'vine', 'puse', 'traje', 'fui', 'hizo', 'tuvo', 'pudo', 'dijo',
+    'saben', 'tarda', 'tardan', 'tenemos', 'sabemos', 'podemos', 'queremos', 'necesitamos', 'buscamos', 'ofrecemos', 'contamos', 'parece',
+    'funciona', 'anda', 'cuesta', 'probalo', 'ignorá', 'revisá', 'contá', 'pasame', 'mandame', 'llamame', 'escribí', 'avisá',
+    // Nouns and adjectives that head a list item or a subject line.
+    'soluciones', 'mantenimiento', 'diseño', 'velocidad', 'búsqueda', 'pasión', 'presupuesto', 'propuesta', 'sinergias', 'sitio', 'sitios',
+    'formulario', 'desarrolladora', 'desarrollador', 'formada', 'formado', 'experiencia', 'habilidades', 'resultados', 'logros', 'objetivo',
+    'objetivos', 'perfil', 'servicios', 'servicio', 'herramientas', 'tecnologías', 'idiomas', 'referencias', 'disponibilidad', 'contacto',
+    'tarifa', 'tarifas', 'plazo', 'plazos', 'alcance', 'entrega', 'entregas', 'soporte', 'consultoría', 'gestión', 'análisis', 'calidad',
+    'compromiso', 'liderazgo', 'proyectos', 'proyecto', 'clientes', 'cliente', 'equipo', 'página', 'ventas', 'seguimiento', 'reunión',
+    'llamada', 'ejemplo', 'ejemplos', 'precio', 'precios', 'costo', 'horario', 'pedido', 'pedidos', 'mejoras', 'ideas', 'opciones',
+    'beneficios', 'ventajas', 'recordatorio', 'respuesta', 'pregunta', 'dudas', 'copias', 'seguridad', 'rendimiento', 'oportunidad',
+    'oportunidades', 'valor', 'enfoque', 'visión', 'estrategia', 'crecimiento', 'éxito', 'excelencia', 'impacto', 'conocimiento',
+    'conocimientos', 'gracias', 'genial', 'perfecto', 'excelente', 'increíble', 'nuevo', 'nueva', 'ideal', 'seguro', 'rápido', 'simple',
+    'mejor', 'mismo', 'misma', 'igual', 'encantada', 'encantado', 'interesada', 'interesado', 'apasionada', 'apasionado', 're', 'rv', 'fwd',
+  ]),
+  en: new Set([
+    // Irregular pasts, base forms and imperatives.
+    'built', 'got', 'made', 'led', 'ran', 'grew', 'wrote', 'drove', 'brought', 'taught', 'began', 'kept', 'found', 'saw', 'became', 'spent',
+    'sent', 'met', 'took', 'gave', 'put', 'set', 'cut', 'won', 'thought', 'felt', 'knew', 'went', 'came', 'left', 'sold', 'told', 'said',
+    'heard', 'held', 'paid', 'chose', 'rebuilt', 'allow', 'enjoy', 'want', 'need', 'help', 'ignore', 'imagine', 'note', 'love', 'feel',
+    'think', 'know', 'believe', 'check', 'see', 'find', 'reach', 'join', 'apply', 'build', 'create', 'design', 'develop', 'deliver', 'manage',
+    'improve', 'increase', 'reduce', 'launch', 'scale', 'optimize', 'ship', 'own', 'write', 'keep', 'make', 'take', 'get', 'give', 'send',
+    'share', 'tell', 'ask', 'call', 'meet', 'talk', 'look', 'follow', 'contact', 'reply', 'attach', 'review', 'consider', 'explore',
+    'discover', 'unlock', 'elevate', 'transform', 'revolutionize', 'empower', 'leverage', 'boost', 'streamline', 'maximize', 'searches',
+    'sounds', "they'd", "they're", "they've", "we're", "we've", "we'd", "you're", "you've", "you'd", "he's", "she's", "i'd", 'they’d',
+    'they’re', 'we’re', 'you’re',
+    // Nouns and adjectives that head a list item or a subject line.
+    'below', 'above', 'proven', 'strong', 'passion', 'cutting-edge', 'congrats', 'congratulations', 'fancy', 'great', 'key', 'laptop',
+    'pressure', 'quick', 're', 'fwd', 'right', 'short', 'tools', 'reference', 'references', 'support', 'free', 'results', 'experience',
+    'skills', 'summary', 'objective', 'profile', 'services', 'education', 'availability', 'rates', 'timeline', 'scope', 'delivery',
+    'proposal', 'quote', 'budget', 'overview', 'highlights', 'achievements', 'responsibilities', 'background', 'focus', 'goal', 'goals',
+    'impact', 'value', 'solutions', 'expertise', 'quality', 'speed', 'performance', 'security', 'maintenance', 'development', 'leadership',
+    'teamwork', 'excellent', 'amazing', 'awesome', 'perfect', 'absolutely', 'definitely', 'certainly', 'honestly', 'actually', 'ha', 'haha',
+  ]),
+};
+/**
+ * Endings of nouns and verbs no common name shares: "Transformación", "Comunicación", "Automatizar",
+ * "Communication". The names among them are left out by NAMES_WITH_ORDINARY_ENDING.
+ */
+const ORDINARY_ENDING: Readonly<Record<Lang, RegExp>> = { es: /(?:ción|sión|ciones|siones|izar)$/iu, en: /(?:tion|sion|tions|sions|ness|ize|izes)$/iu };
+const NAMES_WITH_ORDINARY_ENDING = new Set(['concepción', 'asunción', 'encarnación', 'ascensión', 'purificación', 'consolación', 'anunciación']);
 /** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
 const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
 /**
@@ -578,6 +647,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 function isPossibleName(word: string, lang: Lang, afterMark: boolean): boolean {
   const lower = word.toLocaleLowerCase('und');
   if ([...word].length < 2 || OPENERS[lang].has(lower) || NOT_A_NAME[lang].test(word) || NUMBER_WORDS[lower] !== undefined) return false;
+  if (ORDINARY[lang].has(lower) || (ORDINARY_ENDING[lang].test(word) && !NAMES_WITH_ORDINARY_ENDING.has(lower))) return false;
   if (afterMark && VERB_AFTER_MARK[lang]?.test(word) === true) return false;
   if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;
   if (lang === 'es' && (MONTHS_ES.includes(lower) || lower === 'setiembre')) return false;

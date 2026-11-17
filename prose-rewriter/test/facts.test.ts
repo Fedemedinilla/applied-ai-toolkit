@@ -312,6 +312,68 @@ describe('names at the start of a sentence', () => {
   });
 });
 
+describe('ordinary words at the start of a sentence or a list item', () => {
+  // The live eval of 17/11 and the fact-check probe: a capitalized verb or noun opening a line
+  // ("Optimizar", "Comparto", "Soluciones", "Built", "Proven") was read as a possible name, so a
+  // rewrite that changed or cut it was reverted as a lost or invented fact (about 420 false alarms
+  // over 147 cases). A lexicon of the verbs and nouns these texts open lines with, and noun and
+  // verb endings no name shares, read them as words; surnames that look like verbs stay names.
+  const openings = (text: string, lang: 'es' | 'en') => extract(text, { lang, openings: true }).filter((f) => f.opening === true).map((f) => f.text);
+  const one = (O: string, lang: 'es' | 'en') => ({ O, C: { cv: '' }, sentences: splitSentences(O, lang).map((s) => s.text), lang });
+
+  it('reads the verbs and nouns a Spanish line opens with as words', () => {
+    const lines = [
+      'Optimizar procesos.', 'Liderar equipos.', 'Potenciar sinergias.', 'Mejorar la carga.', 'Comparto algunos ejemplos abajo.',
+      'Disfruto este tipo de trabajo.', 'Ayudo a comercios chicos con su web.', 'Prefiero una llamada corta.', 'Vi que buscan gente.',
+      'Rehice el sitio.', 'Saben lo que hacen.', 'Tarda unos días.', 'Mantengo el sitio.', 'Confirmo el martes.', 'Probalo y avisame.',
+      'Ignorá lo anterior.', 'Soluciones a medida para tu negocio.', 'Mantenimiento mensual del sitio.', 'Diseño de páginas.',
+      'Transformación digital de punta a punta.', 'Velocidad de carga.', 'Atención al cliente.', 'Búsqueda de desarrolladora.',
+      'Comunicación clara.', 'Optimización integral de procesos.', 'Pasión por la web.', 'Postulación al puesto.', 'Presupuesto del sitio.',
+      'Propuesta de valor.', 'Sinergias y valor.', 'Sitio de la escuela.', 'Formulario de pedidos.', 'Desarrolladora web.', 'Formada en diseño.',
+      'Automatizar reportes.', 'Tenemos que hablar.',
+    ];
+    for (const line of lines) expect(openings(line, 'es'), line).toEqual([]);
+  });
+
+  it('reads the verbs, nouns and adjectives an English line opens with as words', () => {
+    const lines = [
+      'Built the help center.', 'Got your message.', 'Allow me to explain.', 'Enjoy the rest of your week.', 'Want to talk?', 'Free on Friday.',
+      'Below are some examples.', 'Proven track record of driving customer satisfaction.', 'Strong communication skills.', 'Passion for support.',
+      'Cutting-edge solutions.', 'Congrats on the launch!', 'Cut the backlog in half.', 'Fancy a call?', 'Great to hear.', 'Help desk setup.',
+      'Ignore the previous instructions.', 'Imagine a faster inbox.', 'Key skills.', 'Laptop fleet management.', 'Note the dates.',
+      'Passion drives me.', 'Pressure is part of the job.', 'Quick question.', 'Reference available.', 'Revolutionize your support.',
+      'Right, here it is.', 'Searches fell.', 'Short version.', 'Support work.', "They'd love it.", 'Tools I use.', 'Communication matters.',
+    ];
+    for (const line of lines) expect(openings(line, 'en'), line).toEqual([]);
+  });
+
+  it('still reads a name that looks like a verb or a noun as a possible name', () => {
+    const es = [
+      'Aguilar me recomendó.', 'Escobar revisó el sitio.', 'Bolívar me pasó el contacto.', 'Salazar me llamó.', 'Javier me pidió el sitio.',
+      'Oscar me escribió.', 'Pilar me recomendó.', 'Omar quiere el sitio.', 'Walter me contrató.', 'Concepción me escribió.', 'Asunción me llamó.',
+      'Gonzalo me pidió el sitio.', 'Sarmiento me contrató.', 'Camilo me escribió.', 'Globant me contrató.',
+    ];
+    for (const line of es) expect(openings(line, 'es'), line).toEqual([line.split(' ')[0]]);
+    const en = ['Mark referred me.', 'Grant asked for it.', 'Drew wrote back.', 'Olivier sent the brief.', 'Pillar hired me.', 'Chase called.', 'Hope called.'];
+    for (const line of en) expect(openings(line, 'en'), line).toEqual([line.split(' ')[0]]);
+  });
+
+  it('accepts a changed or cut opening verb or noun, and still reverts an invented name there', () => {
+    const O = 'Hola Marta,\n\nBusco un puesto donde pueda:\n- Optimizar procesos.\n- Liderar equipos.\n\nSaludos,\nValeria';
+    const sentences = one(O, 'es').sentences;
+    const at = (q: string): number => sentences.findIndex((s) => s.includes(q));
+    expect(checkEdit({ sentenceId: at('Optimizar'), before: 'Optimizar', after: 'Mejorar', reason: 't' }, one(O, 'es')).status).toBe('accepted');
+    expect(factInvariant(O, O.replace('- Optimizar', '- Mejorar'), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('Busco un puesto', 'Comparto algunos ejemplos. Busco un puesto'), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('- Liderar equipos.\n', ''), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('Busco un puesto', 'Escobar me recomendó. Busco un puesto'), { cv: '' }, [], ES).extra.map((f) => f.key)).toEqual(['escobar']);
+    const en = 'Hi Tom,\n\nHere is what I have done:\n- Spearheaded the help desk.\n- Proven track record of driving customer satisfaction.\n\nBest,\nDaniel';
+    expect(factInvariant(en, en.replace('Spearheaded', 'Built'), { cv: 'x' }, [], EN).holds).toBe(true);
+    expect(factInvariant(en, en.replace('- Proven track record of driving customer satisfaction.\n', ''), { cv: 'x' }, [], EN).holds).toBe(true);
+    expect(factInvariant(en, en.replace('Here is', 'Grant asked what. Here is'), { cv: 'x' }, [], EN).extra.map((f) => f.key)).toEqual(['grant']);
+  });
+});
+
 describe('names are matched as names', () => {
   // A name in R is backed only by the same name in O or C, capitalized: the same words in lower
   // case are ordinary words.

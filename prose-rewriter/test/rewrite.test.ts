@@ -818,9 +818,12 @@ const verdictIn = (lang: 'es' | 'en', rewritten: string, invented: readonly numb
 });
 
 describe("strategy 'single': one call, the same guards", () => {
-  // es-email-heavy, the single-call piece of run 3: its subject edit invented "Mantenimiento" and
-  // lost "Propuesta", and the unguarded baseline shipped it. The edits rebuild that piece's text.
+  // es-email-heavy, the single-call piece of run 3. Its subject edit was read as inventing the name
+  // "Mantenimiento" and losing "Propuesta"; both are ordinary nouns heading a subject line, and the
+  // probe of 17/11 counted that reading among the false alarms. The edits rebuild that piece's text.
   const SUBJECT = { sentenceId: 0, before: 'Propuesta de valor para potenciar su presencia digital', after: 'Mantenimiento del sitio de la cooperativa' };
+  /** The same subject edit with a company neither the text nor the CV names. */
+  const SUBJECT_INVENTED = { ...SUBJECT, after: 'Mantenimiento del sitio de la cooperativa con Nubeluz' };
   const ES_REST = [
     { sentenceId: 2, before: 'Espero que este mensaje te encuentre muy bien.', after: '' },
     { sentenceId: 3, before: 'Me pongo en contacto con vos porque me apasiona aportar valor agregado y potenciar sinergias en un mundo cada vez más digital.', after: 'Te escribo porque quiero trabajar en el sitio de la cooperativa.' },
@@ -868,17 +871,29 @@ describe("strategy 'single': one call, the same guards", () => {
     expect(result.status).toBe('ok');
   });
 
-  it('reverts the edit that invents a fact and loses another (es-email-heavy, run 3)', async () => {
+  it('reverts the edit that invents a name in the subject (es-email-heavy, run 3, with a company added)', async () => {
     const input = evalInput('es', 'es-email-heavy');
     const expected = applyAll(input.text, ES_REST);
-    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT_INVENTED, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
     const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
     scripted.assertDone();
     expect(result.rewritten).toBe(expected);
     expect(result.rewritten).toContain('Propuesta de valor');
-    expect(result.rewritten).not.toContain('Mantenimiento');
-    expect(result.changes.find((c) => c.after === SUBJECT.after)).toMatchObject({ status: 'reverted', stage: 'edit', revertReason: expect.stringMatching(/Mantenimiento/) });
+    expect(result.rewritten).not.toContain('Nubeluz');
+    expect(result.changes.find((c) => c.after === SUBJECT_INVENTED.after)).toMatchObject({ status: 'reverted', stage: 'edit', revertReason: expect.stringMatching(/Nubeluz/) });
     expect(result.status).toBe('needs-review');
+    expectSound(input, result);
+  });
+
+  it('applies the run-3 subject edit: "Mantenimiento" and "Propuesta" head the subject as words, not names', async () => {
+    const input = evalInput('es', 'es-email-heavy');
+    const expected = applyAll(input.text, [SUBJECT, ...ES_REST]);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(expected);
+    expect(result.changes.find((c) => c.after === SUBJECT.after)).toMatchObject({ status: 'applied', stage: 'edit' });
+    expect(result.status).toBe('ok');
     expectSound(input, result);
   });
 
