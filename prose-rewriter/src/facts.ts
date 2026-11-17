@@ -635,7 +635,10 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)));
     // After an emoji, a word that does not read as an ordinary one is a name, as it was before the
     // emoji break: matched with its capital, so "el rosa" does not stand in for "Rosa".
-    if (known.has(key) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
+    // A frequent opener is not the name its key matches unless it is written as that name: "It"
+    // opening a sentence is not the CV's "IT" (the probe's cause E).
+    const ordinary = (OPENERS[lang].has(key) || ORDINARY[lang].has(key)) && !/^\p{Lu}{2,}$/u.test(word);
+    if ((known.has(key) && !ordinary) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
     else if (options.openings === true && possible) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
       claimed.push([start, start + word.length]);
@@ -679,8 +682,10 @@ function states(pool: Pool, fact: Fact): boolean {
   if (!WORD_KINDS.has(fact.kind)) return false;
   const source = fact.key.split(' ').map(escape).join(String.raw`\s+`);
   const asName = fact.opening === undefined && (fact.kind === 'proper-noun' || fact.kind === 'acronym');
+  // An acronym is backed only in capitals: "It's" does not state "IT".
+  const shape = fact.kind === 'acronym' ? /^\p{Lu}{2,}/u : /^\p{Lu}/u;
   for (const m of pool.text.matchAll(new RegExp(`${B}${source}${E}`, 'giu'))) {
-    if (!asName || /^\p{Lu}/u.test(m[0])) return true;
+    if (!asName || shape.test(m[0])) return true;
   }
   return false;
 }

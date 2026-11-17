@@ -374,6 +374,21 @@ describe('ordinary words at the start of a sentence or a list item', () => {
   });
 });
 
+describe('an acronym is not an ordinary word', () => {
+  // The probe (cause E): "It's" backed a dropped "IT", and the CV's "IT" made the opener "It" a
+  // name, so cutting "It was a game-changer." read as a lost fact.
+  const cv = 'IT technician at Harrow Lane Primary School since 2019.';
+  it('does not back a dropped acronym with an ordinary word that starts the same way', () => {
+    const O = "I am applying for the IT Service Desk Analyst role. It's the work I do.";
+    expect(factInvariant(O, "I am applying for the Service Desk Analyst role. It's the work I do.", { cv }, [], EN).missing.map((f) => f.key)).toEqual(['it']);
+  });
+
+  it('does not read the opener "It" as the acronym "IT"', () => {
+    const O = 'I kept 120 laptops patched. It was a game-changer.';
+    expect(factInvariant(O, 'I kept 120 laptops patched.', { cv }, [], EN)).toMatchObject({ holds: true });
+  });
+});
+
 describe('names are matched as names', () => {
   // A name in R is backed only by the same name in O or C, capitalized: the same words in lower
   // case are ordinary words.
