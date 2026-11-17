@@ -35,6 +35,7 @@ import {
 } from './protocol.ts';
 import { appliedIds, recompose } from './recompose.ts';
 import type { FlagKind, Result, ResultChange, ResultFinding, ResultLint, Status } from './result.ts';
+import { explainRevert } from './revert-reason.ts';
 
 export interface AppDeps {
   readonly fetch: ApiFetch;
@@ -340,7 +341,7 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     if (c.status === 'reverted') {
       li.classList.add('taken-back');
       state.textContent = 'Taken back';
-      if (c.revertReason) li.append(make('p', `Why: ${c.revertReason}`, 'hint'));
+      if (c.revertReason) li.append(make('p', `Why: ${explainRevert(c.revertReason)}`, 'hint'));
       return li;
     }
     if (!s.rebuildable) return li;

@@ -158,7 +158,8 @@ describe('the three panels', () => {
     expect($('#reverted-wrap').hidden).toBe(false);
     expect(document.querySelectorAll('#reverted li.change')).toHaveLength(reverted.length);
     expect(document.querySelectorAll('#reverted button')).toHaveLength(0);
-    expect(text('#reverted')).toContain(reverted[0]?.revertReason ?? '?');
+    expect(text('#reverted')).toContain('Why: It would have removed something your text states: Optimizar.');
+    expect(text('#reverted')).not.toMatch(/without drop/u);
   });
 
   it('panel 3 explains the status and shows facts, lint before and after, and the cost', async () => {
