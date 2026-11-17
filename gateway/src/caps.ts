@@ -50,9 +50,9 @@ function formatter(timeZone: string): Intl.DateTimeFormat {
 }
 
 function partsAt(instantMs: number, format: Intl.DateTimeFormat): DateParts {
-  const parts = format.formatToParts(instantMs);
-  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value);
-  return { year: value('year'), month: value('month'), day: value('day'), hour: value('hour'), minute: value('minute'), second: value('second') };
+  // formatToParts returns every part the formatter asks for, so none of these is ever missing.
+  const part = Object.fromEntries(format.formatToParts(instantMs).map((p) => [p.type, p.value]));
+  return { year: Number(part.year), month: Number(part.month), day: Number(part.day), hour: Number(part.hour), minute: Number(part.minute), second: Number(part.second) };
 }
 
 /** How far the zone is from UTC at that instant (-3 h in Buenos Aires), in milliseconds. */
@@ -62,8 +62,13 @@ function offsetMs(instantMs: number, format: Intl.DateTimeFormat): number {
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - whole;
 }
 
-function sameDate(p: DateParts, year: number, month: number, day: number): boolean {
-  return p.year === year && p.month === month && p.day === day;
+/**
+ * Whether the instant falls on the local date with that day of the month. Every instant tested is
+ * within a few hours of that date's midnight, so it is on that date or the one before, and those
+ * two never share a day of the month: the day alone tells them apart.
+ */
+function onDay(instantMs: number, day: number, format: Intl.DateTimeFormat): boolean {
+  return partsAt(instantMs, format).day === day;
 }
 
 /**
@@ -75,13 +80,13 @@ function localMidnight(year: number, month: number, day: number, format: Intl.Da
   const asUtc = Date.UTC(year, month - 1, day);
   const approx = asUtc - offsetMs(asUtc, format);
   const twoPass = asUtc - offsetMs(approx, format);
-  if (sameDate(partsAt(twoPass, format), year, month, day)) return new Date(twoPass);
+  if (onDay(twoPass, day, format)) return new Date(twoPass);
   // Midnight at the offset in force before the change is at or after the end of the gap.
   let before = twoPass;
   let after = asUtc - offsetMs(twoPass, format);
   while (after - before > 1000) {
     const mid = before + Math.floor((after - before) / 2000) * 1000;
-    if (sameDate(partsAt(mid, format), year, month, day)) after = mid;
+    if (onDay(mid, day, format)) after = mid;
     else before = mid;
   }
   return new Date(after);
