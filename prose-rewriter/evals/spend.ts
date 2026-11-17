@@ -62,7 +62,7 @@ export const MONTHLY_BUDGET_USD = 20;
  * The most --monthly-cap may raise a month's budget to, in US$ (November 2026: Federico's 50).
  * A typo such as 500 for 50 is refused instead of multiplying the budget; going higher is a code change.
  */
-export const MONTHLY_CAP_CEILING_USD = 50;
+export const MONTHLY_CAP_CEILING_USD = 80;
 
 /** The months follow Federico's calendar, as the gateway's caps do (prose-rewriter/cli.ts). */
 export const SPEND_TIME_ZONE = 'America/Argentina/Buenos_Aires';

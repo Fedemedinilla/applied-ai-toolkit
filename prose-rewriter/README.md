@@ -90,7 +90,7 @@ The harness in `evals/` runs the eval cases through the pipeline and its variant
 **The budget.** Every real-model eval run spends from one monthly budget, decision D14 of the design. The default is US$20 (`MONTHLY_BUDGET_USD`, `evals/spend.ts:59`).
 
 - November 2026: 50 USD (decision of the maintainer, 16/11/2026, to use expiring promotional credit); default 20 USD.
-- A month's budget goes above the default only with an explicit `--monthly-cap`. The November runs pass `--monthly-cap 50`, and the runs from December on pass nothing. The flag can also lower the cap for a run, and cannot raise it past US$50 (`MONTHLY_CAP_CEILING_USD`, `evals/spend.ts:65`), so a typo such as 500 is refused.
+- A month's budget goes above the default only with an explicit `--monthly-cap`. The November runs pass `--monthly-cap 50`, and from 17 November `--monthly-cap 80`, and the runs from December on pass nothing. The flag can also lower the cap for a run, and cannot raise it past US$80 (`MONTHLY_CAP_CEILING_USD`, `evals/spend.ts:65`), so a typo such as 500 is refused.
 - The dry run and the run report print the cap in force and who set it, the default or `--monthly-cap`.
 
 The gateway's own caps reset on every run, so the budget lives in a ledger file outside the repository, `~/.applied-ai-toolkit/eval-spend.json` (`evals/spend.ts:73`). It has one entry per calendar month in Buenos Aires (`evals/spend.ts:68`). The ledger keeps what was spent, not the cap, so a run at the default after a raised one sees the same spend against US$20. `openLedger()` (`evals/spend.ts:227`) writes it through a temp file and a rename under a lock file, and stops on a file it cannot parse instead of overwriting it.
