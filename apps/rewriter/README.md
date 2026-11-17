@@ -21,7 +21,7 @@ npx vite --config apps/rewriter/vite.config.ts        # the page, with /api prox
 
 Without the key the server still starts. `/api/health` answers 503, and the page says the server cannot rewrite and shows the recorded examples instead.
 
-Vite 8.3.4 builds 19.16 kB of JavaScript (7.62 kB gzipped) and 7.88 kB of CSS. csp-build-guard passes it under a `'self'`-only policy, with no inline script and no regex lookbehind. It measures the page's script at 7.6 kB gzip and 6.7 kB brotli, against a budget of 10 kB gzip and 9 kB brotli. The recordings, 88 kB of JSON, are fetched only in demo mode and are not part of that budget.
+Vite 8.3.4 builds 19.90 kB of JavaScript (7.90 kB gzipped) and 7.93 kB of CSS. csp-build-guard passes it under a `'self'`-only policy, with no inline script and no regex lookbehind. It measures the page's script at 7.8 kB gzip and 7.0 kB brotli, against a budget of 10 kB gzip and 9 kB brotli. The recordings, 88 kB of JSON, are fetched only in demo mode and are not part of that budget.
 
 ## The flow
 
