@@ -19,6 +19,11 @@ describe('MAIL-04, stock mail formulas', () => {
     ['Hi Dana,\n\nCould you send the logins at your earliest convenience?\n\nBest,\nSam', 'at your earliest convenience'],
     ['Hi Dana,\n\nThe March file is ready. I look forward to hearing from you.\n\nBest,\nSam', 'I look forward to hearing from you'],
     ['Hi Dana,\n\nThe March file is ready. Looking forward to hearing from you!\n\nBest,\nSam', 'Looking forward to hearing from you'],
+    // Review of 17/11: the same formulas in the wording the eval did not use.
+    ['Hi Dana,\n\nHope this finds you well. The March file is ready.\n\nBest,\nSam', 'Hope this finds you well'],
+    ['Hi Dana,\n\nI trust this email finds you well. The March file is ready.\n\nBest,\nSam', 'I trust this email finds you well'],
+    ['Hi Dana,\n\nI hope this letter finds you in good health. The March file is ready.\n\nBest,\nSam', 'I hope this letter finds you in good health'],
+    ['Hi Dana,\n\nThe March file is ready. I look forward to your reply.\n\nBest,\nSam', 'I look forward to your reply'],
   ];
   const spanish: Array<[string, string]> = [
     ['Hola, Laura:\n\nEspero que este mensaje te encuentre muy bien. Te paso el tablero de marzo.\n\nSaludos,\nAna', 'Espero que este mensaje te encuentre muy bien'],
@@ -27,6 +32,13 @@ describe('MAIL-04, stock mail formulas', () => {
     ['Hola, Laura:\n\nTe paso el tablero de marzo. Quedo atento a cualquier consulta.\n\nSaludos,\nAna', 'Quedo atento a cualquier consulta'],
     ['Hola, Laura:\n\nTe paso el tablero de marzo. Quedo a disposición por cualquier duda.\n\nSaludos,\nAna', 'Quedo a disposición'],
     ['Hola, Laura:\n\nTe paso el tablero de marzo. Agradezco de antemano tu respuesta.\n\nSaludos,\nAna', 'Agradezco de antemano'],
+    // Review of 17/11: a singular determiner, and the wording the eval did not use.
+    ['Hola, Laura:\n\nTe paso el tablero de marzo. Quedo atenta a tu respuesta.\n\nSaludos,\nAna', 'Quedo atenta a tu respuesta'],
+    ['Hola, Laura:\n\nLe paso el tablero de marzo. Quedo atento a su respuesta.\n\nSaludos,\nAna', 'Quedo atento a su respuesta'],
+    ['Hola, Laura:\n\nEspero que te encuentres muy bien. Te paso el tablero de marzo.\n\nSaludos,\nAna', 'Espero que te encuentres muy bien'],
+    ['Hola, Laura:\n\nEspero que se encuentre bien. Le paso el tablero de marzo.\n\nSaludos,\nAna', 'Espero que se encuentre bien'],
+    ['Hola, Laura:\n\nLe paso el tablero de marzo. Quedo a la espera de su respuesta.\n\nSaludos,\nAna', 'Quedo a la espera de su respuesta'],
+    ['Hola, Laura:\n\nTe paso el tablero de marzo. Quedo a la espera de tus comentarios.\n\nSaludos,\nAna', 'Quedo a la espera de tus comentarios'],
   ];
 
   for (const genre of MAIL_GENRES) {
@@ -56,6 +68,10 @@ describe('MAIL-04, stock mail formulas', () => {
       ['Espero que estés bien. Espero que el tablero te sirva.', 'es'],
       ['Quedo atenta al tablero de marzo. El archivo queda a disposición de los gerentes.', 'es'],
       ['Te agradezco el dato de la feria.', 'es'],
+      // Review of 17/11: a subject before "do not hesitate", and "quedó" typed without its accent.
+      ['We do not hesitate to call the carrier when a parcel is late.', 'en'],
+      ['El servidor quedo a disposición del equipo. La planilla quedo a disposicion de los gerentes.', 'es'],
+      ['Espero que la encuentres en el cajón. Quedo a la espera del camión.', 'es'],
     ];
     for (const [text, lang] of plain) for (const genre of MAIL_GENRES) expect(hits(text, lang, genre), text).toEqual([]);
   });

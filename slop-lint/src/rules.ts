@@ -1356,16 +1356,21 @@ const mail: Rule[] = [
     severity: 'low',
     patterns: {
       en: wordList([
-        String.raw`I hope (?:this|my) (?:message|e-?mail|note) finds you(?: all)? (?:well|in good (?:health|spirits))`,
-        String.raw`(?:please )?(?:do not|don['’]t) hesitate to (?:contact|reach out|get in touch|call|write|ask|let me know)`,
+        String.raw`(?:I )?(?:hope|trust) (?:this|my)(?: (?:message|e-?mail|note|letter))? finds you(?: all)? (?:well|in good (?:health|spirits))`,
+        // Not after a subject: "We do not hesitate to call the carrier" reports a habit, not a closer.
+        String.raw`(?<!\b(?:I|we|they|he|she|you|who) )(?:please )?(?:do not|don['’]t) hesitate to (?:contact|reach out|get in touch|call|write|ask|let me know)`,
         'at your earliest convenience',
-        String.raw`(?:I look|I(?:['’]m| am) looking|looking) forward to hearing (?:back )?from you`,
+        String.raw`(?:I look|I(?:['’]m| am) looking|looking) forward to (?:hearing (?:back )?from you|your (?:reply|response))`,
       ]),
       es: wordList([
         'espero que (?:este|el presente|mi) (?:mensaje|correo|mail|e-?mail) (?:te|le|lo|la|los|las) encuentre (?:muy )?bien',
-        'quedo atent[oa] a (?:tus|sus|cualquier) (?:comentarios?|novedad(?:es)?|noticias?|respuestas?|consultas?|dudas?|inquietud(?:es)?)',
-        // With "su" or "tu" the closer is LEX-01's, at level 1.
-        'quedo a (?:entera |total )?disposici(?:ó|o\u0301|o)n',
+        // The same opener with the reader as subject; "Espero que estés bien" stays out (an ordinary greeting).
+        'espero que (?:te encuentres|se encuentren?) (?:muy )?bien',
+        'quedo atent[oa] a (?:tus?|sus?|cualquier) (?:comentarios?|novedad(?:es)?|noticias?|respuestas?|consultas?|dudas?|inquietud(?:es)?)',
+        'quedo a la espera de (?:tus?|sus?) (?:comentarios?|novedad(?:es)?|noticias?|respuestas?)',
+        // With "su" or "tu" the closer is LEX-01's, at level 1. "del"/"de" after it is a thing put at
+        // someone's disposal, as in "El servidor quedo a disposición del equipo" ("quedó" typed without its accent).
+        String.raw`quedo a (?:entera |total )?disposici(?:ó|o\u0301|o)n(?!\s+del?(?![\p{L}]))`,
         'agradezco de antemano',
       ]),
     },
@@ -1398,6 +1403,9 @@ const mail: Rule[] = [
       { lang: 'es', fire: 'Quedo atenta a tus comentarios.', pass: 'Quedo atenta al tablero de marzo.' },
       { lang: 'es', fire: 'Quedo a disposición por cualquier duda.', pass: 'El archivo queda a disposición de los gerentes.' },
       { lang: 'es', fire: 'Agradezco de antemano tu respuesta.', pass: 'Te agradezco el dato.' },
+      { lang: 'en', fire: 'I trust this email finds you well.', pass: 'We do not hesitate to call the carrier when a parcel is late.' },
+      { lang: 'es', fire: 'Quedo a la espera de su respuesta.', pass: 'El servidor quedo a disposición del equipo.' },
+      { lang: 'es', fire: 'Espero que se encuentre muy bien.', pass: 'Espero que estés bien.' },
     ],
   },
 ];
