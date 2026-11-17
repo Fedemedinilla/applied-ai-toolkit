@@ -175,6 +175,14 @@ describe('pricesInForce, boundaries and order', () => {
     expect(pricesInForce(rows, AT).get('claude-sonnet-5-5')?.input).toBe(2);
   });
 
+  it('of two rows with the same validFrom, the first one stays', () => {
+    // Postgres cannot hold both (primary key (model, valid_from), and loadPrices leaves the row that
+    // is already there), but MemoryPriceStore or a custom store can return them. The first row
+    // stays, as loadPrices keeps the first one loaded: a later duplicate does not edit a price.
+    const rows = [row('2026-10-01T00:00:00Z', 2), row('2026-10-01T00:00:00Z', 9)];
+    expect(pricesInForce(rows, AT).get('claude-sonnet-5-5')?.input).toBe(2);
+  });
+
   it('a row with a date that does not parse fails the schema with "invalid date"', () => {
     const result = PriceRow.safeParse(row('next Tuesday', 1));
     expect(result.success).toBe(false);
