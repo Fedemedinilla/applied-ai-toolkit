@@ -46,6 +46,12 @@ export interface ExtractOptions {
   readonly knownNames?: ReadonlySet<string>;
   /** Also read an unknown capitalized first word as a possible name (Fact.opening). */
   readonly openings?: boolean;
+  /**
+   * The list markers of the original ("1.", "b)", "IV."), as listMarkersOf() reads them. A marker
+   * with nothing after it, or a letter or roman one, counts as a marker only when it is one of
+   * these. Left out, extract() reads them from the text it is given.
+   */
+  readonly listMarkers?: ReadonlySet<string>;
 }
 
 /** What C is made of, kept apart so the inventory can tell a CV fact from one about the recipient. */
@@ -501,19 +507,58 @@ const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(
 /**
  * Where a sentence ends: after . ! ? … and a space, at a line break, after an emoji and a space
  * ("Sofi 🙌 Me apasiona"), after a label of one or two words that opens a line ("Subject:
- * Unlocking ...", "Asunto: Propuesta ...") and after a list marker ("2) Migrar"). The word after each
+ * Unlocking ...", "Asunto: Propuesta ...") and after a list marker ("2) Migrar", "b) Migrar"). The word after each
  * of these is a sentence's first word, whose capital says nothing.
  */
-const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+|(?<=^[ \t]*\d{1,2}\))[ \t]+/gmu;
+const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+|(?<=^[ \t]*(?:\d{1,2}|[ivxlc]{1,5}|[IVXLC]{1,5}|\p{L})\))[ \t]+/gmu;
 /**
- * The marker of a numbered list item, "1. " or "2) " at a line start: a place in a list, not a
- * number the text states. Why: removing the markers of es-email-heavy-4 read as losing 1, 2 and 3.
- * A marker with nothing after it on its line ("1." alone) is a marker too: the splitter cuts
- * "1. Comunicación clara" into the sentences "1." and "Comunicación clara", so checkEdit reads the
- * marker alone, and a rewrite that deletes an item's text leaves "1." on its own line (live run 2,
- * es-email-heavy-4: the deletion of each bare marker was reverted as losing a number).
+ * The marker of a list item at a line start, "1. ", "2) ", "b) " or "IV. ": a place in a list, not
+ * a number or an acronym the text states. Why: removing the markers of es-email-heavy-4 read as
+ * losing 1, 2 and 3, and an uppercase roman marker read as an acronym.
+ * A numbered marker with item text after it is always a marker. A bare one ("1." alone on its
+ * line, or the sentence the splitter cuts "1. Comunicación clara" into), and a letter or roman
+ * one, is a marker only where the original makes it one (listMarkersOf): the rewrite of live run 2
+ * left "1." alone on its line after deleting the item texts, while "¿Cuántos sitios?\n12.\n" or
+ * "Proyectos: 12." state a number that a change must not slip past (review of 17/11).
  */
-const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)])(?=[ \t]|$)/gmu;
+const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)]|(?:[ivxlc]{1,5}|[IVXLC]{1,5}|\p{L})[.)])(?=([ \t]+\S)?)(?=[ \t]|$)/gmu;
+const NUMBERED = /^\d/u;
+
+/**
+ * The list markers a text uses: each numbered marker with item text after it, and every marker of
+ * a run of two or more lines that open with one (blank lines between them do not end the run).
+ * A lone "12." or "C. Martínez" is not in a run, so it stays a number or a name.
+ */
+export function listMarkersOf(text: string): Set<string> {
+  const out = new Set<string>();
+  let run: string[] = [];
+  const close = (): void => {
+    if (run.length >= 2) for (const m of run) out.add(m);
+    run = [];
+  };
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue;
+    const m = new RegExp(LIST_MARKER.source, 'u').exec(line);
+    if (m === null) {
+      close();
+      continue;
+    }
+    const mark = m[2] ?? '';
+    run.push(mark);
+    if (NUMBERED.test(mark) && m[3] !== undefined) out.add(mark);
+  }
+  close();
+  return out;
+}
+
+/** The markers to read in `text`: the given ones, or the text's own, where a text that is one bare numbered marker is a fragment of a list. */
+function markersFor(text: string, options: ExtractOptions): ReadonlySet<string> {
+  if (options.listMarkers !== undefined) return options.listMarkers;
+  const own = listMarkersOf(text);
+  const alone = /^[ \t]*(\d{1,2}[.)])[ \t]*$/u.exec(text);
+  if (alone?.[1] !== undefined) own.add(alone[1]);
+  return own;
+}
 
 /**
  * The sentences of a text with their offsets, split at each SENTENCE_BREAK. `afterEmoji` marks one
@@ -550,7 +595,10 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   // A placeholder's span is claimed too, so the anchor pass, which reads the original text, skips it.
   const claimed: Array<[number, number]> = [...text.matchAll(PLACEHOLDER_ANY)].map((m) => [m.index, m.index + m[0].length]);
   // List markers state no number: blanked and claimed the same way.
+  const markers = markersFor(text, options);
   for (const m of rest.matchAll(LIST_MARKER)) {
+    const mark = m[2] ?? '';
+    if (!(NUMBERED.test(mark) && m[3] !== undefined) && !markers.has(mark)) continue;
     const start = m.index + (m[1] ?? '').length;
     const length = (m[2] ?? '').length;
     claimed.push([start, start + length]);
@@ -834,7 +882,7 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
   }
   const after = sentence.slice(0, at) + edit.after + sentence.slice(at + edit.before.length);
   const known = namesOf([context.O, sourcesText(context.C), sentence, after], context);
-  const read = { ...context, knownNames: known, openings: true };
+  const read = { ...context, knownNames: known, openings: true, listMarkers: context.listMarkers ?? listMarkersOf(context.O) };
   const allBefore = extract(sentence, read);
   const allAfter = extract(after, read);
   const beforeFacts = unique(allBefore);
@@ -889,11 +937,12 @@ export function factInvariant(
   rewritten: string,
   sources: FactSources,
   acceptedDrops: readonly string[],
-  options: ExtractOptions,
+  given: ExtractOptions,
 ): InvariantResult {
+  const options = { ...given, listMarkers: given.listMarkers ?? listMarkersOf(original) };
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
-  const C = poolOf(sourcesText(sources), options);
+  const C = poolOf(sourcesText(sources), given);
   const read = { ...options, knownNames: namesOf([original, rewritten, C.text], options), openings: true };
   const inO = extract(original, read);
   const inR = extract(rewritten, read);
@@ -918,10 +967,11 @@ export function factInvariant(
  * so added holds only what nothing backs; notInCv is the inventory's solo-del-usuario; placeholders
  * are the markers left in R.
  */
-export function factReport(original: string, rewritten: string, sources: FactSources, options: ExtractOptions): FactReport {
+export function factReport(original: string, rewritten: string, sources: FactSources, given: ExtractOptions): FactReport {
+  const options = { ...given, listMarkers: given.listMarkers ?? listMarkersOf(original) };
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
-  const C = poolOf(sourcesText(sources), options);
+  const C = poolOf(sourcesText(sources), given);
   const inO = unique(extract(original, options));
   const newInR = unique(extract(rewritten, options)).filter((f) => !states(O, f));
   const key = (f: Fact) => f.key;

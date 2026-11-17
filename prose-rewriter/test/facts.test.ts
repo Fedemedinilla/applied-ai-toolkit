@@ -683,3 +683,40 @@ describe('a list marker with nothing after it (es-email-heavy-4, live run 2)', (
     expect(factInvariant(LIST, R, { cv: '' }, [], ES)).toMatchObject({ holds: true, extra: [] });
   });
 });
+
+describe('a bare marker counts only where the original makes it one (review of 17/11, findings 1 and 4)', () => {
+  it('reads a number alone on its line as a number when the original has no list there', () => {
+    const O = '¿Cuántos sitios entregué en 2025?\n12.\nTodos en Astro.';
+    expect(keys(O)).toContain('12');
+    expect(factInvariant(O, O.replace('12.', '40.'), { cv: '' }, [], ES)).toMatchObject({ holds: false });
+    expect(factInvariant(O, O.replace('12.\n', ''), { cv: '' }, [], ES)).toMatchObject({ holds: false });
+    const E = 'How many help articles did I write last year?\n60.\nAll of them in English.';
+    expect(factInvariant(E, E.replace('60.', '90.'), { cv: '' }, [], EN)).toMatchObject({ holds: false });
+  });
+
+  it('reverts a change or a deletion of a number the splitter left alone in its sentence', () => {
+    const O = 'Proyectos: 12.';
+    const ctx = { O, C: { cv: '' }, sentences: ['12.'], lang: 'es' } as const;
+    expect(checkEdit({ sentenceId: 0, before: '12.', after: '13.', reason: 'test' }, ctx)).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(checkEdit({ sentenceId: 0, before: '12.', after: '', reason: 'test' }, ctx)).toMatchObject({ status: 'reverted', reason: 'lost' });
+  });
+
+  it('still reads the markers of a numbered list as markers, bare or not', () => {
+    const LIST = 'Mis fortalezas:\n\n1. Comunicación clara\n2. Atención al detalle';
+    expect(factInvariant(LIST, 'Mis fortalezas:\n\n1.\n2.', { cv: '' }, [], ES)).toMatchObject({ holds: true });
+    expect(keys('Pasos:\n1.\n2.\n3.')).toEqual([]);
+  });
+
+  it('reads letter and roman markers of a list as markers, and deleting one loses nothing', () => {
+    const O = 'Mis fortalezas:\n\nII. Comunicación clara\nIII. Atención al detalle\nIV. Pasión por aprender';
+    expect(keys(O)).toEqual([]);
+    const ctx = { O, C: { cv: '' }, sentences: ['II.'], lang: 'es' } as const;
+    expect(checkEdit({ sentenceId: 0, before: 'II.', after: '', reason: 'test' }, ctx)).toMatchObject({ status: 'accepted', dropped: [] });
+    expect(keys('Puntos:\na) Comunicación clara\nb) Atención al detalle')).toEqual([]);
+  });
+
+  it('does not take a lone initial or acronym at a line start for a marker', () => {
+    expect(keys('Saludos,\nUSA. Bien.', EN)).toContain('usa');
+    expect(keys('Hablé con IV. Martínez', ES)).toContain('iv');
+  });
+});
