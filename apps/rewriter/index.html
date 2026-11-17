@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rewriter</title>
+    <meta name="description" content="Rewrites a cover letter, an email, a follow-up or a WhatsApp message you wrote, with your CV as the only source of facts. Each change can be reverted.">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="./src/styles.css">
+    <script type="module" src="./src/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the rewriter</a>
+    <nav class="toolkit-bar" aria-label="Applied AI Toolkit">
+      <a href="../"><span aria-hidden="true">&larr;</span> All demos</a>
+      <span class="toolkit-name">Applied AI Toolkit</span>
+    </nav>
+    <header class="top">
+      <h1>Rewriter</h1>
+      <p class="sub">It reads a cover letter, an email, a follow-up or a WhatsApp message you wrote, marks the patterns of generic text, and proposes changes with your CV as the only source of facts. Code checks every change, and you can take any of them back.</p>
+    </header>
+
+    <p id="mode" class="banner">Looking for a local server&hellip;</p>
+
+    <main id="main">
+      <section id="demo" aria-labelledby="demo-heading" hidden>
+        <h2 id="demo-heading">Recorded examples</h2>
+        <p id="demo-intro" class="hint"></p>
+        <fieldset>
+          <legend>Pick an example</legend>
+          <div id="demo-list" class="options"></div>
+        </fieldset>
+        <div id="demo-input" class="input-summary"></div>
+      </section>
+
+      <form id="form" novalidate hidden>
+        <h2>Your text</h2>
+        <div class="field">
+          <label for="text">Text to rewrite</label>
+          <textarea id="text" name="text" rows="10" required aria-describedby="text-hint"></textarea>
+          <p id="text-hint" class="hint">Spanish or English, as you would send it.</p>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="genre">Kind of text</label>
+            <select id="genre" name="genre"></select>
+          </div>
+          <div class="field">
+            <label for="lang">Language of the text</label>
+            <select id="lang" name="lang"></select>
+          </div>
+          <div class="field">
+            <label for="variety">Spanish variety</label>
+            <select id="variety" name="variety" aria-describedby="variety-hint"></select>
+            <p id="variety-hint" class="hint">Spanish only.</p>
+          </div>
+          <div class="field">
+            <label for="register">Register</label>
+            <select id="register" name="register"></select>
+          </div>
+          <div class="field">
+            <label for="rewrite-mode">How far to go</label>
+            <select id="rewrite-mode" name="mode" aria-describedby="mode-hint"></select>
+            <p id="mode-hint" class="hint">By default a WhatsApp message gets the smallest fix and the rest a polish.</p>
+          </div>
+        </div>
+
+        <fieldset>
+          <legend>Recipient <span class="optional">(optional)</span></legend>
+          <div class="grid">
+            <div class="field">
+              <label for="to-name">Name</label>
+              <input id="to-name" name="to-name" type="text" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="to-org">Organisation</label>
+              <input id="to-org" name="to-org" type="text" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="to-role">Role</label>
+              <input id="to-role" name="to-role" type="text" autocomplete="off">
+            </div>
+          </div>
+          <p class="hint">Facts in these fields count as backed, like the CV.</p>
+        </fieldset>
+
+        <div class="field" id="previous-field" hidden>
+          <label for="previous">The earlier message <span class="optional">(optional)</span></label>
+          <textarea id="previous" name="previous" rows="4" aria-describedby="previous-hint"></textarea>
+          <p id="previous-hint" class="hint">For a follow-up: the message it follows.</p>
+        </div>
+
+        <div class="field">
+          <label for="keep">Phrases to leave as they are <span class="optional">(optional)</span></label>
+          <textarea id="keep" name="keep" rows="2" aria-describedby="keep-hint"></textarea>
+          <p id="keep-hint" class="hint">One per line.</p>
+        </div>
+
+        <div class="field">
+          <label for="cv">Your CV, in Markdown</label>
+          <textarea id="cv" name="cv" rows="8" required autocomplete="off" aria-describedby="cv-hint"></textarea>
+          <p id="cv-hint" class="hint">The only source of facts. It stays in this page's memory and goes only to your local server, for this rewrite. It is not saved in the browser, and the server does not log it.</p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="submit">Rewrite</button>
+        </div>
+      </form>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section id="result" aria-labelledby="result-heading" hidden>
+        <h2 id="result-heading" tabindex="-1">Result</h2>
+        <div class="panels">
+          <section class="panel" aria-labelledby="original-heading">
+            <h3 id="original-heading"><span class="num" aria-hidden="true">1</span> Your text</h3>
+            <div id="original" class="text"></div>
+            <h4 id="findings-heading">Generic-text patterns found</h4>
+            <ol id="findings" class="findings" aria-labelledby="findings-heading"></ol>
+          </section>
+
+          <section class="panel" aria-labelledby="rewritten-heading">
+            <h3 id="rewritten-heading"><span class="num" aria-hidden="true">2</span> Rewritten</h3>
+            <div id="rewritten" class="text"></div>
+            <div class="actions">
+              <button type="button" id="copy" class="secondary">Copy the text</button>
+              <button type="button" id="keep-all" class="secondary">Keep every change</button>
+              <button type="button" id="revert-all" class="secondary">Revert every change</button>
+            </div>
+            <p id="changes-hint" class="hint">Reverting a change puts your own words back in its place, so it cannot add a fact.</p>
+            <h4 id="changes-heading">Changes</h4>
+            <ol id="changes" class="changes" aria-labelledby="changes-heading"></ol>
+            <div id="reverted-wrap" hidden>
+              <h4 id="reverted-heading">Taken back by the checks</h4>
+              <p class="hint">These lines stay as you wrote them. They cannot be accepted here: the checks found that each one would add or lose a fact, or change your voice.</p>
+              <ol id="reverted" class="changes" aria-labelledby="reverted-heading"></ol>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="facts-heading">
+            <h3 id="facts-heading"><span class="num" aria-hidden="true">3</span> Facts and flags</h3>
+            <p id="verdict" class="verdict"></p>
+            <p id="message" class="message" hidden></p>
+            <h4>Flags</h4>
+            <ul id="flags" class="flags"></ul>
+            <h4>Facts</h4>
+            <dl id="facts" class="facts"></dl>
+            <h4>Patterns before and after</h4>
+            <p id="lint"></p>
+            <p class="hint">These numbers are for the full rewrite as returned, with every change in it. Reverting a change here does not run the checks again.</p>
+            <h4>Cost</h4>
+            <p id="cost"></p>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
