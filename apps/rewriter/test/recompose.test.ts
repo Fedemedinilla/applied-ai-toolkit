@@ -132,9 +132,13 @@ describe('recompose', () => {
     });
   });
 
-  it('checks a reverted change too, since its "before" is shown as the user\'s words', () => {
-    const bad: ResultChange = { ...change('r', ORIGINAL, 'Saludos.', 'X', 0, 'reverted'), before: 'Chau.' };
-    expect(recompose(ORIGINAL, [bad], ids())).toEqual({ ok: false, reason: 'before-mismatch' });
+  it('takes a reverted change whose quote is not in the original, as prose-rewriter writes a misquote', () => {
+    // An edit the code could not place (not-found, ambiguous, schema) comes back reverted, spanning
+    // the sentence it named and carrying the model's quote: the span never holds that quote.
+    const sentence = 'Me apasiona potenciar sinergias.';
+    const misquote: ResultChange = { ...change('r', ORIGINAL, sentence, 'X', 0, 'reverted'), before: 'texto que no existe' };
+    const nowhere: ResultChange = { ...misquote, id: 'r2', span: { start: 0, end: 0 } };
+    expect(text(recompose(ORIGINAL, [C1, misquote, nowhere, C3], ids('e1', 'e3')))).toBe(text(recompose(ORIGINAL, [C1, C3], ids('e1', 'e3'))));
   });
 
   it('lets a reverted change overlap an applied one: only the applied one is placed', () => {

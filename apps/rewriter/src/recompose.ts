@@ -5,8 +5,8 @@
 //
 // Spans are UTF-16 offsets into the original as the rewriter read it (NFC), as
 // String.prototype.slice takes them. prose-rewriter places no two applied edits over the same
-// text; a result where they overlap, or where a span does not hold its change's "before", is
-// refused instead of rebuilt by guessing.
+// text; a result where they overlap, or where an applied change's span does not hold its
+// "before", is refused instead of rebuilt by guessing.
 
 import type { ResultChange } from './result.ts';
 
@@ -23,12 +23,15 @@ export type Recomposed = { readonly ok: true; readonly text: string; readonly pi
 
 /** The first problem with the changes against this original, or null. */
 export function problemOf(original: string, changes: readonly ResultChange[]): RecomposeProblem | null {
-  for (const c of changes) {
+  // Only applied changes are placed, so only theirs are checked. A reverted change may be an edit
+  // the code could not place: prose-rewriter then spans the sentence the model named (or {0,0})
+  // and keeps the model's quote as "before", which that span does not hold by construction.
+  const applied = changes.filter((c) => c.status === 'applied');
+  for (const c of applied) {
     const { start, end } = c.span;
     if (start > end || end > original.length) return 'out-of-range';
     if (original.slice(start, end) !== c.before) return 'before-mismatch';
   }
-  const applied = changes.filter((c) => c.status === 'applied');
   if (new Set(applied.map((c) => c.id)).size !== applied.length) return 'duplicate-id';
   const sorted = [...applied].sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end);
   for (let i = 1; i < sorted.length; i++) {

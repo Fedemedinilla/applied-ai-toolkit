@@ -10,6 +10,7 @@ import { createHandler, type Handler } from '../server/handler.ts';
 import { createRewriterModel } from '../server/model.ts';
 import { loadRefs } from '../server/refs.ts';
 import { MAX_BODY_BYTES, MAX_CV_CHARS, MAX_FIELD_CHARS, MAX_KEEP, MAX_KEEP_CHARS, MAX_PREVIOUS_CHARS, MAX_TEXT_CHARS } from '../src/protocol.ts';
+import { appliedIds, recompose } from '../src/recompose.ts';
 import { asReply } from '../src/result.ts';
 import { answer, apiError, fakeAnthropic, type FakeAnthropic, type Reply } from './fake-anthropic.ts';
 
@@ -120,6 +121,23 @@ describe('a rewrite', () => {
     expect(rows.map((r) => r.task)).toEqual(['rewrite.edit', 'rewrite.judge']);
     expect(new Set(rows.map((r) => r.jobId)).size).toBe(1);
     expect(rows[0]?.jobId).toMatch(/^[0-9a-f-]{36}$/u);
+  });
+
+  it('sends back a result the page can rebuild change by change when the model misquotes an edit', async () => {
+    const misquoted = answer(
+      JSON.stringify({
+        edits: [
+          { sentenceId: sentenceOf(FORMULA), before: FORMULA.trim(), after: '', reason: 'Fórmula de apertura.', ruleId: 'LEX-01' },
+          { sentenceId: sentenceOf('Rehice'), before: 'texto que no existe', after: 'x', reason: 'r' },
+        ],
+      }),
+    );
+    const { handler } = setup([misquoted, verdict(EXPECTED), verdict(EXPECTED), verdict(EXPECTED)]);
+    const reply = asReply(await (await handler(post(BODY))).json());
+    if (reply === null) throw new Error('no reply');
+    expect(reply.result.changes.map((c) => c.status)).toEqual(['applied', 'reverted']);
+    const all = recompose(reply.original, reply.result.changes, appliedIds(reply.result.changes));
+    expect(all.ok && all.text).toBe(reply.result.rewritten);
   });
 
   it('gives each rewrite its own job id, so the per-job cap binds per rewrite', async () => {
