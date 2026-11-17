@@ -647,3 +647,39 @@ describe('the forms the probe of 17/11 found unread', () => {
     expect(extract('Uso Node.js 20.1 y edito config.ts y README.md.', ES).filter((f) => f.kind === 'url')).toEqual([]);
   });
 });
+
+// Live run 2 of 17/11, es-email-heavy-4: the splitter cuts "1. Comunicación clara" into the
+// sentences "1." and "Comunicación clara", so the edit deleting "1." was checked on the sentence
+// "1." alone, where no space follows the marker; read as the number 1, its deletion "lost" 1 and was
+// reverted. The rewrite then kept "1.\n2.\n3." on their own lines, read as the numbers 1 and 2 again.
+describe('a list marker with nothing after it (es-email-heavy-4, live run 2)', () => {
+  const LIST = 'Mis fortalezas:\n\n1. Comunicación clara\n2. Atención al detalle\n3. Pasión por aprender';
+  const check = (sentence: string, before: string, extra: { drop?: boolean } = {}) =>
+    checkEdit({ sentenceId: 0, before, after: '', reason: 'test', ...extra }, { O: LIST, C: { cv: '' }, sentences: [sentence], lang: 'es' });
+
+  it('reads a marker as a marker whether or not text follows it', () => {
+    expect(keys('1.')).toEqual([]);
+    expect(keys('Mis fortalezas:\n1.\n2)\n3.')).toEqual([]);
+    expect(keys('1.\n2.\n3.\n\nGracias.')).toEqual([]);
+  });
+
+  it('accepts the deletion of a bare marker, the sentence the splitter cuts it into', () => {
+    expect(check('1.', '1.')).toMatchObject({ status: 'accepted', dropped: [] });
+  });
+
+  it('accepts the deletion of a whole item, marker and text, when the text holds no fact', () => {
+    expect(check('1. Comunicación clara', '1. Comunicación clara')).toMatchObject({ status: 'accepted', dropped: [] });
+  });
+
+  it('still reverts the deletion of an item whose text states a fact', () => {
+    const O = 'Hice:\n1. Migré los mails de 12 personas';
+    const r = checkEdit({ sentenceId: 0, before: '1. Migré los mails de 12 personas', after: '', reason: 'test' }, { O, C: { cv: '' }, sentences: ['1. Migré los mails de 12 personas'], lang: 'es' });
+    expect(r).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(r.status === 'reverted' ? r.facts.map((f) => f.key) : []).toEqual(['12']);
+  });
+
+  it('does not read the orphan markers a rewrite leaves as numbers it added', () => {
+    const R = 'Mis fortalezas:\n\n1.\n2.\n3.';
+    expect(factInvariant(LIST, R, { cv: '' }, [], ES)).toMatchObject({ holds: true, extra: [] });
+  });
+});

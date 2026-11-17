@@ -508,8 +508,12 @@ const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F
 /**
  * The marker of a numbered list item, "1. " or "2) " at a line start: a place in a list, not a
  * number the text states. Why: removing the markers of es-email-heavy-4 read as losing 1, 2 and 3.
+ * A marker with nothing after it on its line ("1." alone) is a marker too: the splitter cuts
+ * "1. Comunicación clara" into the sentences "1." and "Comunicación clara", so checkEdit reads the
+ * marker alone, and a rewrite that deletes an item's text leaves "1." on its own line (live run 2,
+ * es-email-heavy-4: the deletion of each bare marker was reverted as losing a number).
  */
-const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)])(?=[ \t])/gmu;
+const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)])(?=[ \t]|$)/gmu;
 
 /**
  * The sentences of a text with their offsets, split at each SENTENCE_BREAK. `afterEmoji` marks one
