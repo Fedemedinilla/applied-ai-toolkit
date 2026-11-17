@@ -1,6 +1,7 @@
 # Builds the apps that work as static files and deploys them to GitHub Pages, at
 # https://fedemedinilla.github.io/applied-ai-toolkit/ (Caja, Receipt, Replay Lab, Site checklist,
-# and a landing page that lists them). The apps that need a server are not published.
+# the Rewriter's recorded demo, and a landing page that lists them). The apps that need a server
+# are not published.
 # The docs site (docs-site/, generated from the READMEs) is built into docs/ of the same artifact.
 # Pages has to be enabled once in the repository: Settings > Pages > Source: GitHub Actions.
 #
@@ -51,7 +52,7 @@ jobs:
 
       - run: npm ci
 
-      # Builds the four apps into dist/apps/ and assembles dist/pages/ (apps/pages.ts). The variable
+      # Builds the five apps into dist/apps/ and assembles dist/pages/ (apps/pages.ts). The variable
       # is a placeholder, not a secret. The build sees it, so if a build inlined it, the guard below
       # would find it.
       - name: Build the site

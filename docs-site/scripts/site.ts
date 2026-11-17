@@ -32,6 +32,7 @@ export const GROUPS: readonly Group[] = [
       'apps/receipt',
       'apps/replay-lab',
       'apps/checklist',
+      'apps/rewriter',
       'apps/writer',
       'apps/chat-widget',
       'apps/salon-assistant',

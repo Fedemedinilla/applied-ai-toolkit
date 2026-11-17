@@ -21,7 +21,7 @@ The files of `git diff --name-only --no-renames <base>...HEAD`, which are the ch
 
 ## Units
 
-`units.ts` holds the 31 units and 4 cross-cutting areas of the full audit as data, each with its globs and the brief its finders get. One extra area, `repo-tooling`, covers what the full audit names no unit for: `test/bench/`, this folder, `.claude/workflows/` and the root configs. A file can belong to several areas: `apps/caja/vite.config.ts` is in `apps-caja` and in `apps-shell-and-pages`. `units.test.ts` fails when a tracked file or a top-level folder has no unit, so a new folder needs a line in `units.ts`. A changed file that no unit owns is listed under `unmapped` instead of being dropped.
+`units.ts` holds the 32 units and 4 cross-cutting areas of the full audit as data, each with its globs and the brief its finders get. One extra area, `repo-tooling`, covers what the full audit names no unit for: `test/bench/`, this folder, `.claude/workflows/` and the root configs. A file can belong to several areas: `apps/caja/vite.config.ts` is in `apps-caja` and in `apps-shell-and-pages`. `units.test.ts` fails when a tracked file or a top-level folder has no unit, so a new folder needs a line in `units.ts`. A changed file that no unit owns is listed under `unmapped` instead of being dropped.
 
 ## Dependents
 

@@ -135,7 +135,7 @@ describe('assemblePages', () => {
   it('refuses to assemble when the landing page leaves out an app that PAGES_APPS lists', () => {
     const url = tree(PAGES_APPS);
     writeFileSync(join(root, 'apps/index.html'), landing.replace('<a href="./receipt/">Receipt</a>', 'Receipt'));
-    expect(() => assemblePages(url)).toThrow(/apps\/index.html links caja, replay-lab, checklist; PAGES_APPS lists/);
+    expect(() => assemblePages(url)).toThrow(/apps\/index.html links caja, replay-lab, checklist, rewriter; PAGES_APPS lists/);
   });
 
   it('refuses to assemble when a published build is missing', () => {

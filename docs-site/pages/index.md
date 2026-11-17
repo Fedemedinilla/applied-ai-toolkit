@@ -1,6 +1,6 @@
 # Applied AI Toolkit
 
-The Applied AI Toolkit is the open source toolbox behind the client work of [Federico Medinilla](https://federicomedinilla.com), a software developer in Buenos Aires who runs the studio [KyndredAI](https://kyndredai.com). Its parts put an LLM into an application under a spending cap and measure a prompt change on the real model before it ships. They also check what the model writes before a visitor sees it, and harden the sites and databases around it. Every folder has a README with its design decisions and tests that run offline with no API key, and eight small apps show the pieces working together.
+The Applied AI Toolkit is the open source toolbox behind the client work of [Federico Medinilla](https://federicomedinilla.com), a software developer in Buenos Aires who runs the studio [KyndredAI](https://kyndredai.com). Its parts put an LLM into an application under a spending cap and measure a prompt change on the real model before it ships. They also check what the model writes before a visitor sees it, and harden the sites and databases around it. Every folder has a README with its design decisions and tests that run offline with no API key, and nine small apps show the pieces working together.
 
 Each page of this site is generated from a file in the [repository](https://github.com/Fedemedinilla/applied-ai-toolkit), and its "Edit page" link opens that file. New here? [Start here](start-here.md) has a two-minute path and a ten-minute path.
 
