@@ -142,6 +142,8 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'paso', 'cuento', 'agradezco', 'espero', 'creo', 'pienso', 'necesito', 'vivo', 'sigo', 'tenés', 'podés', 'querés', 'mirá', 'fijate',
     'avisame', 'contame', 'escribime', 'decime', 'recibe', 'tiene', 'puede', 'hace', 'sirve', 'incluye', 'permite',
     'solo', 'sólo', 'cualquier', 'cualquiera', 'quedo',
+    // Connectors and stock phrases a slop sentence opens with (found by the D3 cases).
+    'asimismo', 'cabe', 'juntos', 'juntas', 'será', 'sería', 'quería', 'quisiéramos', 'muchísimas', 'muchísimo', 'asunto', 'nota',
   ]),
   en: new Set([
     'the', 'a', 'an', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that',
@@ -152,6 +154,10 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'both', 'few', 'several', 'what', 'who', 'which', 'where', 'why', 'how', 'ok', 'okay', 'well', 'best', 'kind', 'regards', 'sincerely',
     'cheers', 'is', 'are', 'was', 'were', 'am', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'should',
     'may', 'might', 'must', 'let', 'one', 'just', 'only', 'even', 'again', 'yours', 'sure', 'happy', 'glad', 'looking', 'attached',
+    // Contractions, connectors and sign-offs a slop sentence opens with (found by the D3 cases).
+    "let's", "it's", "that's", "here's", "there's", "what's", 'let’s', 'it’s', 'that’s', 'here’s', 'there’s', 'what’s', 'furthermore',
+    'moreover', 'additionally', 'besides', 'otherwise', 'whether', 'throughout', 'ultimately', 'overall', 'indeed', 'warm', 'warmest',
+    'subject',
   ]),
 };
 /** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
