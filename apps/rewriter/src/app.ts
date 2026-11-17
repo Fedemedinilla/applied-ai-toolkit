@@ -313,14 +313,16 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     );
   }
 
-  function diffLine(c: ResultChange, lang: Lang): HTMLParagraphElement {
+  function diffLine(c: ResultChange, original: string, lang: Lang): HTMLParagraphElement {
     const p = make('p', undefined, 'diff');
+    // A reverted edit the code could not place keeps the model's quote, which is not in the text.
+    const misquote = c.status === 'reverted' && original.slice(c.span.start, c.span.end) !== c.before;
     const del = make('del', c.before === '' ? '(nothing)' : c.before);
     del.lang = lang;
     const ins = make('ins', c.after === '' ? '(removed)' : c.after);
     ins.lang = lang;
     if (c.after === '') ins.className = 'cut';
-    p.append(make('span', 'Your words: ', 'visually-hidden'), del, make('span', ' → ', 'arrow'), make('span', 'Rewrite: ', 'visually-hidden'), ins);
+    p.append(misquote ? make('span', 'Quoted by the model (not found in your text): ', 'quoted') : make('span', 'Your words: ', 'visually-hidden'), del, make('span', ' → ', 'arrow'), make('span', 'Rewrite: ', 'visually-hidden'), ins);
     return p;
   }
 
@@ -334,7 +336,7 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     head.append(state);
     const reason = make('p', c.reason, 'reason');
     reason.lang = s.lang;
-    li.append(head, diffLine(c, s.lang), reason);
+    li.append(head, diffLine(c, s.original, s.lang), reason);
     if (c.status === 'reverted') {
       li.classList.add('taken-back');
       state.textContent = 'Taken back';

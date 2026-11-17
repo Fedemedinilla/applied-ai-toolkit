@@ -122,6 +122,8 @@ p { margin: 6px 0 0; }
 
 .sub { max-width: 46rem; }
 .hint { font-size: 0.875rem; }
+
+.diff .quoted { color: var(--muted); font-size: 0.875rem; }
 .optional { font-weight: 400; font-size: 0.875rem; }
 
 .banner {

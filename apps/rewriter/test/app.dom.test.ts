@@ -374,6 +374,23 @@ describe('local mode', () => {
     expect(text('#changes-hint')).toMatch(/cannot be rebuilt/u);
   });
 
+  it('keeps the buttons when the checks reverted a misquoted edit, and labels the quote as the model\'s', async () => {
+    const h = await mount({ health: 200 });
+    fillForm();
+    const sentence = heavy.input.text.split('\n').find((l) => l.length > 20) ?? '';
+    const start = heavy.input.text.indexOf(sentence);
+    const misquote = { id: 'e99', span: { start, end: start + sentence.length }, before: 'texto que no existe', after: 'x', reason: 'r', stage: 'edit', status: 'reverted', revertReason: '"texto que no existe" is not in sentence 2' };
+    const result = { ...heavy.result, changes: [...heavy.result.changes, misquote] };
+    h.queue.push({ status: 200, body: { original: heavy.input.text, result } });
+    $<HTMLButtonElement>('#submit').click();
+    await settle();
+    expect(document.querySelectorAll('#changes button')).toHaveLength(heavy.result.changes.filter((c) => c.status === 'applied').length);
+    expect(text('#change-e99')).toContain('Quoted by the model (not found in your text): ');
+    expect(text('#change-e99')).not.toContain('Your words: ');
+    const own = heavy.result.changes.find((c) => c.status === 'reverted');
+    expect(text(`#change-${own?.id ?? '?'}`)).toContain('Your words: ');
+  });
+
   it('renders model text as text, never as markup', async () => {
     const h = await mount({ health: 200 });
     fillForm();
