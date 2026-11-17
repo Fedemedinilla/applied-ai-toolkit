@@ -157,9 +157,10 @@ describe('capWindows, when the clocks skip midnight', () => {
     // Toronto moved from UTC-5 to UTC-4 on 1919-03-30 at 23:30 local, straight to 00:30 on the 31st.
     // Midnight at the old offset is 05:00 UTC (01:00 local), half an hour after the day began at
     // 04:30 UTC. A scan of the IANA data in Node 24 from 1900 to 2037 found no other gap that starts
-    // before a midnight and skips it: these two are what the bisection to the second is for.
+    // before a midnight and skips it (America/Nassau shows the same one only because the bundled ICU
+    // links it to Toronto; with backzone data it has no 1919 gap): this is what the bisection to the
+    // second is for.
     expect(capWindows(new Date('1919-03-31T12:00:00Z'), 'America/Toronto').dayStart).toEqual(new Date('1919-03-31T04:30:00Z'));
-    expect(capWindows(new Date('1919-03-31T12:00:00Z'), 'America/Nassau').dayStart).toEqual(new Date('1919-03-31T04:30:00Z'));
   });
 
   it('every dayStart of 2026 is on the local date of now, and the instant before it is not', () => {

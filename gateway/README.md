@@ -302,7 +302,7 @@ The first run scored 90.15%, with 23 survivors and 4 mutants no test reached. Th
 
 The DST correction for midnight gaps, added on 2026-11-15, brought the score down to 96.33%, under the threshold, with 11 survivors. Six were real gaps, now tests:
 
-- The bisection to the second only matters when a gap starts before midnight and skips it. Santiago and Havana start theirs at midnight, so the loop could be removed with no test failing. Toronto and Nassau on 1919-03-31 went from 23:30 straight to 00:30. A scan of the IANA data in Node 24 from 1900 to 2037 found no other such gap, and the test pins the day start there.
+- The bisection to the second only matters when a gap starts before midnight and skips it. Santiago and Havana start theirs at midnight, so the loop could be removed with no test failing. Toronto on 1919-03-31 went from 23:30 straight to 00:30. A scan of the IANA data in Node 24 from 1900 to 2037 found no other such gap, and the test pins the day start there. Nassau shows the same gap only as an alias of Toronto in the bundled ICU; with backzone data it has none, so the test leaves it out.
 - Two price rows of one model with the same `validFrom`. Postgres cannot hold both, but `MemoryPriceStore` or a custom store can return them, and the first one stays, as `loadPrices` keeps the row that is already there.
 
 The other five were equivalent. No test could kill them, so the code changed instead. `partsAt` read each part with `?.`, and `formatToParts` returns every part the formatter asks for. The date check compared year, month and day, but the instants it checks are always on the target date or the one before. Two consecutive dates never share a day of the month, so it now compares the day alone.
