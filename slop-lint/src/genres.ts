@@ -62,7 +62,7 @@ const NOT_A_LETTER: Readonly<Record<string, GenreSetting>> = {
 const FMT_01 = ruleById('FMT-01');
 
 /** The rules of GENRE_RULES that email and follow-up run. */
-const MAIL_RULES: readonly Rule[] = ['MAIL-01', 'MAIL-02', 'MAIL-03'].map(ruleById);
+const MAIL_RULES: readonly Rule[] = ['MAIL-01', 'MAIL-02', 'MAIL-03', 'MAIL-04'].map(ruleById);
 const MARKUP = String.raw`\*\*[^*\n]+\*\*|__[^_\n]+__|^#{1,6}[ \t]`;
 const LIST_ITEM = String.raw`^[ \t]*(?:[-*•]|\d+[.)])[ \t]+`;
 
@@ -132,7 +132,8 @@ export const GENRE_PROFILES: Readonly<Record<Genre, GenreProfile>> = {
       'SIN-EN-06': { severity: 'low' },
       // REG-01 keeps its default severity, high: a voseo and tuteo mix is flagged without voiding the message.
     },
-    adds: [ruleById('WA-03')],
+    // A mail's stock formula is further out of place in a chat.
+    adds: [ruleById('MAIL-04'), ruleById('WA-03')],
     tier2Budget: COVER_LETTER.tier2Budget,
     thresholds: { ...COVER_LETTER.thresholds, openingMarksFollowText: true },
     experimental: true,

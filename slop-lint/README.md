@@ -600,6 +600,7 @@ These rules are not in the catalog of 52, so a cover letter and a caller that pa
 | MAIL-01 | Thanks formula as the only closing | email, follow-up | en | 1 | high | 0 as the last sentence | structural | SÍNTESIS | Section 12, English Tier 1 ("thank you for your time and consideration" as the only closing line) |
 | MAIL-02 | "Estimado/a" with a slash | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 3 (slop of generated Spanish) |
 | MAIL-03 | Generic subject line | email, follow-up | es | 2 | medium | 0 | pattern | SÍNTESIS | Section 11, item 8 (subject: role, name and a fact; not "Oportunidad emocionante") |
+| MAIL-04 | Stock mail formulas | email, follow-up, whatsapp | both | 2 | low | 0 | pattern | REPORTADO, SÍNTESIS | Wikipedia, Signs of AI writing, "Phrasal templates and placeholder text" ("I hope this message finds you well"), read on 17 November 2026; the other formulas: the prose-rewriter live eval of 17 November 2026, where the register-fit judge named them as the line that decided a failure |
 | SEG-03 | Follow-up that copies the earlier message | follow-up | both | 2 | medium | 8 words in a row from the earlier message | structural | SÍNTESIS | Section 11, item 5, and ESP-03 in section 13.1 (no more than 8 words in a row from the job posting); applied to the earlier message |
 | WA-03 | Emoji used as bullets | whatsapp | both | 2 | medium | 0; a list is 2 lines in a row that open with an emoji, one emoji opening two of them | structural | REPORTADO | Section 4.4 (emoji as bullets among the format signs) |
 

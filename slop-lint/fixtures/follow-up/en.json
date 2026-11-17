@@ -288,7 +288,7 @@
         {
           "text": "Please don’t hesitate to reach out if you have any questions.",
           "slop": true,
-          "rules": []
+          "rules": ["MAIL-04"]
         },
         {
           "text": "Thank you for your time and consideration.",

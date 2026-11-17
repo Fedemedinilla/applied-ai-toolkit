@@ -380,7 +380,7 @@
         {
           "text": "Espero que este mail te encuentre muy bien.",
           "slop": true,
-          "rules": []
+          "rules": ["MAIL-04"]
         },
         {
           "text": "Te escribo para contarte que me apasiona el análisis de datos.",
