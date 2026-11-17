@@ -592,4 +592,13 @@ describe('the forms the probe of 17/11 found unread', () => {
     // A number that opens a line without a marker's period or parenthesis is still a number.
     expect(keys('Pedidos por semana:\n40 en marzo.')).toEqual(['40', '--03']);
   });
+
+  it('reads a bare domain as a URL, so dropping or changing it is a lost fact (en-email-good-3)', () => {
+    const O = 'Tom Hale at calder-systems.example can tell you more. My site is valeria-sosa.com.ar.';
+    expect(extract(O, EN).filter((f) => f.kind === 'url').map((f) => f.key)).toEqual(['calder-systems.example', 'valeria-sosa.com.ar']);
+    expect(factInvariant(O, 'Tom Hale can tell you more. My site is valeria-sosa.com.ar.', { cv: 'x' }, [], EN).missing.map((f) => f.key)).toEqual(['calder-systems.example']);
+    // The same domain behind a scheme states it; a version number or a file name is not a domain.
+    expect(factInvariant(O, O.replace('calder-systems.example', 'https://calder-systems.example'), { cv: 'x' }, [], EN).missing).toEqual([]);
+    expect(extract('Uso Node.js 20.1 y edito config.ts y README.md.', ES).filter((f) => f.kind === 'url')).toEqual([]);
+  });
 });

@@ -262,6 +262,21 @@ const HOUR_HS = new RegExp(String.raw`${B}(\d{1,2})\s?hs${E}`, 'giu');
 /** "a las 15 h": after "las", an hour; elsewhere "15 h" is a duration. */
 const HOUR_H = new RegExp(String.raw`(?<=${B}las\s{1,3})(\d{1,2})\s?h${E}`, 'giu');
 
+/**
+ * A domain written without "http" or "www" (URL_LIKE needs one): "calder-systems.example",
+ * "valeria-sosa.com.ar". Lower case and a known top-level domain only, so "Node.js", "config.ts"
+ * and "ASP.NET" stay what they are. Why: the probe of 17/11 dropped "calder-systems.example" from
+ * en-email-good-3 and the invariant held.
+ */
+const DOMAIN = new RegExp(
+  String.raw`(?<![\p{L}\p{N}@./:-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:${[
+    'com', 'net', 'org', 'io', 'dev', 'app', 'ai', 'co', 'me', 'info', 'tech', 'site', 'online', 'store', 'shop', 'edu', 'gov', 'example',
+    'ar', 'es', 'mx', 'cl', 'uy', 'pe', 'br', 'uk', 'us',
+  ].join('|')})(?![\p{L}\p{N}-])(?:\/[^\s]*)?`,
+  'gu',
+);
+const SCHEME = /^[a-z]+:\/\//u;
+
 /** Units kept with their number, one key per unit in both languages ("9 hours" and "9 horas" are "9 h"). */
 const UNITS: Readonly<Record<string, string>> = {
   '%': '%', s: 's', seg: 's', segundo: 's', segundos: 's', sec: 's', second: 's', seconds: 's', ms: 'ms',
@@ -535,6 +550,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 
   pass(URL_LIKE, (m) => ({ kind: 'url', text: trimmed(m[0]), key: trimmed(m[0]).toLowerCase().replace(/\/$/u, '') }));
   pass(EMAIL, (m) => ({ kind: 'email', text: m[0], key: m[0].toLowerCase() }));
+  pass(DOMAIN, (m) => ({ kind: 'url', text: trimmed(m[0]), key: trimmed(m[0]).toLowerCase().replace(/\/$/u, '') }));
   pass(AMOUNT_BEFORE, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[1] ?? '').toLowerCase()] ?? '$'} ${scaled(m[2] ?? '', m[3], lang)}` }));
   pass(AMOUNT_AFTER, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[3] ?? '').toLowerCase()] ?? '$'} ${scaled(m[1] ?? '', m[2], lang)}` }));
   pass(NUMBER_MAGNITUDE, (m) => ({ kind: 'number', text: m[0], key: scaled(m[1] ?? '', m[2], lang) }));
@@ -691,6 +707,8 @@ const sourcesText = (c: FactSources): string => [c.cv, ...(c.recipient ?? []), .
  */
 function states(pool: Pool, fact: Fact): boolean {
   if (pool.keys.has(fact.key)) return true;
+  // A bare domain is stated by the same domain behind a scheme or in an email too.
+  if (fact.kind === 'url' && !SCHEME.test(fact.key)) return new RegExp(`${B}${escape(fact.key)}${E}`, 'iu').test(pool.text);
   if (!WORD_KINDS.has(fact.kind)) return false;
   const source = fact.key.split(' ').map(escape).join(String.raw`\s+`);
   const asName = fact.opening === undefined && (fact.kind === 'proper-noun' || fact.kind === 'acronym');
