@@ -282,6 +282,29 @@ describe('names at the start of a sentence', () => {
     expect(checkEdit(edit('Armé', 'Yo armé'), one('Armé el formulario.', { cv: '' })).status).toBe('accepted');
   });
 
+  it('lets a rewrite cut a slop sentence that opens with a contraction or a connector', () => {
+    // Found by the D3 cases: these openers were read as possible names, so a correct rewrite that
+    // cut the slop sentence failed the invariant as if it had lost a name.
+    const en = [
+      ["I wrote 60 articles. Let's connect and explore how I can add value.", 'I wrote 60 articles.'],
+      ['I keep 120 laptops patched. Furthermore, I know SQL well.', 'I keep 120 laptops patched. I know SQL well.'],
+      ["I wrote 60 articles. It's a mindset. That's my passion. Here's the thing.", 'I wrote 60 articles.'],
+      ['Throughout my journey, I wrote 60 articles.', 'I wrote 60 articles.'],
+      ['I wrote 60 articles.\n\nWarm regards,\nDaniel', 'I wrote 60 articles.\n\nBest,\nDaniel'],
+      ['I wrote 60 articles.\n\nWarmest regards,\nDaniel', 'I wrote 60 articles.\n\nBest,\nDaniel'],
+      ['Whether big or small, I wrote 60 articles. Moreover, they help.', 'I wrote 60 articles. They help.'],
+    ] as const;
+    for (const [O, R] of en) expect(factInvariant(O, R, { cv: 'x' }, [], EN), O).toMatchObject({ holds: true });
+    const es = [
+      ['Rehice el sitio. Asimismo, armé un formulario.', 'Rehice el sitio. También armé un formulario.'],
+      ['Rehice el sitio. Cabe destacar que me apasiona.', 'Rehice el sitio.'],
+      ['Rehice el sitio. Juntos podemos lograrlo.', 'Rehice el sitio.'],
+      ['Rehice el sitio. Será un placer charlar.', 'Rehice el sitio.'],
+      ['Quería contarte que rehice el sitio.', 'Rehice el sitio.'],
+    ] as const;
+    for (const [O, R] of es) expect(factInvariant(O, R, { cv: '' }, [], ES), O).toMatchObject({ holds: true });
+  });
+
   it('breaks the invariant for a name invented or lost at the start of a sentence', () => {
     expect(factInvariant('Armé el formulario.', 'Google me contrató. Armé el formulario.', { cv: '' }, [], ES).extra.map((f) => f.key)).toEqual(['google']);
     expect(factInvariant('I built the form.', 'Google hired me. I built the form.', { cv: 'x' }, [], EN).holds).toBe(false);
