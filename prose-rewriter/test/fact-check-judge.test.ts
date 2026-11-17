@@ -143,6 +143,76 @@ describe('the fact-check judge (an independent reading of the facts)', () => {
   });
 });
 
+// Run 2 of the D3 cases (17/11/2026): the judge failed 55 of 105 pieces, and all but three of the
+// disagreements were hype or self-assessment it counted as a fact lost or changed, or a fact the CV
+// states that it counted as added. Version 2 of the prompt says what a fact is (something a reader
+// can check) and what is not; these tests pin that wording and the run-2 pairs it was written from.
+describe('the fact-check prompt, version 2: only checkable facts count', () => {
+  const system = FACT_CHECK.instructions;
+
+  it('is version 2, and the gateway sees that version', async () => {
+    expect(FACT_CHECK.version).toBe('2');
+    const { call, fact } = await judgeOne(clean);
+    expect(call.request.promptVersion).toBe('rewrite-fact-check@2');
+    expect(fact.version).toBe('2');
+  });
+
+  it('defines a fact as something a reader can check, negations included', () => {
+    expect(system).toMatch(/something a reader could check/);
+    for (const kind of ['a place', 'a degree or a credential', 'a frequency', 'the negation of any of these', 'a claim of rank or standing']) expect(system).toContain(kind);
+  });
+
+  it('says hype, self-assessment, feelings, offers and questions are not facts, and removing or softening them is intended', () => {
+    expect(system).toMatch(/Not facts: self-assessments, adjectives and hype that name nothing a reader could check/);
+    for (const slop of ['"passionate"', '"results-driven"', '"proven track record"', '"seasoned professional"', '"take it to the next level"', '"me apasiona"', '"sólida trayectoria"', '"orientada a resultados"', '"amplia experiencia"']) {
+      expect(system).toContain(slop);
+    }
+    expect(system).toMatch(/offers, requests and questions/);
+    expect(system).toMatch(/Removing, softening or rewording any of these is what the rewrite is meant to do: never list it/);
+  });
+
+  it('keeps the person\'s own claims: dropping an unbacked one is lost, strengthening one is changed', () => {
+    expect(system).toMatch(/even an inflated one the FACT SHEET does not back/);
+    expect(system).toMatch(/"helped with" to "led"/);
+    expect(system).toMatch(/Dropping "successfully", "transformative" or "cutting-edge" around a fact is not weaker/);
+  });
+
+  it('does not count what the FACT SHEET states: neither an addition nor a vaguer claim made specific', () => {
+    expect(system).toMatch(/A fact the FACT SHEET states is not added, even when ORIGINAL does not have it/);
+    expect(system).toMatch(/A vaguer claim of ORIGINAL replaced by what the FACT SHEET states on the same subject is not changed/);
+    expect(system).toMatch(/a fact about the recipient that nothing states/);
+  });
+
+  it('asks for the kind that makes an entry checkable, and leaves out what has none', () => {
+    expect(system).toMatch(/If you cannot say what a reader would check, it is not a fact: leave it out/);
+    const v = FACT_CHECK.verdict.parse({ lost: [{ kind: 'place', text: 'Córdoba' }, { kind: 'credential', text: 'BSc in Computing' }], changed: [], added: [] });
+    expect(v.lost.map((e) => e.kind)).toEqual(['place', 'credential']);
+  });
+
+  it('can judge with the fact check alone, as a re-judge of recorded pieces does', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [clean] });
+    const records = await judgePieces(CASES, [piece('single-guarded', REWRITE)], { gateway: scripted.gateway, now: NOW, rubrics: ['fact-check'] });
+    scripted.assertDone();
+    expect(records.map((r) => [r.rubric, r.status, r.pass])).toEqual([['fact-check', 'scored', true]]);
+  });
+
+  it('refuses a rubric name it does not know instead of judging nothing', async () => {
+    const scripted = scriptedGateway({});
+    await expect(judgePieces(CASES, [piece('single-guarded', REWRITE)], { gateway: scripted.gateway, now: NOW, rubrics: ['fact-chek'] })).rejects.toThrow(/unknown judge rubric: fact-chek/);
+  });
+
+  // The run-2 pairs, with the verdict the recalibrated judge should give: what is scored is the
+  // reply, so these check that a clean reply passes the pair and that the fact sheet the judge
+  // needs to see the backing is in its message.
+  it('sends the CV line that backs a detail the rewrite adds (run 2: additions the CV states)', async () => {
+    const original = 'Hola Marta, me apasiona la tecnología escolar. Mantengo tres sitios WordPress con copias semanales.';
+    const rewritten = 'Hola Marta, mantengo tres sitios WordPress con copias semanales y actualizaciones mensuales.';
+    const { fact, user } = await judgeOne(clean, original, rewritten);
+    expect(user).toContain('Mantengo tres sitios WordPress con copias semanales y actualizaciones mensuales.');
+    expect(fact).toMatchObject({ status: 'scored', pass: true });
+  });
+});
+
 describe('the fact-check report: pass rate and agreement with the code rubrics', () => {
   const zero = { calls: 0, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 } };
   const fact = (c: string, variant: string, verdict: { lost?: string[]; changed?: string[]; added?: string[] } | 'failed' | 'no-output'): JudgeRecord => {
