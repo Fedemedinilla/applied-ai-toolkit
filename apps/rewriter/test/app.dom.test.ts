@@ -167,6 +167,7 @@ describe('the three panels', () => {
     expect(text('#verdict')).toMatch(/^OK /u);
     expect(text('#facts')).toContain('Added from your CV');
     expect(text('#lint')).toMatch(/Before: 14 patterns .*\.After: 7 patterns/su);
+    expect(text('#lint-hint')).toBe('The score goes from 0 to 15, and higher is cleaner: 15 means no pattern found. One disqualifying pattern, or three serious ones, bring it to 0, so fewer patterns can leave it at 0.');
     expect(text('#cost')).toBe(`2 model calls, US$${heavy.result.usage.costUsd?.toFixed(4)}, as recorded.`);
     expect(text('#result')).toMatch(/numbers are for the full rewrite as returned/u);
   });
