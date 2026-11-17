@@ -17,6 +17,8 @@ const rel = (path: string) => relative(REPO, path);
 const CASES = files('prose-rewriter/evals', /\.(md|json|txt)$/);
 const CVS = CASES.filter((f) => rel(f).startsWith('prose-rewriter/evals/cases/cv/'));
 const STYLE_DATA = files('style-refs', /\.json$/);
+// The rewriter app's demo: real rewrites of the eval cases, served on a public page.
+const DEMO = join(REPO, 'apps/rewriter/demo/examples.json');
 // slop-lint's labelled set by genre, read by slop-lint/scripts/genre-eval.ts.
 const LABELED = ['email', 'follow-up', 'whatsapp'].flatMap((genre) => files(`slop-lint/fixtures/${genre}`, /\.json$/));
 
@@ -42,6 +44,17 @@ describe('the fixtures carry no real data', () => {
     expect(found).toEqual([]);
     // JSON has no comments, so the marker is the "fictional" field the evaluator also checks.
     for (const f of LABELED) expect(String((JSON.parse(read(f)) as { fictional?: unknown }).fictional), rel(f)).toMatch(/^Fictional/);
+  });
+
+  it("keeps the rewriter app's recorded demo under the same rules, marked as fiction", () => {
+    // Every string in the file, one per line: the texts, the rewrites, the reasons and the facts.
+    // The numbers are offsets, counts, scores and costs, and their decimals would read as phones.
+    const strings = (v: unknown): string[] =>
+      typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings) : typeof v === 'object' && v !== null ? Object.values(v).flatMap(strings) : [];
+    const text = strings(JSON.parse(read(DEMO))).join('\n');
+    expect(text.length).toBeGreaterThan(10_000);
+    expect(checkFictional(rel(DEMO), text)).toEqual([]);
+    expect(String((JSON.parse(read(DEMO)) as { fictional?: unknown }).fictional)).toMatch(/^Fictional/);
   });
 
   // Witnesses: if the checks stopped seeing real data, the tests above would pass for the wrong reason.

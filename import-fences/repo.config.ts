@@ -70,6 +70,7 @@ export const APP_USES: Readonly<Record<string, readonly string[]>> = {
   rewriter: [
     'gateway/src/index.ts',
     'prose-rewriter/src/index.ts',
+    'prose-rewriter/evals/cases/*.json',
     'prose-rewriter/evals/cases/cv/*.md',
     'style-refs/src/index.ts',
     'style-refs/sources.json',
