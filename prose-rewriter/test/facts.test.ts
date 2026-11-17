@@ -583,3 +583,13 @@ describe('a name right after an emoji', () => {
     expect(lost('Gracias 🙌 Lemos me recomendó.', 'Gracias 🙌 Me recomendaron.')).toEqual(['Lemos']);
   });
 });
+
+describe('the forms the probe of 17/11 found unread', () => {
+  it('does not read the markers of a numbered list as numbers (es-email-heavy-4)', () => {
+    const O = 'Te propongo:\n1. Revisar el sitio.\n2) Migrar los mails de 12 personas.\n3. Armar el formulario.';
+    expect(keys(O)).toEqual(['12']);
+    expect(factInvariant(O, 'Te propongo revisar el sitio, migrar los mails de 12 personas y armar el formulario.', { cv: '' }, [], ES)).toMatchObject({ holds: true });
+    // A number that opens a line without a marker's period or parenthesis is still a number.
+    expect(keys('Pedidos por semana:\n40 en marzo.')).toEqual(['40', '--03']);
+  });
+});

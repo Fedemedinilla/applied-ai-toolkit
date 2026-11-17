@@ -468,11 +468,16 @@ const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(
 
 /**
  * Where a sentence ends: after . ! ? … and a space, at a line break, after an emoji and a space
- * ("Sofi 🙌 Me apasiona"), and after a label of one or two words that opens a line ("Subject:
- * Unlocking ...", "Asunto: Propuesta ..."). The word after each of these is a sentence's first word,
- * whose capital says nothing.
+ * ("Sofi 🙌 Me apasiona"), after a label of one or two words that opens a line ("Subject:
+ * Unlocking ...", "Asunto: Propuesta ...") and after a list marker ("2) Migrar"). The word after each
+ * of these is a sentence's first word, whose capital says nothing.
  */
-const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+/gmu;
+const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+|(?<=^[ \t]*\d{1,2}\))[ \t]+/gmu;
+/**
+ * The marker of a numbered list item, "1. " or "2) " at a line start: a place in a list, not a
+ * number the text states. Why: removing the markers of es-email-heavy-4 read as losing 1, 2 and 3.
+ */
+const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)])(?=[ \t])/gmu;
 
 /**
  * The sentences of a text with their offsets, split at each SENTENCE_BREAK. `afterEmoji` marks one
@@ -508,6 +513,13 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   let rest = text.replace(PLACEHOLDER_ANY, (m) => ' '.repeat(m.length));
   // A placeholder's span is claimed too, so the anchor pass, which reads the original text, skips it.
   const claimed: Array<[number, number]> = [...text.matchAll(PLACEHOLDER_ANY)].map((m) => [m.index, m.index + m[0].length]);
+  // List markers state no number: blanked and claimed the same way.
+  for (const m of rest.matchAll(LIST_MARKER)) {
+    const start = m.index + (m[1] ?? '').length;
+    const length = (m[2] ?? '').length;
+    claimed.push([start, start + length]);
+    rest = rest.slice(0, start) + ' '.repeat(length) + rest.slice(start + length);
+  }
   const take = (kind: FactKind, start: number, raw: string, key: string): void => {
     facts.push({ kind, text: raw, key, start, end: start + raw.length });
     claimed.push([start, start + raw.length]);
