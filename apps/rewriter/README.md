@@ -34,7 +34,7 @@ Vite 8.3.4 builds 19.16 kB of JavaScript (7.62 kB gzipped) and 7.88 kB of CSS. c
 
 ## Design decisions
 
-**The page rebuilds the text and never asks the model again.** Every change carries its span in the original, its "before" and its "after". [`src/recompose.ts`](src/recompose.ts) walks the applied changes in order and puts in the "after" of each one you keep and the "before" of each one you revert. A revert can only give back your own words, so it cannot add a fact. A change the checks took back has status `reverted` and is never placed, whatever the page asks; a test asks for one and checks it stays out. The function refuses changes whose spans overlap, run past the text or do not hold their "before". When all the changes together do not rebuild the returned rewrite, the page shows that rewrite as returned, with no buttons, and says why.
+**The page rebuilds the text and never asks the model again.** Every change carries its span in the original, its "before" and its "after". [`src/recompose.ts`](src/recompose.ts) walks the applied changes in order and puts in the "after" of each one you keep and the "before" of each one you revert. A revert can only give back your own words, so it cannot add a fact. A change the checks took back has status `reverted` and is never placed, whatever the page asks; a test asks for one and checks it stays out. The function refuses applied changes whose spans overlap, run past the text or do not hold their "before". It does not check reverted ones, since it never places them. An edit the code could not place comes back reverted. Its span is the sentence the model named, and its "before" is the model's own quote. The page labels that quote "Quoted by the model (not found in your text)", not as your words, and says in plain English why each change was taken back ([`src/revert-reason.ts`](src/revert-reason.ts)). When all the changes together do not rebuild the returned rewrite, the page shows that rewrite as returned, with no buttons, and says why.
 
 **The lint numbers are for the rewrite as returned.** Running slop-lint again in the page would put the linter and its rules in the bundle. It would also mean answering a question about a text the checks never saw. The panel says that the numbers count every change, and that reverting one here does not run the checks again.
 
@@ -57,23 +57,24 @@ Vite 8.3.4 builds 19.16 kB of JavaScript (7.62 kB gzipped) and 7.88 kB of CSS. c
 ## What is measured
 
 - **Build.** The sizes and the csp-build-guard result above, measured on this folder with Vite 8.3.4.
-- **The recordings.** The eight results came from the model in a live run. Each one cost between US$0.0250 and US$0.1329, in 1 to 3 calls, as the gateway priced them. These are eight fictional cases, so they are not a cost estimate for your text; prose-rewriter's README has the medians by genre.
+- **The recordings.** The eight results came from the model in a live run. Each one cost between US$0.0088 and US$0.1329, in 1 to 3 calls, as the gateway priced them. These are eight fictional cases, so they are not a cost estimate for your text; prose-rewriter's README has the medians by genre.
 - **No real rewrite through this server has been measured.** The tests drive `rewrite()`, the real gateway and the real SDK client against a fake API that answers with scripted replies. That checks the plumbing and says nothing about the model.
 
 ## What the tests cover
 
 | File | Covers |
 |---|---|
-| `test/recompose.test.ts` | All kept gives the rewrite, none kept gives the original; one change reverted; any order; a check-reverted change never placed; unknown ids; pieces kept, restored and unchanged; deletions; adjacent hunks reverted one at a time; changes at both ends; emoji before a change (UTF-16 offsets); an insertion next to a change; overlap, out-of-range, wrong "before", a backwards span and a repeated id refused |
+| `test/recompose.test.ts` | All kept gives the rewrite, none kept gives the original; one change reverted; any order; a check-reverted change never placed; unknown ids; pieces kept, restored and unchanged; deletions; adjacent hunks reverted one at a time; changes at both ends; emoji before a change (UTF-16 offsets); an insertion next to a change; overlap, out-of-range, wrong "before", a backwards span and a repeated id refused; a reverted misquote (sentence span or `{0,0}`) accepted |
 | `test/marks.test.ts` | No finding; one finding; overlapping, touching and nested findings; empty findings and spans past the end; emoji |
 | `test/protocol.test.ts` | The option lists equal prose-rewriter's enums and each has a label; every `RewriteResult` fits the page's types; the shape check accepts a result and refuses nine broken ones |
-| `test/handler.test.ts` | Health with and without a key; subpaths, methods and paths; the key reader; a rewrite with one edit call and the fact judge on their models, priced, in the ledger under one job id; a job id per rewrite; S1b with no call; recipient, earlier message, mode, register and keep phrases in the prompt; 23 bad bodies refused with no call; a body that is not JSON; text/plain and cross-site posts; a declared and a chunked oversized body; a 529 with `retry-after`, a 401, the monthly cap; no CV, text or recipient in any log or error |
+| `test/handler.test.ts` | Health with and without a key; subpaths, methods and paths; the key reader; a rewrite with one edit call and the fact judge on their models, priced, in the ledger under one job id; a job id per rewrite; a not-found edit that still rebuilds change by change; S1b with no call; recipient, earlier message, mode, register and keep phrases in the prompt; 23 bad bodies refused with no call; a body that is not JSON; text/plain and cross-site posts; a declared and a chunked oversized body; a 529 with `retry-after`, a 401, the monthly cap; no CV, text or recipient in any log or error |
 | `test/dev-server.test.ts` | Only `127.0.0.1` or `localhost` on its own port answered; an oversized body capped |
 | `test/demo.test.ts` | The fiction marker and the shape; each result parses as `RewriteResult`; each input is its eval case's, with a fictional CV; each rewrite rebuilt from its changes and reverted to the original; the coverage of the set; the injection not followed; the file is what the script builds; the shape check refuses a set without the marker, an empty one and broken entries |
-| `test/app.dom.test.ts` | jsdom against the real `index.html`. Demo mode on a 404, a network failure, a 503 and an HTML 200; the examples as labelled radios; switching and announcing; recordings that fail to load. The three panels: marks, findings, changes with and without buttons, status, flags, facts, lint and cost. Revert and keep by button with focus kept; all reverted and all kept, and the copy. Local mode: the form and its labels, missing fields, the exact body sent, no variety for English, the CV kept out of storage, eight failures, the deadline, an unrebuildable result, markup shown as text |
+| `test/app.dom.test.ts` | jsdom against the real `index.html`. Demo mode on a 404, a network failure, a 503 and an HTML 200; the examples as labelled radios; switching and announcing; recordings that fail to load. The three panels: marks, findings, changes with and without buttons, revert reasons in plain English, status, flags, facts, lint with its score hint, and cost. Revert and keep by button with focus kept; all reverted and all kept, and the copy. Local mode: the form and its labels, missing fields, the exact body sent, no variety for English, the CV kept out of storage, eight failures, the deadline, an unrebuildable result, a misquoted edit labelled as the model's with the buttons kept, markup shown as text |
+| `test/revert-reason.test.ts` | Each of prose-rewriter's revert reasons in plain English; an unknown one passed through |
 | `test/build.test.ts` | The production build: one script and one stylesheet with relative URLs; the recordings next to the page and not in the script; no inline script, handler, eval or lookbehind; no prompt rule, zod or slop-lint rule |
 
-142 tests, all offline; the dev-server test listens on a loopback port only.
+150 tests, all offline; the dev-server test listens on a loopback port only.
 
 ## Layout
 
@@ -85,6 +86,7 @@ src/
   result.ts         the page's types for RewriteResult and their shape check
   recompose.ts      the text from the original and the changes kept
   marks.ts          the original cut at the findings
+  revert-reason.ts  the checks' reasons for a revert, in plain English
   demo.ts           the recordings' shape check
   api.ts            health, the rewrite request and the error messages
   app.ts, main.ts   the page
