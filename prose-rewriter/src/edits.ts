@@ -465,7 +465,8 @@ const OPENS_BEFORE = /[(\[{«“‘"'¿¡]/u;
  * Then whole lines (wholeLines) and the blank lines between paragraphs (blankRuns): a line the
  * deletions empty goes with its line break, a list marker whose item text is all deleted goes
  * with it, and a run of three or more line breaks the deletions leave is cut back to the most the
- * user wrote there, at least two. Why: live run 2 of 17/11 (es-email-heavy-4) shipped "1.\n2.\n3."
+ * user wrote there, at least two; a deletion at either end of the text takes the line breaks
+ * between it and the rest (textEdges). Why: live run 2 of 17/11 (es-email-heavy-4) shipped "1.\n2.\n3."
  * between runs of four line breaks after the lead-in, the items and the paragraph after them were
  * deleted.
  */
@@ -494,6 +495,7 @@ export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]
   }
   wholeLines(original, ordered, spans, free);
   blankRuns(original, ordered, spans, free);
+  textEdges(original, ordered, spans, free);
   const widened = ordered.map((e, i) => {
     const span = spans[i] as TextRange;
     return span.start === e.span.start && span.end === e.span.end ? e : { ...e, span, before: original.slice(span.start, span.end) };
@@ -504,8 +506,8 @@ export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]
 type MutableSpan = { start: number; end: number };
 type Free = (from: number, to: number) => boolean;
 
-/** A list item's marker, alone: "1.", "2)", "-", "*" or "•". */
-const BARE_MARKER = /^(?:\d{1,2}[.)]|[-*•])$/u;
+/** A list item's marker, alone: "1.", "2)", "b)", "iv.", "-", "*" or "•". */
+const BARE_MARKER = /^(?:\d{1,2}[.)]|(?:[ivxlc]{1,5}|[IVXLC]{1,5}|\p{L})[.)]|[-*•])$/u;
 
 /**
  * Each line of the original whose content the deletions cover, except at most a list marker that
@@ -599,6 +601,19 @@ function blankRuns(original: string, ordered: readonly AppliedEdit[], spans: Mut
       }
     }
     a = b;
+  }
+}
+
+/**
+ * A deletion that starts the text takes the blanks and line breaks after it, and one that ends
+ * the text the ones before it, so the text never starts or ends with a line break the deletions
+ * left (review of 17/11: a deleted subject line shipped a text that started with "\n").
+ */
+function textEdges(original: string, ordered: readonly AppliedEdit[], spans: MutableSpan[], free: Free): void {
+  for (const [i, span] of spans.entries()) {
+    if (ordered[i]?.after !== '') continue;
+    if (span.start === 0) while (span.end < original.length && /[ \t\r\n]/u.test(original[span.end] ?? '') && free(span.end, span.end + 1)) span.end++;
+    if (span.end === original.length) while (span.start > 0 && /[ \t\r\n]/u.test(original[span.start - 1] ?? '') && free(span.start - 1, span.start)) span.start--;
   }
 }
 

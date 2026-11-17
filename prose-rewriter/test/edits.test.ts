@@ -438,4 +438,19 @@ describe('tidyDeletions over whole lines and lists (es-email-heavy-4, live run 2
     expect(bySpan(tidyDeletions(LIST, tidy))).toEqual(bySpan(tidy));
     for (const a of tidy) expect(LIST.slice(a.span.start, a.span.end)).toBe(a.before);
   });
+
+  // Review of 17/11, finding 4: letter and roman markers were left alone on their lines.
+  it('takes a letter or roman marker with its item too', () => {
+    const letters = 'Hola,\n\na) Comunicación clara\nb) Trabajo en equipo\n\nSaludos';
+    expect(tidyText(letters, ['Comunicación clara', 'Trabajo en equipo'])).toBe('Hola,\n\nSaludos');
+    const roman = 'Hola,\n\ni. Comunicación clara\nii. Trabajo en equipo\n\nSaludos';
+    expect(tidyText(roman, ['Comunicación clara', 'Trabajo en equipo'])).toBe('Hola,\n\nSaludos');
+  });
+
+  // Review of 17/11, finding 5: a deleted first or last paragraph left a line break at the text's edge.
+  it('leaves no line break at the start or the end of the text', () => {
+    const text = 'Asunto: Hola\n\nHola Marta, te escribo por el sitio.\n\nSaludos,\nVal\n\nP.D.: Me apasiona.';
+    expect(tidyText(text, ['Asunto: Hola'])).toBe(text.replace('Asunto: Hola\n\n', ''));
+    expect(tidyText(text, ['P.D.: Me apasiona.'])).toBe(text.replace('\n\nP.D.: Me apasiona.', ''));
+  });
 });
