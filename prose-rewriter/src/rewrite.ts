@@ -234,8 +234,10 @@ const EXTRA = { es: 'Revisá el texto: dice algo que no está ni en tu texto ni 
 
 /** S7. */
 function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals: readonly Proposal[], outcome: Outcome): RewriteResult {
-  // The shipped text never keeps the space a deleted sentence leaves behind (tidyDeletions); the
-  // diff holds the widened hunks, while each change keeps the quote the model wrote.
+  // The shipped text never keeps the space a deleted sentence leaves behind (tidyDeletions). The
+  // diff and every applied change carry the widened span and its text, because the page rebuilds
+  // the text from the changes (apps/rewriter recompose): with the model's bare quote it would put
+  // the stray space back.
   const live = tidyDeletions(a.text, liveEdits(a, units, proposals));
   const rewritten = renderEdits(a.text, live);
   const drops = proposals.flatMap((p) => (p.status === 'live' && p.check?.status === 'accepted' ? p.check.dropped.map((f) => f.key) : []));
@@ -247,14 +249,16 @@ function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals
       : !invariant.holds || invented || outcome.judged.reverted > 0 || outcome.judged.fellBack || outcome.judged.unread || outcome.unread
         ? 'needs-review'
         : 'ok';
+  const shipped = new Map(live.map((e) => [e.id, e]));
   const changes: Change[] = proposals.map((p) => {
     const e = p.edit;
+    const tidy = p.status === 'live' ? shipped.get(p.id) : undefined;
     // An edit code could not place points at the sentence it named (nowhere, if there is none).
     const unit = units.find((u) => u.id === e.sentenceId);
     return Change.parse({
       id: p.id,
-      span: p.span ?? (unit === undefined ? { start: 0, end: 0 } : { start: unit.start, end: unit.end }),
-      before: p.before ?? e.before.normalize('NFC'),
+      span: tidy?.span ?? p.span ?? (unit === undefined ? { start: 0, end: 0 } : { start: unit.start, end: unit.end }),
+      before: tidy?.before ?? p.before ?? e.before.normalize('NFC'),
       after: p.after ?? e.after.normalize('NFC'),
       reason: e.reason,
       ...(e.ruleId === undefined ? {} : { ruleId: e.ruleId }),

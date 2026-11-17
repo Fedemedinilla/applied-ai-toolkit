@@ -188,6 +188,14 @@ function expectSound(input: RewriteInput, result: RewriteResult): void {
   let text = input.text;
   for (const h of [...result.diff].sort((a, b) => b.span.start - a.span.start)) text = text.slice(0, h.span.start) + h.after + text.slice(h.span.end);
   expect(text).toBe(result.rewritten);
+  // The page rebuilds the text from the applied changes alone (apps/rewriter recompose): each one
+  // must hold its span's text, and together they must give back exactly what was shipped.
+  let rebuilt = input.text;
+  for (const c of [...result.changes].filter((x) => x.status === 'applied').sort((a, b) => b.span.start - a.span.start)) {
+    expect(input.text.slice(c.span.start, c.span.end), c.id).toBe(c.before);
+    rebuilt = rebuilt.slice(0, c.span.start) + c.after + rebuilt.slice(c.span.end);
+  }
+  expect(rebuilt).toBe(result.rewritten);
   expect(result.facts.added).toEqual([]);
 }
 

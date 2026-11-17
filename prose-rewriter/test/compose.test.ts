@@ -67,6 +67,14 @@ function expectSound(i: RewriteInput, result: RewriteResult): void {
   let text = i.text;
   for (const h of [...result.diff].sort((a, b) => b.span.start - a.span.start)) text = text.slice(0, h.span.start) + h.after + text.slice(h.span.end);
   expect(text).toBe(result.rewritten);
+  // The page rebuilds the text from the applied changes alone (apps/rewriter recompose): each one
+  // must hold its span's text, and together they must give back exactly what was shipped.
+  let rebuilt = i.text;
+  for (const c of [...result.changes].filter((x) => x.status === 'applied').sort((a, b) => b.span.start - a.span.start)) {
+    expect(i.text.slice(c.span.start, c.span.end), c.id).toBe(c.before);
+    rebuilt = rebuilt.slice(0, c.span.start) + c.after + rebuilt.slice(c.span.end);
+  }
+  expect(rebuilt).toBe(result.rewritten);
 }
 
 // es-email-heavy, run "full": S3's six edits and S4's five, verbatim.
@@ -282,7 +290,7 @@ describe('a judge reply S5 cannot read (F6b eval run)', () => {
     expect(judgeCalls).toBe(3);
     expect(result.rewritten).toBe(cut(i.text, opener.before));
     expect(result.status).toBe('needs-review');
-    expect(result.changes.find((c) => c.before === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
+    expect(result.changes.find((c) => c.before.trim() === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
     expect(result.changes.find((c) => c.before === promise.before && c.stage === 'edit')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^judge: the sentence claimed/) });
     expect(result.flags.filter((f) => f.kind === 'not-in-cv' && /verificar|check/i.test(f.message))).toHaveLength(1);
     expectSound(i, result);
