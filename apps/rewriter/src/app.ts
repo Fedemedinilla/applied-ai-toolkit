@@ -347,7 +347,7 @@ export function mountApp(doc: Document, deps: AppDeps): App {
     const setState = (): void => {
       const on = s.accepted.has(c.id);
       li.dataset['state'] = on ? 'kept' : 'reverted';
-      state.textContent = on ? 'Kept' : 'Reverted: your words';
+      state.textContent = on ? 'Kept' : 'Reverted, your words back';
       button.replaceChildren(doc.createTextNode(on ? 'Revert' : 'Keep'), make('span', ` change ${changeNumber(c.id)}`, 'visually-hidden'));
     };
     setState();
