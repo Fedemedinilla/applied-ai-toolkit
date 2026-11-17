@@ -496,7 +496,10 @@ describe('the dry run estimate', () => {
     // No baseline among the variants: no pairwise-baseline call.
     const rubrics = JUDGE_RUBRICS.filter((r) => r.name !== 'pairwise-baseline');
     const base = estimateInputTokens({ messages: [{ role: 'user', content: JSON.stringify(CLEAN.input) }] });
-    const expected = rubrics.reduce((sum, r, i) => sum + worstCaseUsd(judgeModel, base + i * JUDGE_MAX_TOKENS + bytes(r.instructions), JUDGE_MAX_TOKENS, PRICES)!, 0);
+    // fact-check also reads the original a second time (next to the rewrite), on top of the fact sheet.
+    const extra = (r: (typeof rubrics)[number]): number => bytes(r.instructions) + (r.name === 'fact-check' ? bytes(CLEAN.input.text) : 0);
+    expect(rubrics.map((r) => r.name)).toContain('fact-check');
+    const expected = rubrics.reduce((sum, r, i) => sum + worstCaseUsd(judgeModel, base + i * JUDGE_MAX_TOKENS + extra(r), JUDGE_MAX_TOKENS, PRICES)!, 0);
     expect(est).toEqual({ pieces: 1, calls: rubrics.length, worstUsd: Math.round(expected * 1e6) / 1e6 });
     expect(est.worstUsd).toBeGreaterThan(0);
   });
@@ -790,6 +793,9 @@ describe('the eval CLI', () => {
     expect(text).toContain('### Cost per rewrite');
     expect(text).toContain('| full | whatsapp | minimo | 1 | 1 | 0.0000 | 0.0000 |');
     expect(text).toMatch(/no baseline among the variants/);
+    // The fact check is reported next to the code rubrics; the rewrite equal to the original was not paid for.
+    expect(text).toContain('### Fact check (judge, soft)');
+    expect(text).toContain('| full | 1 | 0 | 0 | n/a | 1 | 0 |');
     expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0060 of US\$20/);
     expect(text).toMatch(/This run: US\$0\.0060 over 2 calls/);
     expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');
