@@ -1,4 +1,4 @@
-// The audit units of this repository, as data: the 31 units and 4 cross-cutting areas of the full
+// The audit units of this repository, as data: the 32 units and 4 cross-cutting areas of the full
 // audit, plus one area of our own for the repository tooling the full audit leaves out. Each area
 // owns the files its globs match (globs as in import-fences: `**` spans folders, `*` one segment).
 // A file may belong to more than one area: apps/caja/vite.config.ts is in apps-caja and in
@@ -11,7 +11,7 @@
 import { globMatcher } from '../../import-fences/src/index.ts';
 
 export type AreaKind =
-  /** One of the 31 units of the full audit: a folder or an app. */
+  /** One of the 32 units of the full audit: a folder or an app. */
   | 'unit'
   /** One of the 4 cross-cutting areas of the full audit. */
   | 'cross'
@@ -54,6 +54,7 @@ export const UNITS: readonly Area[] = [
   folder('apps-caja', 'Offline cash book PWA on amount-parser, optional model mode through gateway (amount must still come from the parser).', 'apps/caja'),
   folder('apps-chat-widget', 'Multi-tenant chat backend + embeddable widget, owner panel, abuse controls, tenant isolation.', 'apps/chat-widget'),
   folder('apps-checklist', 'Offline audit checklist, run rules (Fixed refused before pre-change list), site-check import of run.json v2 and datos.json v1, storage, service worker.', 'apps/checklist'),
+  folder('apps-rewriter', 'Local server over prose-rewriter rewrite() through gateway caps; page recomposes text from accepted changes (reverted ones give back the original words); demo mode with recorded results; CV never stored or logged.', 'apps/rewriter'),
   folder('apps-writer', 'School message writer through gateway and evals, [COMPLETAR] markers for missing facts.', 'apps/writer'),
   folder('apps-salon-assistant', 'Booking assistant: price, time and stylist from tables, never from the model; safe-markdown rendering.', 'apps/salon-assistant'),
   folder('apps-push-lab', 'Web push incl. iPhone, VAPID, its own server, badge.', 'apps/push-lab'),

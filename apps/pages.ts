@@ -10,14 +10,15 @@
  * here: docs-site/ builds it (npm run build:docs) and pages.yml copies it in after this script.
  *
  * Only apps that work as static files are published. Caja checks ./api/health and keeps its model
- * mode hidden when the host answers 404, so it degrades to its offline mode. The chat widget, the
+ * mode hidden when the host answers 404, so it degrades to its offline mode. The rewriter reads
+ * the same 404 and shows rewrites recorded from the model, with no call. The chat widget, the
  * writer, the salon assistant and push-lab need their own server and are left out.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const PAGES_APPS = ['caja', 'receipt', 'replay-lab', 'checklist'] as const;
+export const PAGES_APPS = ['caja', 'receipt', 'replay-lab', 'checklist', 'rewriter'] as const;
 export const PAGES_URL = 'https://fedemedinilla.github.io/applied-ai-toolkit/';
 
 /** The folder of the docs site inside the Pages site. The landing page links it; it is not an app. */

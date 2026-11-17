@@ -42,6 +42,7 @@ body:
         - apps/push-lab
         - apps/receipt
         - apps/replay-lab
+        - apps/rewriter
         - apps/salon-assistant
         - apps/shared
         - apps/writer
