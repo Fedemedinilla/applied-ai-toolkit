@@ -87,6 +87,14 @@ describe('the single-call baseline (design 4.10)', () => {
     expect(result).toMatchObject({ rewritten: MAIL.replace(SINERGIAS, FIXED), applied: 1, refused: 1, usage: { calls: 1 } });
   });
 
+  // Review of 17/11: rewrite() ships tidied deletions (S7), so the baseline must too, or the
+  // pairwise judge compares a clean pipeline text with a baseline that starts a line with a space.
+  it('takes the space a deleted sentence leaves behind, as rewrite() does', async () => {
+    const scripted = scriptedGateway({ 'rewrite.edit': [{ ...edits({ sentenceId: 1, before: 'Espero que estés bien.', after: '' }), ...usage(900, 120) }] });
+    const result = await singleCall(mail(MAIL), { gateway: scripted.gateway, refs: REFS });
+    expect(result).toMatchObject({ rewritten: MAIL.replace('Espero que estés bien. ', ''), applied: 1, refused: 0 });
+  });
+
   it('takes the same early exit as rewrite(): no call', async () => {
     const scripted = scriptedGateway({});
     const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp' }, { gateway: scripted.gateway, refs: REFS });

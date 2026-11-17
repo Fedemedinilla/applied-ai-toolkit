@@ -38,7 +38,7 @@ import {
   type SupportedModel,
   type TokenTotals,
 } from '../../gateway/src/index.ts';
-import { applyEdits } from '../src/edits.ts';
+import { applyEdits, renderEdits, tidyDeletions } from '../src/edits.ts';
 import { restoreData } from '../src/injection.ts';
 import { editProblem } from '../src/outputs.ts';
 import type { PromptRefs } from '../src/prompt.ts';
@@ -145,7 +145,10 @@ export async function singleCall(raw: RewriteInput, options: SingleCallOptions):
   const valid = edits.filter((e) => editProblem(e) === null);
   const units = a.mode === 'reescritura' ? paragraphUnits(a.text, a.sentences) : a.sentences;
   const placed = applyEdits(a.text, units, valid, { keep: a.input.keep ?? [] });
-  return { kind: 'single-call', rewritten: placed.text, applied: placed.accepted.length, refused: edits.length - placed.accepted.length, usage };
+  // S7 of rewrite() takes the space a deleted sentence leaves behind; the baseline does the same,
+  // so the variants still differ only in the guards.
+  const rewritten = renderEdits(a.text, tidyDeletions(a.text, placed.accepted));
+  return { kind: 'single-call', rewritten, applied: placed.accepted.length, refused: edits.length - placed.accepted.length, usage };
 }
 
 /** What one piece cost, measured on the gateway. */
