@@ -171,7 +171,9 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
  * 147 cases). A list, not an ending, because the endings of these words are the endings of common
  * names too: -ar (Aguilar, Escobar, Oscar, Pilar), -er (Javier, Walter), -o (Gonzalo, Camilo),
  * -miento (Sarmiento). Words that are also common names or surnames stay out (Will, Mark, Grant,
- * Drew, Hope, Rosa, Paz, Luna, Claro), so a name invented at a line start is still caught.
+ * Drew, Hope, Rosa, Paz, Luna, Claro, Leo), so a name invented at a line start is still caught.
+ * The list only says a word may be ordinary: a name the CV or the original states is still that
+ * name when it opens a line ("Make and n8n", "- Éxito: tienda online").
  */
 const ORDINARY: Readonly<Record<Lang, ReadonlySet<string>>> = {
   es: new Set([
@@ -186,7 +188,7 @@ const ORDINARY: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'explorar', 'descubrir', 'innovar', 'revolucionar', 'elevar', 'fortalecer', 'fomentar', 'dirigir', 'supervisar', 'administrar',
     // First persons, short and irregular pasts, plurals and imperatives.
     'comparto', 'disfruto', 'ayudo', 'prefiero', 'mantengo', 'confirmo', 'desarrollo', 'gestiono', 'coordino', 'lidero', 'brindo', 'aporto',
-    'sumo', 'programo', 'conozco', 'manejo', 'domino', 'hablo', 'leo', 'aprendo', 'entiendo', 'propongo', 'recomiendo', 'valoro', 'considero',
+    'sumo', 'programo', 'conozco', 'manejo', 'domino', 'hablo', 'aprendo', 'entiendo', 'propongo', 'recomiendo', 'valoro', 'considero',
     'veo', 'vengo', 'vuelvo', 'estudio', 'administro', 'automatizo', 'migro', 'entrego', 'reviso', 'respondo', 'comento', 'aviso', 'retomo',
     'consulto', 'vi', 'rehice', 'tuve', 'dije', 'pude', 'quise', 'supe', 'vine', 'puse', 'traje', 'fui', 'hizo', 'tuvo', 'pudo', 'dijo',
     'saben', 'tarda', 'tardan', 'tenemos', 'sabemos', 'podemos', 'queremos', 'necesitamos', 'buscamos', 'ofrecemos', 'contamos', 'parece',
@@ -228,9 +230,24 @@ const ORDINARY: Readonly<Record<Lang, ReadonlySet<string>>> = {
  * "Communication". The names among them are left out by NAMES_WITH_ORDINARY_ENDING.
  */
 const ORDINARY_ENDING: Readonly<Record<Lang, RegExp>> = { es: /(?:ción|sión|ciones|siones|izar)$/iu, en: /(?:tion|sion|tions|sions|ness|ize|izes)$/iu };
-const NAMES_WITH_ORDINARY_ENDING = new Set(['concepción', 'asunción', 'encarnación', 'ascensión', 'purificación', 'consolación', 'anunciación']);
+const NAMES_WITH_ORDINARY_ENDING = new Set([
+  'concepción', 'asunción', 'encarnación', 'ascensión', 'purificación', 'consolación', 'anunciación',
+  // Tools, brands and names with an English noun ending (review of 17/11: "Notion" was not read).
+  'notion', 'fusion', 'motion', 'vision', 'mission', 'ness', 'nation', 'version', 'passion',
+]);
 /** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
 const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
+/** First names with a past-verb ending: "José me pasó tu contacto" names José, unlike "Armé el sitio". */
+const NAMES_WITH_VERB_ENDING = new Set(['josé', 'noé', 'rené', 'salomé', 'zoé', 'chloé', 'andré']);
+/**
+ * Words that follow a verb and never a name: "Relevar el sitio", "Audit the plugins". A name opening
+ * a sentence is followed by its verb ("Escobar revisó"), so a capitalized word followed by one of
+ * these reads as a verb whatever the verb, which a closed list of verbs cannot promise.
+ */
+const DETERMINER_AFTER: Readonly<Record<Lang, RegExp>> = {
+  es: /^[ \t]+(?:el|la|los|las|un|una|unos|unas|mi|mis|tu|tus|su|sus|nuestr[oa]s?|este|esta|estos|estas|cada|todos|todas)(?![\p{L}\p{N}])/u,
+  en: /^[ \t]+(?:the|a|an|my|our|your|their|this|these|those|every|each|all)(?![\p{L}\p{N}])/u,
+};
 /**
  * Endings of a finite verb that surnames share ("Hablamos" and "Ramos", "Pudiste" and "Batiste"),
  * so they count only on the first word of a question or exclamation, which opens with a verb far
@@ -660,12 +677,13 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     const start = sentence.start + m.index;
     if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
     const key = wordKey(word);
-    const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)));
+    const following = sentence.text.slice(m.index + word.length);
+    const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index))) && !DETERMINER_AFTER[lang].test(following);
     // After an emoji, a word that does not read as an ordinary one is a name, as it was before the
     // emoji break: matched with its capital, so "el rosa" does not stand in for "Rosa".
     // A frequent opener is not the name its key matches unless it is written as that name: "It"
     // opening a sentence is not the CV's "IT" (the probe's cause E).
-    const ordinary = (OPENERS[lang].has(key) || ORDINARY[lang].has(key)) && !/^\p{Lu}{2,}$/u.test(word);
+    const ordinary = OPENERS[lang].has(key) && !/^\p{Lu}{2,}$/u.test(word);
     if ((known.has(key) && !ordinary) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
     else if (options.openings === true && possible) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
@@ -677,7 +695,8 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 
 function isPossibleName(word: string, lang: Lang, afterMark: boolean): boolean {
   const lower = word.toLocaleLowerCase('und');
-  if ([...word].length < 2 || OPENERS[lang].has(lower) || NOT_A_NAME[lang].test(word) || NUMBER_WORDS[lower] !== undefined) return false;
+  if ([...word].length < 2 || OPENERS[lang].has(lower) || NUMBER_WORDS[lower] !== undefined) return false;
+  if (NOT_A_NAME[lang].test(word) && !NAMES_WITH_VERB_ENDING.has(lower)) return false;
   if (ORDINARY[lang].has(lower) || (ORDINARY_ENDING[lang].test(word) && !NAMES_WITH_ORDINARY_ENDING.has(lower))) return false;
   if (afterMark && VERB_AFTER_MARK[lang]?.test(word) === true) return false;
   if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;

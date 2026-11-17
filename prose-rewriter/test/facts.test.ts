@@ -372,6 +372,51 @@ describe('ordinary words at the start of a sentence or a list item', () => {
     expect(factInvariant(en, en.replace('- Proven track record of driving customer satisfaction.\n', ''), { cv: 'x' }, [], EN).holds).toBe(true);
     expect(factInvariant(en, en.replace('Here is', 'Grant asked what. Here is'), { cv: 'x' }, [], EN).extra.map((f) => f.key)).toEqual(['grant']);
   });
+
+  // Review of 17/11: the word list must never hide a name. A key both ordinary and named by the
+  // CV or the original ("Make" the tool, "Éxito" the store) is the name when it opens a line, and
+  // a word that is also a common first name ("Leo") is not in the list at all.
+  it('keeps a name the CV or the original states when it opens a line, even if it is also an ordinary word', () => {
+    const make = 'Make and n8n workflows for clinics.';
+    const cvMake = { cv: 'Automation with Make and n8n.' };
+    expect(factInvariant(make, 'n8n workflows for clinics.', cvMake, [], EN).missing.map((f) => f.key)).toEqual(['make']);
+    expect(factInvariant(make, 'Zapier and n8n workflows for clinics.', cvMake, [], EN).missing.map((f) => f.key)).toEqual(['make']);
+    expect(factInvariant('- Éxito: tienda online.', '- Tienda online.', { cv: 'Ventas en Éxito.' }, [], ES).missing.map((f) => f.key)).toEqual(['éxito']);
+  });
+
+  it('reads "Leo" at a line start as a name, invented or dropped', () => {
+    const O = 'Hola Nadia.\nMe pasaron tu contacto. Te escribo por el sitio.';
+    expect(factInvariant(O, O.replace('Me pasaron', 'Leo me pasó'), { cv: 'x' }, [], ES).extra.map((f) => f.key)).toEqual(['leo']);
+    const L = 'Leo me pasó tu contacto. Te escribo.';
+    expect(factInvariant(L, 'Me pasaron tu contacto. Te escribo.', { cv: 'Referencia: Leo Ibarra.' }, [], ES).missing.map((f) => f.key)).toEqual(['leo']);
+    expect(factInvariant(L, 'Me pasaron tu contacto. Te escribo.', { cv: 'x' }, [], ES).missing.map((f) => f.key)).toEqual(['leo']);
+  });
+
+  it('reads a tool or a name with a noun ending as a possible name (Notion, Fusion, Motion, Vision, Ness)', () => {
+    for (const line of ['Notion holds every brief.', 'Fusion runs the books.', 'Motion edits the videos.', 'Vision reads the scans.', 'Ness hired me.'])
+      expect(openings(line, 'en'), line).toEqual([line.split(' ')[0]]);
+    const O = 'Notion is where I keep every client brief.';
+    expect(factInvariant(O, 'I keep every client brief in one place.', { cv: 'x' }, [], EN).missing.map((f) => f.key)).toEqual(['notion']);
+    expect(factInvariant('I keep every brief.', 'Notion holds every brief.', { cv: 'x' }, [], EN).extra.map((f) => f.key)).toEqual(['notion']);
+  });
+
+  it('reads a capitalized word followed by an article as a verb, whatever the verb (Relevar el sitio, Audit the plugins)', () => {
+    const es = '- Relevar el sitio.\n- Ordenar los plugins.';
+    expect(factInvariant(es, '- Auditar el sitio.\n- Limpiar los plugins.', { cv: 'x' }, [], ES).holds).toBe(true);
+    const en = '- Audit the plugins.\n- Trim the theme.';
+    expect(factInvariant(en, '- Map the plugins.\n- Slim the theme.', { cv: 'x' }, [], EN).holds).toBe(true);
+    // A name is followed by a verb, not an article: these stay names.
+    expect(openings('Escobar revisó el sitio.', 'es')).toEqual(['Escobar']);
+    expect(openings('Grant asked for the brief.', 'en')).toEqual(['Grant']);
+  });
+
+  it('reads a first name with an accented ending as a name (José, Noé, Andrés, Inés), and a past verb as a verb', () => {
+    for (const line of ['José me pasó tu contacto.', 'Noé me escribió.', 'Andrés me recomendó.', 'Inés me llamó.', 'René revisó el sitio.'])
+      expect(openings(line, 'es'), line).toEqual([line.split(' ')[0]]);
+    for (const line of ['Armé el sitio.', 'Llegó el pedido.', 'Trabajé dos años ahí.', 'Lideré el equipo.']) expect(openings(line, 'es'), line).toEqual([]);
+    const O = 'José me pasó tu contacto. Te escribo.';
+    expect(factInvariant(O, 'Me pasaron tu contacto. Te escribo.', { cv: 'x' }, [], ES).missing.map((f) => f.key)).toEqual(['josé']);
+  });
 });
 
 describe('an acronym is not an ordinary word', () => {
