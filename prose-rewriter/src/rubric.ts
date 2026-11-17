@@ -64,16 +64,29 @@ export const RewriteVerdict = z.strictObject({
 export type RewriteVerdict = z.infer<typeof RewriteVerdict>;
 
 /**
- * The JSON of a judge reply: the reply itself, or the object a code fence or a sentence around it
- * holds, from its first brace to its last (the first real-model run lost a piece to a reply that
- * was "not JSON"). A reply with no object is returned as it came, and evals' parser refuses it.
+ * The JSON of a judge reply: the first complete object in it, wherever a code fence, a sentence
+ * before it or a note after it puts it (the real-model runs lost verdicts to replies that were
+ * "not JSON": the first to a fence, 15 of 112 on 17/11 to a note after the object). A reply with no
+ * complete object is returned as it came, and evals' parser refuses it.
  */
 export function judgeReplyJson(reply: string): string {
   const text = reply.trim();
-  if (text.startsWith('{')) return text;
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
+  // The first complete object, read brace by brace with strings skipped: a note after the object
+  // (or a brace inside one of its strings) must not reach JSON.parse.
+  for (let start = text.indexOf('{'); start >= 0; start = text.indexOf('{', start + 1)) {
+    let depth = 0;
+    let inString = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (ch === '\\') i++;
+        else if (ch === '"') inString = false;
+      } else if (ch === '"') inString = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return text;
 }
 
 /** The judge client with each reply's text reduced to its JSON (judgeReplyJson). */

@@ -11,6 +11,13 @@ import { DEFAULT_STRATEGY, defaultRegister, GENRES, type JudgeClient, RewriteInp
 import { CapError, ResponseError, type Gateway } from '../../gateway/src/index.ts';
 import { scriptedGateway } from './scripted-gateway.ts';
 
+/**
+ * `text` without the sentence `before`, and without the space it leaves behind, as S7 ships a
+ * deletion (tidyDeletions): the space after it, or failing that the one before it.
+ */
+const cut = (text: string, before: string): string =>
+  text.includes(`${before} `) ? text.replace(`${before} `, '') : text.includes(` ${before}`) ? text.replace(` ${before}`, '') : text.replace(before, '');
+
 const CV_ES = readFileSync(new URL('../evals/cases/cv/es-rioplatense.md', import.meta.url), 'utf8');
 const CV_EN = readFileSync(new URL('../evals/cases/cv/en.md', import.meta.url), 'utf8');
 
@@ -181,6 +188,14 @@ function expectSound(input: RewriteInput, result: RewriteResult): void {
   let text = input.text;
   for (const h of [...result.diff].sort((a, b) => b.span.start - a.span.start)) text = text.slice(0, h.span.start) + h.after + text.slice(h.span.end);
   expect(text).toBe(result.rewritten);
+  // The page rebuilds the text from the applied changes alone (apps/rewriter recompose): each one
+  // must hold its span's text, and together they must give back exactly what was shipped.
+  let rebuilt = input.text;
+  for (const c of [...result.changes].filter((x) => x.status === 'applied').sort((a, b) => b.span.start - a.span.start)) {
+    expect(input.text.slice(c.span.start, c.span.end), c.id).toBe(c.before);
+    rebuilt = rebuilt.slice(0, c.span.start) + c.after + rebuilt.slice(c.span.end);
+  }
+  expect(rebuilt).toBe(result.rewritten);
   expect(result.facts.added).toEqual([]);
 }
 
@@ -811,9 +826,12 @@ const verdictIn = (lang: 'es' | 'en', rewritten: string, invented: readonly numb
 });
 
 describe("strategy 'single': one call, the same guards", () => {
-  // es-email-heavy, the single-call piece of run 3: its subject edit invented "Mantenimiento" and
-  // lost "Propuesta", and the unguarded baseline shipped it. The edits rebuild that piece's text.
+  // es-email-heavy, the single-call piece of run 3. Its subject edit was read as inventing the name
+  // "Mantenimiento" and losing "Propuesta"; both are ordinary nouns heading a subject line, and the
+  // probe of 17/11 counted that reading among the false alarms. The edits rebuild that piece's text.
   const SUBJECT = { sentenceId: 0, before: 'Propuesta de valor para potenciar su presencia digital', after: 'Mantenimiento del sitio de la cooperativa' };
+  /** The same subject edit with a company neither the text nor the CV names. */
+  const SUBJECT_INVENTED = { ...SUBJECT, after: 'Mantenimiento del sitio de la cooperativa con Nubeluz' };
   const ES_REST = [
     { sentenceId: 2, before: 'Espero que este mensaje te encuentre muy bien.', after: '' },
     { sentenceId: 3, before: 'Me pongo en contacto con vos porque me apasiona aportar valor agregado y potenciar sinergias en un mundo cada vez más digital.', after: 'Te escribo porque quiero trabajar en el sitio de la cooperativa.' },
@@ -821,7 +839,7 @@ describe("strategy 'single': one call, the same guards", () => {
     { sentenceId: 6, before: 'Sin lugar a dudas, puedo llevar el sitio de la cooperativa al siguiente nivel.', after: 'Puedo hacer lo mismo con el sitio de la cooperativa.' },
     { sentenceId: 7, before: 'Quedo a tu entera disposición ante cualquier consulta.', after: 'Si te interesa, escribime y coordinamos una llamada.' },
   ];
-  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => (e.after === '' ? cut(t, e.before) : t.replace(e.before, e.after)), text);
 
   it('makes one call that plans and edits, then the judge: no plan, no style, no extra round', async () => {
     const input = evalInput('es', 'es-email-heavy');
@@ -838,6 +856,16 @@ describe("strategy 'single': one call, the same guards", () => {
     expectSound(input, result);
   });
 
+  it('leaves no space at the start of a paragraph where it deleted a sentence (es-email-heavy, live run 17/11)', async () => {
+    // The live run shipped "Hola Martín,\n\n Te escribo...": the deleted sentence's quote leaves out the space after it.
+    const input = evalInput('es', 'es-email-heavy');
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(...ES_REST)], 'rewrite.judge': [verdictIn('es', applyAll(input.text, ES_REST))] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    expect(result.rewritten).toContain('Hola Martín,\n\nTe escribo porque');
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]|\S {2,}\S|[ \t]\n/u);
+    expectSound(input, result);
+  });
+
   it('is the default: rewrite() without a strategy makes the same one call, never the plan (decided 16/11/2026)', async () => {
     expect(DEFAULT_STRATEGY).toBe('single');
     const input = evalInput('es', 'es-email-heavy');
@@ -851,17 +879,29 @@ describe("strategy 'single': one call, the same guards", () => {
     expect(result.status).toBe('ok');
   });
 
-  it('reverts the edit that invents a fact and loses another (es-email-heavy, run 3)', async () => {
+  it('reverts the edit that invents a name in the subject (es-email-heavy, run 3, with a company added)', async () => {
     const input = evalInput('es', 'es-email-heavy');
     const expected = applyAll(input.text, ES_REST);
-    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT_INVENTED, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
     const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
     scripted.assertDone();
     expect(result.rewritten).toBe(expected);
     expect(result.rewritten).toContain('Propuesta de valor');
-    expect(result.rewritten).not.toContain('Mantenimiento');
-    expect(result.changes.find((c) => c.after === SUBJECT.after)).toMatchObject({ status: 'reverted', stage: 'edit', revertReason: expect.stringMatching(/Mantenimiento/) });
+    expect(result.rewritten).not.toContain('Nubeluz');
+    expect(result.changes.find((c) => c.after === SUBJECT_INVENTED.after)).toMatchObject({ status: 'reverted', stage: 'edit', revertReason: expect.stringMatching(/Nubeluz/) });
     expect(result.status).toBe('needs-review');
+    expectSound(input, result);
+  });
+
+  it('applies the run-3 subject edit: "Mantenimiento" and "Propuesta" head the subject as words, not names', async () => {
+    const input = evalInput('es', 'es-email-heavy');
+    const expected = applyAll(input.text, [SUBJECT, ...ES_REST]);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(SUBJECT, ...ES_REST)], 'rewrite.judge': [verdictIn('es', expected)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    expect(result.rewritten).toBe(expected);
+    expect(result.changes.find((c) => c.after === SUBJECT.after)).toMatchObject({ status: 'applied', stage: 'edit' });
+    expect(result.status).toBe('ok');
     expectSound(input, result);
   });
 
@@ -963,7 +1003,7 @@ describe('S5 drops against what the judge leaves', () => {
   const CLOSING = { sentenceId: 5, before: 'Quedo a la espera de su respuesta.', after: 'Si le sirve, le muestro estos proyectos en una llamada corta.' };
   const SPLIT = { sentenceId: 2, before: 'desde marzo de 2023: armé', after: 'desde marzo de 2023. Armé', principleId: 'es-vary-sentence-length' };
   const TWIN = { sentenceId: 4, before: LUMEN, after: '', reason: 'no fact', principleId: 'es-only-what-moves-the-reader', drop: true };
-  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => (e.after === '' ? cut(t, e.before) : t.replace(e.before, e.after)), text);
 
   it('reverts an accepted drop once the edit that kept its fact is reverted by the judge', async () => {
     const input = evalInput('es', 'es-cover-letter-heavy');
@@ -1132,5 +1172,64 @@ describe('a stage reply that cannot be read', () => {
     await expect(rewrite(mail(MAIL), { gateway: failing(new CapError('cap_per_job', 1, 1)), refs: REFS, strategy: 'staged' })).rejects.toBeInstanceOf(CapError);
     const refusal = new ResponseError('refusal', 'refused', { usageId: 'u1', requestId: null, modelResponded: 'claude-sonnet-5-5', stopReason: 'refusal', costUsd: 0 });
     await expect(rewrite(mail(MAIL), { gateway: failing(refusal), refs: REFS, strategy: 'staged' })).rejects.toBe(refusal);
+  });
+});
+
+// Live run 2 of 17/11, es-email-heavy-4 (single-guarded): the edits deleted the lead-in "Mis
+// fortalezas:", each numbered item in two edits ("1." and " Comunicación clara", the sentences the
+// splitter cuts) and the paragraph after the list. S5 reverted the three bare markers as losing 1, 2
+// and 3; the text kept "1.\n2.\n3." between runs of four line breaks, the invariant read the orphan
+// markers as added numbers and the piece was blocked. The edits below are the recorded ones.
+describe('es-email-heavy-4, live run 2: a numbered list deleted whole', () => {
+  const RECORDED: Array<{ before: string; after: string }> = [
+    { before: 'Optimización integral de sus procesos de correo', after: 'Soporte técnico para el estudio' },
+    { before: 'Ante todo, quería agradecerte por tomarte el tiempo de leer este mensaje. ', after: '' },
+    { before: 'Sé que tu tiempo es valioso.', after: '' },
+    { before: 'En el dinámico contexto actual, la comunicación es clave.', after: 'Te escribo para [COMPLETAR: qué le proponés o le pedís a Hernán].' },
+    { before: ' Y es ahí donde entro yo.', after: '' },
+    { before: 'Durante mi paso por el Estudio Contable Ruiz y Asociados, lideré con éxito un desafiante proceso de transformación: migré', after: 'En el Estudio Contable Ruiz y Asociados migré' },
+    { before: ' — un verdadero testimonio de mi compromiso con la excelencia', after: '' },
+    { before: 'Mis fortalezas:', after: '' },
+    { before: '1.', after: '' },
+    { before: ' Comunicación clara', after: '' },
+    { before: '2.', after: '' },
+    { before: ' Atención al detalle', after: '' },
+    { before: '3.', after: '' },
+    { before: ' Pasión por aprender', after: '' },
+    { before: 'Estoy segura de que, trabajando codo a codo, podemos llevar al estudio a otro nivel de eficiencia, organización y profesionalismo.', after: '' },
+    { before: ' ¡Será un placer!', after: '' },
+  ];
+  /**
+   * Each recorded edit as the model quoted it, with the id of the sentence of the original that
+   * holds its quote. The record ships the tidied spans, so a deletion's quote is trimmed back.
+   */
+  const placed = (input: RewriteInput) => {
+    const sentences = prepare(RewriteInput.parse(input)).sentences;
+    return RECORDED.map((e) => {
+      const before = e.after === '' ? e.before.trim() : e.before;
+      const holder = sentences.find((s) => s.text === before) ?? sentences.find((s) => s.text.includes(before));
+      if (holder === undefined) throw new Error(`no sentence holds ${before}`);
+      return { sentenceId: holder.id, before, after: e.after };
+    });
+  };
+
+  // The recorded edits, applied with the bare markers, the lines they empty and the blank lines they leave.
+  const EXPECTED =
+    'Asunto: Soporte técnico para el estudio\n\nEstimado Hernán:\n\nTe escribo para [COMPLETAR: qué le proponés o le pedís a Hernán]. En el Estudio Contable Ruiz y Asociados migré los mails de 12 personas a un dominio propio sin perder correo. Además, escribí las guías internas para cargar comprobantes, que el estudio sigue usando.\n\nNo dudes en contactarme ante cualquier inquietud.\n\nCordialmente,\nValeria Sosa Pereyra';
+
+  it('applies the deletion of every marker and ships no orphan marker and no run of blank lines', async () => {
+    const input = evalInput('es', 'es-email-heavy-4');
+    const list = placed(input);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(...list)], 'rewrite.judge': [verdictIn('es', EXPECTED)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    for (const marker of ['1.', '2.', '3.']) expect(result.changes.find((c) => c.before.trim().startsWith(marker)), marker).toMatchObject({ status: 'applied' });
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]*\d{1,2}[.)][ \t]*(?:\n|$)/u);
+    expect(result.rewritten).not.toMatch(/\n[ \t]*\n[ \t]*\n/u);
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]|[ \t](?:\n|$)/u);
+    expect(result.rewritten).toBe(EXPECTED);
+    expect(result.facts.added).toEqual([]);
+    expect(result.status).not.toBe('blocked');
+    expectSound(input, result);
   });
 });

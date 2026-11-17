@@ -3,7 +3,7 @@
 // can be reverted alone, and the diff comes from the accepted edits. Every text is fictional:
 // Valeria Sosa Pereyra is the fictional CV of evals/cases/cv/es-rioplatense.md.
 import { describe, expect, it } from 'vitest';
-import { type AppliedEdit, applyEdits, diffHunks, renderEdits, revertEdit, splitSentences } from '../src/edits.ts';
+import { type AppliedEdit, applyEdits, diffHunks, renderEdits, revertEdit, splitSentences, tidyDeletions } from '../src/edits.ts';
 import { DiffHunk, type Edit } from '../src/types.ts';
 
 const TEXT = [
@@ -288,5 +288,169 @@ describe('properties over random edits', () => {
       expect(bySpan(b.accepted), `seed ${seed}`).toEqual(bySpan(a.accepted));
       expect(diffHunks(TEXT, b.accepted), `seed ${seed}`).toEqual(diffHunks(TEXT, a.accepted));
     }
+  });
+});
+
+// The live eval of 17/11 shipped "Hola Martín,\n\n Te escribo..." (es-email-heavy and 25 other
+// pieces): the model deletes a sentence by quoting it without the space after it, so the space
+// stays at the start of the paragraph, or doubles up between two sentences.
+describe('tidyDeletions', () => {
+  const tidyText = (text: string, edits: readonly Edit[]): string =>
+    renderEdits(text, tidyDeletions(text, applyEdits(text, splitSentences(text, 'es'), edits).accepted));
+
+  it('takes the space after a sentence deleted at the start of a paragraph, so the paragraph does not start with a space', () => {
+    const text = 'Hola Martín,\n\nEspero que estés bien. Te escribo por el sitio.\n\nSaludos,\nValeria';
+    expect(tidyText(text, [edit(1, 'Espero que estés bien.', '')])).toBe('Hola Martín,\n\nTe escribo por el sitio.\n\nSaludos,\nValeria');
+  });
+
+  it('leaves one space where a sentence between two others is deleted, and no space at the end of a line', () => {
+    const text = 'Hola Marta,\n\nTe escribo por el sitio. Me apasiona la web. Lo armé en Astro.\nAvisame.';
+    const ids = (q: string): number => splitSentences(text, 'es').findIndex((s) => s.text === q);
+    expect(tidyText(text, [edit(ids('Me apasiona la web.'), 'Me apasiona la web.', '')])).toBe('Hola Marta,\n\nTe escribo por el sitio. Lo armé en Astro.\nAvisame.');
+    expect(tidyText(text, [edit(ids('Lo armé en Astro.'), 'Lo armé en Astro.', '')])).toBe('Hola Marta,\n\nTe escribo por el sitio. Me apasiona la web.\nAvisame.');
+  });
+
+  it('tidies two deleted sentences in a row the same way whatever order they came in', () => {
+    const text = 'Hola Marta,\n\nEspero que estés bien. Me apasiona la web. Te escribo por el sitio.';
+    const ids = (q: string): number => splitSentences(text, 'es').findIndex((s) => s.text === q);
+    const both = [edit(ids('Espero que estés bien.'), 'Espero que estés bien.', ''), edit(ids('Me apasiona la web.'), 'Me apasiona la web.', '')];
+    expect(tidyText(text, both)).toBe('Hola Marta,\n\nTe escribo por el sitio.');
+    expect(tidyText(text, [...both].reverse())).toBe('Hola Marta,\n\nTe escribo por el sitio.');
+  });
+
+  it('takes the space before a run of deleted sentences that closes a line (en-cover-letter-heavy-3, live run 17/11)', () => {
+    const text = 'Hi Marcus,\n\nI am applying for the role. Every team starts with a ticket. That ticket changed everything.\n\nBest,\nDaniel';
+    const ids = (q: string): number => splitSentences(text, 'en').findIndex((s) => s.text === q);
+    const both = [edit(ids('Every team starts with a ticket.'), 'Every team starts with a ticket.', ''), edit(ids('That ticket changed everything.'), 'That ticket changed everything.', '')];
+    const tidy = (list: readonly Edit[]): string => renderEdits(text, tidyDeletions(text, applyEdits(text, splitSentences(text, 'en'), list).accepted));
+    expect(tidy(both)).toBe('Hi Marcus,\n\nI am applying for the role.\n\nBest,\nDaniel');
+    expect(tidy([...both].reverse())).toBe('Hi Marcus,\n\nI am applying for the role.\n\nBest,\nDaniel');
+  });
+
+  it('never glues two words: a deleted word between letters and punctuation keeps its neighbours apart', () => {
+    const text = 'Uso Astro mucho, y también Supabase.';
+    expect(tidyText(text, [edit(0, 'mucho', '')])).toBe('Uso Astro, y también Supabase.');
+    expect(tidyText(text, [edit(0, 'Astr', '')])).toBe('Uso o mucho, y también Supabase.');
+  });
+
+  // Review of 17/11: the page lets the user restore any single change, so each deletion of a run
+  // must take its own space. Restoring one of two deleted sentences must neither glue two
+  // sentences ("Hola.Tres") nor leave a space at the end or start of a line. A run that fills a
+  // whole line is left out: its two deletions share one space, which only one of them can hold.
+  it('widens each deletion of a run on its own, so restoring any one of them leaves clean text', () => {
+    const shapes: { text: string; quotes: string[] }[] = [
+      { text: 'Hola. Uno dos. Tres cuatro.\nChau.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Uno dos. Tres cuatro. Cinco.\nChau.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Hola. Uno dos. Tres cuatro. Cinco.', quotes: ['Uno dos.', 'Tres cuatro.'] },
+      { text: 'Hola.\n\nUno dos. Tres cuatro. Cinco.\n\nChau.', quotes: ['Tres cuatro.', 'Cinco.'] },
+      { text: '(Uno dos. Tres cuatro.) Cinco.', quotes: ['Uno dos.'] },
+      { text: 'Hola. Uno. Dos. Tres.\nChau.', quotes: ['Uno.', 'Dos.', 'Tres.'] },
+    ];
+    for (const { text, quotes } of shapes) {
+      const units = splitSentences(text, 'es');
+      const edits = quotes.map((q) => edit(units.findIndex((s) => s.text === q), q, ''));
+      const tidy = tidyDeletions(text, applyEdits(text, units, edits).accepted);
+      for (let keep = 0; keep < 1 << tidy.length; keep++) {
+        // Bit i set: the user keeps deletion i; unset: they restore it.
+        let out = text;
+        for (const [i, a] of [...tidy.entries()].reverse()) if ((keep >> i) & 1) out = out.slice(0, a.span.start) + a.after + out.slice(a.span.end);
+        const label = `${JSON.stringify(text)} keep=${keep.toString(2)}`;
+        expect(out, label).not.toMatch(/[.!?][^\s.!?)]/u);
+        expect(out, label).not.toMatch(/(?:^|\n)[ \t]|[ \t](?:\n|$)| {2}/u);
+      }
+    }
+  });
+
+  it('keeps every span in the original and the diff applying to the tidy text, and tidying twice changes nothing', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      // Half the runs delete what each random edit quotes, so most edits are deletions.
+      const edits = randomEdits(rng(seed)).map((e) => (seed % 2 === 0 ? { ...e, after: '' } : e));
+      const { accepted } = applyEdits(TEXT, SENTENCES, edits);
+      const tidy = tidyDeletions(TEXT, accepted);
+      const text = renderEdits(TEXT, tidy);
+      for (const a of tidy) expect(TEXT.slice(a.span.start, a.span.end), `seed ${seed}`).toBe(a.before);
+      let applied = TEXT;
+      for (const h of [...diffHunks(TEXT, tidy)].reverse()) applied = applied.slice(0, h.span.start) + h.after + applied.slice(h.span.end);
+      expect(applied, `seed ${seed}`).toBe(text);
+      expect(bySpan(tidyDeletions(TEXT, tidy)), `seed ${seed}`).toEqual(bySpan(tidy));
+      // Deletions alone never leave a line starting with a space: TEXT has none.
+      if (edits.every((e) => e.after === '')) for (const line of text.split('\n')) expect(line, `seed ${seed}`).not.toMatch(/^[ \t]/u);
+    }
+  });
+});
+
+// Live run 2 of 17/11, es-email-heavy-4: the edits deleted the lead-in "Mis fortalezas:", the text
+// of each numbered item and the paragraph after the list, one sentence at a time (the splitter cuts
+// "1. Comunicación clara" into "1." and "Comunicación clara"). The text kept "1.\n2.\n3." on lines
+// of their own, between runs of four line breaks.
+describe('tidyDeletions over whole lines and lists (es-email-heavy-4, live run 2)', () => {
+  const LIST = 'Hola Hernán:\n\nTe escribo por el sitio.\n\nMis fortalezas:\n\n1. Comunicación clara\n2. Atención al detalle\n3. Pasión por aprender\n\nEstoy segura de que podemos.\n\nSaludos,\nValeria';
+  const KEPT = 'Hola Hernán:\n\nTe escribo por el sitio.\n\nSaludos,\nValeria';
+  const ITEMS = ['Comunicación clara', 'Atención al detalle', 'Pasión por aprender'];
+  const MARKERS = ['1.', '2.', '3.'];
+  const tidyOf = (text: string, quotes: readonly string[]): AppliedEdit[] => {
+    const units = splitSentences(text, 'es');
+    const edits = quotes.map((q) => {
+      // The sentence that is the quote, or failing that the one that holds it ("1) Comunicación clara").
+      const exact = units.findIndex((s) => s.text === q);
+      const id = exact >= 0 ? exact : units.findIndex((s) => s.text.includes(q));
+      if (id < 0) throw new Error(`no sentence holds ${q}`);
+      return edit(id, q, '');
+    });
+    const placed = applyEdits(text, units, edits);
+    expect(placed.rejected).toEqual([]);
+    return tidyDeletions(text, placed.accepted);
+  };
+  const tidyText = (text: string, quotes: readonly string[]): string => renderEdits(text, tidyOf(text, quotes));
+
+  it('leaves no orphan marker and no run of blank lines when the lead-in, every item and the paragraph after are deleted', () => {
+    const out = tidyText(LIST, ['Mis fortalezas:', ...MARKERS, ...ITEMS, 'Estoy segura de que podemos.']);
+    expect(out).toBe(KEPT);
+  });
+
+  it('takes the marker with the item when only the text after it is deleted', () => {
+    expect(tidyText(LIST, ['Mis fortalezas:', ...ITEMS, 'Estoy segura de que podemos.'])).toBe(KEPT);
+    expect(tidyText(LIST.replace(/(\d)\./gu, '$1)'), ['Mis fortalezas:', ...ITEMS, 'Estoy segura de que podemos.'])).toBe(KEPT);
+  });
+
+  it('removes the line of one deleted item, and leaves the other items as they were', () => {
+    expect(tidyText(LIST, ['2.', 'Atención al detalle'])).toBe(LIST.replace('2. Atención al detalle\n', ''));
+    expect(tidyText(LIST, ['Atención al detalle'])).toBe(LIST.replace('2. Atención al detalle\n', ''));
+  });
+
+  it('removes a deleted paragraph with one of the blank lines around it', () => {
+    expect(tidyText(LIST, ['Estoy segura de que podemos.'])).toBe(LIST.replace('Estoy segura de que podemos.\n\n', ''));
+  });
+
+  it('never touches the blank lines the user wrote', () => {
+    const own = 'Hola Hernán:\n\n\n\nTe escribo por el sitio.\n\n\nEstoy segura de que podemos.\n\nSaludos,\nValeria';
+    expect(tidyText(own, ['Te escribo por el sitio.'])).toBe(own.replace('Te escribo por el sitio.\n\n\n', ''));
+    // Three line breaks of the user's own stay three when the paragraph after them goes.
+    expect(tidyText(own, ['Estoy segura de que podemos.'])).toBe(own.replace('Estoy segura de que podemos.\n\n', ''));
+    // Nothing deleted: nothing collapsed.
+    expect(tidyText(own, [])).toBe(own);
+  });
+
+  it('leaves no space at either end of a line, and tidying twice changes nothing', () => {
+    const quotes = ['Mis fortalezas:', ...ITEMS, 'Estoy segura de que podemos.'];
+    const tidy = tidyOf(LIST, quotes);
+    expect(renderEdits(LIST, tidy)).not.toMatch(/(?:^|\n)[ \t]|[ \t](?:\n|$)/u);
+    expect(bySpan(tidyDeletions(LIST, tidy))).toEqual(bySpan(tidy));
+    for (const a of tidy) expect(LIST.slice(a.span.start, a.span.end)).toBe(a.before);
+  });
+
+  // Review of 17/11, finding 4: letter and roman markers were left alone on their lines.
+  it('takes a letter or roman marker with its item too', () => {
+    const letters = 'Hola,\n\na) Comunicación clara\nb) Trabajo en equipo\n\nSaludos';
+    expect(tidyText(letters, ['Comunicación clara', 'Trabajo en equipo'])).toBe('Hola,\n\nSaludos');
+    const roman = 'Hola,\n\ni. Comunicación clara\nii. Trabajo en equipo\n\nSaludos';
+    expect(tidyText(roman, ['Comunicación clara', 'Trabajo en equipo'])).toBe('Hola,\n\nSaludos');
+  });
+
+  // Review of 17/11, finding 5: a deleted first or last paragraph left a line break at the text's edge.
+  it('leaves no line break at the start or the end of the text', () => {
+    const text = 'Asunto: Hola\n\nHola Marta, te escribo por el sitio.\n\nSaludos,\nVal\n\nP.D.: Me apasiona.';
+    expect(tidyText(text, ['Asunto: Hola'])).toBe(text.replace('Asunto: Hola\n\n', ''));
+    expect(tidyText(text, ['P.D.: Me apasiona.'])).toBe(text.replace('\n\nP.D.: Me apasiona.', ''));
   });
 });

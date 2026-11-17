@@ -15,6 +15,13 @@ import { prepare } from '../src/stages/analyse.ts';
 import { RewriteInput, type RewriteResult } from '../src/types.ts';
 import { scriptedGateway, type ScriptedReply } from './scripted-gateway.ts';
 
+/**
+ * `text` without the sentence `before`, and without the space it leaves behind, as S7 ships a
+ * deletion (tidyDeletions): the space after it, or failing that the one before it.
+ */
+const cut = (text: string, before: string): string =>
+  text.includes(`${before} `) ? text.replace(`${before} `, '') : text.includes(` ${before}`) ? text.replace(` ${before}`, '') : text.replace(before, '');
+
 const ROOT = new URL('../../', import.meta.url);
 const json = (file: string): unknown[] => JSON.parse(readFileSync(new URL(file, ROOT), 'utf8')) as unknown[];
 const REFS: PromptRefs = {
@@ -60,6 +67,14 @@ function expectSound(i: RewriteInput, result: RewriteResult): void {
   let text = i.text;
   for (const h of [...result.diff].sort((a, b) => b.span.start - a.span.start)) text = text.slice(0, h.span.start) + h.after + text.slice(h.span.end);
   expect(text).toBe(result.rewritten);
+  // The page rebuilds the text from the applied changes alone (apps/rewriter recompose): each one
+  // must hold its span's text, and together they must give back exactly what was shipped.
+  let rebuilt = i.text;
+  for (const c of [...result.changes].filter((x) => x.status === 'applied').sort((a, b) => b.span.start - a.span.start)) {
+    expect(i.text.slice(c.span.start, c.span.end), c.id).toBe(c.before);
+    rebuilt = rebuilt.slice(0, c.span.start) + c.after + rebuilt.slice(c.span.end);
+  }
+  expect(rebuilt).toBe(result.rewritten);
 }
 
 // es-email-heavy, run "full": S3's six edits and S4's five, verbatim.
@@ -92,11 +107,10 @@ describe('S4 after S3 (F6b eval run)', () => {
     const style = ES_S4[1] as Proposed;
     // S3's third edit is reverted (voice: the run's "adds usted"); S4's rewrite of that sentence then
     // stands on the sentence as the user wrote it. The other style edits quote text S3 removed or
-    // rewrote, so they no longer apply.
-    const expected = i.text
-      .replace((ES_S3[1] as Proposed).before, '')
-      .replace(style.before, style.after)
-      .replace((ES_S3[3] as Proposed).before, '')
+    // rewrote, so they no longer apply. S3's subject edit applies: its "Mantenimiento" heads the
+    // subject as a noun, which the fact check read as an invented name until 17/11.
+    const expected = cut(cut(i.text.replace((ES_S3[0] as Proposed).before, (ES_S3[0] as Proposed).after), (ES_S3[1] as Proposed).before)
+      .replace(style.before, style.after), (ES_S3[3] as Proposed).before)
       .replace((ES_S3[4] as Proposed).before, (ES_S3[4] as Proposed).after)
       .replace((ES_S3[5] as Proposed).before, (ES_S3[5] as Proposed).after);
     const scripted = scriptedGateway({
@@ -200,7 +214,7 @@ const lines = (rewritten: string, lang: 'es' | 'en') => judgeLines(rewritten, la
 
 describe('the S5 judge reply (F6b eval run)', () => {
   const i = input('es-follow-up-heavy');
-  const expected = i.text.replace((ES_FOLLOW_S3[0] as Proposed).before, '').replace((ES_FOLLOW_S3[1] as Proposed).before, '');
+  const expected = cut(cut(i.text, (ES_FOLLOW_S3[0] as Proposed).before), (ES_FOLLOW_S3[1] as Proposed).before);
   const run = async (...judge: ScriptedReply[]) => {
     const scripted = scriptedGateway({
       'rewrite.plan': [plan(6)],
@@ -230,7 +244,7 @@ describe('the S5 judge reply (F6b eval run)', () => {
 describe('a judge reply S5 cannot read (F6b eval run)', () => {
   const i = input('es-follow-up-heavy');
   const [opener, promise] = ES_FOLLOW_S3 as [Proposed, Proposed];
-  const both = i.text.replace(opener.before, '').replace(promise.before, '');
+  const both = cut(cut(i.text, opener.before), promise.before);
   // The run's two errors, as replies: a line without its support, and prose.
   const wrongShape: ScriptedReply = { text: JSON.stringify({ lines: judgeLines(both, 'es').map((l) => ({ line: l.line, note: '' })), note: '' }) };
   const prose: ScriptedReply = { text: 'Every line of the rewrite is backed by the draft.' };
@@ -274,9 +288,9 @@ describe('a judge reply S5 cannot read (F6b eval run)', () => {
     };
     const { result, judgeCalls } = await run(first, prose, wrongShape);
     expect(judgeCalls).toBe(3);
-    expect(result.rewritten).toBe(i.text.replace(opener.before, ''));
+    expect(result.rewritten).toBe(cut(i.text, opener.before));
     expect(result.status).toBe('needs-review');
-    expect(result.changes.find((c) => c.before === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
+    expect(result.changes.find((c) => c.before.trim() === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
     expect(result.changes.find((c) => c.before === promise.before && c.stage === 'edit')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^judge: the sentence claimed/) });
     expect(result.flags.filter((f) => f.kind === 'not-in-cv' && /verificar|check/i.test(f.message))).toHaveLength(1);
     expectSound(i, result);

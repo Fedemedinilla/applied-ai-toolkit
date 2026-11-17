@@ -57,7 +57,8 @@ const lexical: PatternRule[] = [
         'aprovechar mis (?:habilidades|conocimientos|capacidades)',
         'sólido historial',
         'no (?:dudes?|dude) en',
-        'quedo a (?:su|tu) (?:entera )?disposición',
+        // Accent dropped, as a chat is often typed, or decomposed (NFD), like REG-02's "encantaría".
+        'quedo a (?:su|tu) (?:entera )?disposici(?:ó|o\u0301|o)n',
         'ponerme la camiseta',
       ]),
     },
@@ -69,7 +70,8 @@ const lexical: PatternRule[] = [
     deviation:
       'Adds the section 12 entries missing from the 13.2 extract (en el panorama actual, apasionado por, me apasiona, ' +
       'aprovechar mis habilidades, navegar in a figurative sense) and the variant "aportar un valor significativo" from the ' +
-      'section 15 neutral letter. "En resumen" and "en definitiva" are left to EST-05. ' +
+      'section 15 neutral letter. "Disposición" also matches without its accent or decomposed, as a chat is often typed. ' +
+      '"En resumen" and "en definitiva" are left to EST-05. ' +
       'Proactivo and orientado a resultados are left to ESP-04.',
     examples: [
       { lang: 'es', fire: 'Me dirijo a ustedes para presentar mi candidatura.', pass: 'Me dirijo a la oficina de Rosario los lunes.' },
@@ -1344,6 +1346,67 @@ const mail: Rule[] = [
       'The subject is read from a first line that starts with "Asunto:" or "Subject:" (design decision D6). The report names one generic ' +
       'subject and no list, so only that phrase and its plural are matched; a subject that lacks the role, the name or the fact is not reported.',
     examples: [{ lang: 'es', fire: 'Asunto: Oportunidad emocionante\n\nHola, Laura:', pass: 'Asunto: Analista de datos · Ana Ruiz · Power BI\n\nHola, Laura:' }],
+  },
+  {
+    kind: 'pattern',
+    id: 'MAIL-04',
+    name: 'Stock mail formulas',
+    lang: 'both',
+    level: 2,
+    severity: 'low',
+    patterns: {
+      en: wordList([
+        String.raw`(?:I )?(?:hope|trust) (?:this|my)(?: (?:message|e-?mail|note|letter))? finds you(?: all)? (?:well|in good (?:health|spirits))`,
+        // Not after a subject: "We do not hesitate to call the carrier" reports a habit, not a closer.
+        String.raw`(?<!\b(?:I|we|they|he|she|you|who) )(?:please )?(?:do not|don['’]t) hesitate to (?:contact|reach out|get in touch|call|write|ask|let me know)`,
+        'at your earliest convenience',
+        String.raw`(?:I look|I(?:['’]m| am) looking|looking) forward to (?:hearing (?:back )?from you|your (?:reply|response))`,
+      ]),
+      es: wordList([
+        'espero que (?:este|el presente|mi) (?:mensaje|correo|mail|e-?mail) (?:te|le|lo|la|los|las) encuentre (?:muy )?bien',
+        // The same opener with the reader as subject; "Espero que estés bien" stays out (an ordinary greeting).
+        'espero que (?:te encuentres|se encuentren?) (?:muy )?bien',
+        'quedo atent[oa] a (?:tus?|sus?|cualquier) (?:comentarios?|novedad(?:es)?|noticias?|respuestas?|consultas?|dudas?|inquietud(?:es)?)',
+        'quedo a la espera de (?:tus?|sus?) (?:comentarios?|novedad(?:es)?|noticias?|respuestas?)',
+        // With "su" or "tu" the closer is LEX-01's, at level 1. "del"/"de" after it is a thing put at
+        // someone's disposal, as in "El servidor quedo a disposición del equipo" ("quedó" typed without its accent).
+        String.raw`quedo a (?:entera |total )?disposici(?:ó|o\u0301|o)n(?!\s+del?(?![\p{L}]))`,
+        'agradezco de antemano',
+      ]),
+    },
+    flags: 'giu',
+    quoteExempt: true,
+    message: 'Stock mail formula. It fills a line and tells this reader nothing.',
+    suggestion: 'Cut it, or say the concrete thing: what you will send, or when you can talk.',
+    source: {
+      evidence: ['REPORTADO', 'SÍNTESIS'],
+      ref:
+        'Wikipedia, Signs of AI writing, "Phrasal templates and placeholder text" ("I hope this message finds you well"), read on 17 November 2026; ' +
+        'the other formulas: the prose-rewriter live eval of 17 November 2026, where the register-fit judge named them as the line that decided a failure',
+      section: '11',
+    },
+    deviation:
+      'research/genres.md planned MAIL-04 for the English opener only, at low severity, because its one checked source is REPORTADO. ' +
+      'The closers and the Spanish calque of the opener have no published source; they enter because a live eval of the rewriter ' +
+      '(147 fictional cases, 17 November 2026) found them surviving rewrites that nothing reported, so they share the low severity. ' +
+      'Level 2: a person writes each of them too, and one alone does not make a mail generated. It runs in whatsapp as well, where a ' +
+      'mail formula is further out of place. "Thank you for your time and consideration" stays with MAIL-01, which reports it as the ' +
+      'only closing; "quedo a su/tu (entera) disposición" and "no dudes en" stay with LEX-01, at level 1. "I hope you are doing well" ' +
+      'and "Espero que estés bien" are left out: they read as ordinary greetings.',
+    falsePositives: 'A first mail to a stranger in a formal register, where a person may write any of them on purpose.',
+    examples: [
+      { lang: 'en', fire: 'I hope this email finds you well.', pass: 'I hope the move went well.' },
+      { lang: 'en', fire: 'Please do not hesitate to contact me.', pass: 'I did not hesitate to call the carrier.' },
+      { lang: 'en', fire: 'Send it at your earliest convenience.', pass: 'Send it by Friday.' },
+      { lang: 'en', fire: 'I look forward to hearing from you.', pass: 'I look forward to Thursday.' },
+      { lang: 'es', fire: 'Espero que este mensaje te encuentre muy bien.', pass: 'Espero que el tablero te sirva.' },
+      { lang: 'es', fire: 'Quedo atenta a tus comentarios.', pass: 'Quedo atenta al tablero de marzo.' },
+      { lang: 'es', fire: 'Quedo a disposición por cualquier duda.', pass: 'El archivo queda a disposición de los gerentes.' },
+      { lang: 'es', fire: 'Agradezco de antemano tu respuesta.', pass: 'Te agradezco el dato.' },
+      { lang: 'en', fire: 'I trust this email finds you well.', pass: 'We do not hesitate to call the carrier when a parcel is late.' },
+      { lang: 'es', fire: 'Quedo a la espera de su respuesta.', pass: 'El servidor quedo a disposición del equipo.' },
+      { lang: 'es', fire: 'Espero que se encuentre muy bien.', pass: 'Espero que estés bien.' },
+    ],
   },
 ];
 

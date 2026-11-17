@@ -46,6 +46,12 @@ export interface ExtractOptions {
   readonly knownNames?: ReadonlySet<string>;
   /** Also read an unknown capitalized first word as a possible name (Fact.opening). */
   readonly openings?: boolean;
+  /**
+   * The list markers of the original ("1.", "b)", "IV."), as listMarkersOf() reads them. A marker
+   * with nothing after it, or a letter or roman one, counts as a marker only when it is one of
+   * these. Left out, extract() reads them from the text it is given.
+   */
+  readonly listMarkers?: ReadonlySet<string>;
 }
 
 /** What C is made of, kept apart so the inventory can tell a CV fact from one about the recipient. */
@@ -160,8 +166,94 @@ const OPENERS: Readonly<Record<Lang, ReadonlySet<string>>> = {
     'subject',
   ]),
 };
+/**
+ * The verbs, nouns and adjectives job-search texts open a sentence, a list item or a subject line
+ * with, which OPENERS and the endings below do not cover: infinitives ("Optimizar"), first persons
+ * ("Comparto"), short or irregular past forms ("Vi", "Rehice", "Built", "Got"), imperatives and
+ * the nouns that head a list item ("Soluciones a medida", "Proven track record").
+ *
+ * Why: the live eval of 17/11 and the fact-check probe read these as possible names, so a rewrite
+ * that changed or cut one was reverted as a lost or invented fact (about 420 false alarms over the
+ * 147 cases). A list, not an ending, because the endings of these words are the endings of common
+ * names too: -ar (Aguilar, Escobar, Oscar, Pilar), -er (Javier, Walter), -o (Gonzalo, Camilo),
+ * -miento (Sarmiento). Words that are also common names or surnames stay out (Will, Mark, Grant,
+ * Drew, Hope, Rosa, Paz, Luna, Claro, Leo), so a name invented at a line start is still caught.
+ * The list only says a word may be ordinary: a name the CV or the original states is still that
+ * name when it opens a line ("Make and n8n", "- Éxito: tienda online").
+ */
+const ORDINARY: Readonly<Record<Lang, ReadonlySet<string>>> = {
+  es: new Set([
+    // Infinitives.
+    'optimizar', 'liderar', 'potenciar', 'mejorar', 'gestionar', 'desarrollar', 'implementar', 'diseñar', 'crear', 'ayudar', 'impulsar',
+    'transformar', 'coordinar', 'construir', 'ofrecer', 'brindar', 'aportar', 'generar', 'lograr', 'aumentar', 'reducir', 'acompañar',
+    'colaborar', 'trabajar', 'aprender', 'escalar', 'migrar', 'integrar', 'mantener', 'resolver', 'atender', 'asesorar', 'entregar',
+    'conectar', 'asegurar', 'contar', 'hablar', 'ver', 'saber', 'sumar', 'armar', 'hacer', 'llevar', 'seguir', 'crecer', 'buscar',
+    'encontrar', 'charlar', 'revisar', 'probar', 'usar', 'aplicar', 'postular', 'escribir', 'responder', 'enviar', 'mandar', 'agendar',
+    'actualizar', 'configurar', 'programar', 'documentar', 'capacitar', 'planificar', 'medir', 'cobrar', 'facturar', 'vender', 'contratar',
+    'dar', 'tener', 'poder', 'ser', 'estar', 'empezar', 'comenzar', 'terminar', 'cerrar', 'abrir', 'recibir', 'leer', 'conocer', 'entender',
+    'explorar', 'descubrir', 'innovar', 'revolucionar', 'elevar', 'fortalecer', 'fomentar', 'dirigir', 'supervisar', 'administrar',
+    // First persons, short and irregular pasts, plurals and imperatives.
+    'comparto', 'disfruto', 'ayudo', 'prefiero', 'mantengo', 'confirmo', 'desarrollo', 'gestiono', 'coordino', 'lidero', 'brindo', 'aporto',
+    'sumo', 'programo', 'conozco', 'manejo', 'domino', 'hablo', 'aprendo', 'entiendo', 'propongo', 'recomiendo', 'valoro', 'considero',
+    'veo', 'vengo', 'vuelvo', 'estudio', 'administro', 'automatizo', 'migro', 'entrego', 'reviso', 'respondo', 'comento', 'aviso', 'retomo',
+    'consulto', 'vi', 'rehice', 'tuve', 'dije', 'pude', 'quise', 'supe', 'vine', 'puse', 'traje', 'fui', 'hizo', 'tuvo', 'pudo', 'dijo',
+    'saben', 'tarda', 'tardan', 'tenemos', 'sabemos', 'podemos', 'queremos', 'necesitamos', 'buscamos', 'ofrecemos', 'contamos', 'parece',
+    'funciona', 'anda', 'cuesta', 'probalo', 'ignorá', 'revisá', 'contá', 'pasame', 'mandame', 'llamame', 'escribí', 'avisá',
+    // Nouns and adjectives that head a list item or a subject line.
+    'soluciones', 'mantenimiento', 'diseño', 'velocidad', 'búsqueda', 'pasión', 'presupuesto', 'propuesta', 'sinergias', 'sitio', 'sitios',
+    'formulario', 'desarrolladora', 'desarrollador', 'formada', 'formado', 'experiencia', 'habilidades', 'resultados', 'logros', 'objetivo',
+    'objetivos', 'perfil', 'servicios', 'servicio', 'herramientas', 'tecnologías', 'idiomas', 'referencias', 'disponibilidad', 'contacto',
+    'tarifa', 'tarifas', 'plazo', 'plazos', 'alcance', 'entrega', 'entregas', 'soporte', 'consultoría', 'gestión', 'análisis', 'calidad',
+    'compromiso', 'liderazgo', 'proyectos', 'proyecto', 'clientes', 'cliente', 'equipo', 'página', 'ventas', 'seguimiento', 'reunión',
+    'llamada', 'ejemplo', 'ejemplos', 'precio', 'precios', 'costo', 'horario', 'pedido', 'pedidos', 'mejoras', 'ideas', 'opciones',
+    'beneficios', 'ventajas', 'recordatorio', 'respuesta', 'pregunta', 'dudas', 'copias', 'seguridad', 'rendimiento', 'oportunidad',
+    'oportunidades', 'valor', 'enfoque', 'visión', 'estrategia', 'crecimiento', 'éxito', 'excelencia', 'impacto', 'conocimiento',
+    'conocimientos', 'gracias', 'genial', 'perfecto', 'excelente', 'increíble', 'nuevo', 'nueva', 'ideal', 'seguro', 'rápido', 'simple',
+    'mejor', 'mismo', 'misma', 'igual', 'encantada', 'encantado', 'interesada', 'interesado', 'apasionada', 'apasionado', 're', 'rv', 'fwd',
+  ]),
+  en: new Set([
+    // Irregular pasts, base forms and imperatives.
+    'built', 'got', 'made', 'led', 'ran', 'grew', 'wrote', 'drove', 'brought', 'taught', 'began', 'kept', 'found', 'saw', 'became', 'spent',
+    'sent', 'met', 'took', 'gave', 'put', 'set', 'cut', 'won', 'thought', 'felt', 'knew', 'went', 'came', 'left', 'sold', 'told', 'said',
+    'heard', 'held', 'paid', 'chose', 'rebuilt', 'allow', 'enjoy', 'want', 'need', 'help', 'ignore', 'imagine', 'note', 'love', 'feel',
+    'think', 'know', 'believe', 'check', 'see', 'find', 'reach', 'join', 'apply', 'build', 'create', 'design', 'develop', 'deliver', 'manage',
+    'improve', 'increase', 'reduce', 'launch', 'scale', 'optimize', 'ship', 'own', 'write', 'keep', 'make', 'take', 'get', 'give', 'send',
+    'share', 'tell', 'ask', 'call', 'meet', 'talk', 'look', 'follow', 'contact', 'reply', 'attach', 'review', 'consider', 'explore',
+    'discover', 'unlock', 'elevate', 'transform', 'revolutionize', 'empower', 'leverage', 'boost', 'streamline', 'maximize', 'searches',
+    'sounds', "they'd", "they're", "they've", "we're", "we've", "we'd", "you're", "you've", "you'd", "he's", "she's", "i'd", 'they’d',
+    'they’re', 'we’re', 'you’re',
+    // Nouns and adjectives that head a list item or a subject line.
+    'below', 'above', 'proven', 'strong', 'passion', 'cutting-edge', 'congrats', 'congratulations', 'fancy', 'great', 'key', 'laptop',
+    'pressure', 'quick', 're', 'fwd', 'right', 'short', 'tools', 'reference', 'references', 'support', 'free', 'results', 'experience',
+    'skills', 'summary', 'objective', 'profile', 'services', 'education', 'availability', 'rates', 'timeline', 'scope', 'delivery',
+    'proposal', 'quote', 'budget', 'overview', 'highlights', 'achievements', 'responsibilities', 'background', 'focus', 'goal', 'goals',
+    'impact', 'value', 'solutions', 'expertise', 'quality', 'speed', 'performance', 'security', 'maintenance', 'development', 'leadership',
+    'teamwork', 'excellent', 'amazing', 'awesome', 'perfect', 'absolutely', 'definitely', 'certainly', 'honestly', 'actually', 'ha', 'haha',
+  ]),
+};
+/**
+ * Endings of nouns and verbs no common name shares: "Transformación", "Comunicación", "Automatizar",
+ * "Communication". The names among them are left out by NAMES_WITH_ORDINARY_ENDING.
+ */
+const ORDINARY_ENDING: Readonly<Record<Lang, RegExp>> = { es: /(?:ción|sión|ciones|siones|izar)$/iu, en: /(?:tion|sion|tions|sions|ness|ize|izes)$/iu };
+const NAMES_WITH_ORDINARY_ENDING = new Set([
+  'concepción', 'asunción', 'encarnación', 'ascensión', 'purificación', 'consolación', 'anunciación',
+  // Tools, brands and names with an English noun ending (review of 17/11: "Notion" was not read).
+  'notion', 'fusion', 'motion', 'vision', 'mission', 'ness', 'nation', 'version', 'passion',
+]);
 /** Endings of verbs and adverbs, never of a name: "Armé", "Llegó", "buscando", "Built", "Leading", "Quickly". */
 const NOT_A_NAME: Readonly<Record<Lang, RegExp>> = { es: /(?:[éó]|ando|iendo|mente)$/iu, en: /(?:ed|ing|ly)$/iu };
+/** First names with a past-verb ending: "José me pasó tu contacto" names José, unlike "Armé el sitio". */
+const NAMES_WITH_VERB_ENDING = new Set(['josé', 'noé', 'rené', 'salomé', 'zoé', 'chloé', 'andré']);
+/**
+ * Words that follow a verb and never a name: "Relevar el sitio", "Audit the plugins". A name opening
+ * a sentence is followed by its verb ("Escobar revisó"), so a capitalized word followed by one of
+ * these reads as a verb whatever the verb, which a closed list of verbs cannot promise.
+ */
+const DETERMINER_AFTER: Readonly<Record<Lang, RegExp>> = {
+  es: /^[ \t]+(?:el|la|los|las|un|una|unos|unas|mi|mis|tu|tus|su|sus|nuestr[oa]s?|este|esta|estos|estas|cada|todos|todas)(?![\p{L}\p{N}])/u,
+  en: /^[ \t]+(?:the|a|an|my|our|your|their|this|these|those|every|each|all)(?![\p{L}\p{N}])/u,
+};
 /**
  * Endings of a finite verb that surnames share ("Hablamos" and "Ramos", "Pudiste" and "Batiste"),
  * so they count only on the first word of a question or exclamation, which opens with a verb far
@@ -192,6 +284,21 @@ const DATE_EN = new RegExp(
 const HOUR_HS = new RegExp(String.raw`${B}(\d{1,2})\s?hs${E}`, 'giu');
 /** "a las 15 h": after "las", an hour; elsewhere "15 h" is a duration. */
 const HOUR_H = new RegExp(String.raw`(?<=${B}las\s{1,3})(\d{1,2})\s?h${E}`, 'giu');
+
+/**
+ * A domain written without "http" or "www" (URL_LIKE needs one): "calder-systems.example",
+ * "valeria-sosa.com.ar". Lower case and a known top-level domain only, so "Node.js", "config.ts"
+ * and "ASP.NET" stay what they are. Why: the probe of 17/11 dropped "calder-systems.example" from
+ * en-email-good-3 and the invariant held.
+ */
+const DOMAIN = new RegExp(
+  String.raw`(?<![\p{L}\p{N}@./:-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:${[
+    'com', 'net', 'org', 'io', 'dev', 'app', 'ai', 'co', 'me', 'info', 'tech', 'site', 'online', 'store', 'shop', 'edu', 'gov', 'example',
+    'ar', 'es', 'mx', 'cl', 'uy', 'pe', 'br', 'uk', 'us',
+  ].join('|')})(?![\p{L}\p{N}-])(?:\/[^\s]*)?`,
+  'gu',
+);
+const SCHEME = /^[a-z]+:\/\//u;
 
 /** Units kept with their number, one key per unit in both languages ("9 hours" and "9 horas" are "9 h"). */
 const UNITS: Readonly<Record<string, string>> = {
@@ -399,11 +506,59 @@ const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(
 
 /**
  * Where a sentence ends: after . ! ? … and a space, at a line break, after an emoji and a space
- * ("Sofi 🙌 Me apasiona"), and after a label of one or two words that opens a line ("Subject:
- * Unlocking ...", "Asunto: Propuesta ..."). The word after each of these is a sentence's first word,
- * whose capital says nothing.
+ * ("Sofi 🙌 Me apasiona"), after a label of one or two words that opens a line ("Subject:
+ * Unlocking ...", "Asunto: Propuesta ...") and after a list marker ("2) Migrar", "b) Migrar"). The word after each
+ * of these is a sentence's first word, whose capital says nothing.
  */
-const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+/gmu;
+const SENTENCE_BREAK = /(?<=[.!?…])\s+|\n+|(?<=\p{Extended_Pictographic}\uFE0F?)[ \t]+|(?<=^[ \t]*\p{L}+(?: \p{L}+)?:)[ \t]+|(?<=^[ \t]*(?:\d{1,2}|[ivxlc]{1,5}|[IVXLC]{1,5}|\p{L})\))[ \t]+/gmu;
+/**
+ * The marker of a list item at a line start, "1. ", "2) ", "b) " or "IV. ": a place in a list, not
+ * a number or an acronym the text states. Why: removing the markers of es-email-heavy-4 read as
+ * losing 1, 2 and 3, and an uppercase roman marker read as an acronym.
+ * A numbered marker with item text after it is always a marker. A bare one ("1." alone on its
+ * line, or the sentence the splitter cuts "1. Comunicación clara" into), and a letter or roman
+ * one, is a marker only where the original makes it one (listMarkersOf): the rewrite of live run 2
+ * left "1." alone on its line after deleting the item texts, while "¿Cuántos sitios?\n12.\n" or
+ * "Proyectos: 12." state a number that a change must not slip past (review of 17/11).
+ */
+const LIST_MARKER = /^([ \t]*)(\d{1,2}[.)]|(?:[ivxlc]{1,5}|[IVXLC]{1,5}|\p{L})[.)])(?=([ \t]+\S)?)(?=[ \t]|$)/gmu;
+const NUMBERED = /^\d/u;
+
+/**
+ * The list markers a text uses: each numbered marker with item text after it, and every marker of
+ * a run of two or more lines that open with one (blank lines between them do not end the run).
+ * A lone "12." or "C. Martínez" is not in a run, so it stays a number or a name.
+ */
+export function listMarkersOf(text: string): Set<string> {
+  const out = new Set<string>();
+  let run: string[] = [];
+  const close = (): void => {
+    if (run.length >= 2) for (const m of run) out.add(m);
+    run = [];
+  };
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue;
+    const m = new RegExp(LIST_MARKER.source, 'u').exec(line);
+    if (m === null) {
+      close();
+      continue;
+    }
+    const mark = m[2] ?? '';
+    run.push(mark);
+    if (NUMBERED.test(mark) && m[3] !== undefined) out.add(mark);
+  }
+  close();
+  return out;
+}
+
+/** The markers to read in `text`: the given ones, or the text's own, where a text that is one bare numbered marker is a fragment of a list. */
+function markersFor(text: string, options: ExtractOptions): ReadonlySet<string> {
+  if (options.listMarkers !== undefined) return options.listMarkers;
+  const own = listMarkersOf(text);
+  const alone = /^[ \t]*(\d{1,2}[.)])[ \t]*$/u.exec(text);
+  if (alone?.[1] !== undefined) own.add(alone[1]);
+  return own;
+}
 
 /**
  * The sentences of a text with their offsets, split at each SENTENCE_BREAK. `afterEmoji` marks one
@@ -439,6 +594,16 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
   let rest = text.replace(PLACEHOLDER_ANY, (m) => ' '.repeat(m.length));
   // A placeholder's span is claimed too, so the anchor pass, which reads the original text, skips it.
   const claimed: Array<[number, number]> = [...text.matchAll(PLACEHOLDER_ANY)].map((m) => [m.index, m.index + m[0].length]);
+  // List markers state no number: blanked and claimed the same way.
+  const markers = markersFor(text, options);
+  for (const m of rest.matchAll(LIST_MARKER)) {
+    const mark = m[2] ?? '';
+    if (!(NUMBERED.test(mark) && m[3] !== undefined) && !markers.has(mark)) continue;
+    const start = m.index + (m[1] ?? '').length;
+    const length = (m[2] ?? '').length;
+    claimed.push([start, start + length]);
+    rest = rest.slice(0, start) + ' '.repeat(length) + rest.slice(start + length);
+  }
   const take = (kind: FactKind, start: number, raw: string, key: string): void => {
     facts.push({ kind, text: raw, key, start, end: start + raw.length });
     claimed.push([start, start + raw.length]);
@@ -454,6 +619,7 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 
   pass(URL_LIKE, (m) => ({ kind: 'url', text: trimmed(m[0]), key: trimmed(m[0]).toLowerCase().replace(/\/$/u, '') }));
   pass(EMAIL, (m) => ({ kind: 'email', text: m[0], key: m[0].toLowerCase() }));
+  pass(DOMAIN, (m) => ({ kind: 'url', text: trimmed(m[0]), key: trimmed(m[0]).toLowerCase().replace(/\/$/u, '') }));
   pass(AMOUNT_BEFORE, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[1] ?? '').toLowerCase()] ?? '$'} ${scaled(m[2] ?? '', m[3], lang)}` }));
   pass(AMOUNT_AFTER, (m) => ({ kind: 'amount', text: m[0], key: `${CURRENCY[(m[3] ?? '').toLowerCase()] ?? '$'} ${scaled(m[1] ?? '', m[2], lang)}` }));
   pass(NUMBER_MAGNITUDE, (m) => ({ kind: 'number', text: m[0], key: scaled(m[1] ?? '', m[2], lang) }));
@@ -563,10 +729,14 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
     const start = sentence.start + m.index;
     if (!/^\p{Lu}/u.test(word) || /\p{N}/u.test(word) || !free(start, start + word.length)) continue;
     const key = wordKey(word);
-    const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index)));
+    const following = sentence.text.slice(m.index + word.length);
+    const possible = isPossibleName(word, lang, /[¿¡]\s*$/u.test(sentence.text.slice(0, m.index))) && !DETERMINER_AFTER[lang].test(following);
     // After an emoji, a word that does not read as an ordinary one is a name, as it was before the
     // emoji break: matched with its capital, so "el rosa" does not stand in for "Rosa".
-    if (known.has(key) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
+    // A frequent opener is not the name its key matches unless it is written as that name: "It"
+    // opening a sentence is not the CV's "IT" (the probe's cause E).
+    const ordinary = OPENERS[lang].has(key) && !/^\p{Lu}{2,}$/u.test(word);
+    if ((known.has(key) && !ordinary) || (sentence.afterEmoji && possible)) take('proper-noun', start, word, key);
     else if (options.openings === true && possible) {
       facts.push({ kind: 'proper-noun', text: word, key, start, end: start + word.length, opening: true });
       claimed.push([start, start + word.length]);
@@ -577,7 +747,9 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
 
 function isPossibleName(word: string, lang: Lang, afterMark: boolean): boolean {
   const lower = word.toLocaleLowerCase('und');
-  if ([...word].length < 2 || OPENERS[lang].has(lower) || NOT_A_NAME[lang].test(word) || NUMBER_WORDS[lower] !== undefined) return false;
+  if ([...word].length < 2 || OPENERS[lang].has(lower) || NUMBER_WORDS[lower] !== undefined) return false;
+  if (NOT_A_NAME[lang].test(word) && !NAMES_WITH_VERB_ENDING.has(lower)) return false;
+  if (ORDINARY[lang].has(lower) || (ORDINARY_ENDING[lang].test(word) && !NAMES_WITH_ORDINARY_ENDING.has(lower))) return false;
   if (afterMark && VERB_AFTER_MARK[lang]?.test(word) === true) return false;
   if (lang === 'en' && (FIRST_PERSON_EN.has(word) || WEEKDAYS_EN.includes(word) || MONTHS_EN.includes(word))) return false;
   if (lang === 'es' && (MONTHS_ES.includes(lower) || lower === 'setiembre')) return false;
@@ -606,11 +778,15 @@ const sourcesText = (c: FactSources): string => [c.cv, ...(c.recipient ?? []), .
  */
 function states(pool: Pool, fact: Fact): boolean {
   if (pool.keys.has(fact.key)) return true;
+  // A bare domain is stated by the same domain behind a scheme or in an email too.
+  if (fact.kind === 'url' && !SCHEME.test(fact.key)) return new RegExp(`${B}${escape(fact.key)}${E}`, 'iu').test(pool.text);
   if (!WORD_KINDS.has(fact.kind)) return false;
   const source = fact.key.split(' ').map(escape).join(String.raw`\s+`);
   const asName = fact.opening === undefined && (fact.kind === 'proper-noun' || fact.kind === 'acronym');
+  // An acronym is backed only in capitals: "It's" does not state "IT".
+  const shape = fact.kind === 'acronym' ? /^\p{Lu}{2,}/u : /^\p{Lu}/u;
   for (const m of pool.text.matchAll(new RegExp(`${B}${source}${E}`, 'giu'))) {
-    if (!asName || /^\p{Lu}/u.test(m[0])) return true;
+    if (!asName || shape.test(m[0])) return true;
   }
   return false;
 }
@@ -706,7 +882,7 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
   }
   const after = sentence.slice(0, at) + edit.after + sentence.slice(at + edit.before.length);
   const known = namesOf([context.O, sourcesText(context.C), sentence, after], context);
-  const read = { ...context, knownNames: known, openings: true };
+  const read = { ...context, knownNames: known, openings: true, listMarkers: context.listMarkers ?? listMarkersOf(context.O) };
   const allBefore = extract(sentence, read);
   const allAfter = extract(after, read);
   const beforeFacts = unique(allBefore);
@@ -761,11 +937,12 @@ export function factInvariant(
   rewritten: string,
   sources: FactSources,
   acceptedDrops: readonly string[],
-  options: ExtractOptions,
+  given: ExtractOptions,
 ): InvariantResult {
+  const options = { ...given, listMarkers: given.listMarkers ?? listMarkersOf(original) };
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
-  const C = poolOf(sourcesText(sources), options);
+  const C = poolOf(sourcesText(sources), given);
   const read = { ...options, knownNames: namesOf([original, rewritten, C.text], options), openings: true };
   const inO = extract(original, read);
   const inR = extract(rewritten, read);
@@ -790,10 +967,11 @@ export function factInvariant(
  * so added holds only what nothing backs; notInCv is the inventory's solo-del-usuario; placeholders
  * are the markers left in R.
  */
-export function factReport(original: string, rewritten: string, sources: FactSources, options: ExtractOptions): FactReport {
+export function factReport(original: string, rewritten: string, sources: FactSources, given: ExtractOptions): FactReport {
+  const options = { ...given, listMarkers: given.listMarkers ?? listMarkersOf(original) };
   const O = poolOf(original, options);
   const R = poolOf(rewritten, options);
-  const C = poolOf(sourcesText(sources), options);
+  const C = poolOf(sourcesText(sources), given);
   const inO = unique(extract(original, options));
   const newInR = unique(extract(rewritten, options)).filter((f) => !states(O, f));
   const key = (f: Fact) => f.key;

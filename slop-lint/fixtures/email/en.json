@@ -376,7 +376,7 @@
         {
           "text": "I hope this email finds you well.",
           "slop": true,
-          "rules": []
+          "rules": ["MAIL-04"]
         },
         {
           "text": "I wanted to reach out because I am passionate about data.",

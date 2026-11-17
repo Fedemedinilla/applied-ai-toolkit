@@ -36,7 +36,7 @@ import { STAGE_ATTEMPTS, STAGE_MAX_TOKENS } from '../src/stages/model.ts';
 import { TASK_CONFIGS } from '../src/tasks.ts';
 import { defaultMode, Genre, Lang } from '../src/types.ts';
 import type { LoadedCase } from './cases.ts';
-import { BASELINE, JUDGE_MAX_TOKENS, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from './judges.ts';
+import { BASELINE, FACT_CHECK, factCheckReport, JUDGE_MAX_TOKENS, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from './judges.ts';
 import { runPipelines, VARIANTS, type PieceRecord, type PipelineVariant } from './pipeline.ts';
 import { codeRuns, hardFailures, scorePieces, type CodeRecord } from './rubrics.ts';
 import {
@@ -243,7 +243,10 @@ export async function estimateRun(cases: readonly LoadedCase[], variants: readon
     }
     for (const rubric of JUDGE_RUBRICS) {
       if (rubric.name === 'pairwise-baseline' && (v.id === BASELINE || !hasBaseline)) continue;
-      seq.push({ model: TASK_CONFIGS['rewrite.judge'].model, maxTokens: JUDGE_MAX_TOKENS, extra: utf8(rubric.instructions) });
+      // The fact check reads the fact sheet and the original, which the base already counts, and the
+      // original once more next to the rewrite.
+      const twice = rubric.name === FACT_CHECK.name ? utf8(c.input.text) : 0;
+      seq.push({ model: TASK_CONFIGS['rewrite.judge'].model, maxTokens: JUDGE_MAX_TOKENS, extra: utf8(rubric.instructions) + twice });
     }
     let carried = 0;
     for (const call of seq) {
@@ -465,6 +468,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
     verdict.markdown,
     `### Hard failures\n\n${hard.length === 0 ? 'None.' : hard.slice(0, 20).map((r) => `- ${r.rubric} on ${r.case} (${r.variant})${r.detail === undefined ? '' : `: ${r.detail}`}`).join('\n')}`,
     `Code rubric runs: ${codeRuns(code).size}.`,
+    factCheckReport(judges, code),
     costReport(costRows(pieces)),
     `This run: US$${usd4(run.spentUsd)} over ${run.calls} calls, judges included.`,
     spendLine(ledger.month(), args.monthlyCapSetBy),

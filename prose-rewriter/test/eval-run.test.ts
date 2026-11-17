@@ -97,10 +97,10 @@ describe('the spend ledger', () => {
     expect(() => openLedger({ path, monthlyCapUsd: 0, clock: fixed, raised: true })).toThrow(/positive/);
     expect(() => openLedger({ path, monthlyCapUsd: 5, clock: fixed })).not.toThrow();
     // A flag raises the cap only up to MONTHLY_CAP_CEILING_USD, so a typo (500 for 50) cannot multiply the budget.
-    expect(MONTHLY_CAP_CEILING_USD).toBe(50);
-    expect(() => openLedger({ path, monthlyCapUsd: 50.01, clock: fixed, raised: true })).toThrow(/ceiling of US\$50/);
-    expect(() => openLedger({ path, monthlyCapUsd: 1e303, clock: fixed, raised: true })).toThrow(/ceiling of US\$50/);
-    // November 2026: 50 (Federico, 16/11/2026), set with the flag; the ledger then holds that cap.
+    expect(MONTHLY_CAP_CEILING_USD).toBe(80);
+    expect(() => openLedger({ path, monthlyCapUsd: 80.01, clock: fixed, raised: true })).toThrow(/ceiling of US\$80/);
+    expect(() => openLedger({ path, monthlyCapUsd: 1e303, clock: fixed, raised: true })).toThrow(/ceiling of US\$80/);
+    // November 2026: 50 (Federico, 16/11/2026), then 80 (17/11/2026), set with the flag; the ledger then holds that cap.
     const raised = openLedger({ path, monthlyCapUsd: 50, clock: fixed, raised: true });
     raised.settle(raised.reserve(45), 45);
     expect(raised.month()).toMatchObject({ capUsd: 50, spentUsd: 45, remainingUsd: 5 });
@@ -496,7 +496,10 @@ describe('the dry run estimate', () => {
     // No baseline among the variants: no pairwise-baseline call.
     const rubrics = JUDGE_RUBRICS.filter((r) => r.name !== 'pairwise-baseline');
     const base = estimateInputTokens({ messages: [{ role: 'user', content: JSON.stringify(CLEAN.input) }] });
-    const expected = rubrics.reduce((sum, r, i) => sum + worstCaseUsd(judgeModel, base + i * JUDGE_MAX_TOKENS + bytes(r.instructions), JUDGE_MAX_TOKENS, PRICES)!, 0);
+    // fact-check also reads the original a second time (next to the rewrite), on top of the fact sheet.
+    const extra = (r: (typeof rubrics)[number]): number => bytes(r.instructions) + (r.name === 'fact-check' ? bytes(CLEAN.input.text) : 0);
+    expect(rubrics.map((r) => r.name)).toContain('fact-check');
+    const expected = rubrics.reduce((sum, r, i) => sum + worstCaseUsd(judgeModel, base + i * JUDGE_MAX_TOKENS + extra(r), JUDGE_MAX_TOKENS, PRICES)!, 0);
     expect(est).toEqual({ pieces: 1, calls: rubrics.length, worstUsd: Math.round(expected * 1e6) / 1e6 });
     expect(est.worstUsd).toBeGreaterThan(0);
   });
@@ -790,6 +793,9 @@ describe('the eval CLI', () => {
     expect(text).toContain('### Cost per rewrite');
     expect(text).toContain('| full | whatsapp | minimo | 1 | 1 | 0.0000 | 0.0000 |');
     expect(text).toMatch(/no baseline among the variants/);
+    // The fact check is reported next to the code rubrics; the rewrite equal to the original was not paid for.
+    expect(text).toContain('### Fact check (judge, soft)');
+    expect(text).toContain('| full | 1 | 0 | 0 | n/a | 1 | 0 |');
     expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0060 of US\$20/);
     expect(text).toMatch(/This run: US\$0\.0060 over 2 calls/);
     expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');

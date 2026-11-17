@@ -25,8 +25,9 @@ const CV = `${readFileSync(new URL('../../../prose-rewriter/evals/cases/cv/es-ri
 
 const TEXT = 'Hola Marta,\n\nEspero que este mensaje te encuentre muy bien. Rehice el sitio de la Panadería Los Álamos en Astro y ahora carga en 1,6 s.\n\nSaludos,\nValeria';
 const FORMULA = 'Espero que este mensaje te encuentre muy bien. ';
-// The edit quotes the sentence without its trailing space, so the space stays, as in the real rewrites.
-const EXPECTED = TEXT.replace(FORMULA.trim(), '');
+// The edit quotes the sentence without its trailing space, as in the real rewrites; the product
+// takes that space with it (prose-rewriter tidyDeletions), so the paragraph starts clean.
+const EXPECTED = TEXT.replace(FORMULA, '');
 
 const sentenceOf = (quote: string): number => {
   const s = splitSentences(TEXT, 'es').find((x) => x.text.includes(quote.trim()));

@@ -394,7 +394,7 @@ describe('rules only a genre runs', () => {
   const where = (id: string) => GENRES.filter((g) => resolveRules(RULES, g).some((r) => r.id === id));
 
   it('run in the genres the design gives them and never in a cover letter', () => {
-    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'], 'SEG-03': ['follow-up'], 'WA-03': ['whatsapp'] };
+    const expected: Record<string, Genre[]> = { 'MAIL-01': ['email', 'follow-up'], 'MAIL-02': ['email', 'follow-up'], 'MAIL-03': ['email', 'follow-up'], 'MAIL-04': ['email', 'follow-up', 'whatsapp'], 'SEG-03': ['follow-up'], 'WA-03': ['whatsapp'] };
     for (const [id, genres] of Object.entries(expected)) expect(where(id), id).toEqual(genres);
     expect(GENRE_RULES.map((r) => r.id).sort()).toEqual(Object.keys(expected).sort());
   });

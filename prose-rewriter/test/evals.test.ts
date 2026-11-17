@@ -87,6 +87,14 @@ describe('the single-call baseline (design 4.10)', () => {
     expect(result).toMatchObject({ rewritten: MAIL.replace(SINERGIAS, FIXED), applied: 1, refused: 1, usage: { calls: 1 } });
   });
 
+  // Review of 17/11: rewrite() ships tidied deletions (S7), so the baseline must too, or the
+  // pairwise judge compares a clean pipeline text with a baseline that starts a line with a space.
+  it('takes the space a deleted sentence leaves behind, as rewrite() does', async () => {
+    const scripted = scriptedGateway({ 'rewrite.edit': [{ ...edits({ sentenceId: 1, before: 'Espero que estés bien.', after: '' }), ...usage(900, 120) }] });
+    const result = await singleCall(mail(MAIL), { gateway: scripted.gateway, refs: REFS });
+    expect(result).toMatchObject({ rewritten: MAIL.replace('Espero que estés bien. ', ''), applied: 1, refused: 0 });
+  });
+
   it('takes the same early exit as rewrite(): no call', async () => {
     const scripted = scriptedGateway({});
     const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp' }, { gateway: scripted.gateway, refs: REFS });
@@ -283,9 +291,10 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   });
   const choice = (c: 'A' | 'B') => ({ text: JSON.stringify({ choice: c, note: '' }) });
   const yes = (key: string, value: boolean) => ({ text: JSON.stringify({ [key]: value, note: '' }) });
+  const noFactDiffers = { text: JSON.stringify({ lost: [], changed: [], added: [], note: '' }) };
 
-  it('lists the four judge rubrics of design 5, pairwise twice', () => {
-    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination']);
+  it('lists the four judge rubrics of design 5, pairwise twice, and the fact check', () => {
+    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination', 'fact-check']);
   });
 
   it('derives the A/B order from the case id alone: the same on every run', () => {
@@ -297,7 +306,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   it('judges blind through rewrite.judge, maps the choice back through the order, and feeds gate() and decide()', async () => {
     // Every pairwise judge answers "A": whether that is the candidate depends on the order of the case.
     const scripted = scriptedGateway({
-      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true)],
+      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true), noFactDiffers, noFactDiffers],
     });
     const seen: JudgeRecord[] = [];
     const records = await judgePieces(CASES, [piece('full', pipelined), piece('single-call', single)], { gateway: scripted.gateway, now: NOW, record: (r) => seen.push(r) });
@@ -347,17 +356,19 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'no-output', null],
       ['register-fit', 'scored', true],
       ['literary-contamination', 'scored', true],
+      ['fact-check', 'no-output', null],
     ]);
     expect(records.filter((r) => r.variant === 'no-style').map((r) => [r.rubric, r.status])).toEqual([
       ['pairwise-original', 'failed'],
       ['same-voice', 'failed'],
       ['register-fit', 'failed'],
       ['literary-contamination', 'failed'],
+      ['fact-check', 'failed'],
     ]);
   });
 
   it('records a judge reply it cannot read as failed and goes on', async () => {
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false)] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false), noFactDiffers] });
     const records = await judgePieces(CASES, [piece('full', pipelined)], { gateway: scripted.gateway, now: NOW });
     scripted.assertDone();
     expect(records.map((r) => [r.rubric, r.status])).toEqual([
@@ -365,6 +376,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'scored'],
       ['register-fit', 'scored'],
       ['literary-contamination', 'scored'],
+      ['fact-check', 'scored'],
     ]);
     expect(records[0]?.error).toMatch(/^JudgeError/);
   });

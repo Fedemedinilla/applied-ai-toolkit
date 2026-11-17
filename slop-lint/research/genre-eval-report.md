@@ -17,10 +17,10 @@ The same hand wrote the texts and knows the catalog, so the slop texts lean on p
 
 | genre | lang | texts | human | slop | sentences | slop sentences | slop with no rule named, reported anyway |
 |---|---|---|---|---|---|---|---|
-| email | es | 12 | 7 | 5 | 92 | 21 | 0.14 (1/7) |
-| email | en | 12 | 7 | 5 | 92 | 18 | 0.00 (0/5) |
-| follow-up | es | 10 | 6 | 4 | 72 | 12 | 0.00 (0/4) |
-| follow-up | en | 10 | 6 | 4 | 72 | 12 | 0.00 (0/4) |
+| email | es | 12 | 7 | 5 | 92 | 21 | 0.17 (1/6) |
+| email | en | 12 | 7 | 5 | 92 | 18 | 0.00 (0/4) |
+| follow-up | es | 10 | 6 | 4 | 72 | 12 | 0.00 (0/3) |
+| follow-up | en | 10 | 6 | 4 | 72 | 12 | 0.00 (0/3) |
 | whatsapp | es | 10 | 6 | 4 | 33 | 11 | 0.00 (0/3) |
 | whatsapp | en | 10 | 6 | 4 | 33 | 10 | 0.00 (0/4) |
 
@@ -39,13 +39,13 @@ The criterion for whatsapp to leave experimental is zero here (design 3.6).
 | genre | level | precision | recall | false-positive rate |
 |---|---|---|---|---|
 | email | 1 | 1.00 (20/20) | 1.00 (20/20) | 0.00 (0/145) |
-| email | 2 | 0.68 (13/19) | 0.81 (13/16) | 0.04 (6/145) |
+| email | 2 | 0.71 (15/21) | 0.83 (15/18) | 0.04 (6/145) |
 | email | 3 | 1.00 (2/2) | n/a | 0.00 (0/145) |
-| email | any | 0.82 (27/33) | 0.96 (26/27) | 0.04 (6/145) |
+| email | any | 0.83 (29/35) | 0.97 (28/29) | 0.04 (6/145) |
 | follow-up | 1 | 1.00 (9/9) | 1.00 (9/9) | 0.00 (0/120) |
-| follow-up | 2 | 1.00 (8/8) | 0.88 (7/8) | 0.00 (0/120) |
+| follow-up | 2 | 1.00 (10/10) | 0.90 (9/10) | 0.00 (0/120) |
 | follow-up | 3 | n/a | n/a | 0.00 (0/120) |
-| follow-up | any | 1.00 (16/16) | 1.00 (16/16) | 0.00 (0/120) |
+| follow-up | any | 1.00 (18/18) | 1.00 (18/18) | 0.00 (0/120) |
 | whatsapp | 1 | 1.00 (6/6) | 1.00 (6/6) | 0.00 (0/45) |
 | whatsapp | 2 | 1.00 (6/6) | 0.75 (6/8) | 0.00 (0/45) |
 | whatsapp | 3 | n/a | n/a | 0.00 (0/45) |
@@ -77,6 +77,7 @@ Only the rules that fired or that a label names, per genre.
 | email | MAIL-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | MAIL-02 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
 | email | MAIL-03 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
+| email | MAIL-04 | 2 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/182) |
 | email | REG-02 | 2 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/182) |
 | email | RET-01 | 2 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/182) |
 | email | SIN-01 | 1 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/183) |
@@ -89,6 +90,7 @@ Only the rules that fired or that a label names, per genre.
 | follow-up | LEX-04 | 2 | sentence | 0 | 0 | 1 | n/a | 0.00 (0/1) | 0.00 (0/143) |
 | follow-up | MAIL-01 | 1 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/142) |
 | follow-up | MAIL-02 | 2 | sentence | 1 | 0 | 0 | 1.00 (1/1) | 1.00 (1/1) | 0.00 (0/143) |
+| follow-up | MAIL-04 | 2 | sentence | 2 | 0 | 0 | 1.00 (2/2) | 1.00 (2/2) | 0.00 (0/142) |
 | follow-up | OFI-01 | 2 | text | 0 | 1 | 0 | 0.00 (0/1) | n/a | 0.05 (1/20) |
 | follow-up | REG-02 | 2 | sentence | 0 | 1 | 0 | 0.00 (0/1) | n/a | 0.01 (1/144) |
 | follow-up | SEG-03 | 2 | sentence | 6 | 0 | 0 | 1.00 (6/6) | 1.00 (6/6) | 0.00 (0/138) |

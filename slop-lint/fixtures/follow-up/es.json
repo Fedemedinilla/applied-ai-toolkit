@@ -380,7 +380,7 @@
         {
           "text": "Agradezco de antemano su tiempo y consideración.",
           "slop": true,
-          "rules": []
+          "rules": ["MAIL-04"]
         },
         {
           "text": "Atentamente,",

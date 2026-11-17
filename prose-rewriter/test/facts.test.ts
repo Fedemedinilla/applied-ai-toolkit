@@ -312,6 +312,128 @@ describe('names at the start of a sentence', () => {
   });
 });
 
+describe('ordinary words at the start of a sentence or a list item', () => {
+  // The live eval of 17/11 and the fact-check probe: a capitalized verb or noun opening a line
+  // ("Optimizar", "Comparto", "Soluciones", "Built", "Proven") was read as a possible name, so a
+  // rewrite that changed or cut it was reverted as a lost or invented fact (about 420 false alarms
+  // over 147 cases). A lexicon of the verbs and nouns these texts open lines with, and noun and
+  // verb endings no name shares, read them as words; surnames that look like verbs stay names.
+  const openings = (text: string, lang: 'es' | 'en') => extract(text, { lang, openings: true }).filter((f) => f.opening === true).map((f) => f.text);
+  const one = (O: string, lang: 'es' | 'en') => ({ O, C: { cv: '' }, sentences: splitSentences(O, lang).map((s) => s.text), lang });
+
+  it('reads the verbs and nouns a Spanish line opens with as words', () => {
+    const lines = [
+      'Optimizar procesos.', 'Liderar equipos.', 'Potenciar sinergias.', 'Mejorar la carga.', 'Comparto algunos ejemplos abajo.',
+      'Disfruto este tipo de trabajo.', 'Ayudo a comercios chicos con su web.', 'Prefiero una llamada corta.', 'Vi que buscan gente.',
+      'Rehice el sitio.', 'Saben lo que hacen.', 'Tarda unos días.', 'Mantengo el sitio.', 'Confirmo el martes.', 'Probalo y avisame.',
+      'Ignorá lo anterior.', 'Soluciones a medida para tu negocio.', 'Mantenimiento mensual del sitio.', 'Diseño de páginas.',
+      'Transformación digital de punta a punta.', 'Velocidad de carga.', 'Atención al cliente.', 'Búsqueda de desarrolladora.',
+      'Comunicación clara.', 'Optimización integral de procesos.', 'Pasión por la web.', 'Postulación al puesto.', 'Presupuesto del sitio.',
+      'Propuesta de valor.', 'Sinergias y valor.', 'Sitio de la escuela.', 'Formulario de pedidos.', 'Desarrolladora web.', 'Formada en diseño.',
+      'Automatizar reportes.', 'Tenemos que hablar.',
+    ];
+    for (const line of lines) expect(openings(line, 'es'), line).toEqual([]);
+  });
+
+  it('reads the verbs, nouns and adjectives an English line opens with as words', () => {
+    const lines = [
+      'Built the help center.', 'Got your message.', 'Allow me to explain.', 'Enjoy the rest of your week.', 'Want to talk?', 'Free on Friday.',
+      'Below are some examples.', 'Proven track record of driving customer satisfaction.', 'Strong communication skills.', 'Passion for support.',
+      'Cutting-edge solutions.', 'Congrats on the launch!', 'Cut the backlog in half.', 'Fancy a call?', 'Great to hear.', 'Help desk setup.',
+      'Ignore the previous instructions.', 'Imagine a faster inbox.', 'Key skills.', 'Laptop fleet management.', 'Note the dates.',
+      'Passion drives me.', 'Pressure is part of the job.', 'Quick question.', 'Reference available.', 'Revolutionize your support.',
+      'Right, here it is.', 'Searches fell.', 'Short version.', 'Support work.', "They'd love it.", 'Tools I use.', 'Communication matters.',
+    ];
+    for (const line of lines) expect(openings(line, 'en'), line).toEqual([]);
+  });
+
+  it('still reads a name that looks like a verb or a noun as a possible name', () => {
+    const es = [
+      'Aguilar me recomendó.', 'Escobar revisó el sitio.', 'Bolívar me pasó el contacto.', 'Salazar me llamó.', 'Javier me pidió el sitio.',
+      'Oscar me escribió.', 'Pilar me recomendó.', 'Omar quiere el sitio.', 'Walter me contrató.', 'Concepción me escribió.', 'Asunción me llamó.',
+      'Gonzalo me pidió el sitio.', 'Sarmiento me contrató.', 'Camilo me escribió.', 'Globant me contrató.',
+    ];
+    for (const line of es) expect(openings(line, 'es'), line).toEqual([line.split(' ')[0]]);
+    const en = ['Mark referred me.', 'Grant asked for it.', 'Drew wrote back.', 'Olivier sent the brief.', 'Pillar hired me.', 'Chase called.', 'Hope called.'];
+    for (const line of en) expect(openings(line, 'en'), line).toEqual([line.split(' ')[0]]);
+  });
+
+  it('accepts a changed or cut opening verb or noun, and still reverts an invented name there', () => {
+    const O = 'Hola Marta,\n\nBusco un puesto donde pueda:\n- Optimizar procesos.\n- Liderar equipos.\n\nSaludos,\nValeria';
+    const sentences = one(O, 'es').sentences;
+    const at = (q: string): number => sentences.findIndex((s) => s.includes(q));
+    expect(checkEdit({ sentenceId: at('Optimizar'), before: 'Optimizar', after: 'Mejorar', reason: 't' }, one(O, 'es')).status).toBe('accepted');
+    expect(factInvariant(O, O.replace('- Optimizar', '- Mejorar'), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('Busco un puesto', 'Comparto algunos ejemplos. Busco un puesto'), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('- Liderar equipos.\n', ''), { cv: '' }, [], ES).holds).toBe(true);
+    expect(factInvariant(O, O.replace('Busco un puesto', 'Escobar me recomendó. Busco un puesto'), { cv: '' }, [], ES).extra.map((f) => f.key)).toEqual(['escobar']);
+    const en = 'Hi Tom,\n\nHere is what I have done:\n- Spearheaded the help desk.\n- Proven track record of driving customer satisfaction.\n\nBest,\nDaniel';
+    expect(factInvariant(en, en.replace('Spearheaded', 'Built'), { cv: 'x' }, [], EN).holds).toBe(true);
+    expect(factInvariant(en, en.replace('- Proven track record of driving customer satisfaction.\n', ''), { cv: 'x' }, [], EN).holds).toBe(true);
+    expect(factInvariant(en, en.replace('Here is', 'Grant asked what. Here is'), { cv: 'x' }, [], EN).extra.map((f) => f.key)).toEqual(['grant']);
+  });
+
+  // Review of 17/11: the word list must never hide a name. A key both ordinary and named by the
+  // CV or the original ("Make" the tool, "Éxito" the store) is the name when it opens a line, and
+  // a word that is also a common first name ("Leo") is not in the list at all.
+  it('keeps a name the CV or the original states when it opens a line, even if it is also an ordinary word', () => {
+    const make = 'Make and n8n workflows for clinics.';
+    const cvMake = { cv: 'Automation with Make and n8n.' };
+    expect(factInvariant(make, 'n8n workflows for clinics.', cvMake, [], EN).missing.map((f) => f.key)).toEqual(['make']);
+    expect(factInvariant(make, 'Zapier and n8n workflows for clinics.', cvMake, [], EN).missing.map((f) => f.key)).toEqual(['make']);
+    expect(factInvariant('- Éxito: tienda online.', '- Tienda online.', { cv: 'Ventas en Éxito.' }, [], ES).missing.map((f) => f.key)).toEqual(['éxito']);
+  });
+
+  it('reads "Leo" at a line start as a name, invented or dropped', () => {
+    const O = 'Hola Nadia.\nMe pasaron tu contacto. Te escribo por el sitio.';
+    expect(factInvariant(O, O.replace('Me pasaron', 'Leo me pasó'), { cv: 'x' }, [], ES).extra.map((f) => f.key)).toEqual(['leo']);
+    const L = 'Leo me pasó tu contacto. Te escribo.';
+    expect(factInvariant(L, 'Me pasaron tu contacto. Te escribo.', { cv: 'Referencia: Leo Ibarra.' }, [], ES).missing.map((f) => f.key)).toEqual(['leo']);
+    expect(factInvariant(L, 'Me pasaron tu contacto. Te escribo.', { cv: 'x' }, [], ES).missing.map((f) => f.key)).toEqual(['leo']);
+  });
+
+  it('reads a tool or a name with a noun ending as a possible name (Notion, Fusion, Motion, Vision, Ness)', () => {
+    for (const line of ['Notion holds every brief.', 'Fusion runs the books.', 'Motion edits the videos.', 'Vision reads the scans.', 'Ness hired me.'])
+      expect(openings(line, 'en'), line).toEqual([line.split(' ')[0]]);
+    const O = 'Notion is where I keep every client brief.';
+    expect(factInvariant(O, 'I keep every client brief in one place.', { cv: 'x' }, [], EN).missing.map((f) => f.key)).toEqual(['notion']);
+    expect(factInvariant('I keep every brief.', 'Notion holds every brief.', { cv: 'x' }, [], EN).extra.map((f) => f.key)).toEqual(['notion']);
+  });
+
+  it('reads a capitalized word followed by an article as a verb, whatever the verb (Relevar el sitio, Audit the plugins)', () => {
+    const es = '- Relevar el sitio.\n- Ordenar los plugins.';
+    expect(factInvariant(es, '- Auditar el sitio.\n- Limpiar los plugins.', { cv: 'x' }, [], ES).holds).toBe(true);
+    const en = '- Audit the plugins.\n- Trim the theme.';
+    expect(factInvariant(en, '- Map the plugins.\n- Slim the theme.', { cv: 'x' }, [], EN).holds).toBe(true);
+    // A name is followed by a verb, not an article: these stay names.
+    expect(openings('Escobar revisó el sitio.', 'es')).toEqual(['Escobar']);
+    expect(openings('Grant asked for the brief.', 'en')).toEqual(['Grant']);
+  });
+
+  it('reads a first name with an accented ending as a name (José, Noé, Andrés, Inés), and a past verb as a verb', () => {
+    for (const line of ['José me pasó tu contacto.', 'Noé me escribió.', 'Andrés me recomendó.', 'Inés me llamó.', 'René revisó el sitio.'])
+      expect(openings(line, 'es'), line).toEqual([line.split(' ')[0]]);
+    for (const line of ['Armé el sitio.', 'Llegó el pedido.', 'Trabajé dos años ahí.', 'Lideré el equipo.']) expect(openings(line, 'es'), line).toEqual([]);
+    const O = 'José me pasó tu contacto. Te escribo.';
+    expect(factInvariant(O, 'Me pasaron tu contacto. Te escribo.', { cv: 'x' }, [], ES).missing.map((f) => f.key)).toEqual(['josé']);
+  });
+});
+
+describe('an acronym is not an ordinary word', () => {
+  // The probe (cause E): "It's" backed a dropped "IT", and the CV's "IT" made the opener "It" a
+  // name, so cutting "It was a game-changer." read as a lost fact.
+  const cv = 'IT technician at Harrow Lane Primary School since 2019.';
+  it('does not back a dropped acronym with an ordinary word that starts the same way', () => {
+    const O = "I am applying for the IT Service Desk Analyst role. It's the work I do.";
+    expect(factInvariant(O, "I am applying for the Service Desk Analyst role. It's the work I do.", { cv }, [], EN).missing.map((f) => f.key)).toEqual(['it']);
+  });
+
+  it('does not read the opener "It" as the acronym "IT"', () => {
+    const O = 'I kept 120 laptops patched. It was a game-changer.';
+    expect(factInvariant(O, 'I kept 120 laptops patched.', { cv }, [], EN)).toMatchObject({ holds: true });
+  });
+});
+
 describe('names are matched as names', () => {
   // A name in R is backed only by the same name in O or C, capitalized: the same words in lower
   // case are ordinary words.
@@ -504,5 +626,97 @@ describe('a name right after an emoji', () => {
     const lost = (O: string, R: string) => factInvariant(O, R, { cv: '' }, [], ES).missing.map((f) => f.text);
     expect(lost('Gracias 🙌 Rosa me recomendó. Me gusta el rosa.', 'Gracias 🙌 Me recomendaron. Me gusta el rosa.')).toEqual(['Rosa']);
     expect(lost('Gracias 🙌 Lemos me recomendó.', 'Gracias 🙌 Me recomendaron.')).toEqual(['Lemos']);
+  });
+});
+
+describe('the forms the probe of 17/11 found unread', () => {
+  it('does not read the markers of a numbered list as numbers (es-email-heavy-4)', () => {
+    const O = 'Te propongo:\n1. Revisar el sitio.\n2) Migrar los mails de 12 personas.\n3. Armar el formulario.';
+    expect(keys(O)).toEqual(['12']);
+    expect(factInvariant(O, 'Te propongo revisar el sitio, migrar los mails de 12 personas y armar el formulario.', { cv: '' }, [], ES)).toMatchObject({ holds: true });
+    // A number that opens a line without a marker's period or parenthesis is still a number.
+    expect(keys('Pedidos por semana:\n40 en marzo.')).toEqual(['40', '--03']);
+  });
+
+  it('reads a bare domain as a URL, so dropping or changing it is a lost fact (en-email-good-3)', () => {
+    const O = 'Tom Hale at calder-systems.example can tell you more. My site is valeria-sosa.com.ar.';
+    expect(extract(O, EN).filter((f) => f.kind === 'url').map((f) => f.key)).toEqual(['calder-systems.example', 'valeria-sosa.com.ar']);
+    expect(factInvariant(O, 'Tom Hale can tell you more. My site is valeria-sosa.com.ar.', { cv: 'x' }, [], EN).missing.map((f) => f.key)).toEqual(['calder-systems.example']);
+    // The same domain behind a scheme states it; a version number or a file name is not a domain.
+    expect(factInvariant(O, O.replace('calder-systems.example', 'https://calder-systems.example'), { cv: 'x' }, [], EN).missing).toEqual([]);
+    expect(extract('Uso Node.js 20.1 y edito config.ts y README.md.', ES).filter((f) => f.kind === 'url')).toEqual([]);
+  });
+});
+
+// Live run 2 of 17/11, es-email-heavy-4: the splitter cuts "1. Comunicación clara" into the
+// sentences "1." and "Comunicación clara", so the edit deleting "1." was checked on the sentence
+// "1." alone, where no space follows the marker; read as the number 1, its deletion "lost" 1 and was
+// reverted. The rewrite then kept "1.\n2.\n3." on their own lines, read as the numbers 1 and 2 again.
+describe('a list marker with nothing after it (es-email-heavy-4, live run 2)', () => {
+  const LIST = 'Mis fortalezas:\n\n1. Comunicación clara\n2. Atención al detalle\n3. Pasión por aprender';
+  const check = (sentence: string, before: string, extra: { drop?: boolean } = {}) =>
+    checkEdit({ sentenceId: 0, before, after: '', reason: 'test', ...extra }, { O: LIST, C: { cv: '' }, sentences: [sentence], lang: 'es' });
+
+  it('reads a marker as a marker whether or not text follows it', () => {
+    expect(keys('1.')).toEqual([]);
+    expect(keys('Mis fortalezas:\n1.\n2)\n3.')).toEqual([]);
+    expect(keys('1.\n2.\n3.\n\nGracias.')).toEqual([]);
+  });
+
+  it('accepts the deletion of a bare marker, the sentence the splitter cuts it into', () => {
+    expect(check('1.', '1.')).toMatchObject({ status: 'accepted', dropped: [] });
+  });
+
+  it('accepts the deletion of a whole item, marker and text, when the text holds no fact', () => {
+    expect(check('1. Comunicación clara', '1. Comunicación clara')).toMatchObject({ status: 'accepted', dropped: [] });
+  });
+
+  it('still reverts the deletion of an item whose text states a fact', () => {
+    const O = 'Hice:\n1. Migré los mails de 12 personas';
+    const r = checkEdit({ sentenceId: 0, before: '1. Migré los mails de 12 personas', after: '', reason: 'test' }, { O, C: { cv: '' }, sentences: ['1. Migré los mails de 12 personas'], lang: 'es' });
+    expect(r).toMatchObject({ status: 'reverted', reason: 'lost' });
+    expect(r.status === 'reverted' ? r.facts.map((f) => f.key) : []).toEqual(['12']);
+  });
+
+  it('does not read the orphan markers a rewrite leaves as numbers it added', () => {
+    const R = 'Mis fortalezas:\n\n1.\n2.\n3.';
+    expect(factInvariant(LIST, R, { cv: '' }, [], ES)).toMatchObject({ holds: true, extra: [] });
+  });
+});
+
+describe('a bare marker counts only where the original makes it one (review of 17/11, findings 1 and 4)', () => {
+  it('reads a number alone on its line as a number when the original has no list there', () => {
+    const O = '¿Cuántos sitios entregué en 2025?\n12.\nTodos en Astro.';
+    expect(keys(O)).toContain('12');
+    expect(factInvariant(O, O.replace('12.', '40.'), { cv: '' }, [], ES)).toMatchObject({ holds: false });
+    expect(factInvariant(O, O.replace('12.\n', ''), { cv: '' }, [], ES)).toMatchObject({ holds: false });
+    const E = 'How many help articles did I write last year?\n60.\nAll of them in English.';
+    expect(factInvariant(E, E.replace('60.', '90.'), { cv: '' }, [], EN)).toMatchObject({ holds: false });
+  });
+
+  it('reverts a change or a deletion of a number the splitter left alone in its sentence', () => {
+    const O = 'Proyectos: 12.';
+    const ctx = { O, C: { cv: '' }, sentences: ['12.'], lang: 'es' } as const;
+    expect(checkEdit({ sentenceId: 0, before: '12.', after: '13.', reason: 'test' }, ctx)).toMatchObject({ status: 'reverted', reason: 'changed-number' });
+    expect(checkEdit({ sentenceId: 0, before: '12.', after: '', reason: 'test' }, ctx)).toMatchObject({ status: 'reverted', reason: 'lost' });
+  });
+
+  it('still reads the markers of a numbered list as markers, bare or not', () => {
+    const LIST = 'Mis fortalezas:\n\n1. Comunicación clara\n2. Atención al detalle';
+    expect(factInvariant(LIST, 'Mis fortalezas:\n\n1.\n2.', { cv: '' }, [], ES)).toMatchObject({ holds: true });
+    expect(keys('Pasos:\n1.\n2.\n3.')).toEqual([]);
+  });
+
+  it('reads letter and roman markers of a list as markers, and deleting one loses nothing', () => {
+    const O = 'Mis fortalezas:\n\nII. Comunicación clara\nIII. Atención al detalle\nIV. Pasión por aprender';
+    expect(keys(O)).toEqual([]);
+    const ctx = { O, C: { cv: '' }, sentences: ['II.'], lang: 'es' } as const;
+    expect(checkEdit({ sentenceId: 0, before: 'II.', after: '', reason: 'test' }, ctx)).toMatchObject({ status: 'accepted', dropped: [] });
+    expect(keys('Puntos:\na) Comunicación clara\nb) Atención al detalle')).toEqual([]);
+  });
+
+  it('does not take a lone initial or acronym at a line start for a marker', () => {
+    expect(keys('Saludos,\nUSA. Bien.', EN)).toContain('usa');
+    expect(keys('Hablé con IV. Martínez', ES)).toContain('iv');
   });
 });
