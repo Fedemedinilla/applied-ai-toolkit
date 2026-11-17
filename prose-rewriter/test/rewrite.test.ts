@@ -1174,3 +1174,62 @@ describe('a stage reply that cannot be read', () => {
     await expect(rewrite(mail(MAIL), { gateway: failing(refusal), refs: REFS, strategy: 'staged' })).rejects.toBe(refusal);
   });
 });
+
+// Live run 2 of 17/11, es-email-heavy-4 (single-guarded): the edits deleted the lead-in "Mis
+// fortalezas:", each numbered item in two edits ("1." and " Comunicación clara", the sentences the
+// splitter cuts) and the paragraph after the list. S5 reverted the three bare markers as losing 1, 2
+// and 3; the text kept "1.\n2.\n3." between runs of four line breaks, the invariant read the orphan
+// markers as added numbers and the piece was blocked. The edits below are the recorded ones.
+describe('es-email-heavy-4, live run 2: a numbered list deleted whole', () => {
+  const RECORDED: Array<{ before: string; after: string }> = [
+    { before: 'Optimización integral de sus procesos de correo', after: 'Soporte técnico para el estudio' },
+    { before: 'Ante todo, quería agradecerte por tomarte el tiempo de leer este mensaje. ', after: '' },
+    { before: 'Sé que tu tiempo es valioso.', after: '' },
+    { before: 'En el dinámico contexto actual, la comunicación es clave.', after: 'Te escribo para [COMPLETAR: qué le proponés o le pedís a Hernán].' },
+    { before: ' Y es ahí donde entro yo.', after: '' },
+    { before: 'Durante mi paso por el Estudio Contable Ruiz y Asociados, lideré con éxito un desafiante proceso de transformación: migré', after: 'En el Estudio Contable Ruiz y Asociados migré' },
+    { before: ' — un verdadero testimonio de mi compromiso con la excelencia', after: '' },
+    { before: 'Mis fortalezas:', after: '' },
+    { before: '1.', after: '' },
+    { before: ' Comunicación clara', after: '' },
+    { before: '2.', after: '' },
+    { before: ' Atención al detalle', after: '' },
+    { before: '3.', after: '' },
+    { before: ' Pasión por aprender', after: '' },
+    { before: 'Estoy segura de que, trabajando codo a codo, podemos llevar al estudio a otro nivel de eficiencia, organización y profesionalismo.', after: '' },
+    { before: ' ¡Será un placer!', after: '' },
+  ];
+  /**
+   * Each recorded edit as the model quoted it, with the id of the sentence of the original that
+   * holds its quote. The record ships the tidied spans, so a deletion's quote is trimmed back.
+   */
+  const placed = (input: RewriteInput) => {
+    const sentences = prepare(RewriteInput.parse(input)).sentences;
+    return RECORDED.map((e) => {
+      const before = e.after === '' ? e.before.trim() : e.before;
+      const holder = sentences.find((s) => s.text === before) ?? sentences.find((s) => s.text.includes(before));
+      if (holder === undefined) throw new Error(`no sentence holds ${before}`);
+      return { sentenceId: holder.id, before, after: e.after };
+    });
+  };
+
+  // The recorded edits, applied with the bare markers, the lines they empty and the blank lines they leave.
+  const EXPECTED =
+    'Asunto: Soporte técnico para el estudio\n\nEstimado Hernán:\n\nTe escribo para [COMPLETAR: qué le proponés o le pedís a Hernán]. En el Estudio Contable Ruiz y Asociados migré los mails de 12 personas a un dominio propio sin perder correo. Además, escribí las guías internas para cargar comprobantes, que el estudio sigue usando.\n\nNo dudes en contactarme ante cualquier inquietud.\n\nCordialmente,\nValeria Sosa Pereyra';
+
+  it('applies the deletion of every marker and ships no orphan marker and no run of blank lines', async () => {
+    const input = evalInput('es', 'es-email-heavy-4');
+    const list = placed(input);
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(...list)], 'rewrite.judge': [verdictIn('es', EXPECTED)] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    scripted.assertDone();
+    for (const marker of ['1.', '2.', '3.']) expect(result.changes.find((c) => c.before.trim().startsWith(marker)), marker).toMatchObject({ status: 'applied' });
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]*\d{1,2}[.)][ \t]*(?:\n|$)/u);
+    expect(result.rewritten).not.toMatch(/\n[ \t]*\n[ \t]*\n/u);
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]|[ \t](?:\n|$)/u);
+    expect(result.rewritten).toBe(EXPECTED);
+    expect(result.facts.added).toEqual([]);
+    expect(result.status).not.toBe('blocked');
+    expectSound(input, result);
+  });
+});

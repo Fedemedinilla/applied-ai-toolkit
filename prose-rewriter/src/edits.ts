@@ -461,6 +461,13 @@ const OPENS_BEFORE = /[(\[{«“‘"'¿¡]/u;
  * since the checks match each edit's quote against its sentence; S7 tidies the edits it ships.
  * Each deletion decides alone (review of 17/11): a run widened as one gap glued two sentences
  * ("Hola.Tres") when the user restored one of them.
+ *
+ * Then whole lines (wholeLines) and the blank lines between paragraphs (blankRuns): a line the
+ * deletions empty goes with its line break, a list marker whose item text is all deleted goes
+ * with it, and a run of three or more line breaks the deletions leave is cut back to the most the
+ * user wrote there, at least two. Why: live run 2 of 17/11 (es-email-heavy-4) shipped "1.\n2.\n3."
+ * between runs of four line breaks after the lead-in, the items and the paragraph after them were
+ * deleted.
  */
 export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]): AppliedEdit[] {
   const ordered = [...accepted].sort((a, b) => a.span.start - b.span.start);
@@ -485,11 +492,114 @@ export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]
       span.end = k1;
     }
   }
+  wholeLines(original, ordered, spans, free);
+  blankRuns(original, ordered, spans, free);
   const widened = ordered.map((e, i) => {
     const span = spans[i] as TextRange;
     return span.start === e.span.start && span.end === e.span.end ? e : { ...e, span, before: original.slice(span.start, span.end) };
   });
   return render(original, widened).accepted;
+}
+
+type MutableSpan = { start: number; end: number };
+type Free = (from: number, to: number) => boolean;
+
+/** A list item's marker, alone: "1.", "2)", "-", "*" or "•". */
+const BARE_MARKER = /^(?:\d{1,2}[.)]|[-*•])$/u;
+
+/**
+ * Each line of the original whose content the deletions cover, except at most a list marker that
+ * opens it, goes whole: the first deletion on it takes the marker and the blanks before it, each
+ * deletion the blanks up to the next one, and the last one the line break after the line (the
+ * first one the break before it, on the last line). A line with any other edit on it, or whose
+ * break an edit already holds, is left as it is. Restoring one deletion of a line that several
+ * fill can glue that line to the next: the page's restore is per change, and a whole line is one
+ * break that only one of them can hold.
+ */
+function wholeLines(original: string, ordered: readonly AppliedEdit[], spans: MutableSpan[], free: Free): void {
+  for (let ls = 0; ls < original.length; ) {
+    const newline = original.indexOf('\n', ls);
+    const le = newline < 0 ? original.length : newline;
+    const line = { ls, le };
+    ls = le + 1;
+    if (original.slice(line.ls, line.le).trim() === '') continue;
+    const on = spans
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => (s.start < line.le && s.end > line.ls) || (s.start === s.end && s.start >= line.ls && s.start <= line.le));
+    if (on.length === 0 || on.some(({ i, s }) => ordered[i]?.after !== '' || s.start < line.ls || s.end > line.le)) continue;
+    // What no deletion covers on the line: nothing but blanks, or a marker before the first deletion.
+    const first = on[0]?.s as MutableSpan;
+    const last = on[on.length - 1]?.s as MutableSpan;
+    let rest = '';
+    for (let k = line.ls; k < line.le; k++) if (free(k, k + 1)) rest += original[k] ?? '';
+    const head = original.slice(line.ls, first.start);
+    if (rest.trim() !== '' && !(BARE_MARKER.test(rest.trim()) && head.trim() === rest.trim())) continue;
+    first.start = line.ls;
+    for (let j = 0; j + 1 < on.length; j++) (on[j]?.s as MutableSpan).end = (on[j + 1]?.s as MutableSpan).start;
+    last.end = line.le;
+    if (line.le < original.length && free(line.le, line.le + 1)) last.end = line.le + 1;
+    else if (line.le === original.length && line.ls > 0 && free(line.ls - 1, line.ls)) first.start = line.ls - 1;
+  }
+}
+
+/**
+ * Each stretch of the original made only of deletions and the blanks and line breaks between them
+ * that leaves three or more line breaks in the text is cut back to the most line breaks the user
+ * wrote in a row inside it, at least two: the deletions, in text order, take the breaks after
+ * them, then, in reverse order, the ones before them. A stretch with no deletion is the user's
+ * own and stays as written.
+ */
+function blankRuns(original: string, ordered: readonly AppliedEdit[], spans: MutableSpan[], free: Free): void {
+  const deletionAt = (k: number): number => spans.findIndex((s, i) => ordered[i]?.after === '' && s.start <= k && k < s.end);
+  for (let a = 0; a < original.length; ) {
+    let b = a;
+    const inside: number[] = [];
+    let breaks = 0;
+    let own = 0;
+    let row = 0;
+    while (b < original.length) {
+      const d = deletionAt(b);
+      if (d >= 0) {
+        if (!inside.includes(d)) inside.push(d);
+        row = 0;
+        b = (spans[d] as MutableSpan).end;
+        continue;
+      }
+      const ch = original[b] ?? '';
+      if (!free(b, b + 1) || !/[ \t\r\n]/u.test(ch)) break;
+      if (ch === '\n') {
+        breaks++;
+        own = Math.max(own, ++row);
+      }
+      b++;
+    }
+    if (b === a) {
+      a++;
+      continue;
+    }
+    let excess = breaks - Math.max(2, own);
+    if (inside.length > 0 && excess > 0) {
+      for (const d of inside) {
+        const span = spans[d] as MutableSpan;
+        for (let k = span.end; excess > 0 && k < b && free(k, k + 1) && /[ \t\r\n]/u.test(original[k] ?? ''); k++) {
+          if (original[k] === '\n') {
+            excess--;
+            span.end = k + 1;
+          }
+        }
+      }
+      for (const d of [...inside].reverse()) {
+        const span = spans[d] as MutableSpan;
+        for (let k = span.start - 1; excess > 0 && k >= a && free(k, k + 1) && /[ \t\r\n]/u.test(original[k] ?? ''); k--) {
+          if (original[k] === '\n') {
+            excess--;
+            span.start = k;
+          }
+        }
+      }
+    }
+    a = b;
+  }
 }
 
 /** RewriteResult.diff: one hunk per accepted edit, in the original's coordinates and in text order. */
