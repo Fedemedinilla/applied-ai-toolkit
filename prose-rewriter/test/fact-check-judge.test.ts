@@ -189,6 +189,22 @@ describe('the fact-check prompt, version 2: only checkable facts count', () => {
     expect(v.lost.map((e) => e.kind)).toEqual(['place', 'credential']);
   });
 
+  // Review of 17/11, finding 2: en-follow-up-light-3 asks "Could you tell me by Friday...?" and must keep "by Friday".
+  it('keeps a date, number or name inside a question, request, greeting or sign-off a fact, and gives no example that holds one', () => {
+    expect(system).toMatch(/A date, a deadline, a number or a name inside a greeting, a sign-off, an offer, a request or a question is still a fact/);
+    const notFacts = (system.split('\n').find((l) => l.startsWith('Not facts:')) ?? '').split('Removing, softening')[0] ?? '';
+    expect(notFacts).toMatch(/offers, requests and questions/);
+    expect(notFacts).not.toMatch(/Thursday|Friday|Monday|lunes|viernes/);
+  });
+
+  // Findings 6, 7 and 8: a self-description is not a level, a guarantee needs no number, and a CV fact moved to another job is changed.
+  it('tells a level from a self-description, counts any guarantee as added, and backs a detail only for the same employer and period', () => {
+    expect(system).toMatch(/a seniority stated as a title or a grade \(junior, senior, lead, B2, "nivel avanzado"\) or as years/);
+    expect(system).toMatch(/Removing a self-description such as "expert" or "experta en atención al cliente" is not a lost fact/);
+    expect(system).toMatch(/any promised or guaranteed outcome, with or without a number/);
+    expect(system).toMatch(/on the same subject, employer and period/);
+  });
+
   it('can judge with the fact check alone, as a re-judge of recorded pieces does', async () => {
     const scripted = scriptedGateway({ 'rewrite.judge': [clean] });
     const records = await judgePieces(CASES, [piece('single-guarded', REWRITE)], { gateway: scripted.gateway, now: NOW, rubrics: ['fact-check'] });
