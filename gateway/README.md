@@ -277,18 +277,18 @@ The two Postgres suites run on PGlite, which has one connection. They exercise t
 ## Mutation testing
 
 ```sh
-npm run mutation:gateway   # StrykerJS over src/caps.ts and src/cost.ts with this folder's tests; about 50 seconds on 4 cores
+npm run mutation:gateway   # StrykerJS over src/caps.ts and src/cost.ts with this folder's tests; about 5 minutes on 4 cores
 ```
 
 Stryker changes the code one small edit at a time (a `>=` into a `>`, a condition into `true`) and runs the tests against each mutant. A mutant that survives is a line a bug could change with no test failing. The report goes to `reports/mutation/gateway/`.
 
-Measured on 2026-11-14 with StrykerJS 10.1.1, on 4 cores of a shared cloud container:
+Measured on 2026-11-17 with StrykerJS 10.1.1, on 4 cores of a shared cloud container. A mutant that makes the tests run past Stryker's timeout counts as killed. All 16 of those are in `caps.ts`, 5 in the DST correction and 11 in `checkCaps` and its helpers.
 
-| File | Mutants | Killed | Survived | Score |
-| --- | --- | --- | --- | --- |
-| `src/caps.ts` | 90 | 89 | 1 | 98.89% |
-| `src/cost.ts` | 184 | 183 | 1 | 99.46% |
-| Both | 274 | 272 | 2 | 99.27% |
+| File | Mutants | Killed | Of them, by timeout | Survived | Score |
+| --- | --- | --- | --- | --- | --- |
+| `src/caps.ts` | 98 | 98 | 16 | 0 | 100.00% |
+| `src/cost.ts` | 184 | 184 | 0 | 0 | 100.00% |
+| Both | 282 | 282 | 16 | 0 | 100.00% |
 
 The first run scored 90.15%, with 23 survivors and 4 mutants no test reached. The gaps it showed, each now a test:
 
@@ -300,10 +300,12 @@ The first run scored 90.15%, with 23 survivors and 4 mutants no test reached. Th
 - `countAttachments` over `null`, a null `source` and a `source` that is a string, which threw with the type checks removed.
 - The filter that blanks base64 data also blanked the `data` of a plain-text document when its type check was removed.
 
-Two mutants survive and are equivalent, so no test can kill them:
+The DST correction for midnight gaps, added on 2026-11-15, brought the score down to 96.33%, under the threshold, with 11 survivors. Six were real gaps, now tests:
 
-- `caps.ts`, `parts.find(...)?.value` without the `?.`: `Intl.DateTimeFormat.formatToParts` returns every part the formatter asks for, so the lookup never misses.
-- `cost.ts`, `from > current.from` as `>=` in `pricesInForce`: the two differ only for two rows of one model with the same `validFrom`, which the primary key `(model, valid_from)` of `model_prices` rules out.
+- The bisection to the second only matters when a gap starts before midnight and skips it. Santiago and Havana start theirs at midnight, so the loop could be removed with no test failing. Toronto and Nassau on 1919-03-31 went from 23:30 straight to 00:30. A scan of the IANA data in Node 24 from 1900 to 2037 found no other such gap, and the test pins the day start there.
+- Two price rows of one model with the same `validFrom`. Postgres cannot hold both, but `MemoryPriceStore` or a custom store can return them, and the first one stays, as `loadPrices` keeps the row that is already there.
+
+The other five were equivalent. No test could kill them, so the code changed instead. `partsAt` read each part with `?.`, and `formatToParts` returns every part the formatter asks for. The date check compared year, month and day, but the instants it checks are always on the target date or the one before. Two consecutive dates never share a day of the month, so it now compares the day alone.
 
 `thresholds.break` in `stryker.config.json` is 97: a run below it exits non-zero. The weekly workflow `.github/workflows/quality.yml` runs it.
 
