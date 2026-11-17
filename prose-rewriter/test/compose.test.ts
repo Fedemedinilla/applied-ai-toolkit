@@ -15,6 +15,13 @@ import { prepare } from '../src/stages/analyse.ts';
 import { RewriteInput, type RewriteResult } from '../src/types.ts';
 import { scriptedGateway, type ScriptedReply } from './scripted-gateway.ts';
 
+/**
+ * `text` without the sentence `before`, and without the space it leaves behind, as S7 ships a
+ * deletion (tidyDeletions): the space after it, or failing that the one before it.
+ */
+const cut = (text: string, before: string): string =>
+  text.includes(`${before} `) ? text.replace(`${before} `, '') : text.includes(` ${before}`) ? text.replace(` ${before}`, '') : text.replace(before, '');
+
 const ROOT = new URL('../../', import.meta.url);
 const json = (file: string): unknown[] => JSON.parse(readFileSync(new URL(file, ROOT), 'utf8')) as unknown[];
 const REFS: PromptRefs = {
@@ -93,10 +100,8 @@ describe('S4 after S3 (F6b eval run)', () => {
     // S3's third edit is reverted (voice: the run's "adds usted"); S4's rewrite of that sentence then
     // stands on the sentence as the user wrote it. The other style edits quote text S3 removed or
     // rewrote, so they no longer apply.
-    const expected = i.text
-      .replace((ES_S3[1] as Proposed).before, '')
-      .replace(style.before, style.after)
-      .replace((ES_S3[3] as Proposed).before, '')
+    const expected = cut(cut(i.text, (ES_S3[1] as Proposed).before)
+      .replace(style.before, style.after), (ES_S3[3] as Proposed).before)
       .replace((ES_S3[4] as Proposed).before, (ES_S3[4] as Proposed).after)
       .replace((ES_S3[5] as Proposed).before, (ES_S3[5] as Proposed).after);
     const scripted = scriptedGateway({
@@ -200,7 +205,7 @@ const lines = (rewritten: string, lang: 'es' | 'en') => judgeLines(rewritten, la
 
 describe('the S5 judge reply (F6b eval run)', () => {
   const i = input('es-follow-up-heavy');
-  const expected = i.text.replace((ES_FOLLOW_S3[0] as Proposed).before, '').replace((ES_FOLLOW_S3[1] as Proposed).before, '');
+  const expected = cut(cut(i.text, (ES_FOLLOW_S3[0] as Proposed).before), (ES_FOLLOW_S3[1] as Proposed).before);
   const run = async (...judge: ScriptedReply[]) => {
     const scripted = scriptedGateway({
       'rewrite.plan': [plan(6)],
@@ -230,7 +235,7 @@ describe('the S5 judge reply (F6b eval run)', () => {
 describe('a judge reply S5 cannot read (F6b eval run)', () => {
   const i = input('es-follow-up-heavy');
   const [opener, promise] = ES_FOLLOW_S3 as [Proposed, Proposed];
-  const both = i.text.replace(opener.before, '').replace(promise.before, '');
+  const both = cut(cut(i.text, opener.before), promise.before);
   // The run's two errors, as replies: a line without its support, and prose.
   const wrongShape: ScriptedReply = { text: JSON.stringify({ lines: judgeLines(both, 'es').map((l) => ({ line: l.line, note: '' })), note: '' }) };
   const prose: ScriptedReply = { text: 'Every line of the rewrite is backed by the draft.' };
@@ -274,7 +279,7 @@ describe('a judge reply S5 cannot read (F6b eval run)', () => {
     };
     const { result, judgeCalls } = await run(first, prose, wrongShape);
     expect(judgeCalls).toBe(3);
-    expect(result.rewritten).toBe(i.text.replace(opener.before, ''));
+    expect(result.rewritten).toBe(cut(i.text, opener.before));
     expect(result.status).toBe('needs-review');
     expect(result.changes.find((c) => c.before === opener.before && c.stage === 'edit')).toMatchObject({ status: 'applied' });
     expect(result.changes.find((c) => c.before === promise.before && c.stage === 'edit')).toMatchObject({ status: 'reverted', revertReason: expect.stringMatching(/^judge: the sentence claimed/) });

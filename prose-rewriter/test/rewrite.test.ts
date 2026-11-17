@@ -11,6 +11,13 @@ import { DEFAULT_STRATEGY, defaultRegister, GENRES, type JudgeClient, RewriteInp
 import { CapError, ResponseError, type Gateway } from '../../gateway/src/index.ts';
 import { scriptedGateway } from './scripted-gateway.ts';
 
+/**
+ * `text` without the sentence `before`, and without the space it leaves behind, as S7 ships a
+ * deletion (tidyDeletions): the space after it, or failing that the one before it.
+ */
+const cut = (text: string, before: string): string =>
+  text.includes(`${before} `) ? text.replace(`${before} `, '') : text.includes(` ${before}`) ? text.replace(` ${before}`, '') : text.replace(before, '');
+
 const CV_ES = readFileSync(new URL('../evals/cases/cv/es-rioplatense.md', import.meta.url), 'utf8');
 const CV_EN = readFileSync(new URL('../evals/cases/cv/en.md', import.meta.url), 'utf8');
 
@@ -821,7 +828,7 @@ describe("strategy 'single': one call, the same guards", () => {
     { sentenceId: 6, before: 'Sin lugar a dudas, puedo llevar el sitio de la cooperativa al siguiente nivel.', after: 'Puedo hacer lo mismo con el sitio de la cooperativa.' },
     { sentenceId: 7, before: 'Quedo a tu entera disposición ante cualquier consulta.', after: 'Si te interesa, escribime y coordinamos una llamada.' },
   ];
-  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => (e.after === '' ? cut(t, e.before) : t.replace(e.before, e.after)), text);
 
   it('makes one call that plans and edits, then the judge: no plan, no style, no extra round', async () => {
     const input = evalInput('es', 'es-email-heavy');
@@ -835,6 +842,16 @@ describe("strategy 'single': one call, the same guards", () => {
     expect(result.rewritten).toBe(expected);
     expect(result.changes.every((c) => c.stage === 'edit' && c.status === 'applied')).toBe(true);
     expect(result.status).toBe('ok');
+    expectSound(input, result);
+  });
+
+  it('leaves no space at the start of a paragraph where it deleted a sentence (es-email-heavy, live run 17/11)', async () => {
+    // The live run shipped "Hola Martín,\n\n Te escribo...": the deleted sentence's quote leaves out the space after it.
+    const input = evalInput('es', 'es-email-heavy');
+    const scripted = scriptedGateway({ 'rewrite.edit': [edits(...ES_REST)], 'rewrite.judge': [verdictIn('es', applyAll(input.text, ES_REST))] });
+    const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
+    expect(result.rewritten).toContain('Hola Martín,\n\nTe escribo porque');
+    expect(result.rewritten).not.toMatch(/(?:^|\n)[ \t]|\S {2,}\S|[ \t]\n/u);
     expectSound(input, result);
   });
 
@@ -963,7 +980,7 @@ describe('S5 drops against what the judge leaves', () => {
   const CLOSING = { sentenceId: 5, before: 'Quedo a la espera de su respuesta.', after: 'Si le sirve, le muestro estos proyectos en una llamada corta.' };
   const SPLIT = { sentenceId: 2, before: 'desde marzo de 2023: armé', after: 'desde marzo de 2023. Armé', principleId: 'es-vary-sentence-length' };
   const TWIN = { sentenceId: 4, before: LUMEN, after: '', reason: 'no fact', principleId: 'es-only-what-moves-the-reader', drop: true };
-  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => t.replace(e.before, e.after), text);
+  const applyAll = (text: string, list: ReadonlyArray<{ before: string; after: string }>): string => list.reduce((t, e) => (e.after === '' ? cut(t, e.before) : t.replace(e.before, e.after)), text);
 
   it('reverts an accepted drop once the edit that kept its fact is reverted by the judge', async () => {
     const input = evalInput('es', 'es-cover-letter-heavy');

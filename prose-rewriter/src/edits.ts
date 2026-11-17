@@ -436,6 +436,74 @@ export function revertEdit(
   return reverted === undefined ? rendered : { ...rendered, reverted };
 }
 
+const BLANK = /[ \t]/u;
+/** What may follow a deleted word directly, with no space before it: closing punctuation. */
+const CLOSES_AFTER = /[,.;:!?…)\]»”]/u;
+
+/**
+ * The accepted edits with each deletion (an empty `after`) widened over the spaces it would leave
+ * behind, so the text they produce never starts a line with a space, ends one with a space, or
+ * keeps two spaces between sentences: the space after it when it opens a line or sits between
+ * two spaces, the space before it when it closes a line or comes before closing punctuation. A
+ * deletion only takes spaces no other edit holds, the space after it first, so the result does
+ * not depend on the edits' order, and tidying twice changes nothing. Spans and quotes stay in the
+ * original's coordinates, so the diff still applies; newSpan is computed again.
+ *
+ * Why: the model deletes a sentence by quoting it without the space after it, and the live eval
+ * of 17/11 shipped "Hola Martín,\n\n Te escribo..." in 26 of 147 pieces. Kept out of applyEdits,
+ * since the checks match each edit's quote against its sentence; S7 tidies the edits it ships.
+ */
+export function tidyDeletions(original: string, accepted: readonly AppliedEdit[]): AppliedEdit[] {
+  const ordered = [...accepted].sort((a, b) => a.span.start - b.span.start);
+  const spans = ordered.map((e) => ({ start: e.span.start, end: e.span.end }));
+  const free = (from: number, to: number): boolean => spans.every((s) => to <= s.start || from >= s.end);
+  const plans = ordered.map((e, i) => {
+    if (e.after !== '') return undefined;
+    const { start, end } = spans[i] as TextRange;
+    let k0 = start;
+    while (k0 > 0 && BLANK.test(original[k0 - 1] ?? '')) k0--;
+    let k1 = end;
+    while (k1 < original.length && BLANK.test(original[k1] ?? '')) k1++;
+    const lineStart = k0 === 0 || original[k0 - 1] === '\n';
+    const lineEnd = k1 === original.length || /[\r\n]/u.test(original[k1] ?? '');
+    return { i, start, end, k0, k1, lineStart, lineEnd };
+  });
+  // The space after first: a deletion that opens a line, or sits between two spaces mid-line.
+  const forward = new Set<number>();
+  for (const p of plans) {
+    if (p === undefined || p.k1 === p.end) continue;
+    if ((p.lineStart || (p.k0 < p.start && !p.lineEnd)) && free(p.end, p.k1)) {
+      (spans[p.i] as TextRange & { end: number }).end = p.k1;
+      forward.add(p.i);
+    }
+  }
+  // Then the space before: a deletion that closes a line, or comes right before closing punctuation.
+  // When a deletion that took the space after it sits right before, the run of deletions is one
+  // gap, and the first of them takes the space before the run.
+  for (const p of plans) {
+    if (p === undefined || forward.has(p.i)) continue;
+    if (!(p.lineEnd || p.k1 > p.end || CLOSES_AFTER.test(original[p.end] ?? ''))) continue;
+    let at = p.i;
+    for (;;) {
+      const span = spans[at] as TextRange & { start: number };
+      let k0 = span.start;
+      while (k0 > 0 && BLANK.test(original[k0 - 1] ?? '')) k0--;
+      if (k0 < span.start && free(k0, span.start)) {
+        if (k0 > 0 && original[k0 - 1] !== '\n') span.start = k0;
+        break;
+      }
+      const previous = spans.findIndex((s, j) => s.end === span.start && j !== at && ordered[j]?.after === '');
+      if (previous < 0) break;
+      at = previous;
+    }
+  }
+  const widened = ordered.map((e, i) => {
+    const span = spans[i] as TextRange;
+    return span.start === e.span.start && span.end === e.span.end ? e : { ...e, span, before: original.slice(span.start, span.end) };
+  });
+  return render(original, widened).accepted;
+}
+
 /** RewriteResult.diff: one hunk per accepted edit, in the original's coordinates and in text order. */
 export function diffHunks(original: string, accepted: readonly AppliedEdit[]): DiffHunk[] {
   return render(original, accepted).accepted.map((a) => ({ span: { start: a.span.start, end: a.span.end }, before: a.before, after: a.after }));

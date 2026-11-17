@@ -40,7 +40,7 @@
  * - 'ok' otherwise.
  */
 import { ResponseError } from '../../gateway/src/index.ts';
-import { diffHunks } from './edits.ts';
+import { diffHunks, renderEdits, tidyDeletions } from './edits.ts';
 import { factInvariant, factReport, type Fact } from './facts.ts';
 import { restoreData } from './injection.ts';
 import { gatewayModelClient } from './model-client.ts';
@@ -234,8 +234,10 @@ const EXTRA = { es: 'Revisá el texto: dice algo que no está ni en tu texto ni 
 
 /** S7. */
 function assemble(a: Analysis, units: Parameters<typeof liveEdits>[1], proposals: readonly Proposal[], outcome: Outcome): RewriteResult {
-  const live = liveEdits(a, units, proposals);
-  const rewritten = rendered(a, units, proposals);
+  // The shipped text never keeps the space a deleted sentence leaves behind (tidyDeletions); the
+  // diff holds the widened hunks, while each change keeps the quote the model wrote.
+  const live = tidyDeletions(a.text, liveEdits(a, units, proposals));
+  const rewritten = renderEdits(a.text, live);
   const drops = proposals.flatMap((p) => (p.status === 'live' && p.check?.status === 'accepted' ? p.check.dropped.map((f) => f.key) : []));
   const invariant = factInvariant(a.text, rewritten, a.sources, drops, a.extractOptions);
   const invented = proposals.some((p) => p.check?.status === 'reverted' && p.check.reason === 'invented');
