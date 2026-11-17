@@ -10,6 +10,7 @@ import { gatewayModelClient } from '../src/model-client.ts';
 import {
   factSheet,
   judgeLines,
+  judgeReplyJson,
   judgeRuns,
   planReverts,
   REWRITE_JUDGE_PROMPT_VERSION,
@@ -347,5 +348,24 @@ describe('judgeRuns (D10)', () => {
   it('runs on WhatsApp outside minimo', () => {
     expect(judgeRuns({ genre: 'whatsapp', mode: 'pulido' })).toBe(true);
     expect(judgeRuns({ genre: 'whatsapp', mode: 'reescritura' })).toBe(true);
+  });
+});
+
+describe('judgeReplyJson', () => {
+  // Live run of 17/11: 15 of 112 fact-check verdicts failed as "not JSON". A reply that opens with
+  // the object and adds a note after it was passed through whole, so JSON.parse saw the note.
+  it('keeps only the first complete object when a note follows it', () => {
+    expect(JSON.parse(judgeReplyJson('{"lost":[],"added":[]}\n\nNote: the rewrite only cut slop.'))).toEqual({ lost: [], added: [] });
+    expect(JSON.parse(judgeReplyJson('Here it is:\n```json\n{"a":1}\n```\nThe "b" key {is} not needed.'))).toEqual({ a: 1 });
+  });
+
+  it('reads braces and quotes inside strings as text', () => {
+    const raw = '{"lost":[{"fact":"el {plan} \\"B\\"","kind":"claim"}]} trailing } brace';
+    expect(JSON.parse(judgeReplyJson(raw))).toEqual({ lost: [{ fact: 'el {plan} "B"', kind: 'claim' }] });
+  });
+
+  it('returns the text as it is when it holds no complete object', () => {
+    expect(judgeReplyJson('no json here')).toBe('no json here');
+    expect(judgeReplyJson('{"open": true')).toBe('{"open": true');
   });
 });
