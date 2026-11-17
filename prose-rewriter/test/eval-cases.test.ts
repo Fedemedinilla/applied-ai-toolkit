@@ -24,12 +24,12 @@ describe('the eval cases', () => {
     for (const c of CASES) expect(c.id.startsWith(`${c.input.lang}-`), c.id).toBe(true);
   });
 
-  it('cover every genre and language with one light, one heavy and one already good text', () => {
+  it('cover every genre and language with four light, four heavy and four already good texts', () => {
     for (const lang of ['es', 'en'] as const satisfies readonly Lang[]) {
       for (const genre of GENRES) {
         for (const kind of CASE_KINDS.filter((k) => k !== 'trap')) {
           const found = CASES.filter((c) => c.input.lang === lang && c.input.genre === genre && c.kind === kind);
-          expect(found.map((c) => c.id), `${lang} ${genre} ${kind}`).toHaveLength(1);
+          expect(found.map((c) => c.id), `${lang} ${genre} ${kind}`).toHaveLength(4);
         }
       }
     }
@@ -37,8 +37,11 @@ describe('the eval cases', () => {
     for (const c of CASES.filter((x) => x.input.lang === 'es')) expect(c.input.variety, c.id).toBe('rioplatense');
   });
 
-  it('hold every trap of design section 5 once', () => {
-    expect(CASES.filter((c) => c.kind === 'trap').map((c) => c.trap).sort()).toEqual([...TRAPS].sort());
+  it('hold every trap of design section 5 three times per language, the WhatsApp voice in Spanish only', () => {
+    const traps = (lang: Lang) => CASES.filter((c) => c.kind === 'trap' && c.input.lang === lang).map((c) => c.trap).sort();
+    expect(traps('es')).toEqual([...TRAPS, ...TRAPS, ...TRAPS].sort());
+    const en = TRAPS.filter((t) => t !== 'whatsapp-voice');
+    expect(traps('en')).toEqual([...en, ...en, ...en].sort());
   });
 
   it('grade the slop: heavy texts have more findings than light ones, and good texts have no level 1 finding', () => {

@@ -12,9 +12,10 @@
  * instruction with the markers that would show it was obeyed. Every expectation is checked against
  * the case's own text when the file is read, so a typo cannot make a rubric pass for nothing.
  *
- * How many cases per genre is not decided (D3): the files hold one of each kind per genre and
- * language plus one case per trap, a small set because every live run is paid from a fixed
- * monthly budget (D14).
+ * D3 grows the set so measured rates have a usable denominator: the files hold four of each kind
+ * (light, heavy, good) per genre and language, 96 cases, plus three cases per trap and language,
+ * 27 in Spanish and 24 in English (the WhatsApp voice trap is Spanish only), 147 in all. Every
+ * live run is still paid from a fixed monthly budget (D14), so the dry run states its cost first.
  */
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
