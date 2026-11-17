@@ -41,12 +41,16 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   'idempotent-orders': ['idempotent-orders/src/index.ts'],
   'import-fences': ['import-fences/src/index.ts'],
   'pdf-receipt': ['pdf-receipt/src/index.ts'],
+  // A private workspace, not a published package: its entry is still the one way an app reaches it.
+  // The fictional eval cases and CVs are its published data, read by the rewriter app's demo tests.
+  'prose-rewriter': ['prose-rewriter/src/index.ts', 'prose-rewriter/evals/cases/*.json', 'prose-rewriter/evals/cases/cv/*.md'],
   'safe-markdown': ['safe-markdown/src/index.ts'],
   // The example run that the report and the checklist app agree on; read by the checklist's tests.
   'site-check': ['site-check/examples/datos.json', 'site-check/examples/run.json'],
   // The package entries of @fedemedinilla/slop-lint: '.' is src/lint.ts, './types' is src/types.ts.
   'slop-lint': ['slop-lint/src/lint.ts', 'slop-lint/src/types.ts'],
-  'style-refs': ['style-refs/src/index.ts'],
+  // The data files are what a caller loads and checks with the entry's schemas (style-refs has no I/O).
+  'style-refs': ['style-refs/src/index.ts', 'style-refs/sources.json', 'style-refs/principles/*.json', 'style-refs/examples/*.json'],
 };
 
 /**
@@ -61,6 +65,17 @@ export const APP_USES: Readonly<Record<string, readonly string[]>> = {
   checklist: ['site-check/examples/datos.json', 'site-check/examples/run.json'],
   receipt: ['pdf-receipt/src/index.ts'],
   'replay-lab': ['deterministic-sim/src/index.ts'],
+  // The server calls rewrite() through the gateway and loads style-refs' data with its schemas; the
+  // page imports only types from prose-rewriter.
+  rewriter: [
+    'gateway/src/index.ts',
+    'prose-rewriter/src/index.ts',
+    'prose-rewriter/evals/cases/cv/*.md',
+    'style-refs/src/index.ts',
+    'style-refs/sources.json',
+    'style-refs/principles/*.json',
+    'style-refs/examples/*.json',
+  ],
   'salon-assistant': ['gateway/src/index.ts', 'grounded-assistant/src/index.ts', 'safe-markdown/src/index.ts'],
   writer: ['evals/src/index.ts', 'gateway/src/index.ts'],
 };
@@ -214,6 +229,7 @@ export default defineConfig({
         'prose-rewriter/evals/cli.ts',
         'apps/caja/server/env.ts',
         'apps/chat-widget/server/env.ts',
+        'apps/rewriter/server/env.ts',
         'apps/salon-assistant/server/env.ts',
         'apps/writer/server/env.ts',
       ],
