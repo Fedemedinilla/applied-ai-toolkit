@@ -163,7 +163,7 @@ describe('planReverts', () => {
     const v: RewriteVerdict = {
       lines: lines.map((l) =>
         l.line === ran
-          ? { line: l.line, support: 'brief', note: '', unbacked: 'ran the whole help desk on my own', cv: 'Support engineer at Brightwell Parcels' }
+          ? { line: l.line, support: 'brief', note: '', unbacked: 'ran the whole help desk on my own', cv: 'Support engineer at Brightwell Parcels.' }
           : { line: l.line, support: 'no-claim', note: '', unbacked: '', cv: '' },
       ),
       note: '',
