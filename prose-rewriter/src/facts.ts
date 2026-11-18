@@ -842,14 +842,51 @@ export function inventory(original: string, sources: FactSources, options: Extra
     ...f,
     label: states(cv, f) ? 'en-cv' : states(recipient, f) ? 'del-destinatario' : 'solo-del-usuario',
   }));
+  const cvText = [sources.cv, ...(sources.extraFacts ?? [])].join('\n');
   const flags = facts
     .filter((f) => f.label === 'solo-del-usuario')
-    .map((f): Flag => ({
-      kind: 'not-in-cv',
-      span: { start: f.start, end: f.end },
-      message: options.lang === 'es' ? `Tu texto dice «${f.text}»; no figura en tu CV.` : `Your text says "${f.text}"; it is not in your CV.`,
-    }));
+    .map((f): Flag => ({ kind: 'not-in-cv', span: { start: f.start, end: f.end }, message: notInCvMessage(f, original, cvText, options) }));
   return { facts, flags };
+}
+
+const UNIT_OF = (key: string): string => key.replace(/^[\d.,/]+\s*/u, '');
+const andList = (items: readonly string[], lang: Lang, quote: (s: string) => string): string =>
+  items.length === 1 ? quote(items[0] ?? '') : `${items.slice(0, -1).map(quote).join(', ')} ${lang === 'es' ? 'y' : 'and'} ${quote(items.at(-1) ?? '')}`;
+
+/**
+ * The CV's figures of the same kind as a number only the user states: the same unit ("31 %" for
+ * "300 %", "9 hours" for "12 hours"), or, for a bare number, the same one or two words after it
+ * ("60 help articles" for "80 help articles"). They are named as figures of that kind, never as the
+ * real value of the claim: "31 %" of searches says nothing about "300 %" of sales.
+ */
+function cvFiguresLike(f: Fact, original: string, cv: string, options: ExtractOptions): string[] {
+  const unit = UNIT_OF(f.key);
+  if (unit !== '') {
+    return unique(extract(cv, { lang: options.lang }).filter((c) => c.kind === f.kind && UNIT_OF(c.key) === unit)).map((c) => c.text);
+  }
+  const after = /^\s+(\p{L}+)(?:\s+(\p{L}+))?/u.exec(original.slice(f.end));
+  if (after === null) return [];
+  const escape = (w: string): string => w.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  for (const words of after[2] === undefined ? [[after[1] ?? '']] : [[after[1] ?? '', after[2]], [after[1] ?? '']]) {
+    const re = new RegExp(`(?<![\\p{L}\\d])\\d[\\d.,]*\\s+${words.map(escape).join('\\s+')}(?![\\p{L}])`, 'giu');
+    const found = [...new Set([...cv.matchAll(re)].map((m) => m[0]))];
+    if (found.length > 0) return found;
+  }
+  return [];
+}
+
+/** Decision of 18/11/2026: the claim stays as written, with the reason and the CV's figures of its kind. */
+function notInCvMessage(f: Fact, original: string, cv: string, options: ExtractOptions): string {
+  const es = options.lang === 'es';
+  const head = es
+    ? `Tu texto dice «${f.text}»; no figura en tu CV. Lo dejé como lo escribiste: si no lo podés respaldar, corregilo antes de enviarlo.`
+    : `Your text says "${f.text}"; it is not in your CV. I left it as you wrote it: if you cannot back it, fix it before you send it.`;
+  if (f.kind !== 'number' && f.kind !== 'amount') return head;
+  const like = cvFiguresLike(f, original, cv, options);
+  if (like.length === 0) return `${head} ${es ? 'Tu CV no tiene cifras de ese tipo.' : 'Your CV has no figures of that kind.'}`;
+  return es
+    ? `${head} Cifras de ese tipo que sí tiene tu CV: ${andList(like, 'es', (x) => `«${x}»`)}.`
+    : `${head} Figures of that kind your CV does have: ${andList(like, 'en', (x) => `"${x}"`)}.`;
 }
 
 export type RevertReason = 'not-found' | 'changed-number' | 'invented' | 'lost' | 'drop-not-elsewhere';
