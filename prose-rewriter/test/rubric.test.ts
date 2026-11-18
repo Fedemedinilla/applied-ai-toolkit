@@ -14,9 +14,10 @@ import {
   judgeRuns,
   planReverts,
   REWRITE_JUDGE_PROMPT_VERSION,
+  REWRITE_RUBRIC,
   rewritePiece,
   rewriteRubric,
-  type RewriteVerdict,
+  RewriteVerdict,
 } from '../src/rubric.ts';
 import { callSettings } from '../src/tasks.ts';
 import type { Edit } from '../src/types.ts';
@@ -45,7 +46,7 @@ function rewriteWith(edits: ReadonlyArray<Omit<Edit, 'sentenceId' | 'reason'>>, 
 }
 
 function verdict(supports: readonly LineSupport[], notes: Record<number, string> = {}): RewriteVerdict {
-  return { lines: supports.map((support, i) => ({ line: i + 1, support, note: notes[i + 1] ?? '' })), note: '' };
+  return { lines: supports.map((support, i) => ({ line: i + 1, support, note: notes[i + 1] ?? '', unbacked: '', cv: '' })), note: '' };
 }
 
 /** A verdict that marks invented every line holding one of `needles`, and the rest no-claim. */
@@ -155,6 +156,42 @@ describe('the judge through the gateway', () => {
 });
 
 describe('planReverts', () => {
+  it('flags a claim of the draft that the CV does not back, with the reason and what the CV says (decision of 18/11)', () => {
+    const original = 'Hi Ana,\nI ran the whole help desk on my own. I cut the median first reply time from 9 hours to 3 hours.\nBest,\nDaniel';
+    const lines = judgeLines(original, 'en');
+    const ran = lineOf(original, 'whole help desk');
+    const v: RewriteVerdict = {
+      lines: lines.map((l) =>
+        l.line === ran
+          ? { line: l.line, support: 'brief', note: '', unbacked: 'ran the whole help desk on my own', cv: 'Support engineer at Brightwell Parcels' }
+          : { line: l.line, support: 'no-claim', note: '', unbacked: '', cv: '' },
+      ),
+      note: '',
+    };
+    const plan = planReverts({ original, rewritten: original, lang: 'en', verdict: v, edits: [], round: 'first' });
+    expect(plan.revert).toEqual([]);
+    expect(plan.userClaims).toHaveLength(1);
+    const flag = plan.userClaims[0]!.flag;
+    expect(flag.kind).toBe('not-in-cv');
+    expect(flag.message).toBe('This sentence of yours says "ran the whole help desk on my own", which your CV does not back. I left it as you wrote it: if you cannot back it, fix it before you send it. Your CV says: "Support engineer at Brightwell Parcels".');
+    expect(original.slice(flag.span!.start, flag.span!.end)).toBe('I ran the whole help desk on my own.');
+    const es = planReverts({ original, rewritten: original, lang: 'es', verdict: { ...v, lines: v.lines.map((l) => (l.line === ran ? { ...l, cv: '' } : l)) }, edits: [], round: 'first' });
+    expect(es.userClaims[0]!.flag.message).toBe('Esta oración tuya dice «ran the whole help desk on my own», que tu CV no respalda. La dejé como la escribiste: si no la podés respaldar, corregila antes de enviarla. Tu CV no dice nada sobre eso.');
+  });
+
+  it('asks the judge, on a brief line, for the claim the CV does not back and what the CV says', () => {
+    expect(REWRITE_RUBRIC).toMatch(/"unbacked"/u);
+    expect(REWRITE_RUBRIC).toMatch(/"cv"/u);
+    expect(REWRITE_RUBRIC).toMatch(/self-praise[^\n]*not a claim/iu);
+    expect(REWRITE_JUDGE_PROMPT_VERSION).toBe('rewrite-judge@3');
+  });
+
+  it('reads a verdict without the two new keys as before: a brief line raises no flag', () => {
+    const lines = judgeLines(ORIGINAL, 'en');
+    const plan = planReverts({ original: ORIGINAL, rewritten: ORIGINAL, lang: 'en', verdict: RewriteVerdict.parse({ lines: lines.map((l) => ({ line: l.line, support: 'brief', note: '' })), note: '' }), edits: [], round: 'first' });
+    expect(plan.userClaims).toEqual([]);
+  });
+
   it('reverts the edits that touch an invented line, last to first, and leaves the others', async () => {
     const { text, accepted } = rewriteWith([
       { before: 'Thanks for the call on Tuesday.', after: "Thanks for Tuesday's call." },
