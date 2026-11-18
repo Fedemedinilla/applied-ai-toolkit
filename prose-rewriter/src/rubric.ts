@@ -309,7 +309,9 @@ function madeOrder(edits: readonly AppliedEdit[], order: readonly string[] | und
  * when `edits` do not produce `rewritten` from `original`.
  */
 /** The flag for a claim of the draft the CV does not back: kept as written, with the reason and what the CV says. */
-function unbackedMessage(claim: string, cv: string, lang: Lang): string {
+function unbackedMessage(rawClaim: string, rawCv: string, lang: Lang): string {
+  // The quotes close the sentence themselves: a stop inside them would print as «…semana.».
+  const [claim, cv] = [rawClaim, rawCv].map((q) => q.replace(/[\s.;:,]+$/u, ''));
   return lang === 'es'
     ? `Esta oración tuya dice «${claim}», que tu CV no respalda. La dejé como la escribiste: si no la podés respaldar, corregila antes de enviarla. ${cv === '' ? 'Tu CV no dice nada sobre eso.' : `Tu CV dice: «${cv}».`}`
     : `This sentence of yours says "${claim}", which your CV does not back. I left it as you wrote it: if you cannot back it, fix it before you send it. ${cv === '' ? 'Your CV says nothing about it.' : `Your CV says: "${cv}".`}`;
