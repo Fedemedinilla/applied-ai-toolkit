@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { createECDH } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import webpush from 'web-push';
+import * as webpush from 'web-push';
 import { checkVapid, derivePublicKey, generateVapidPair, readVapidConfig } from '../server/vapid.ts';
 
 const subject = 'mailto:lab@example.test';

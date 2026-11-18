@@ -2,7 +2,7 @@
 // web-push library. Nothing reaches the network: https.request is replaced by a fake push service.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import webpush from 'web-push';
+import * as webpush from 'web-push';
 import { createHandler } from '../server/handler.ts';
 import { deliver, MESSAGE_KINDS, payloadFor, webPushSender } from '../server/push.ts';
 import { memoryStore } from '../server/store.ts';
