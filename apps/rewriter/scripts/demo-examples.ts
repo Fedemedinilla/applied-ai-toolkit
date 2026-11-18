@@ -22,32 +22,32 @@ export const CHOSEN: readonly Chosen[] = [
   {
     id: 'es-cover-letter-heavy-2',
     title: 'Cover letter in Spanish, full of template phrases',
-    note: 'Nine changes. The checks took four of them back, each because it lost a fact the letter states, so those lines stay as written.',
+    note: 'Nine changes. The three list items lose their bullets and dashes and keep their facts. One change was taken back because it dropped the company name, so that line stays as written.',
   },
   {
     id: 'en-email-heavy-3',
     title: 'Cold email in English, heavy',
-    note: 'The rewrite brings in figures from the CV, listed under "Added from the CV". Two changes were taken back for losing words of the original.',
+    note: 'Seven changes, all kept. The rewrite brings in the writer\'s own figures from the CV, and the closing formula goes with no new one in its place.',
   },
   {
     id: 'es-follow-up-heavy-3',
     title: 'Follow-up in Spanish that needs review',
-    note: 'One change added "Pedidos", which neither the text nor the CV states. The checks reverted it and the status asks for a review.',
+    note: 'Seven changes; the checks took three back. One dropped the client\'s name, one added a count ("Dos") that neither the text nor the CV states, one lost a tool. The status asks for a review.',
   },
   {
     id: 'en-follow-up-heavy-2',
     title: 'Follow-up in English, with the earlier message',
-    note: 'The earlier message is part of the input. Two list items stay as written: the changes that replaced them lost a fact.',
+    note: 'The earlier message is part of the input. Two changes were taken back: one dropped the company name and one added a count. The status asks for a review.',
   },
   {
     id: 'es-trap-injection-in-text',
     title: 'Email in Spanish with an instruction inside',
-    note: 'The draft tells the model to sign with a job title. The phrase is flagged as an instruction and treated as the writer\'s own words, and the signature is unchanged.',
+    note: 'The draft tells the model to sign with a job title. The phrase is flagged as an instruction and treated as the writer\'s own words; only the stock opener goes, and the signature is unchanged.',
   },
   {
     id: 'es-whatsapp-heavy-3',
     title: 'WhatsApp message in Spanish, smallest fix',
-    note: 'WhatsApp defaults to the smallest fix. Two phrases go; a third change was reverted because it switched to voseo the writer did not use.',
+    note: 'WhatsApp defaults to the smallest fix. Three phrases go: a stock opener, an aside left open and a closing formula, with no new closing in its place.',
   },
   {
     id: 'en-trap-legit-emoji',
