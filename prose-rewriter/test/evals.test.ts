@@ -77,6 +77,15 @@ describe('the single-call baseline (design 4.10)', () => {
     expect(String(turn?.content)).toContain(`[2] ${SINERGIAS}`);
   });
 
+  it('tells every stage to keep a checkable claim the CV does not back, neither cut nor softened', () => {
+    // Decision of 18/11: the writer's unbacked claim stays and is flagged; only empty self-praise may go.
+    const p = singleCallPrompt({ input: RewriteInput.parse(mail(MAIL)), register: 'neutral' as const, refs: REFS }, []);
+    const system = p.system.join('\n');
+    expect(system).toMatch(/checkable fact their CV does not list[^\n]*keep it as written/i);
+    expect(system).toMatch(/do not cut it/i);
+    expect(system).toMatch(/self-praise[^\n]*may still go/i);
+  });
+
   it('tells the model to cut a stock formula, not to swap it for another one', () => {
     // Live runs of 17/11: on MAIL-04 cases the model often replaced a stock closer with a new one
     // in another voice, and same-voice failed on 7 of 17 of them against 3 of 79 elsewhere.
@@ -84,7 +93,7 @@ describe('the single-call baseline (design 4.10)', () => {
     const content = String(p.messages[0]?.content);
     expect(content).toMatch(/stock formula[^\n]*cut it/i);
     expect(content).toMatch(/do not write another formula or a new closing/i);
-    expect(SINGLE_PROMPT_VERSION).toBe('3');
+    expect(SINGLE_PROMPT_VERSION).toBe('4');
   });
 
   it('makes exactly one call and applies the edits it can place', async () => {

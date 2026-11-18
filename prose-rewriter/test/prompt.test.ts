@@ -296,7 +296,7 @@ describe('the conversation', () => {
       expect(x?.messages.at(-1)?.role).toBe('user');
     }
     expect([p?.task, e?.task, s?.task]).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style']);
-    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@2', 'rewrite-edit@2', 'rewrite-style@3']);
+    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@3', 'rewrite-edit@3', 'rewrite-style@4']);
     expect(p?.schema).toBe(PlanOutput);
     expect(e?.schema).toBe(EditOutput);
   });
