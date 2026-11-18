@@ -105,7 +105,9 @@ describe('structured', () => {
     await gateway.structured(Triage, REQUEST);
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.url).toBe('https://api.anthropic.com/v1/messages?beta=true');
+    // SDK 1.7 dropped the ?beta=true query that 1.1 added; the beta is asked for by the header
+    // below. A live structured call on SDK 1.7 succeeded on 2026-11-18 (gateway/examples/live-call.ts).
+    expect(requests[0]?.url).toBe('https://api.anthropic.com/v1/messages');
     expect(requests[0]?.headers.get('anthropic-beta')).toBe(FALLBACK_DEFAULT_BETA);
     expect(requests[0]?.body).toEqual({
       model: 'claude-sonnet-5-5',

@@ -66,9 +66,10 @@ function node(value: unknown, path: string): SchemaNode {
 
 /**
  * Turns the JSON schema zod produces into what the structured outputs API accepts. Written here
- * instead of using the SDK helper because the helper in SDK 1.1.0 (betaZodOutputFormat) strips
- * `enum` and `const` from strings and only mentions them in the description, so the model could
- * return a value outside the enum. This function:
+ * instead of using the SDK helper because the helper in SDK 1.1.0 (betaZodOutputFormat) stripped
+ * `enum` and `const` from strings and only mentioned them in the description, so the model could
+ * return a value outside the enum. SDK 1.7 keeps the enum but drops the `type` beside it;
+ * schema.test.ts pins both. This function:
  * - keeps type (also as a list), enum, const, anyOf, allOf, $ref and $defs, required, default, the
  *   accepted formats, and minItems 0 or 1;
  * - turns oneOf into anyOf (zod uses oneOf for discriminated unions; zod checks the discriminator);
