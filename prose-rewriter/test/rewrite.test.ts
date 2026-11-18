@@ -325,7 +325,7 @@ describe('S5 the fact judge', () => {
     scripted.assertDone();
     expect(result.rewritten).toBe(MAIL);
     expect(result.changes.every((c) => c.status === 'reverted')).toBe(true);
-    const fallback = result.flags.find((f) => f.kind === 'not-in-cv' && /back as you wrote it/.test(f.message));
+    const fallback = result.flags.find((f) => f.kind === 'not-in-cv' && /^La reescritura de esta oración afirmaba algo que tu CV no respalda.*Volvió a como la escribiste\.$/su.test(f.message));
     expect(fallback?.span === undefined ? '' : MAIL.slice(fallback.span.start, fallback.span.end)).toBe(SPEED);
     expect(result.status).toBe('needs-review');
     expectSound(input, result);
@@ -758,7 +758,8 @@ describe('S5, S6, S7 and S1b: the branches the stages take', () => {
     });
     const result = await rewrite(mail(MAIL), { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
-    const claim = result.flags.find((f) => /I left it as you wrote it/.test(f.message));
+    // A Spanish text gets the flag in Spanish, with what to do before sending (decision of 18/11).
+    const claim = result.flags.find((f) => /^Esta oración tuya dice algo que tu CV no respalda.*La dejé como la escribiste: si no la podés respaldar, corregila antes de enviarla\.$/su.test(f.message));
     expect(claim?.span === undefined ? '' : MAIL.slice(claim.span.start, claim.span.end)).toBe(SPEED);
   });
 
