@@ -103,7 +103,7 @@ The agent that wrote a change is a poor reviewer of it, because it reads its own
 - `workflow-secrets.test.ts` finds nothing in any workflow of this repository, and checks that `ci.yml` really carries credential-shaped placeholders, so that check is not vacuous. Each finding is produced by breaking a clean workflow in one way, quoted values, quoted keys and flow mappings included. `RELEASE_POLICY` gets its own cases: the release jobs pass, and each way of putting `id-token` next to a repository write fails. A comment that a rule would otherwise match produces none, while a `#` line inside a block scalar such as `run: |` is still read.
 - `hooks.test.ts` runs both hooks as Claude Code runs them, with JSON on stdin, the exit code and stderr. For the guard it covers protected globs, the JSON flag, `NotebookEdit`, the override, its own config and settings, and settings outside the project. It also covers symbolic links, dangling ones included, and a link inside the project to a settings file outside it. Malformed input is covered, a null or missing path among it. So are JSON files with a byte order mark, a broken or missing config, and the settings command with a Node that cannot run the file. For the related-tests hook, a fake `npx` shows exit 2 with the tail of the output on a failure and a silent exit 0 on a pass. A file named like an option reaches `vitest` as a path. It also checks that every command in `settings.json` points at a file this folder ships and that the reviewer's tools are read-only.
 
-On 2026-11-15, `npx vitest run agent-playbook` ran 83 tests in 4 files.
+On 2026-11-18, `npx vitest run agent-playbook` ran 84 tests in 4 files.
 
 ## What changed from the private originals
 

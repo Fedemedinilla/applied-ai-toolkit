@@ -104,7 +104,7 @@ More dice raise the median and widen the spread. In this ruleset nothing makes a
 | `test/purity.test.ts` | Every file in `src/` against the rules above; 48 violations the scanner must catch and 8 clean snippets it must pass |
 | `test/hooks.test.ts` | Glob matching, protected and unprotected paths, a new ruleset file allowed while committed ones stay protected, the handwritten marker in edits and in shell writes, the override, the Bash heuristic with absolute paths, quoted redirect targets, command lists, `2>&1`, redirects elsewhere and folder removal, case folding, input that is not a tool call, the guard as a process, the related-tests command |
 
-213 tests, offline, no key.
+215 tests, offline, no key.
 
 ## Changes from the source
 

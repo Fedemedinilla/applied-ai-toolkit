@@ -129,7 +129,7 @@ The report prints the gate, the hard failures of the code rubrics, the cost tabl
 
 ## Measured
 
-F6b's fourth run against the real model, on 2026-11-16, went over the 33 eval cases with three variants: `full` (the staged strategy), `single-call` (one call, no checks) and `single-guarded` (the single strategy). The cases are fictional, and 33 is a small sample. Decision D3, how many cases the gate needs, is still open. Every gate in the report was inconclusive at a margin of 0.1.
+F6b's fourth run against the real model, on 2026-11-16, went over the 33 eval cases with three variants: `full` (the staged strategy), `single-call` (one call, no checks) and `single-guarded` (the single strategy). The cases are fictional, and 33 is a small sample; the 147-case runs below came after D3 grew the set. Every gate in the report was inconclusive at a margin of 0.1.
 
 | | staged (`full`) | single (`single-guarded`) |
 |---|---:|---:|
@@ -149,6 +149,32 @@ Cost per rewrite in US$, measured on the gateway, with the fact judge where it r
 | whatsapp | minimo | 0.0424 | 0.1009 | 0.0259 | 0.0570 |
 
 From this run, the maintainer made `single` the default of `rewrite()` and the CLI on 2026-11-16. `staged` stays available with `--strategy staged`. The per-job cap went from a placeholder of US$0.50 to US$0.25, above the highest p90 (US$0.1412) with room for a retry. The daily and monthly caps stayed at US$2 and US$10 (`src/tasks.ts:52`). The live eval runs seed their gateway with these caps (`evals/cli.ts:30`), so a run after this one has a per-job cap of US$0.25, half the US$0.50 the fourth run was measured under. Both CLIs and the tests import them as `REWRITE_CAPS`.
+
+### On 147 cases (D3)
+
+D3 grew the set to 147 fictional cases (#23). Each genre and language has four light, four heavy and four good texts, and each language has three cases of every trap. The threshold the gate needs is still open. Two live runs of `single-guarded` went over all 147, one on 2026-11-17 before the robustness pass of #25 and one after it.
+
+| | before #25 | after #25 |
+|---|---:|---:|
+| Hard failures | 0 | 0 |
+| Preferred to the original | 107/111 | 110/113 |
+| Keeps the writer's voice | 101/111 | 103/113 |
+| Register fits the genre | 105/147 | 106/147 |
+| Good texts left alone | 32/32 | 32/32 |
+| Injected instruction ignored | 12/12 | 12/12 |
+
+Against the unguarded `single-call` on 41 of those cases, after #25, the blind comparison was inconclusive (11 of 27, 95% CI 25% to 59%). The guarded single was not worse at keeping the voice, and `single-call` had 8 hard failures against 0.
+
+Register fits the genre least often on heavy texts, 10 of 32. A stock opener or closer survives, or the model writes a new one. #26 told the single call to cut such formulas (`rewrite-single@3`). On 29 cases with stock formulas, measured on 2026-11-18 against the earlier prompt, the formulas left fell from 7 to 2. Voice went from 20/27 to 22/27 and register fit from 14/29 to 11/29, both inside run-to-run noise, so the change stays provisional.
+
+The cost per rewrite in US$ after #25, with the fact judge where it runs, was this.
+
+| Genre | Mode | median | p90 |
+|---|---|---:|---:|
+| cover-letter | pulido | 0.0429 | 0.1013 |
+| email | pulido | 0.0295 | 0.1021 |
+| follow-up | pulido | 0.0357 | 0.0908 |
+| whatsapp | minimo | 0.0238 | 0.0504 |
 
 ## Fixtures and data
 

@@ -2,7 +2,7 @@
 
 site-check reads a public website the way a visitor's browser does and writes a plain-language report on its security, speed, search visibility and contact paths. It is built around two constraints. It has to stay legal without the owner's permission, so a scope guard in the network layer refuses any request a visitor would not make. Every sentence of the report has to be reproducible, so 37 fixed rules turn measurements into pre-written text, and `--rerender` rebuilds a report byte for byte from its stored run, `run.json`. There is no language model in the loop, on purpose. The reader acts on these sentences without being able to check them, so each one has to come from a measurement that someone else can check. `--compare` turns two stored runs into a before/after report (see Before and after).
 
-Python standard library only: about 23,000 lines in `sitecheck/` and 732 tests that run offline against a fake site and fake APIs on 127.0.0.1.
+Python standard library only: about 23,000 lines in `sitecheck/` and 733 tests that run offline against a fake site and fake APIs on 127.0.0.1.
 
 The command line, the console messages, the file names and the stored run are in English. The report is written in Spanish (Argentina, formal "usted") by default, because the tool was built for small Argentine organisations such as schools and SMEs. `--lang en` writes it in English, in a shorter form (see Report language). The operator notes that the console repeats from the stored run are in Spanish.
 
