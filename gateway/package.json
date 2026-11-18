@@ -50,7 +50,7 @@
     "prepack": "node -e \"require('node:fs').copyFileSync('../LICENSE','LICENSE')\" && npm run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "1.7.0"
+    "@anthropic-ai/sdk": "1.8.0"
   },
   "peerDependencies": {
     "zod": "^4.6.7"
