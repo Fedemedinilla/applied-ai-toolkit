@@ -122,6 +122,14 @@ describe('.github/dependabot.yml', () => {
     }
   });
 
+  it('keeps the root npm entry off @types/node majors past the runtime and off TypeScript 7', () => {
+    // engines pins Node 24, so @types/node 25+ would type APIs that do not exist at runtime.
+    // TypeScript 7 (the Go port) ships no compiler API, which import-fences and two tests use.
+    const root = all.find((e) => e.ecosystem === 'npm' && e.directories.includes('/'));
+    expect(root?.text).toMatch(/- dependency-name: "@types\/node"\s*\n\s+versions: \[">=25"\]/);
+    expect(root?.text).toMatch(/- dependency-name: "typescript"\s*\n\s+versions: \[">=7"\]/);
+  });
+
   it('sets no label, since the repository defines none for dependencies', () => {
     expect(text).not.toMatch(/^\s+labels:/m);
   });
