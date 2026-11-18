@@ -465,7 +465,7 @@ A rule can hold alternatives whose source is weaker than its own, reported at a 
 
 ## What the tests cover
 
-On 2026-11-16, `npx vitest run slop-lint` ran 539 tests in 18 files, all offline and without an API key:
+On 2026-11-18, `npx vitest run slop-lint` ran 618 tests in 19 files, all offline and without an API key:
 
 - `rules.test.ts`: catalog integrity (unique ids, every regex compiles with `giu` and with its flags, no `i` on FMT-03 and FMT-04, a pattern per declared language, level 1 only for high or disqualifying rules, a source and section on every rule, its own source and a lower severity for a rule's weaker alternatives, one structural check per structural rule, every id listed in this README), and the positive and near-miss example of every rule.
 - `lint.test.ts`: the shared Tier 2 budget and the no-repeat rule, Tier 3 words with and without anchors, caller anchors, overlap resolution, quote exemption and stray quote marks, closers by position, language filtering, the Unicode boundary, offsets, line and column, score weights, disqualification, purity, empty input, and the structural checks (register mixing, em dash and raya budgets, opening signs per sentence, openers at every sentence start).
@@ -481,6 +481,10 @@ On 2026-11-16, `npx vitest run slop-lint` ran 539 tests in 18 files, all offline
 - `config.test.ts`: the globs; the validator's message and key path for 25 bad values; the `X-` prefix against the catalog; custom rules through `lint()` at each level; one charge per span next to a built-in rule; `settingsFor()` with settings, overrides in order, stdin and `ignore`.
 - `config-schema.test.ts`: the JSON Schema and the hand validator over the same 68 fixtures in `test/fixtures/config/`, the top-level keys of both, and that the schema closes every object.
 - `suppress.test.ts`: suppression by rule id for a region, a line and a span inside a line; several ids and a reason; budgets unchanged by a suppression; unused, refused and invalid directives with their position; the disqualify rule with and without `allowDisqualify`, at the severity the config gives; the mask turned off; the result's unchanged shape without directives.
+- `genres.test.ts`: the cover-letter profile equal to no genre on every section 15 letter; the other profiles and the thresholds they take from the context; messages per genre; email, Markdown in a mail and FMT-01-LIST; follow-up; whatsapp; variety; `guessGenre`; and the rules only a genre runs (MAIL-01, MAIL-02, MAIL-03, SEG-03, WA-03).
+- `stock-formulas.test.ts`: MAIL-04 on each English and Spanish formula at level 2 and severity low, in email, follow-up and whatsapp; never on a cover letter; the plain wording near each formula left alone; "quedo a tu entera disposición" charged once, by LEX-01; nothing on the human texts of the labelled set; LEX-01 on "disposicion" typed without its accent.
+- `genre-eval.test.ts`: the labelled set's validator and sentence spans; true and false positives and false negatives per rule and level, level 1 on human texts only, the confusion matrix at the current cuts, one valid file per genre and language, and the saved report kept in step with the set.
+- `cli-genre.test.ts`: `--genre` against the golden of each new genre, the experimental note on stderr, cover-letter unchanged, the `auto` guess with its fallback, `--variety`, `--previous` and SEG-03, the rule list per genre, SARIF, and the config's genre.
 - `cli-config.test.ts`: the CLI in temporary folders. Discovery in the folder, in a parent and not past `.git`; `--config` and `--no-config`; the same bytes with an empty config in text, JSON and SARIF; exit 2 with the key path. Flags over config; per-glob language; `ignore`; a custom rule and a suppressed finding in text, `--json` and `--sarif`; `--list-rules` with and without a config.
 
 ## Benchmarks
