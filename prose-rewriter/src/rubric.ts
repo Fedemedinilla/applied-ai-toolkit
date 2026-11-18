@@ -317,7 +317,11 @@ export function planReverts(input: PlanInput): RevertPlan {
     const span = { start: toOriginal(start, input.edits, 'start'), end: toOriginal(end, input.edits, 'end') };
     const why = judged.note === '' ? '' : ` (${judged.note})`;
     if (touching.length === 0) {
-      userClaims.push({ line: judged.line, flag: { kind: 'not-in-cv', span, message: `This sentence of yours says something your CV does not back${why}. I left it as you wrote it.` } });
+      const kept =
+        input.lang === 'es'
+          ? `Esta oración tuya dice algo que tu CV no respalda${why}. La dejé como la escribiste: si no la podés respaldar, corregila antes de enviarla.`
+          : `This sentence of yours says something your CV does not back${why}. I left it as you wrote it: if you cannot back it, fix it before you send it.`;
+      userClaims.push({ line: judged.line, flag: { kind: 'not-in-cv', span, message: kept } });
       continue;
     }
     for (const e of touching) if (!revert.includes(e.id)) revert.push(e.id);
@@ -326,7 +330,14 @@ export function planReverts(input: PlanInput): RevertPlan {
         line: judged.line,
         edits: touching.map((e) => e.id),
         original: span,
-        flag: { kind: 'not-in-cv', span, message: `The rewrite of this sentence claimed something your CV does not back${why}. It is back as you wrote it.` },
+        flag: {
+          kind: 'not-in-cv',
+          span,
+          message:
+            input.lang === 'es'
+              ? `La reescritura de esta oración afirmaba algo que tu CV no respalda${why}. Volvió a como la escribiste.`
+              : `The rewrite of this sentence claimed something your CV does not back${why}. It is back as you wrote it.`,
+        },
       });
     }
   }
