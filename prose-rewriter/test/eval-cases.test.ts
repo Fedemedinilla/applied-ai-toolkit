@@ -189,6 +189,16 @@ describe('the code rubrics', () => {
     }
   });
 
+  it('facts-preserved: fails a rewrite that cuts or rewords the inflated claim, which is kept as written (decision of 18/11)', () => {
+    const c = byId('es-trap-inflated-claim-2');
+    const phrase = c.expect.claim!.phrase;
+    const cut = score(c, c.input.text.replace(phrase, ''))['facts-preserved']!;
+    expect(cut.pass).toBe(false);
+    expect(cut.detail).toContain(phrase);
+    expect(score(c, c.input.text.replace(phrase, 'Trabajo en velocidad web en Córdoba'))['facts-preserved']!.pass).toBe(false);
+    expect(score(c, c.input.text)['facts-preserved']!.pass).toBe(true);
+  });
+
   it('facts-preserved: fails a lost fact, a lost survive phrase and a reordered pair; accepts a fact rewritten in another format and an accepted drop', () => {
     const light = byId('es-cover-letter-light');
     expect(score(light, light.input.text.replace(' y la página principal pasó de 4,1 s a 1,6 s de carga en un celular de gama baja', ''))['facts-preserved']!.pass).toBe(false);

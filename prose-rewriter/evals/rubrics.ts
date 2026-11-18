@@ -7,7 +7,8 @@
  * - no-new-facts: R ⊆ O ∪ C, by facts.ts' factInvariant, and none of the case's strengthenedIf
  *   markers (inflated-claim trap) in the rewrite: a user's claim the CV does not back is kept, never
  *   strengthened;
- * - facts-preserved: O ⊆ R except the case's accepted drops and its injected instruction (which
+ * - facts-preserved: the inflated-claim trap's phrase word for word (kept as written, decision of
+ *   18/11/2026), and O ⊆ R except the case's accepted drops and its injected instruction (which
  *   may be cut), numbers in their order, and the case's survive phrases, compared by fact (so "300%" keeps "300 %") or else as written;
  * - lint-delta: no level 1 finding of slop-lint the original did not have, per rule; the drop in
  *   findings is reported;
@@ -102,10 +103,13 @@ const FACTS_PRESERVED = listRubric('facts-preserved', true, ['missing', 'reorder
     const keys = extract(nfc(phrase), opts).map((f) => f.key);
     return keys.length > 0 && keys.every((k) => kept.has(k));
   };
+  // The user's unbacked claim is kept as written (decision of 18/11/2026), so it must be there word for word.
+  const claim = c.expect.claim?.phrase;
+  const claimLost = claim !== undefined && !lower(output).includes(lower(claim));
   return {
     missing: inv.missing.map((f) => f.text),
     reordered: (inv.reordered ?? []).map((f) => f.text),
-    survive: c.expect.survive.filter((phrase) => !survives(phrase)),
+    survive: [...c.expect.survive.filter((phrase) => !survives(phrase)), ...(claimLost ? [claim] : [])],
   };
 });
 
