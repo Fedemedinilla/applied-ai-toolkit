@@ -158,7 +158,7 @@ describe('the three panels', () => {
     expect($('#reverted-wrap').hidden).toBe(false);
     expect(document.querySelectorAll('#reverted li.change')).toHaveLength(reverted.length);
     expect(document.querySelectorAll('#reverted button')).toHaveLength(0);
-    expect(text('#reverted')).toContain('Why: It would have removed something your text states: Optimizar.');
+    expect(text('#reverted')).toContain('Why: It would have removed something your text states: Nodo, Sur, Software.');
     expect(text('#reverted')).not.toMatch(/without drop/u);
   });
 
@@ -166,7 +166,7 @@ describe('the three panels', () => {
     await mount();
     expect(text('#verdict')).toMatch(/^OK /u);
     expect(text('#facts')).toContain('Added from your CV');
-    expect(text('#lint')).toMatch(/Before: 14 patterns .*\.After: 7 patterns/su);
+    expect(text('#lint')).toMatch(/Before: 14 patterns .*\.After: 1 pattern\b/su);
     expect(text('#lint-hint')).toBe('The score goes from 0 to 15, and higher is cleaner: 15 means no pattern found. One disqualifying pattern, or three serious ones, bring it to 0, so fewer patterns can leave it at 0.');
     expect(text('#cost')).toBe(`2 model calls, US$${heavy.result.usage.costUsd?.toFixed(4)}, as recorded.`);
     expect(text('#result')).toMatch(/numbers are for the full rewrite as returned/u);
@@ -217,7 +217,7 @@ describe('reverting and keeping changes', () => {
     $('#copy').click();
     await settle();
     expect(h.copied.at(-1)).toBe(heavy.result.rewritten);
-    expect(text('#status')).toMatch(/Copied the text, with 5 of 5 changes kept/u);
+    expect(text('#status')).toMatch(/Copied the text, with 8 of 8 changes kept/u);
   });
 
   it('says how to copy by hand when there is no clipboard or it refuses', async () => {
@@ -300,7 +300,7 @@ describe('local mode', () => {
     expect($('#result').hidden).toBe(false);
     expect(document.activeElement?.id).toBe('result-heading');
     expect(text('#rewritten')).toBe(heavy.result.rewritten);
-    expect(text('#status')).toMatch(/Rewritten with 5 changes, 4 taken back by the checks\. Status: OK\./u);
+    expect(text('#status')).toMatch(/Rewritten with 8 changes, 1 taken back by the checks\. Status: OK\./u);
     expect(text('#cost')).not.toMatch(/as recorded/u);
   });
 
