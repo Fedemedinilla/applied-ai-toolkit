@@ -212,6 +212,15 @@ describe('inventory', () => {
     ]);
   });
 
+  it('does not flag a title or a weekday, which say nothing about the writer', () => {
+    // Live run of 18/11: "Ms", "Mr" and "Wednesday" were flagged as "not in your CV".
+    const en = inventory('Dear Ms Whitfield, can we talk on Wednesday? Thanks, Mr Okoro.', { cv: 'Support engineer.' }, EN);
+    expect(en.flags.map((f) => f.message).join('\n')).not.toMatch(/"(?:Ms|Mr|Wednesday)"/u);
+    const es = inventory('Hola Sr. Pérez, ¿lo vemos el martes?', { cv: 'Desarrolladora web.' }, ES);
+    expect(es.flags.map((f) => f.message).join('\n')).not.toMatch(/«(?:Sr|martes)»/u);
+    expect(en.flags.map((f) => f.message).join('\n')).toMatch(/"Whitfield"/u);
+  });
+
   it('names the CV figures of the same kind, and says so when the CV has none', () => {
     const none = inventory('Hice 7 sitios este año.', { cv: 'Desarrolladora web desde 2023.' }, ES);
     expect(none.flags.map((f) => f.message)).toEqual([

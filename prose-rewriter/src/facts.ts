@@ -844,10 +844,14 @@ export function inventory(original: string, sources: FactSources, options: Extra
   }));
   const cvText = [sources.cv, ...(sources.extraFacts ?? [])].join('\n');
   const flags = facts
-    .filter((f) => f.label === 'solo-del-usuario')
+    .filter((f) => f.label === 'solo-del-usuario' && !saysNothingAboutTheWriter(f))
     .map((f): Flag => ({ kind: 'not-in-cv', span: { start: f.start, end: f.end }, message: notInCvMessage(f, original, cvText, options) }));
   return { facts, flags };
 }
+
+/** Titles of address and weekdays: facts of the text, not claims about the writer, so never flagged. */
+const HONORIFICS = new Set(['mr', 'mrs', 'ms', 'dr', 'sr', 'sra', 'srta', 'dra', 'lic', 'ing']);
+const saysNothingAboutTheWriter = (f: Fact): boolean => HONORIFICS.has(f.key) || f.key.startsWith('weekday:');
 
 const UNIT_OF = (key: string): string => key.replace(/^[\d.,/]+\s*/u, '');
 const andList = (items: readonly string[], lang: Lang, quote: (s: string) => string): string =>
