@@ -195,12 +195,40 @@ describe('inventory', () => {
       ['40', 'en-cv'],
       ['25', 'solo-del-usuario'],
     ]);
-    expect(flags).toEqual([{ kind: 'not-in-cv', span: { start: O.indexOf('25'), end: O.indexOf('25') + 2 }, message: 'Tu texto dice «25»; no figura en tu CV.' }]);
+    expect(flags).toEqual([
+      {
+        kind: 'not-in-cv',
+        span: { start: O.indexOf('25'), end: O.indexOf('25') + 2 },
+        message: 'Tu texto dice «25»; no figura en tu CV. Lo dejé como lo escribiste: si no lo podés respaldar, corregilo antes de enviarlo. Cifras de ese tipo que sí tiene tu CV: «12 personas».',
+      },
+    ]);
   });
 
-  it('writes the flag in English for an English text', () => {
+  it('writes the flag in English for an English text, with the figure the CV gives for the same thing', () => {
+    // Decision of 18/11: an unbacked claim is kept and flagged, with the reason and the real figure.
     const { flags } = inventory('At Brightwell Parcels I wrote 80 help articles.', { cv: CV_EN }, EN);
-    expect(flags.map((f) => f.message)).toEqual(['Your text says "80"; it is not in your CV.']);
+    expect(flags.map((f) => f.message)).toEqual([
+      'Your text says "80"; it is not in your CV. I left it as you wrote it: if you cannot back it, fix it before you send it. Figures of that kind your CV does have: "60 help articles".',
+    ]);
+  });
+
+  it('names the CV figures of the same kind, and says so when the CV has none', () => {
+    const none = inventory('Hice 7 sitios este año.', { cv: 'Desarrolladora web desde 2023.' }, ES);
+    expect(none.flags.map((f) => f.message)).toEqual([
+      'Tu texto dice «7»; no figura en tu CV. Lo dejé como lo escribiste: si no lo podés respaldar, corregilo antes de enviarlo. Tu CV no tiene cifras de ese tipo.',
+    ]);
+  });
+
+  it('gives the CV figures with the same unit, without claiming they measure the same thing', () => {
+    const es = inventory('Con mis sitios las ventas subieron un 300 %.', { cv: 'Las búsquedas que terminaban en ticket bajaron del 31 % al 22 %.' }, ES);
+    expect(es.flags.map((f) => f.message)).toEqual([
+      'Tu texto dice «300 %»; no figura en tu CV. Lo dejé como lo escribiste: si no lo podés respaldar, corregilo antes de enviarlo. Cifras de ese tipo que sí tiene tu CV: «31 %» y «22 %».',
+    ]);
+    const en = inventory('I cut reply time from 12 hours to 1 hour.', { cv: CV_EN }, EN);
+    expect(en.flags.map((f) => f.message)).toEqual([
+      'Your text says "12 hours"; it is not in your CV. I left it as you wrote it: if you cannot back it, fix it before you send it. Figures of that kind your CV does have: "9 hours" and "3 hours".',
+      'Your text says "1 hour"; it is not in your CV. I left it as you wrote it: if you cannot back it, fix it before you send it. Figures of that kind your CV does have: "9 hours" and "3 hours".',
+    ]);
   });
 });
 
