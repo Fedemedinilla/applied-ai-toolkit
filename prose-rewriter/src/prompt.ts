@@ -286,10 +286,14 @@ export function stylePrompt(
   };
 }
 
+/** The single call's own version: its task changed on 18/11 (cut stock formulas) and the stages' did not. */
+export const SINGLE_PROMPT_VERSION = '3';
+
 const SINGLE_TASK = [
   'TASK: plan and edit in one step',
   'Read the findings and each sentence, decide what to fix, and for each sentence worth fixing propose the smallest edit that solves it: the sentenceId, "before" quoted exactly from that sentence (without its number), "after", the reason and the ruleId of the finding it answers.',
   'An edit stays inside one sentence. Set "drop" only when the edit removes a fact on purpose and the fact stays in another sentence. If no edit is worth making, reply with no edits.',
+  'When a finding marks a stock formula (an opener such as "I hope this finds you well" or a closer such as "quedo a disposición", "do not hesitate to contact me"), cut it: "after" is empty, or the rest of the sentence when the formula is only part of it. Do not write another formula or a new closing line in its place; the sign-off and the signature stay as the writer wrote them.',
 ].join('\n');
 
 /**
@@ -303,7 +307,7 @@ export function singleCallPrompt(c: PromptContext, findings: readonly Finding[])
   const mode = c.input.mode ?? defaultMode(c.input.genre);
   return {
     task: 'rewrite.edit',
-    promptVersion: `rewrite-single@${PROMPT_VERSION}`,
+    promptVersion: `rewrite-single@${SINGLE_PROMPT_VERSION}`,
     system: systemBlocks(c),
     messages: conversation(mode === 'reescritura' ? `${SINGLE_TASK}\n${PARAGRAPH_EDITS}` : SINGLE_TASK, [textBlock(sentences), ...keepBlock(c.input), '', findingLines(sentences, findings)]),
     schema: EditOutput,

@@ -7,7 +7,7 @@ import { appendJsonl, decide, gate, parseRun, readJsonl } from '../../evals/src/
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import { caseOrder, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from '../evals/judges.ts';
 import { pipelineVariant, runPipelines, singleCall, VARIANTS, type EvalCase, type PieceRecord } from '../evals/pipeline.ts';
-import { PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from '../src/prompt.ts';
+import { SINGLE_PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from '../src/prompt.ts';
 import { rewrite } from '../src/rewrite.ts';
 import { judgeLines } from '../src/rubric.ts';
 import { RewriteInput } from '../src/types.ts';
@@ -69,12 +69,22 @@ describe('the single-call baseline (design 4.10)', () => {
     const context = { input, register: 'neutral' as const, refs: REFS };
     const p = singleCallPrompt(context, []);
     expect(p.task).toBe('rewrite.edit');
-    expect(p.promptVersion).toBe(`rewrite-single@${PROMPT_VERSION}`);
+    expect(p.promptVersion).toBe(`rewrite-single@${SINGLE_PROMPT_VERSION}`);
     expect(p.system).toEqual(systemBlocks(context));
     const [turn] = p.messages;
     expect(turn?.role).toBe('user');
     expect(String(turn?.content)).toMatch(/^TASK: plan and edit in one step/);
     expect(String(turn?.content)).toContain(`[2] ${SINERGIAS}`);
+  });
+
+  it('tells the model to cut a stock formula, not to swap it for another one', () => {
+    // Live runs of 17/11: on MAIL-04 cases the model often replaced a stock closer with a new one
+    // in another voice, and same-voice failed on 7 of 17 of them against 3 of 79 elsewhere.
+    const p = singleCallPrompt({ input: RewriteInput.parse(mail(MAIL)), register: 'neutral' as const, refs: REFS }, []);
+    const content = String(p.messages[0]?.content);
+    expect(content).toMatch(/stock formula[^\n]*cut it/i);
+    expect(content).toMatch(/do not write another formula or a new closing/i);
+    expect(SINGLE_PROMPT_VERSION).toBe('3');
   });
 
   it('makes exactly one call and applies the edits it can place', async () => {
@@ -83,7 +93,7 @@ describe('the single-call baseline (design 4.10)', () => {
     });
     const result = await singleCall(mail(MAIL), { gateway: scripted.gateway, refs: REFS });
     scripted.assertDone();
-    expect(scripted.calls.map((c) => [c.task, c.request.promptVersion])).toEqual([['rewrite.edit', `rewrite-single@${PROMPT_VERSION}`]]);
+    expect(scripted.calls.map((c) => [c.task, c.request.promptVersion])).toEqual([['rewrite.edit', `rewrite-single@${SINGLE_PROMPT_VERSION}`]]);
     expect(result).toMatchObject({ rewritten: MAIL.replace(SINERGIAS, FIXED), applied: 1, refused: 1, usage: { calls: 1 } });
   });
 
@@ -122,7 +132,7 @@ describe('the pipeline variants (design 5, "F6 suma")', () => {
     const [g] = await runPipelines(CASES, [byId('single-guarded')], { gateway: guarded.gateway, refs: REFS });
     guarded.assertDone();
     expect(tasksOf(guarded)).toEqual(['rewrite.edit', 'rewrite.judge']);
-    expect(guarded.calls[0]?.request.promptVersion).toBe(`rewrite-single@${PROMPT_VERSION}`);
+    expect(guarded.calls[0]?.request.promptVersion).toBe(`rewrite-single@${SINGLE_PROMPT_VERSION}`);
     expect(g?.usage).toMatchObject({ calls: 2, extraRound: false });
     expect(g?.status === 'done' ? [g.result.kind, g.rewritten] : g?.error).toEqual(['pipeline', MAIL.replace('ya carga', 'ahora carga')]);
     const bare = scriptedGateway({ 'rewrite.edit': reply()['rewrite.edit'] });

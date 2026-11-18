@@ -4,7 +4,8 @@
 // mistake in it is invisible until a notification does not arrive, and it is a standard with many
 // steps, so it is not rewritten here.
 
-import webpush, { type Urgency } from 'web-push';
+import * as webpush from 'web-push';
+import type { Urgency } from 'web-push';
 import type { StoredSubscription, SubscriptionStore } from './store.ts';
 import type { VapidConfig } from './vapid.ts';
 

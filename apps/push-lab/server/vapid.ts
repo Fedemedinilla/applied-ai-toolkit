@@ -8,7 +8,7 @@
 // with ECDH and compares the two.
 
 import { createECDH, timingSafeEqual } from 'node:crypto';
-import webpush from 'web-push';
+import * as webpush from 'web-push';
 
 export const ENV = {
   publicKey: 'PUSH_LAB_VAPID_PUBLIC_KEY',

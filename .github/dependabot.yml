@@ -33,6 +33,13 @@ updates:
       npm-root-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # engines pins Node 24: @types/node 25+ would type APIs that do not exist at runtime.
+      - dependency-name: "@types/node"
+        versions: [">=25"]
+      # TypeScript 7 (the Go port) ships no compiler API; import-fences and two tests use it.
+      - dependency-name: "typescript"
+        versions: [">=7"]
 
   - package-ecosystem: "npm"
     directory: "/docs-site"

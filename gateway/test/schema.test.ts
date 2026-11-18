@@ -39,11 +39,15 @@ describe('structuredFormat: the schema that is sent', () => {
     });
   });
 
-  it('the SDK helper drops the enum and leaves it as text, which is why it is not used', () => {
+  // A canary on the SDK helper. In SDK 1.1 it dropped the enum and left it as text, the reason the
+  // gateway converts schemas itself. SDK 1.7 keeps the enum but drops the string type beside it;
+  // the gateway's own converter keeps both, and refuses an unsupported schema before calling.
+  it('the SDK helper keeps the enum since 1.7 but drops its type; the gateway keeps both', () => {
     const { parse: _parse, ...fromSdk } = betaZodOutputFormat(Review);
-    expect(fromSdk.schema).not.toHaveProperty('properties.verdict.enum');
-    expect(fromSdk.schema).toHaveProperty('properties.verdict.description', expect.stringContaining('accept'));
+    expect(fromSdk.schema).toHaveProperty('properties.verdict.enum', ['accept', 'revise', 'reject']);
+    expect(fromSdk.schema).not.toHaveProperty('properties.verdict.type');
     expect(structuredFormat(Review).format.schema).toHaveProperty('properties.verdict.enum', ['accept', 'revise', 'reject']);
+    expect(structuredFormat(Review).format.schema).toHaveProperty('properties.verdict.type', 'string');
   });
 
   it('a schema the API does not accept fails before calling', () => {
