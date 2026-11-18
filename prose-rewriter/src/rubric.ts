@@ -31,7 +31,7 @@ import { callSettings } from './tasks.ts';
 import { defaultMode, Lang, type Flag, type RewriteInput } from './types.ts';
 
 /** Bumped whenever the instructions, the labels or the prompt layout change. */
-export const REWRITE_RUBRIC_VERSION = '2';
+export const REWRITE_RUBRIC_VERSION = '3';
 /** The gateway's promptVersion for the judge's calls: a fixed constant, never built from the input. */
 export const REWRITE_JUDGE_PROMPT_VERSION = `rewrite-judge@${REWRITE_RUBRIC_VERSION}`;
 
@@ -48,9 +48,11 @@ For every numbered line of REWRITE, decide where its content comes from:
 
 When you mark a line "invented", say in its note which claim nothing backs. Judge only what is written. Every line gets exactly one entry.
 
+A "brief" line may hold a claim the person's CV does not back: a result, a figure, a rank, a title, a client or a responsibility the fact sheet does not state. The person keeps it, and is told. For such a line, write in "unbacked" that claim, quoted short from the line, and in "cv" what the fact sheet says on the same subject, quoted short, or "" if it says nothing. Empty self-praise with nothing to check ("passionate", "results-driven") is not a claim: leave both "". For every other line, both are "".
+
 Reply with one JSON object and nothing else: no code fence, no text before or after it. Use this shape:
-{"lines":[{"line":1,"support":"no-claim","note":""}],"note":""}
-"lines" has one entry per numbered line, from 1 to the last, and every entry has all three keys: "line", "support" and "note". A line's "note" is "" unless the line is "invented". The last "note" is one sentence on the text as a whole, or "". Write both notes even when they are empty.`;
+{"lines":[{"line":1,"support":"no-claim","note":"","unbacked":"","cv":""}],"note":""}
+"lines" has one entry per numbered line, from 1 to the last, and every entry has all five keys: "line", "support", "note", "unbacked" and "cv". A line's "note" is "" unless the line is "invented". The last "note" is one sentence on the text as a whole, or "". Write the notes and the two keys even when they are empty.`;
 
 /**
  * The judge's call has no structured output (gatewayModelClient refuses one), so only the prompt
@@ -58,7 +60,16 @@ Reply with one JSON object and nothing else: no code fence, no text before or af
  * empty note reads as "". The first real-model run lost four pieces to a missing note.
  */
 export const RewriteVerdict = z.strictObject({
-  lines: z.array(z.strictObject({ line: z.number().int().min(1), support: LineSupport, note: z.string().default('') })),
+  lines: z.array(
+    z.strictObject({
+      line: z.number().int().min(1),
+      support: LineSupport,
+      note: z.string().default(''),
+      // A "brief" line's claim that the fact sheet does not back, and what the sheet says on it (decision of 18/11/2026).
+      unbacked: z.string().default(''),
+      cv: z.string().default(''),
+    }),
+  ),
   note: z.string().default(''),
 });
 export type RewriteVerdict = z.infer<typeof RewriteVerdict>;
@@ -297,6 +308,13 @@ function madeOrder(edits: readonly AppliedEdit[], order: readonly string[] | und
  * Throws JudgeError when the verdict does not account for every line of `rewritten`, and Error
  * when `edits` do not produce `rewritten` from `original`.
  */
+/** The flag for a claim of the draft the CV does not back: kept as written, with the reason and what the CV says. */
+function unbackedMessage(claim: string, cv: string, lang: Lang): string {
+  return lang === 'es'
+    ? `Esta oración tuya dice «${claim}», que tu CV no respalda. La dejé como la escribiste: si no la podés respaldar, corregila antes de enviarla. ${cv === '' ? 'Tu CV no dice nada sobre eso.' : `Tu CV dice: «${cv}».`}`
+    : `This sentence of yours says "${claim}", which your CV does not back. I left it as you wrote it: if you cannot back it, fix it before you send it. ${cv === '' ? 'Your CV says nothing about it.' : `Your CV says: "${cv}".`}`;
+}
+
 export function planReverts(input: PlanInput): RevertPlan {
   const lines = judgeLines(input.rewritten, input.lang);
   checkLineCoverage(input.verdict, lines.length);
@@ -308,6 +326,13 @@ export function planReverts(input: PlanInput): RevertPlan {
   const fallback: Fallback[] = [];
   const userClaims: UserClaim[] = [];
   for (const judged of input.verdict.lines) {
+    if (judged.support === 'brief' && judged.unbacked.trim() !== '') {
+      const line = byLine.get(judged.line);
+      if (line === undefined) throw new JudgeError(`judge named line ${judged.line}, which the rewrite does not have`);
+      const span = { start: toOriginal(line.start, input.edits, 'start'), end: toOriginal(line.end, input.edits, 'end') };
+      userClaims.push({ line: judged.line, flag: { kind: 'not-in-cv', span, message: unbackedMessage(judged.unbacked.trim(), judged.cv.trim(), input.lang) } });
+      continue;
+    }
     if (judged.support !== 'invented') continue;
     const line = byLine.get(judged.line);
     if (line === undefined) throw new JudgeError(`judge named line ${judged.line}, which the rewrite does not have`);
