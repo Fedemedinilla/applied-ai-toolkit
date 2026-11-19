@@ -42,6 +42,7 @@ const { values, positionals } = parseArgs({
 const out = positionals[0] ?? fail(USAGE);
 const variantIds = values.variants.split(',');
 for (const id of variantIds) if (!VARIANTS.some((v) => v.id === id)) fail(`unknown variant ${id}; one of ${VARIANTS.map((v) => v.id).join(', ')}`);
+for (const [i, id] of variantIds.entries()) if (variantIds.indexOf(id) !== i) fail(`variant ${id} is listed twice in --variants`);
 const cases = CASE_SETS[values.cases] ?? fail(`unknown --cases ${values.cases}; one of ${Object.keys(CASE_SETS).join(', ')}`);
 const positive = (name: string, raw: string, integer: boolean): number => {
   const n = Number(raw);
