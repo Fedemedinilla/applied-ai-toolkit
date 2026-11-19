@@ -11,7 +11,7 @@
 // one, --no-config ignores it. A flag given here wins over the config file, which may also supply --lang.
 // --list-rules prints every rule the config file leaves on, for both languages (the lang column says which); with one file,
 // as that file's overrides leave them. It does not read --lang.
-// Exit codes: 0 no level 1 finding, 1 at least one level 1 finding in any file, 2 bad usage, a bad config file or unreadable input.
+// Exit codes: 0 no level 1 finding (or --help), 1 at least one level 1 finding in any file, 2 bad usage, a bad config file or unreadable input.
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { isCustomId, isIgnored, settingsFor, type Config, type Settings } from './src/config.ts';
@@ -185,7 +185,13 @@ function listRules(settings: Settings, configFile: string | null, json: boolean)
 }
 
 function main(): number {
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  // Help wins over everything else on the line, as in most CLIs, and is not a usage error.
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(`${USAGE}\n`);
+    return 0;
+  }
+  const args = parseArgs(argv);
   if (typeof args === 'string') {
     process.stderr.write(`${args}\n${USAGE}\n`);
     return 2;
