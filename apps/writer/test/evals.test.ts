@@ -2,6 +2,7 @@
 // removes exactly the [COMPLETAR] rule, the deterministic score reads specifics correctly, and a
 // whole run with scripted models lands each invention on the right variant. No key, no network.
 
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import type { ModelClient, ModelRequest } from '../../../evals/src/index.ts';
 import { dumpPrompts, planJobs, preflight, runEval, systemFor } from '../../../evals/src/index.ts';
@@ -211,5 +212,16 @@ describe('the gateway as the eval client', () => {
     await expect(gatewayModelClient(gateway).create({ ...WRITER_CALL, ...base, model: 'claude-opus-5-5' })).rejects.toThrow(/differ from the gateway task/u);
     await expect(gatewayModelClient(gateway).create({ ...WRITER_CALL, ...base, output_config: { effort: 'high' } })).rejects.toThrow(/differ/u);
     expect(api.requests).toHaveLength(0);
+  });
+});
+
+describe('evals/run.ts on the command line', () => {
+  // Audit of 2026-11-15: a variant given twice reached planJobs and ended in a stack trace.
+  it('refuses a variant given twice with a usage error, before any work', () => {
+    const script = new URL('../evals/run.ts', import.meta.url).pathname;
+    const r = spawnSync(process.execPath, [script, 'unused-output.json', '--variants', 'V0,NC,V0', '--dump'], { encoding: 'utf8', env: { ...process.env, ANTHROPIC_API_KEY: '' } });
+    expect(r.status).toBe(2);
+    expect(r.stderr.trim()).toBe('variant V0 is listed twice in --variants');
+    expect(r.stderr).not.toMatch(/\bat \w+ \(/u);
   });
 });

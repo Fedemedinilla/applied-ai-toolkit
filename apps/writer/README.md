@@ -110,7 +110,7 @@ The live run goes through the gateway rather than the SDK, so it spends under th
 | `test/build.test.ts` | The production build into a temp folder: one script and one stylesheet with relative URLs; no inline script, eval or lookbehind; every category name present; no prompt text, style rule, example or tone; no zod |
 | `test/evals.test.ts` | Ten cases with valid roles and categories; no relative date in a brief or title; V0 equals the product prompt; the one-message brief; the fact sheet without examples; NC applies to every case and changes only the rule and the clause; dumps; specifics extraction and support rules; draft scoring; a scripted run that puts an invention on NC, gaps on V0 and a failed call in its column; the gateway as the eval client, and its refusal of drifted settings |
 
-141 tests, all offline; the dev-server test listens on a loopback port only. `test/fake-anthropic.ts` is the fake API. It answers the real client with server-sent events in the API's format and can cut a stream after any event.
+142 tests, all offline; the dev-server test listens on a loopback port only. `test/fake-anthropic.ts` is the fake API. It answers the real client with server-sent events in the API's format and can cut a stream after any event.
 
 ## Layout
 
