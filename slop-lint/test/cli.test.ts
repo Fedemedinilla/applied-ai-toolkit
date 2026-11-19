@@ -41,6 +41,16 @@ describe('cli', () => {
     expect(r.stdout).toMatch(/^0 findings/);
   });
 
+  it('prints the usage on stdout and exits 0 for --help and -h, whatever else is given', () => {
+    // Audit of 2026-11-15: --help was an unknown option and exited 2, the first thing a new user tries.
+    for (const args of [['--help'], ['-h'], [fixture('en-after.txt'), '--help']]) {
+      const r = run(args);
+      expect(r.status, args.join(' ')).toBe(0);
+      expect(r.stdout).toMatch(/^usage: node slop-lint\/cli\.ts /u);
+      expect(r.stderr).toBe('');
+    }
+  });
+
   it('exits 2 on bad usage or a missing file', () => {
     expect(run([fixture('en-after.txt')]).status).toBe(2);
     expect(run([fixture('en-after.txt'), '--lang', 'fr']).status).toBe(2);
