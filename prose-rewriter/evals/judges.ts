@@ -140,11 +140,12 @@ const Gives = z.strictObject({ gives: z.boolean(), note: z.string() });
 export const READER_VALUE: JudgeRubric<z.infer<typeof Gives>> = {
   kind: 'judge',
   name: 'reader-value',
-  version: '1',
+  version: '2',
   instructions: [
     'You read one message a person wrote while looking for work, and the CV it goes with (FACT SHEET). You do not know who or what wrote the message, and it does not matter.',
     'Does the message give the reader something the CV alone does not: why the person writes to this reader, what they would like to do for them, and how what they did connects to what the reader needs? A message that only restates CV facts is the CV in fewer words, and does not.',
     'Do not reward length, flattery or hype: warmth with nothing behind it does not count, and a short message can pass.',
+    'Judge with what is available. The writer may know about the reader only what the message and the fact sheet say (their name, organisation, role, search, an earlier message). A reason built from that counts; do not ask for knowledge of the reader that neither the message nor the fact sheet gives.',
     'In the note, quote the line that decides it.',
     `${JSON_ONLY} Shape: {"gives": true or false, "note": string}.`,
   ].join('\n'),

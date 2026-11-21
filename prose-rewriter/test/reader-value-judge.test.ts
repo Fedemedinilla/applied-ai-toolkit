@@ -31,6 +31,10 @@ describe('the reader-value judge', () => {
     expect(READER_VALUE.instructions).toMatch(/something the CV alone does not/u);
     expect(READER_VALUE.instructions).toMatch(/the CV in fewer words/u);
     expect(READER_VALUE.instructions).toMatch(/Do not reward length/u);
+    // Run of 2026-11-21: version 1 failed 12 of 14 for not knowing more about the reader than anyone
+    // had told it. Version 2 judges with what the message and the fact sheet give.
+    expect(READER_VALUE.version).toBe('2');
+    expect(READER_VALUE.instructions).toMatch(/do not ask for knowledge of the reader that neither the message nor the fact sheet gives/iu);
   });
 
   it('reads the message next to the CV it goes with, and scores the answer', async () => {
