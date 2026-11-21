@@ -66,6 +66,18 @@ A principle taken from a casual source never reaches a formal prompt, and three 
 - `validateRefs()` refuses a lesson whose genres or registers go beyond the scope of any source it cites. An `avoid` entry may name a casual source in a formal register, since it warns against it (no lunfardo in an email).
 - `principlesFor()` checks the scope again when it picks, so data that skipped the validator still cannot leak a casual lesson into a formal prompt.
 
+## Writing for the reader
+
+Added on 2026-11-21. A review of the rewriter by a person, on 14 fictional texts, found the rewrites read like the CV in fewer words, with results but no reason for writing and no link to the reader. The earlier principles teach what to cut. Nineteen new principles, nine in English and ten in Spanish, teach what a letter or a mail must give that the CV cannot:
+
+- open on the reader, then state the writer's intention;
+- tie each result to what the reader needs;
+- bridge into the experience with transitions that connect, never filler;
+- close courteously and openly, with no fixed day in a first contact;
+- in a follow-up, recall the earlier contact.
+
+Four new sources back them, each recorded with its licence. The National Careers Service publishes under the OGL v3.0. The US Department of Labor's "Resume Essentials" and the US Department of Veterans Affairs are US government works (17 USC 105). Sherwin Cody's *Success in Letter Writing* of 1906 is in the public domain in the United States. Five more are kept as links only, because their licence could not be confirmed or is not free. They are Europass, Canada's Job Bank, CareerOneStop, gub.uy and a 2010 PDF on argentina.gob.ar. None of the new principles allows a new fact. Their `check` keeps the facts of the original, and prose-rewriter's fact checks still revert any fact the text and the CV do not state.
+
 ## Design decisions
 
 - **Principles, not passages.** A story from 1917 teaches sentence craft, not the register of an email in 2026. So the literature enters as principles we wrote, and the register comes from plain-language guides under open licences.

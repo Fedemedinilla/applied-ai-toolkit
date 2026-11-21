@@ -374,8 +374,8 @@ describe('judgeRuns (D10)', () => {
     }
   });
 
-  it('runs on WhatsApp in minimo only with strict, and minimo is the WhatsApp default', () => {
-    expect(judgeRuns({ genre: 'whatsapp' })).toBe(false);
+  it('runs on WhatsApp in minimo only with strict; WhatsApp defaults to redaccion since 21/11, so it runs by default', () => {
+    expect(judgeRuns({ genre: 'whatsapp' })).toBe(true);
     expect(judgeRuns({ genre: 'whatsapp', mode: 'minimo' })).toBe(false);
     expect(judgeRuns({ genre: 'whatsapp', mode: 'minimo', strict: false })).toBe(false);
     expect(judgeRuns({ genre: 'whatsapp', mode: 'minimo', strict: true })).toBe(true);
@@ -385,6 +385,7 @@ describe('judgeRuns (D10)', () => {
   it('runs on WhatsApp outside minimo', () => {
     expect(judgeRuns({ genre: 'whatsapp', mode: 'pulido' })).toBe(true);
     expect(judgeRuns({ genre: 'whatsapp', mode: 'reescritura' })).toBe(true);
+    expect(judgeRuns({ genre: 'whatsapp', mode: 'redaccion' })).toBe(true);
   });
 });
 

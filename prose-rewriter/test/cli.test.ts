@@ -53,11 +53,13 @@ async function run(argv: string[], script: Script = {}, extra: { files?: Record<
   return { code, out, err, keys, calls: scripted.calls };
 }
 
-const BASE = ['--genre', 'whatsapp', '--lang', 'es', '--variety', 'rioplatense', '--cv', CV_PATH];
+const ARGS = ['--genre', 'whatsapp', '--lang', 'es', '--variety', 'rioplatense', '--cv', CV_PATH];
+// The run tests were written for minimo, WhatsApp's default before 21/11/2026; they name it.
+const BASE = [...ARGS, '--mode', 'minimo'];
 
 describe('parseArgs', () => {
   it('reads every flag of design 4.11, with --keep repeatable', () => {
-    const args = parseArgs([...BASE, '--to', 'to.json', '--previous', 'prev.txt', '--mode', 'pulido', '--keep', 'el jueves', '--keep=1,6 s', '--strict', '--json', 'draft.txt']);
+    const args = parseArgs([...ARGS, '--to', 'to.json', '--previous', 'prev.txt', '--mode', 'pulido', '--keep', 'el jueves', '--keep=1,6 s', '--strict', '--json', 'draft.txt']);
     expect(args).toEqual({
       genre: 'whatsapp',
       lang: 'es',
@@ -167,7 +169,7 @@ describe('runCli: usage errors', () => {
 
 describe('runCli: the API key', () => {
   it.each([[undefined], ['   ']])('refuses to run without ANTHROPIC_API_KEY (%j), with its own code and no gateway built', async (apiKey) => {
-    const r = await run([...BASE, '--mode', 'pulido', 'draft.txt'], {}, { apiKey });
+    const r = await run([...ARGS, '--mode', 'pulido', 'draft.txt'], {}, { apiKey });
     expect(r.code).toBe(EXIT.failed);
     expect(r.err).toMatch(/ANTHROPIC_API_KEY/);
     expect(r.keys).toEqual([]);

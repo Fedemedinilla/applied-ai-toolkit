@@ -35,7 +35,7 @@ import { defaultMode, type Mode, type Register, type RewriteInput } from './type
 import { GENRE_REQUIRES, voicePromptLines, voiceProfile } from './voice.ts';
 
 /** Bumped whenever the rules, the layout or a stage's task change. */
-export const PROMPT_VERSION = '3';
+export const PROMPT_VERSION = '4';
 
 /** style-refs' data as the caller loaded and parsed it. */
 export interface PromptRefs {
@@ -77,6 +77,7 @@ const MODE_LINES: Readonly<Record<Mode, string>> = {
   minimo: 'minimo: fix only what the findings point at, with the smallest edit that solves it.',
   pulido: 'pulido: fix the findings and polish the sentences that need it; keep the rest as written.',
   reescritura: 'reescritura: reword the sentences that need it; the facts and the voice stay.',
+  redaccion: 'redaccion: write the text for its reader. Fix the findings, then make it read as a message to this person, not as the CV in fewer words; the facts and the voice stay.',
 };
 
 const bullets = (lines: readonly string[]): string[] => lines.map((l) => `- ${l}`);
@@ -234,7 +235,7 @@ const EDIT_TASK = [
 
 /** reescritura only (design 4.4): an edit may cover a paragraph instead of a sentence. */
 const PARAGRAPH_EDITS =
-  'In reescritura, an edit may instead reword the paragraph that starts at its sentenceId: quote "before" exactly from that sentence to the end of its paragraph (its line), and keep every fact of it.';
+  'In reescritura and redaccion, an edit may instead reword the paragraph that starts at its sentenceId: quote "before" exactly from that sentence to the end of its paragraph (its line), and keep every fact of it.';
 
 /** S3: one edit per item of the plan; in reescritura, one per paragraph at most. */
 export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<typeof EditOutput> {
@@ -252,7 +253,7 @@ export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<type
     task: 'rewrite.edit',
     promptVersion: `rewrite-edit@${PROMPT_VERSION}`,
     system: systemBlocks(c),
-    messages: conversation(mode === 'reescritura' ? `${EDIT_TASK}\n${PARAGRAPH_EDITS}` : EDIT_TASK, [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', planBlock]),
+    messages: conversation(taskFor(EDIT_TASK, mode), [textBlock(sentences), ...keepBlock(c.input), '', 'PLAN (from the planning step, by sentenceId)', planBlock]),
     schema: EditOutput,
   };
 }
@@ -286,8 +287,27 @@ export function stylePrompt(
   };
 }
 
-/** The single call's own version: its task changed on 18/11 (cut stock formulas); 4 when the hard rules changed (keep unbacked claims). */
-export const SINGLE_PROMPT_VERSION = '4';
+/** The single call's own version: its task changed on 18/11 (cut stock formulas); 4 when the hard rules changed (keep unbacked claims); 5 with redaccion (21/11). */
+export const SINGLE_PROMPT_VERSION = '5';
+
+/**
+ * What redaccion adds to a task (decision of 21/11/2026). The human review of 20/11 found the
+ * rewrites listed results with no reason for writing and no link to the reader; these lines say what
+ * a reader-oriented message needs. Every addition is a connection made of what the text, the
+ * recipient and <perfil> already state: the fact checks treat any new fact as before.
+ */
+const READER_TASK = [
+  'REDACCION: the text goes with the CV, so it must give what the CV cannot.',
+  '- Early on, say why the writer is writing to this reader, from what the text or the recipient states (their search, their site, their message), and what the writer would like to do for them, as an intention ("me gustaría ayudarlos con eso", "I\'d like to help with that").',
+  '- Connect each result the text keeps to what the reader needs, in a short clause ("eso mismo lo podría hacer con su sitio"); keep two or three results, not a list of everything.',
+  '- Add the transitions that make it read as one message, in the writer\'s voice and register. A transition carries intention or connection, never a new fact, never a stock formula or a hype word.',
+  '- In a first contact, close with an open, easy next step ("la semana que viene, o cuando te quede cómodo") instead of a fixed day; keep a day the reader already proposed.',
+  '- Where a result would be stronger with a link to see it and none is given, write [COMPLETAR: link to the work].',
+  '- Keep it short: a few sentences more than the original at most. On WhatsApp, keep the chat register.',
+].join('\n');
+
+const taskFor = (base: string, mode: Mode): string =>
+  mode === 'redaccion' ? `${base}\n${PARAGRAPH_EDITS}\n${READER_TASK}` : mode === 'reescritura' ? `${base}\n${PARAGRAPH_EDITS}` : base;
 
 const SINGLE_TASK = [
   'TASK: plan and edit in one step',
@@ -309,7 +329,7 @@ export function singleCallPrompt(c: PromptContext, findings: readonly Finding[])
     task: 'rewrite.edit',
     promptVersion: `rewrite-single@${SINGLE_PROMPT_VERSION}`,
     system: systemBlocks(c),
-    messages: conversation(mode === 'reescritura' ? `${SINGLE_TASK}\n${PARAGRAPH_EDITS}` : SINGLE_TASK, [textBlock(sentences), ...keepBlock(c.input), '', findingLines(sentences, findings)]),
+    messages: conversation(taskFor(SINGLE_TASK, mode), [textBlock(sentences), ...keepBlock(c.input), '', findingLines(sentences, findings)]),
     schema: EditOutput,
   };
 }
