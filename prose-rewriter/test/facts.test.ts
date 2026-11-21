@@ -184,6 +184,28 @@ describe('checkEdit fromCv', () => {
   });
 });
 
+describe('a subject line in Title Case (live run of 2026-11-21)', () => {
+  // "Subject: Revolutionize Your Customer Journey" read as three names, so the edit that replaced
+  // the slogan was reverted for losing them. In a Title Case subject a capital says nothing unless
+  // the name appears elsewhere in the text, the CV or the other side of the edit.
+  it('lets a rewrite replace a Title Case slogan in the subject', () => {
+    const O = 'Subject: Revolutionize Your Customer Journey\n\nHi Leo,\nPebble & Pine is growing.';
+    const R = 'Subject: Help with customer support at Pebble & Pine\n\nHi Leo,\nPebble & Pine is growing.';
+    expect(factInvariant(O, R, { cv: 'x' }, [], EN)).toMatchObject({ holds: true });
+  });
+
+  it('still keeps a name of the subject that the text or the CV names elsewhere', () => {
+    const O = 'Subject: Support Role At Larkspur Freight\n\nHi Priya,\nI saw the opening at Larkspur Freight.';
+    const R = 'Subject: A question about the support role\n\nHi Priya,\nI saw the opening.';
+    expect(factInvariant(O, R, { cv: 'x' }, [], EN).missing.map((f) => f.key)).toEqual(['larkspur', 'freight']);
+  });
+
+  it('reads a subject that is not Title Case as before', () => {
+    const O = 'Asunto: Propuesta para Ferretería Quintana\n\nHola Ana, te escribo por el sitio.';
+    expect(factInvariant(O, 'Asunto: Una propuesta\n\nHola Ana, te escribo por el sitio.', { cv: '' }, [], ES).missing.map((f) => f.key)).toEqual(['ferretería', 'quintana']);
+  });
+});
+
 describe('inventory', () => {
   it('labels each fact of the original and flags what is not in the CV', () => {
     const O = 'Hola Marta, armé el formulario de la Ferretería Quintana: recibe 40 pedidos por semana y lo usan 25 personas.';
