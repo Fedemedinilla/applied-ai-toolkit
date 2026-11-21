@@ -443,7 +443,8 @@ const CV_ES = readFileSync(new URL('prose-rewriter/evals/cases/cv/es-rioplatense
 const loaded = (id: string, text: string, genre: 'email' | 'whatsapp'): LoadedCase => ({
   id,
   kind: 'good',
-  input: RewriteInput.parse({ text, genre, lang: 'es', variety: 'rioplatense', profile: { cvMarkdown: CV_ES } }),
+  // A WhatsApp case names minimo, its default before 21/11/2026, so a clean one still exits early.
+  input: RewriteInput.parse({ text, genre, lang: 'es', variety: 'rioplatense', ...(genre === 'whatsapp' ? { mode: 'minimo' } : {}), profile: { cvMarkdown: CV_ES } }),
   expect: { survive: [], acceptedDrops: [], placeholdersAllowed: false },
 });
 /** Fictional. Clean: S1b returns it unchanged, with no model call. */

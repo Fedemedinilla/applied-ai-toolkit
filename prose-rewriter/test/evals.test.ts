@@ -28,7 +28,7 @@ const MAIL = 'Hola Marta,\nEspero que estés bien. Quería comentarte que me apa
 const SINERGIAS = 'Quería comentarte que me apasiona potenciar sinergias.';
 const FIXED = 'Quería contarte que el sitio está listo.';
 
-const mail = (text: string): RewriteInput => ({ text, genre: 'email', lang: 'es', variety: 'rioplatense', profile: { cvMarkdown: CV_ES } });
+const mail = (text: string): RewriteInput => ({ text, genre: 'email', lang: 'es', variety: 'rioplatense', mode: 'pulido', profile: { cvMarkdown: CV_ES } });
 const plan = (...sentenceIds: number[]) => ({ data: { items: sentenceIds.map((sentenceId) => ({ sentenceId, action: 'remove-formula', reason: 'set phrase', ruleId: 'LEX-01' })) } });
 const edits = (...list: Array<{ sentenceId: number; before: string; after: string; principleId?: string }>) => ({
   data: { edits: list.map((e) => ({ reason: 'fix', ...e })) },
@@ -93,7 +93,7 @@ describe('the single-call baseline (design 4.10)', () => {
     const content = String(p.messages[0]?.content);
     expect(content).toMatch(/stock formula[^\n]*cut it/i);
     expect(content).toMatch(/do not write another formula or a new closing/i);
-    expect(SINGLE_PROMPT_VERSION).toBe('4');
+    expect(SINGLE_PROMPT_VERSION).toBe('5');
   });
 
   it('makes exactly one call and applies the edits it can place', async () => {
@@ -116,7 +116,7 @@ describe('the single-call baseline (design 4.10)', () => {
 
   it('takes the same early exit as rewrite(): no call', async () => {
     const scripted = scriptedGateway({});
-    const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp' }, { gateway: scripted.gateway, refs: REFS });
+    const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp', mode: 'minimo' }, { gateway: scripted.gateway, refs: REFS });
     expect(scripted.calls).toEqual([]);
     expect(result).toMatchObject({ rewritten: CLEAN_CHAT, applied: 0, refused: 0, usage: { calls: 0, costUsd: 0 } });
   });
@@ -283,7 +283,7 @@ describe('runPipelines', () => {
   it('writes the records with evals appendJsonl, one line per piece', async () => {
     const path = join(mkdtempSync(join(tmpdir(), 'rewriter-evals-')), 'run.jsonl');
     const scripted = scriptedGateway({});
-    const clean: EvalCase = { id: 'es-whatsapp-clean', input: { ...mail(CLEAN_CHAT), genre: 'whatsapp' } };
+    const clean: EvalCase = { id: 'es-whatsapp-clean', input: { ...mail(CLEAN_CHAT), genre: 'whatsapp', mode: 'minimo' } };
     await runPipelines([clean], [byId('full'), byId('single-call')], { gateway: scripted.gateway, refs: REFS, record: (r) => appendJsonl(path, r) });
     const lines = readJsonl<PieceRecord>(path);
     expect(lines.map((r) => [r.case, r.variant, r.status, r.usage.calls, r.usage.costUsd])).toEqual([

@@ -30,7 +30,7 @@ export const EXIT = { ok: 0, needsReview: 1, blocked: 2, usage: 3, failed: 4 } a
 
 export const USAGE =
   'usage: node prose-rewriter/cli.ts --genre cover-letter|email|follow-up|whatsapp --lang es|en [--variety rioplatense|neutral] ' +
-  '--cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura] [--keep "phrase"]... [--strict] [--strategy staged|single] [--json] <draft file>';
+  '--cv <file> [--to recipient.json] [--previous file] [--mode minimo|pulido|reescritura|redaccion] [--keep "phrase"]... [--strict] [--strategy staged|single] [--json] <draft file>';
 
 export interface Args {
   readonly genre: Genre;
@@ -88,7 +88,7 @@ export function parseArgs(argv: readonly string[]): Args | string {
   const variety = Variety.optional().safeParse(values.variety);
   if (!variety.success) return '--variety must be rioplatense or neutral';
   const mode = Mode.optional().safeParse(values.mode);
-  if (!mode.success) return '--mode must be minimo, pulido or reescritura';
+  if (!mode.success) return '--mode must be minimo, pulido, reescritura or redaccion';
   const strategy = z.enum(STRATEGIES).optional().safeParse(values.strategy);
   if (!strategy.success) return '--strategy must be staged or single';
   if (values.cv === undefined) return '--cv is required';

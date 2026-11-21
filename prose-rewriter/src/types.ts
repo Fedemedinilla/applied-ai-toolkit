@@ -28,13 +28,21 @@ export type Variety = z.infer<typeof Variety>;
 export const Register = z.enum(['formal', 'neutral', 'casual']);
 export type Register = z.infer<typeof Register>;
 
-/** How far a rewrite may go: the smallest fix, a polish, or a real rewording by paragraph. */
-export const Mode = z.enum(['minimo', 'pulido', 'reescritura']);
+/**
+ * How far a rewrite may go: the smallest fix, a polish, a real rewording by paragraph, or
+ * `redaccion`, which writes for the reader: it may add connections (why this reader, the writer's
+ * intention, a bridge from a result to the reader's need, transitions, an open close), never facts.
+ */
+export const Mode = z.enum(['minimo', 'pulido', 'reescritura', 'redaccion']);
 export type Mode = z.infer<typeof Mode>;
 
-/** WhatsApp defaults to the smallest edit; every other genre to a polish. */
+/**
+ * Decision of 21/11/2026, after the human review of 20/11 found the rewrites read like "the CV in
+ * fewer words": mails, follow-ups and WhatsApp are written for the reader by default; a cover
+ * letter keeps the polish.
+ */
 export function defaultMode(genre: Genre): Mode {
-  return genre === 'whatsapp' ? 'minimo' : 'pulido';
+  return genre === 'cover-letter' ? 'pulido' : 'redaccion';
 }
 
 /**

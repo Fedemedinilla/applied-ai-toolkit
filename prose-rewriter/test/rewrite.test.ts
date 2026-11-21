@@ -24,11 +24,14 @@ const CV_EN = readFileSync(new URL('../evals/cases/cv/en.md', import.meta.url), 
 /** A clean WhatsApp message: slop-lint finds nothing at level 1 or 2 in it. */
 const CLEAN = 'Hola Marta, te paso el link del sitio nuevo de la panadería. Lo armé en Astro y carga en 1,6 s. Avisame si querés que lo veamos el jueves.';
 
+// These suites test the stages of minimo and pulido, written before redaccion became the default
+// of mails, follow-ups and WhatsApp (21/11/2026), so the helpers name their mode.
 const whatsapp = (text: string, extra: Partial<RewriteInput> = {}): RewriteInput => ({
   text,
   genre: 'whatsapp',
   lang: 'es',
   variety: 'rioplatense',
+  mode: 'minimo',
   profile: { cvMarkdown: CV_ES },
   ...extra,
 });
@@ -116,7 +119,7 @@ describe('S1b early exit', () => {
   it('says it in English when the text is in English', async () => {
     const scripted = scriptedGateway({});
     const text = 'Hi Tom, the new help page is up. It loads in 1.2 s on my phone. Shall we go through it on Thursday?';
-    const result = await rewrite({ text, genre: 'whatsapp', lang: 'en', profile: { cvMarkdown: CV_EN } }, { gateway: scripted.gateway, strategy: 'staged' });
+    const result = await rewrite({ text, genre: 'whatsapp', lang: 'en', mode: 'minimo', profile: { cvMarkdown: CV_EN } }, { gateway: scripted.gateway, strategy: 'staged' });
     expect(scripted.calls).toEqual([]);
     expect(result.message).toBe('I found nothing to change');
   });
@@ -166,7 +169,7 @@ const SINERGIAS = 'Quería comentarte que me apasiona potenciar sinergias.';
 const FIXED = 'Quería contarte que el sitio está listo.';
 const SPEED = 'El sitio de la panadería ya carga en 1,6 s.';
 
-const mail = (text: string, extra: Partial<RewriteInput> = {}): RewriteInput => ({ ...whatsapp(text), genre: 'email', ...extra });
+const mail = (text: string, extra: Partial<RewriteInput> = {}): RewriteInput => ({ ...whatsapp(text), genre: 'email', mode: 'pulido', ...extra });
 
 const plan = (...sentenceIds: number[]) => ({ data: { items: sentenceIds.map((sentenceId) => ({ sentenceId, action: 'remove-formula', reason: 'set phrase', ruleId: 'LEX-01' })) } });
 const edits = (...list: Array<{ sentenceId: number; before: string; after: string; principleId?: string }>) => ({
