@@ -312,12 +312,14 @@ describe('sources.json against the author table and register guides of design 4.
   };
 
   it('lists every author and guide of the tables, excluded ones included', () => {
+    // The guides on writing for the reader joined on 2026-11-21, after the human review of the rewriter.
     expect(sources.map((s) => s.id).sort()).toEqual([
-      'andis-lenguaje-claro', 'argentina-gob-ar', 'arlt-aguafuertes', 'azorin', 'baroja', 'bierce-write-it-right',
-      'chekhov-garnett-lady-with-the-dog', 'ec-how-to-write-clearly', 'federal-plain-language', 'franklin-autobiography',
-      'galdos-fortunata-y-jacinta', 'govuk-style-guide', 'lincoln-gettysburg', 'mansilla-ranqueles', 'orwell-politics',
-      'quiroga-cuentos-1917', 'quiroga-decalogo', 'red-lenguaje-claro-es', 'sarmiento-facundo', 'strunk-elements-1920',
-      'strunk-white-1959', 'twain-cooper-offences',
+      'andis-lenguaje-claro', 'argentina-gacetilla-carta', 'argentina-gob-ar', 'arlt-aguafuertes', 'azorin', 'baroja',
+      'bierce-write-it-right', 'careeronestop-cover-letters', 'chekhov-garnett-lady-with-the-dog', 'cody-success-in-letter-writing',
+      'dol-resume-essentials', 'ec-how-to-write-clearly', 'europass-cover-letter', 'federal-plain-language', 'franklin-autobiography',
+      'galdos-fortunata-y-jacinta', 'govuk-style-guide', 'gub-uy-carta-presentacion', 'jobbank-canada-stand-out', 'lincoln-gettysburg',
+      'mansilla-ranqueles', 'ncs-covering-letter', 'orwell-politics', 'quiroga-cuentos-1917', 'quiroga-decalogo', 'red-lenguaje-claro-es',
+      'sarmiento-facundo', 'strunk-elements-1920', 'strunk-white-1959', 'twain-cooper-offences', 'va-careers-cover-letter',
     ]);
   });
 

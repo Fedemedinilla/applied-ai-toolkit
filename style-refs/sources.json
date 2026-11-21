@@ -591,5 +591,231 @@
     "evidence": "REPORTADO",
     "use": "link-only",
     "note": "Link only, never copied: a non-commercial licence is not free for this repository. The address is the agency page, not the guide itself; on 2026-11-16 it redirected to www.argentina.gob.ar/salud/senadis, and the address of the guide is [SIN VERIFICAR]. Status as reported by the public-domain research of 2026-11-15 (design 4.8), not checked against each law."
+  },
+  {
+    "id": "ncs-covering-letter",
+    "kind": "guide",
+    "author": "National Careers Service (England)",
+    "work": "Covering letter (careers advice)",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "gb"
+    ],
+    "status": {
+      "ar": "open-licence",
+      "us": "open-licence",
+      "eu": "open-licence",
+      "es": "open-licence"
+    },
+    "licence": "Open Government Licence v3.0",
+    "url": "https://nationalcareers.service.gov.uk/careers-advice/covering-letter",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "attribution": "Contains public sector information licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). Adapted from the National Careers Service careers advice on covering letters, © Crown copyright.",
+    "note": "Principles with attribution: say the role and why you want to work there, match your skills to what the employer asks for, three to five paragraphs, thank the reader and say you look forward to hearing from them. The footer read 'All content is available under the Open Government Licence v3.0, except where otherwise stated' and '© Crown copyright' when fetched on 2026-11-21. Not checked against each law."
+  },
+  {
+    "id": "dol-resume-essentials",
+    "kind": "guide",
+    "author": "US Department of Labor, Veterans' Employment and Training Service (TEAMS workshops)",
+    "work": "Resume Essentials: Participant Guide, Section 4, Writing Your Cover Letter (February 2026 edition)",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "public-domain",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "no copyright in the US (17 USC 105); dol.gov states that materials created by the federal government are generally public domain, except third-party material; outside the US [SIN VERIFICAR]",
+    "url": "https://www.dol.gov/sites/dolgov/files/VETS/files/ResumeEssentials_PG_Interactive_Feb2026.pdf",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles only, pages 57 to 61 and 67 to 68 of the guide: the letter connects your background to the employer's needs and does not repeat the work history; one example of how you can contribute; 250 to 400 words; close with a polite, open-ended call to action and avoid 'I'll call to schedule an interview', which may sound too forceful. Not used: the LinkedIn statistics it quotes (third-party data) and its advice to swap words for rarer synonyms, which contradicts es-plain-exact-words and en-short-common-words. Year of publication taken from the file name, so `published` stays null. Copyright notice read on www.dol.gov/general/aboutdol/copyright on 2026-11-21."
+  },
+  {
+    "id": "va-careers-cover-letter",
+    "kind": "guide",
+    "author": "US Department of Veterans Affairs (VA Careers)",
+    "work": "How to captivate a recruiter with a surefire cover letter",
+    "published": 2023,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "public-domain",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "no copyright in the US (17 USC 105); VA copyright policy: government-produced materials on VA websites are not copyright protected; outside the US [SIN VERIFICAR]",
+    "url": "https://vacareers.va.gov/job-news-advice/how-to-captivate-recruiter-with-surefire-cover-letter/",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles only: the resume covers the past, the letter says how you will contribute and gives what the hiring manager does not already have; connect experience to the posting; one page; thank the reader and ask for the next step. Article dated 2023-08-11, unsigned, on an official VA site. The policy line was read on department.va.gov/copyright-policy on 2026-11-21. Its advice to open with a personal anecdote is not used, since the rewriter adds no facts."
+  },
+  {
+    "id": "cody-success-in-letter-writing",
+    "kind": "guide",
+    "author": "Sherwin Cody",
+    "work": "Success in Letter Writing, Business and Social",
+    "published": 1906,
+    "authorDied": 1959,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "public-domain",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "public domain in the US (published 1906, before 1931); elsewhere [SIN VERIFICAR], since the author died in 1959",
+    "url": "https://archive.org/details/successinletterw00codyrich",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "principles",
+    "note": "Principles in our own words only, never excerpts: the scan is on archive.org (sixth edition, 1913; copyright line 1906), not on Gutenberg or Wikisource. Lessons used: knowledge of the reader decides what is said; a letter applying for a position speaks of the qualifications the employer cares about, and too many weaken it; talk about their business, do not brag; good-humoured, kindly, courteous tone; never longer than will be read. Its model letters and period phrasing are not imitated. Author's dates 1868 to 1959 per Wikipedia and SNAC."
+  },
+  {
+    "id": "europass-cover-letter",
+    "kind": "guide",
+    "author": "European Commission (Europass)",
+    "work": "Create your Europass Cover Letter",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "eu"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "[SIN VERIFICAR]; Commission content is usually reusable under Decision 2011/833/EU, but the Europass legal notice could not be read",
+    "url": "https://europass.europa.eu/en/create-europass-cover-letter",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only until the Europass legal notice confirms the reuse terms (europass.europa.eu/en/legal-notice answered 404 on 2026-11-21). It agrees with the principles: motivation first, one or two points about the employer, one page, formal and polite tone."
+  },
+  {
+    "id": "jobbank-canada-stand-out",
+    "kind": "guide",
+    "author": "Government of Canada (Job Bank)",
+    "work": "Stand out to employers and land your dream job",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "ca"
+    ],
+    "status": {
+      "ar": "protected",
+      "us": "protected",
+      "eu": "protected",
+      "es": "protected"
+    },
+    "licence": "Canada.ca terms: non-commercial reproduction only; commercial redistribution needs written permission",
+    "url": "https://www.jobbank.gc.ca/career-planning/resources/stand-out",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only: the page links to the Canada.ca terms, which allow non-commercial reproduction only; it does not carry the Open Government Licence – Canada. Not free for this repository."
+  },
+  {
+    "id": "careeronestop-cover-letters",
+    "kind": "guide",
+    "author": "CareerOneStop (sponsored by the US Department of Labor)",
+    "work": "Cover letters",
+    "published": null,
+    "authorDied": null,
+    "lang": "en",
+    "originalLang": "en",
+    "nationality": [
+      "us"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "[SIN VERIFICAR]; the site is sponsored by DOL but whether its text is a federal work was not confirmed",
+    "url": "https://www.careeronestop.org/JobSearch/Resumes/cover-letters.aspx",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only: the page answered 403 to the fetch on 2026-11-21 and its terms were not read."
+  },
+  {
+    "id": "gub-uy-carta-presentacion",
+    "kind": "guide",
+    "author": "Gobierno de Uruguay (gub.uy), after material of the MTSS",
+    "work": "Carta de presentación",
+    "published": null,
+    "authorDied": null,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "uy"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "[SIN VERIFICAR]; the page shows no licence and gub.uy terms vary by agency",
+    "url": "https://www.gub.uy/node/341",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only. It agrees with the principles: the letter complements the CV and does not replace it, starts with what moves you to apply, two or three points of your profile linked to the role, one page."
+  },
+  {
+    "id": "argentina-gacetilla-carta",
+    "kind": "guide",
+    "author": "Gobierno de la República Argentina (issuing office not named)",
+    "work": "Redacción de una Carta de Presentación (gacetilla)",
+    "published": null,
+    "authorDied": null,
+    "lang": "es",
+    "originalLang": "es",
+    "nationality": [
+      "ar"
+    ],
+    "status": {
+      "ar": "unverified",
+      "us": "unverified",
+      "eu": "unverified",
+      "es": "unverified"
+    },
+    "licence": "[SIN VERIFICAR]; hosted on argentina.gob.ar, whose CC BY 4.0 line on /acerca does not say whether it covers uploaded PDFs",
+    "url": "https://www.argentina.gob.ar/sites/default/files/3._gacetilla_carta_presentacion.pdf",
+    "verified": "2026-11-21",
+    "evidence": "REPORTADO",
+    "use": "link-only",
+    "note": "Link only. PDF metadata dates it 2010-05-18, author field a user name. It says the letter must not repeat the CV and must fit the employer's needs; its model letters ('Tengo el agrado de dirigirme a Uds.') are the register the rewriter removes."
   }
 ]
