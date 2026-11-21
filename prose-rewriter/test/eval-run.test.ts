@@ -782,7 +782,7 @@ describe('the eval CLI', () => {
 
   it('--live runs, records, judges and reports the gate, the cost table and the month spend', async () => {
     const judge = (text: string) => ({ text, usage: { input: 1000, output: 100 } });
-    const scripted = scriptedGateway({ 'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}')] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}'), judge('{"gives": true, "note": ""}')] });
     const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN] });
     const outDir = join(h.dir, 'run');
     // No baseline among the variants: the run finished, the gate could not run.
@@ -797,10 +797,11 @@ describe('the eval CLI', () => {
     // The fact check is reported next to the code rubrics; the rewrite equal to the original was not paid for.
     expect(text).toContain('### Fact check (judge, soft)');
     expect(text).toContain('| full | 1 | 0 | 0 | n/a | 1 | 0 |');
-    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0060 of US\$20/);
-    expect(text).toMatch(/This run: US\$0\.0060 over 2 calls/);
+    // Three judge calls at US$0.0030 each: register-fit, literary-contamination and reader-value.
+    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0090 of US\$20/);
+    expect(text).toMatch(/This run: US\$0\.0090 over 3 calls/);
     expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');
-    expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.006);
+    expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.009);
     expect(h.out.join('') + h.err.join('')).not.toContain(SECRET);
   });
 

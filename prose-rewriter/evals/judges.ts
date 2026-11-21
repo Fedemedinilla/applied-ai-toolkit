@@ -11,6 +11,9 @@
  * - register-fit: is the rewrite's register right for the genre, language and variety;
  * - literary-contamination: archaism, ornament or a storyteller's tone in the rewrite; passes
  *   when there is none;
+ * - reader-value: does the rewrite give the reader what the CV it goes with cannot (why this reader,
+ *   the writer's intention, results tied to the reader's need), or is it the CV in fewer words;
+ *   soft, added on 2026-11-21 after the human review of 2026-11-20;
  * - fact-check: the facts the rewrite lost, changed or added against the original and the fact
  *   sheet (CV, extra facts, recipient); passes when it lists none. The code rubrics facts-preserved
  *   and no-new-facts use the same factInvariant as the product's guard, so "0 hard failures" grades
@@ -127,6 +130,31 @@ const LITERARY = binary(
   (v) => !v.contaminated,
 );
 
+const Gives = z.strictObject({ gives: z.boolean(), note: z.string() });
+
+/**
+ * reader-value (decision of 2026-11-21): the human review of 2026-11-20 found rewrites that read
+ * like "the CV in fewer words". The judge reads the message next to the CV it goes with and says
+ * whether the message gives what the CV cannot. Soft: no gate reads it until a run is measured.
+ */
+export const READER_VALUE: JudgeRubric<z.infer<typeof Gives>> = {
+  kind: 'judge',
+  name: 'reader-value',
+  version: '1',
+  instructions: [
+    'You read one message a person wrote while looking for work, and the CV it goes with (FACT SHEET). You do not know who or what wrote the message, and it does not matter.',
+    'Does the message give the reader something the CV alone does not: why the person writes to this reader, what they would like to do for them, and how what they did connects to what the reader needs? A message that only restates CV facts is the CV in fewer words, and does not.',
+    'Do not reward length, flattery or hype: warmth with nothing behind it does not count, and a short message can pass.',
+    'In the note, quote the line that decides it.',
+    `${JSON_ONLY} Shape: {"gives": true or false, "note": string}.`,
+  ].join('\n'),
+  call: CALL,
+  verdict: Gives,
+  // `reference` is the fact sheet: the CV, other facts and the recipient.
+  prompt: (piece, reference) => ['BRIEF', piece.brief, '', 'FACT SHEET', wrapData('perfil', reference), '', piece.text].join('\n'),
+  reduce: (v) => ({ pass: v.gives, metrics: {} }),
+};
+
 /**
  * The kind of a fact, for the report only: a kind the judge makes up reads as "other" instead of
  * costing the verdict, since the lists, not the kinds, decide the pass.
@@ -198,6 +226,7 @@ export const JUDGE_RUBRICS: readonly JudgeRubric<object>[] = [
   SAME_VOICE,
   REGISTER_FIT,
   LITERARY,
+  READER_VALUE,
   FACT_CHECK,
 ];
 
@@ -293,7 +322,7 @@ function items(cases: readonly EvalCase[], pieces: readonly PieceRecord[], rubri
     for (const p of pieces) {
       const input = byCase.get(p.case);
       if (input === undefined) throw new Error(`piece of case ${p.case}, which is not among the cases`);
-      const sheet = rubric.name === FACT_CHECK.name ? { reference: factSheet({ ...input.profile, ...(input.recipient === undefined ? {} : { recipient: input.recipient }) }) } : {};
+      const sheet = rubric.name === FACT_CHECK.name || rubric.name === READER_VALUE.name ? { reference: factSheet({ ...input.profile, ...(input.recipient === undefined ? {} : { recipient: input.recipient }) }) } : {};
       const base = { rubric, case: p.case, variant: p.variant, lang: p.lang, brief: brief(input), ...sheet };
       let reference = input.text;
       if (rubric.name === 'pairwise-baseline') {
@@ -371,7 +400,7 @@ export async function judgePieces(cases: readonly EvalCase[], pieces: readonly P
       const gatewayClient = gatewayModelClient(measuredGateway(options.gateway, meter), { task: 'rewrite.judge', userId: options.userId ?? null, promptVersion: `rewrite-${rubric.name}@${rubric.version}` });
       // The fact check takes the object out of a code fence or a sentence around it, as the
       // product's fact judge does: the live runs lost judge verdicts to replies that were "not JSON".
-      const client = rubric.name === FACT_CHECK.name ? jsonJudgeClient(gatewayClient) : gatewayClient;
+      const client = rubric.name === FACT_CHECK.name || rubric.name === READER_VALUE.name ? jsonJudgeClient(gatewayClient) : gatewayClient;
       const usage = (): JudgeRecord['usage'] => ({ calls: meter.calls, costUsd: meter.costUsd, tokens: { ...meter.tokens } });
       try {
         const { id: _id, judge: _judge, ...verdict } = await judgeWith(rubric, client, piece, item.reference ?? '', 1, CALL);

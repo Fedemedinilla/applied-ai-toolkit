@@ -38,12 +38,13 @@ const piece = (variant: string, rewritten: string, caseId = 'es-email-facts'): P
   usage: { calls: 1, costUsd: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }, extraRound: false },
 });
 
-/** Replies for the five other rubrics of one piece with no baseline: pairwise-original, same-voice, register-fit, literary-contamination. */
+/** Replies for the other rubrics of one piece with no baseline: pairwise-original, same-voice, register-fit, literary-contamination, reader-value. */
 const others = () => [
   { text: JSON.stringify({ choice: 'A', note: '' }) },
   { text: JSON.stringify({ same: true, note: '' }) },
   { text: JSON.stringify({ fits: true, note: '' }) },
   { text: JSON.stringify({ contaminated: false, note: '' }) },
+  { text: JSON.stringify({ gives: true, note: '' }) },
 ];
 const clean = { text: JSON.stringify({ lost: [], changed: [], added: [], note: '' }) };
 
