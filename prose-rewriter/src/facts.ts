@@ -976,10 +976,17 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
   const sources = poolOf(sourcesText(context.C), context);
   const invented = added.filter((f) => !states(original, f) && !states(sources, f));
   if (invented.length > 0) return { status: 'reverted', reason: 'invented', facts: invented, message: `adds ${listOf(invented)}, found in neither the text nor the CV` };
-  if (lost.length > 0 && edit.drop !== true) return { status: 'reverted', reason: 'lost', facts: lost, message: `loses ${listOf(lost)} without drop` };
   if (lost.length > 0) {
     const elsewhere = poolOf(context.sentences.filter((_, i) => i !== edit.sentenceId).join('\n'), context);
     const gone = lost.filter((f) => !states(elsewhere, f));
+    // A fact another sentence still states is not lost, whether or not the model set drop: the
+    // cut stands as a drop, and recheckDrops() reverts it if that other sentence goes too (live run
+    // of 2026-11-21: a cut of "Pebble & Pine's" was reverted though two sentences still named it).
+    // Without drop, "still stated" means read there as the same kind of fact, never a word inside a
+    // URL or an address ("ana@contoso.example" does not keep "Contoso").
+    const restated = new Set(extract(context.sentences.filter((_, i) => i !== edit.sentenceId).join('\n'), context).map((f) => `${f.kind}:${f.key}`));
+    const unkept = lost.filter((f) => !restated.has(`${f.kind}:${f.key}`));
+    if (unkept.length > 0 && edit.drop !== true) return { status: 'reverted', reason: 'lost', facts: unkept, message: `loses ${listOf(unkept)} without drop` };
     if (gone.length > 0) return { status: 'reverted', reason: 'drop-not-elsewhere', facts: gone, message: `drops ${listOf(gone)}, which no other sentence states` };
   }
   return { status: 'accepted', fromCv: added.filter((f) => !states(original, f)), dropped: lost };

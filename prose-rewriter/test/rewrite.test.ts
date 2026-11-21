@@ -1027,7 +1027,11 @@ describe('S5 drops against what the judge leaves', () => {
     expect(result.rewritten).toBe(expected);
     const deletions = result.changes.filter((c) => c.before === LUMEN);
     expect(deletions.map((c) => [c.stage, c.status])).toEqual([['edit', 'reverted'], ['style', 'reverted']]);
-    expect(deletions[1]?.revertReason).toMatch(/^facts: .*Estudio/);
+    // The S3 cut of the Lumen sentence stood as a drop while the opening still named Estudio Lumen
+    // (2026-11-21); once the judge reverted the opening, the recheck took the drop back too. The
+    // style twin could no longer be placed, since its sentence was cut when S4 ran.
+    expect(deletions[0]?.revertReason).toMatch(/^facts: .*Estudio/);
+    expect(deletions[1]?.revertReason).toMatch(/is not in sentence 4/);
     expect(result.status).toBe('needs-review');
     expectSound(input, result);
   });

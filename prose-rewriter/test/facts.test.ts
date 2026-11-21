@@ -184,6 +184,23 @@ describe('checkEdit fromCv', () => {
   });
 });
 
+describe('a fact the edit cuts that another sentence still states (live run of 2026-11-21)', () => {
+  // "I'd be thrilled to ... elevate Pebble & Pine's support game" was reverted for losing the
+  // company, which two other sentences still named: the model had not set drop.
+  const O = "Pebble & Pine is growing. I'd love to help Pebble & Pine. I'd be thrilled to elevate Pebble & Pine's support game together.";
+  const sentences = ['Pebble & Pine is growing.', "I'd love to help Pebble & Pine.", "I'd be thrilled to elevate Pebble & Pine's support game together."];
+  const ctx = { O, C: { cv: 'x' }, sentences, lang: 'en' } as const;
+  it('accepts the cut as a drop, with the facts it drops listed for the later rechecks', () => {
+    const r = checkEdit({ sentenceId: 2, before: "I'd be thrilled to elevate Pebble & Pine's support game together.", after: "I'm happy to talk at a time that suits you.", reason: 'test' }, ctx);
+    expect(r).toMatchObject({ status: 'accepted' });
+    expect(r.status === 'accepted' && r.dropped.map((f) => f.key)).toEqual(['pebble', 'pine']);
+  });
+  it('still reverts a cut of a fact no other sentence states', () => {
+    const r = checkEdit({ sentenceId: 1, before: "I'd love to help Pebble & Pine.", after: "I'd love to help.", reason: 'test' }, { ...ctx, sentences: ['It is growing.', "I'd love to help Pebble & Pine.", 'Thanks.'], O: "It is growing. I'd love to help Pebble & Pine. Thanks." });
+    expect(r).toMatchObject({ status: 'reverted', reason: 'lost' });
+  });
+});
+
 describe('a subject line in Title Case (live run of 2026-11-21)', () => {
   // "Subject: Revolutionize Your Customer Journey" read as three names, so the edit that replaced
   // the slogan was reverted for losing them. In a Title Case subject a capital says nothing unless
@@ -629,7 +646,11 @@ describe('ordinary words at the start of a sentence (F6b eval run)', () => {
     // Kestrel is a name because C writes it capitalized mid-sentence, whatever the first word looks like.
     const C = { cv: 'I wrote help articles for Kestrel Books in 2024.' };
     expect(check('Kestrel Books is hiring a support engineer.', C, 'Kestrel Books is hiring', 'The shop is hiring', 'en')).toMatchObject({ status: 'reverted', reason: 'lost' });
-    expect(check('Solo uso Supabase. Supabase guarda los pedidos.', { cv: '' }, 'Supabase guarda', 'Una base guarda')).toMatchObject({ status: 'reverted', reason: 'lost' });
+    // Read as a name, it is a fact; since 2026-11-21 a cut of it stands as a drop while the other
+    // sentence still names it, and the cut of a name no other sentence states is still reverted.
+    const kept = check('Solo uso Supabase. Supabase guarda los pedidos.', { cv: '' }, 'Supabase guarda', 'Una base guarda');
+    expect(kept.status === 'accepted' && kept.dropped.map((f) => f.key)).toEqual(['supabase']);
+    expect(check('Uso una base. Supabase guarda los pedidos.', { cv: '' }, 'Supabase guarda', 'Una base guarda')).toMatchObject({ status: 'reverted', reason: 'lost' });
     expect(factInvariant('Kestrel Books is hiring.', 'The shop is hiring.', C, [], EN).missing.map((f) => f.key)).toEqual(['kestrel', 'books']);
   });
 });
