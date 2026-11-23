@@ -1,0 +1,6 @@
+# The sdist carries what the wheel is built from. setuptools adds tests/ and every
+# top-level .py file by default; the tests need the checkout's support files, and
+# site_check.py is the script a checkout runs without installing.
+prune tests
+prune examples
+exclude site_check.py

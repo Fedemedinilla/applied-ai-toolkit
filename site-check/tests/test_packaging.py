@@ -1,15 +1,18 @@
 """Packaging: pyproject.toml agrees with the package, and what it would ship runs.
 
 Nothing here touches the network or publishes anything. The sdist is built
-with the setuptools already on the machine, from a copy of the sources in a
-temporary folder; without setuptools that test is skipped and the others
-still check the metadata and the entry points.
+with the setuptools already on the machine, from a copy of the folder in a
+temporary folder; without setuptools 77 or newer (the first that reads an SPDX
+license string) those tests are skipped and the others still check the
+metadata and the entry points.
 """
 
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
@@ -28,17 +31,16 @@ import sitecheck
 ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 PROJECT = PYPROJECT["project"]
-SHIPPED = ("pyproject.toml", "README.md", "LICENSE", "sitecheck", "schema")
 DATA_FILES = ("sitecheck/catalogs/es.json", "sitecheck/catalogs/en.json")
 
 
+# Local output that .gitignore keeps out of a checkout, so out of a build too.
+NOT_CHECKED_IN = ("__pycache__", "*.pyc", "site-check-runs", "runs", "build", "dist", "*.egg-info")
+
+
 def _copy_sources(dest: Path) -> None:
-    for name in SHIPPED:
-        source = ROOT / name
-        if source.is_dir():
-            shutil.copytree(source, dest / name, ignore=shutil.ignore_patterns("__pycache__"))
-        else:
-            shutil.copyfile(source, dest / name)
+    """The whole folder as a checkout has it, tests and examples included, so the build decides what ships."""
+    shutil.copytree(ROOT, dest, dirs_exist_ok=True, ignore=shutil.ignore_patterns(*NOT_CHECKED_IN))
 
 
 def _python(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -54,7 +56,9 @@ class MetadataTest(unittest.TestCase):
         self.assertEqual(PROJECT["requires-python"], ">=3.11")
         self.assertEqual(PROJECT["dependencies"], [], "standard library only")
         self.assertNotIn("optional-dependencies", PROJECT)
-        self.assertEqual(PROJECT["license"], {"text": "MIT"})
+        self.assertEqual(PROJECT["license"], "MIT")
+        self.assertEqual(PROJECT["license-files"], ["LICENSE"])
+        self.assertFalse([c for c in PROJECT["classifiers"] if c.startswith("License ::")])
         self.assertIn("MIT License", (ROOT / "LICENSE").read_text(encoding="utf-8"))
         self.assertEqual(PROJECT["readme"], "README.md")
 
@@ -111,7 +115,29 @@ class EntryPointsTest(unittest.TestCase):
             self.assertIn("modules outside the standard library were loaded: thirdparty", done.stderr)
 
 
-@unittest.skipUnless(importlib.util.find_spec("setuptools"), "setuptools is not installed: the sdist is not built")
+def _setuptools_major() -> int | None:
+    if importlib.util.find_spec("setuptools") is None:
+        return None
+    return int(importlib.metadata.version("setuptools").split(".")[0])
+
+
+# pyproject.toml asks for setuptools>=77, which reads `license` as an SPDX expression.
+MIN_SETUPTOOLS = 77
+
+
+# CI sets SITECHECK_REQUIRE_BUILD=1 after installing setuptools, so a missing one fails there instead of skipping.
+BUILD_REQUIRED = os.environ.get("SITECHECK_REQUIRE_BUILD") == "1"
+
+
+class BuildToolTest(unittest.TestCase):
+    def test_setuptools_is_new_enough_where_the_build_is_required(self) -> None:
+        if not BUILD_REQUIRED:
+            self.skipTest("SITECHECK_REQUIRE_BUILD is not set")
+        self.assertGreaterEqual(_setuptools_major() or 0, MIN_SETUPTOOLS)
+
+
+@unittest.skipUnless((_setuptools_major() or 0) >= MIN_SETUPTOOLS,
+                     f"setuptools {MIN_SETUPTOOLS} or newer is not installed: the sdist is not built")
 class BuildTest(unittest.TestCase):
     def test_the_sdist_builds_offline_and_carries_the_data(self) -> None:
         with temp_dir() as root:
@@ -122,6 +148,9 @@ class BuildTest(unittest.TestCase):
             build = "import sys; from setuptools import build_meta; print(build_meta.build_sdist(sys.argv[1]))"
             done = _python(["-c", build, str(out)], src)
             self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+            # setuptools stops accepting deprecated metadata (a license table, license classifiers) on a
+            # set date, so a deprecation today is a build that fails later.
+            self.assertNotIn("Deprecat", done.stderr)
             # setuptools 69.3+ names the sdist after the PEP 625 normalized name (site_check_passive);
             # older ones keep the project name as written. Take the name the backend returns.
             stem = done.stdout.strip().splitlines()[-1].removesuffix(".tar.gz")
@@ -138,10 +167,12 @@ class BuildTest(unittest.TestCase):
             for name in (*DATA_FILES, "schema/run.schema.json", "LICENSE", "pyproject.toml", "sitecheck/cli.py",
                          "sitecheck/checks/security.py"):
                 self.assertIn(prefix + name, names)
-            self.assertFalse(any("/tests/" in n or "/examples/" in n for n in names))
+            self.assertEqual(sorted(n for n in names if "/tests/" in n or "/examples/" in n), [])
+            self.assertNotIn(prefix + "site_check.py", names)
             self.assertIn(f"Name: {sitecheck.DIST_NAME}\n", metadata)
             self.assertIn(f"Version: {sitecheck.__version__}\n", metadata)
             self.assertIn("Requires-Python: >=3.11\n", metadata)
+            self.assertIn("License-Expression: MIT\n", metadata)
             self.assertNotIn("Requires-Dist:", metadata)
 
     def test_the_wheel_carries_the_data_and_the_entry_point_where_it_can_be_built(self) -> None:

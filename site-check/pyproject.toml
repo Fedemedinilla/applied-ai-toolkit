@@ -2,7 +2,7 @@
 # checked against PyPI: it is the one place to change it (tests/test_packaging.py
 # reads it from here and from sitecheck.DIST_NAME).
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,13 +11,13 @@ dynamic = ["version"]
 description = "Passive, outside-in website check: reads only what a visitor's browser reads and writes a reproducible report."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Federico Medinilla" }]
 keywords = ["website", "audit", "passive", "security-headers", "pagespeed", "sarif"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
