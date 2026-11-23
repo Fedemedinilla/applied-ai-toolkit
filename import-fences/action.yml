@@ -50,7 +50,7 @@ runs:
     - name: Install typescript and zod
       shell: bash
       env:
-        TYPESCRIPT_VERSION: 5.9.3
+        TYPESCRIPT_VERSION: 6.0.3
         ZOD_VERSION: 4.6.7
       run: npm install --prefix "$GITHUB_ACTION_PATH" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "typescript@$TYPESCRIPT_VERSION" "zod@$ZOD_VERSION"
 

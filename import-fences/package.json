@@ -53,7 +53,7 @@
     "prepack": "node -e \"require('node:fs').copyFileSync('../LICENSE','LICENSE')\" && npm run build"
   },
   "dependencies": {
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "zod": "4.6.7"
   }
 }

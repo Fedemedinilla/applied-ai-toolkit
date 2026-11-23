@@ -16,7 +16,7 @@ import { check, defineConfig, diskSource, loadConfig, NODE_BUILTINS, toSarif } f
 The package entry is built from `src/index.ts`, and the `import-fences` bin is built from `cli.ts` and takes the same arguments as `node import-fences/cli.ts`. Inside this repository nothing changes. Node runs the `.ts` files directly, and the paths below stay as they are.
 
 - **The package ships JavaScript.** Node does not strip types for files inside `node_modules`, so `npm pack` compiles `cli.ts` and `src/` to `dist/` with [`tsconfig.build.json`](tsconfig.build.json), with declarations and source maps that carry the text of the `.ts` sources, which are not shipped.
-- **`typescript` is a dependency, pinned to 5.9.3, and not a peer.** The checker parses files with the compiler API and reads `importClause.phaseModifier` to tell `import type` from a value import. That field exists since 5.9. An older compiler would leave it undefined, and every `import type` would count as code with no error to show for it. The project's own TypeScript can be any version, since this copy is only a parser and is installed next to it. The cost is a second copy on disk, about 23 MB, when the versions differ.
+- **`typescript` is a dependency, pinned to 6.0.3, and not a peer.** The checker parses files with the compiler API and reads `importClause.phaseModifier` to tell `import type` from a value import. That field exists since 5.9. An older compiler would leave it undefined, and every `import type` would count as code with no error to show for it. The project's own TypeScript can be any version, since this copy is only a parser and is installed next to it. The cost is a second copy on disk, about 23 MB, when the versions differ.
 - **`zod` is a dependency, pinned to 4.6.7.** It validates the config. A caller never passes a zod schema in, so nothing has to be shared with the project's copy.
 - **A config written in TypeScript still works.** The config is the project's own file, outside `node_modules`, so Node 24 strips its types when the installed bin imports it. It can import `defineConfig` and `NODE_BUILTINS` from `@fedemedinilla/import-fences`. It has to be erasable TypeScript (no `enum`, no `namespace`), and anything it imports must be something Node can load. A project on an older Node, or one that prefers no code in its config, uses the JSON form.
 - **`import` and `require()` both load it.** Each `exports` entry pairs `types` with `default`, and Node 24 loads an ES module through `require()`.
@@ -250,7 +250,7 @@ The same test removes `gateway/src/client.ts` from the SDK exception and checks 
 
 ## Adopting it
 
-1. Install the package, or copy the folder; a copy needs `typescript` 5.9 and `zod`.
+1. Install the package, or copy the folder; a copy needs `typescript` 5.9 or later and `zod`.
 2. Write a config with one group and one rule you already follow, and run the CLI. Fix or allow what it reports. An `allow` entry is an exception with a name, and `stale-allow` removes it from the list once the code no longer needs it.
 3. Add a test like `test/repo.test.ts` so the suite enforces it, or run the CLI or the action as a CI step; exit code 1 fails the job.
 4. Add `why` to every rule. The reason in the output is what a teammate or an agent reads at the moment they break the fence.
