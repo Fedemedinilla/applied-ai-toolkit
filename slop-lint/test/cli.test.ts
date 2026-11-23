@@ -46,7 +46,7 @@ describe('cli', () => {
     for (const args of [['--help'], ['-h'], [fixture('en-after.txt'), '--help']]) {
       const r = run(args);
       expect(r.status, args.join(' ')).toBe(0);
-      expect(r.stdout).toMatch(/^usage: node slop-lint\/cli\.ts /u);
+      expect(r.stdout).toMatch(/^usage: slop-lint /u);
       expect(r.stderr).toBe('');
     }
   });

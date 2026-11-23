@@ -23,8 +23,8 @@ import { artifactUri, toSarif } from './src/sarif.ts';
 import type { Finding, Format, Genre, Lang, LintOptions, LintResult, Rule, Variety } from './src/types.ts';
 
 const USAGE =
-  'usage: node slop-lint/cli.ts <file|-> [file...] --lang en|es [--format text|markdown] [--genre g|auto] [--variety rioplatense|neutral] [--previous file] [--json | --sarif [--sarif-uri uri]] [--anchors a,b,c] [--config file | --no-config]\n' +
-  '       node slop-lint/cli.ts --list-rules [--json] [--genre g] [file] [--config file | --no-config]';
+  'usage: slop-lint <file|-> [file...] --lang en|es [--format text|markdown] [--genre g|auto] [--variety rioplatense|neutral] [--previous file] [--json | --sarif [--sarif-uri uri]] [--anchors a,b,c] [--config file | --no-config]\n' +
+  '       slop-lint --list-rules [--json] [--genre g] [file] [--config file | --no-config]';
 
 interface Args {
   files: string[];
