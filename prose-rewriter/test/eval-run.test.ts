@@ -97,9 +97,10 @@ describe('the spend ledger', () => {
     expect(() => openLedger({ path, monthlyCapUsd: 0, clock: fixed, raised: true })).toThrow(/positive/);
     expect(() => openLedger({ path, monthlyCapUsd: 5, clock: fixed })).not.toThrow();
     // A flag raises the cap only up to MONTHLY_CAP_CEILING_USD, so a typo (500 for 50) cannot multiply the budget.
-    expect(MONTHLY_CAP_CEILING_USD).toBe(80);
-    expect(() => openLedger({ path, monthlyCapUsd: 80.01, clock: fixed, raised: true })).toThrow(/ceiling of US\$80/);
-    expect(() => openLedger({ path, monthlyCapUsd: 1e303, clock: fixed, raised: true })).toThrow(/ceiling of US\$80/);
+    expect(MONTHLY_CAP_CEILING_USD).toBe(100);
+    expect(() => openLedger({ path, monthlyCapUsd: 100.01, clock: fixed, raised: true })).toThrow(/ceiling of US\$100/);
+    expect(() => openLedger({ path, monthlyCapUsd: 1e303, clock: fixed, raised: true })).toThrow(/ceiling of US\$100/);
+    expect(() => openLedger({ path, monthlyCapUsd: 100, clock: fixed, raised: true })).not.toThrow();
     // November 2026: 50 (Federico, 16/11/2026), then 80 (17/11/2026), set with the flag; the ledger then holds that cap.
     const raised = openLedger({ path, monthlyCapUsd: 50, clock: fixed, raised: true });
     raised.settle(raised.reserve(45), 45);
