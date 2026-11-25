@@ -149,10 +149,11 @@ describe('a rewrite', () => {
     expect(new Set(rows.map((r) => r.jobId)).size).toBe(2);
   });
 
-  it('answers a WhatsApp with nothing to change with no model call (S1b)', async () => {
+  it('answers a WhatsApp in minimo with nothing to change with no model call (S1b)', async () => {
     const { handler, api } = setup([]);
     const text = 'Hola Marta, ya está el sitio de la panadería. ¿Lo vemos el jueves?';
-    const res = await handler(post({ text, genre: 'whatsapp', lang: 'es', cv: CV }));
+    // minimo was WhatsApp's default before 21/11/2026; the early exit is minimo's.
+    const res = await handler(post({ text, genre: 'whatsapp', lang: 'es', mode: 'minimo', cv: CV }));
     expect(res.status).toBe(200);
     const reply = asReply(await res.json());
     expect(reply?.result).toMatchObject({ rewritten: text, changes: [], usage: { calls: 0 } });

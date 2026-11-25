@@ -126,8 +126,10 @@ describe('the system blocks', () => {
   });
 
   it('state the genre default mode when the input names none', () => {
+    // ctx() is a cover letter: since 21/11/2026 mails, follow-ups and WhatsApp default to redaccion.
     expect(systemBlocks(ctx())[3]).toMatch(/MODE\npulido:/);
-    expect(systemBlocks(ctx({ genre: 'whatsapp' }, 'casual'))[3]).toMatch(/MODE\nminimo:/);
+    expect(systemBlocks(ctx({ genre: 'whatsapp' }, 'casual'))[3]).toMatch(/MODE\nredaccion:/);
+    expect(systemBlocks(ctx({ genre: 'email' }, 'neutral'))[3]).toMatch(/MODE\nredaccion:/);
     expect(systemBlocks(ctx({ mode: 'reescritura' }))[3]).toMatch(/MODE\nreescritura:/);
   });
 
@@ -296,7 +298,7 @@ describe('the conversation', () => {
       expect(x?.messages.at(-1)?.role).toBe('user');
     }
     expect([p?.task, e?.task, s?.task]).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style']);
-    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@3', 'rewrite-edit@3', 'rewrite-style@4']);
+    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@4', 'rewrite-edit@4', 'rewrite-style@4']);
     expect(p?.schema).toBe(PlanOutput);
     expect(e?.schema).toBe(EditOutput);
   });
@@ -307,5 +309,32 @@ describe('the conversation', () => {
     expect(p).toMatch(/\[2\] LEX-01 \(level 2\): «apasionada»/);
     const e = whole(editPrompt(ctx(), plan));
     expect(e).toContain('[2] make-specific (LEX-01): usar el dato del CV');
+  });
+});
+
+const EMPTY_REFS_FOR_MODE = { principles: [], sources: [], examples: [] } as const;
+
+describe('redaccion, the reader-oriented mode (decision of 21/11/2026)', () => {
+  // Human review of 20/11: the rewrites read like "the CV in fewer words". This mode may add
+  // connections (why them, the writer's intention, a bridge from a result to the reader's need,
+  // transitions, an open close) and never facts.
+  it('tells the single call what a reader-oriented text needs, and that connections are not facts', async () => {
+    const { singleCallPrompt } = await import('../src/prompt.ts');
+    const { RewriteInput } = await import('../src/types.ts');
+    const input = RewriteInput.parse({ text: 'Hola Marta,\n\nArmé el sitio de la panadería en Astro.\n\nSaludos,\nValeria', genre: 'email', lang: 'es', variety: 'rioplatense', profile: { cvMarkdown: '# CV' } });
+    const red = String(singleCallPrompt({ input, register: 'neutral', refs: EMPTY_REFS_FOR_MODE }, []).messages[0]?.content);
+    expect(red).toMatch(/why the writer is writing to this reader/iu);
+    expect(red).toMatch(/connect[^\n]*to what the reader needs/iu);
+    expect(red).toMatch(/never a new fact/iu);
+    expect(red).toMatch(/fixed day/iu);
+    const pulido = String(singleCallPrompt({ input: { ...input, mode: 'pulido' }, register: 'neutral', refs: EMPTY_REFS_FOR_MODE }, []).messages[0]?.content);
+    expect(pulido).not.toMatch(/why the writer is writing to this reader/iu);
+  });
+
+  it('lets redaccion reword a paragraph, as reescritura does', async () => {
+    const { singleCallPrompt } = await import('../src/prompt.ts');
+    const { RewriteInput } = await import('../src/types.ts');
+    const input = RewriteInput.parse({ text: 'Hola,\n\nArmé un sitio.', genre: 'whatsapp', lang: 'es', profile: { cvMarkdown: '# CV' } });
+    expect(String(singleCallPrompt({ input, register: 'casual', refs: EMPTY_REFS_FOR_MODE }, []).messages[0]?.content)).toMatch(/reword the paragraph that starts at its sentenceId/u);
   });
 });

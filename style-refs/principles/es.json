@@ -144,5 +144,96 @@
     "text": "Do not take the tone of a story: no fatalism, no drama and no irony at the reader's expense.",
     "check": "The judge's literary-contamination and register-fit rubrics find no tragic or sardonic turn the original did not have.",
     "sources": ["quiroga-cuentos-1917", "arlt-aguafuertes"]
+  },
+  {
+    "id": "es-open-on-why-this-reader",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Open on the reader, not on yourself: the role, the need or the plan of theirs that made you write ('Te escribo porque vi que la escuela quiere renovar el sitio'), taken from the original or the posting, before any achievement of yours.",
+    "check": "The first paragraph names the reader's organisation, role, need or the earlier contact, using only what the original or the posting says, and no achievement or metric of the writer appears before it.",
+    "sources": ["ncs-covering-letter", "dol-resume-essentials", "federal-plain-language", "cody-success-in-letter-writing"]
+  },
+  {
+    "id": "es-state-the-intention",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Say in one plain sentence what you want to bring them or help them with ('me gustaría ayudarlos con eso'), before you give the evidence; it states an intention and adds no fact.",
+    "check": "Before the first achievement there is one sentence of intention that points at the reader's need; it holds no number, client, tool or result that the original or the CV lacks (facts-preserved).",
+    "sources": ["dol-resume-essentials", "va-careers-cover-letter"]
+  },
+  {
+    "id": "es-link-each-achievement-to-their-need",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Put each achievement next to the need of theirs it answers, in the same sentence or the one before; an achievement told for its own sake reads like reciting the CV.",
+    "check": "Every sentence with an achievement or a metric is tied, by a clause or by the sentence before it, to a need, requirement or plan of the reader named in the text; no bare list of achievements without a lead-in.",
+    "sources": ["dol-resume-essentials", "ncs-covering-letter", "va-careers-cover-letter", "cody-success-in-letter-writing"]
+  },
+  {
+    "id": "es-add-what-the-cv-cannot",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "The letter is not the CV in fewer words: it gives what the CV cannot, why you write to them, what you want to do there and how one example relates to their need, and leaves the rest of the history to the CV.",
+    "check": "Judge question: does the text give the reader something the CV alone does not (the reason for writing, the intention, the link between an example and their need), or is it the CV in fewer words? A rewrite that only lists CV items fails.",
+    "sources": ["dol-resume-essentials", "va-careers-cover-letter", "cody-success-in-letter-writing"]
+  },
+  {
+    "id": "es-bridge-into-your-experience",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Lead into your experience with a short bridge that says why you are telling it, and link one paragraph to the next with a word that carries the logic ('por eso', 'además', 'en ese sentido'); a transition that links nothing is filler.",
+    "check": "A bridge sentence that refers to the reader's need or to the intention comes before the first achievement; each transition names a relation between the parts it joins, and slop-lint reports no stock filler opener such as 'en el dinámico mundo actual'.",
+    "sources": ["federal-plain-language", "dol-resume-essentials"]
+  },
+  {
+    "id": "es-bridge-in-your-own-voice",
+    "lang": "es",
+    "variety": "rioplatense",
+    "genres": ["email", "follow-up"],
+    "registers": ["neutral"],
+    "text": "In a neutral rioplatense email, the bridge can be as plain as 'Te cuento lo que hice últimamente, a ver si te sirve para lo de ustedes': it announces the examples and ties them to the reader in the writer's own voice.",
+    "check": "When the original uses vos, the bridge before the first achievement uses vos too and names the reader's matter ('lo de ustedes', the project, the role); no 'me permito comentarle' or other stock formula.",
+    "sources": ["dol-resume-essentials", "argentina-gob-ar"]
+  },
+  {
+    "id": "es-open-courteous-close",
+    "lang": "es",
+    "genres": ["cover-letter", "email"],
+    "registers": ["formal", "neutral"],
+    "text": "In a first contact, close with a polite, open offer: you are happy to talk or to send more, when it suits them ('la semana que viene o cuando te quede cómodo'). Do not set the day for them ('¿Lo vemos el viernes?') or announce that you will call.",
+    "check": "In a first contact the last paragraph names no fixed weekday, date or hour chosen by the writer and no 'te llamo'; it offers availability or more information and thanks the reader. A day the original already agreed with the reader stays.",
+    "sources": ["dol-resume-essentials", "ncs-covering-letter", "cody-success-in-letter-writing"]
+  },
+  {
+    "id": "es-follow-up-recall-and-ask",
+    "lang": "es",
+    "genres": ["follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "A follow-up first recalls the earlier contact and what it was about ('Te escribo para retomar la charla por el puesto de soporte'), then adds the one thing left to say and asks lightly about the next step or the timeline they gave.",
+    "check": "The first sentence refers to the previous message or conversation; the close asks about the next step or the timeline without a deadline set by the writer.",
+    "sources": ["argentina-gob-ar", "cody-success-in-letter-writing"]
+  },
+  {
+    "id": "es-warm-courteous-no-hype",
+    "lang": "es",
+    "genres": ["cover-letter", "email", "follow-up"],
+    "registers": ["formal", "neutral"],
+    "text": "Be warm and courteous without selling: thank the reader, keep a natural tone without losing formality, and let the facts speak instead of praise of yourself.",
+    "check": "The text thanks the reader or acknowledges their time once; no self-praise without a fact behind it ('apasionado', 'altamente capacitado', 'llevar al siguiente nivel'); the judge's same-voice rubric holds.",
+    "sources": ["cody-success-in-letter-writing", "argentina-gob-ar", "ncs-covering-letter"]
+  },
+  {
+    "id": "es-room-for-the-reader",
+    "lang": "es",
+    "genres": ["cover-letter"],
+    "registers": ["formal", "neutral"],
+    "text": "A cover letter has room for three to five short paragraphs, about one page; spend it on the why, the intention and the links, not on more CV items, and stop before it is longer than the reader will read.",
+    "check": "The cover letter stays within one page (about 400 words at most) and the words it gains over the original go to the opening, the intention and the bridges, never to facts the original lacks.",
+    "sources": ["dol-resume-essentials", "ncs-covering-letter", "va-careers-cover-letter", "cody-success-in-letter-writing"]
   }
 ]

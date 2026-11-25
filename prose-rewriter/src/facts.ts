@@ -502,6 +502,23 @@ const WORD_KINDS: ReadonlySet<FactKind> = new Set(['proper-noun', 'acronym', 'to
 /** A changed one of these is a changed number (design 4.6: "12 por 15" always reverts). */
 const NUMERIC_KINDS: ReadonlySet<FactKind> = new Set(['number', 'amount', 'date', 'time', 'phone']);
 
+/**
+ * The spans of subject lines written in Title Case: a line that opens with "Subject:", "Asunto:",
+ * "Re:" or "RV:" whose words after the first are capitalized (live run of 2026-11-21).
+ */
+function titleCaseSubjects(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const m of text.matchAll(/^(?:subject|asunto|re|rv|fw|fwd)[ \t]*:[ \t]*(.+)$/gimu)) {
+    // After the first word, every word longer than three letters is capitalized, and at least two
+    // are: "Revolutionize Your Customer Journey" is Title Case, "Propuesta para Ferretería
+    // Quintana" is a sentence that names a company.
+    const rest = ((m[1] ?? '').match(/\p{L}[\p{L}'’-]*/gu) ?? []).slice(1);
+    const capital = (w: string): boolean => /^\p{Lu}/u.test(w);
+    if (rest.filter(capital).length >= 2 && rest.every((w) => capital(w) || [...w].length <= 3)) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
+
 const wordKey = (text: string): string => text.toLocaleLowerCase('und').replace(/['’]s$/u, '').replace(/\s+/gu, ' ');
 
 /**
@@ -591,6 +608,12 @@ export function placeholders(text: string): string[] {
 export function extract(text: string, options: ExtractOptions): Fact[] {
   const { lang } = options;
   const facts: Fact[] = [];
+  const titleSubjects = titleCaseSubjects(text);
+  const inTitleSubject = (at: number): boolean => titleSubjects.some(([s, e]) => at >= s && at < e);
+  // Capitalized words outside a Title Case subject, plus the names known from elsewhere (O, C, the
+  // other side of an edit): only these stay names inside such a subject.
+  const namedOutside = new Set(options.knownNames ?? []);
+  for (const m of text.matchAll(/\p{Lu}[\p{L}'’]*/gu)) if (!inTitleSubject(m.index)) namedOutside.add(wordKey(m[0]));
   let rest = text.replace(PLACEHOLDER_ANY, (m) => ' '.repeat(m.length));
   // A placeholder's span is claimed too, so the anchor pass, which reads the original text, skips it.
   const claimed: Array<[number, number]> = [...text.matchAll(PLACEHOLDER_ANY)].map((m) => [m.index, m.index + m[0].length]);
@@ -710,8 +733,11 @@ export function extract(text: string, options: ExtractOptions): Fact[] {
       } else if (extraKeys.has(wordKey(term))) take('anchor', start, term, wordKey(term));
       else if (/^\p{Lu}{2,}/u.test(term)) take('acronym', start, term, wordKey(term));
       // Weekdays and months were read as dates above, so a capital here is a name.
-      else if (/^\p{Lu}/u.test(term)) take('proper-noun', start, term, wordKey(term));
-      else take('tool', start, term, wordKey(term));
+      else if (/^\p{Lu}/u.test(term)) {
+        // In a Title Case subject a capital says nothing ("Revolutionize Your Customer Journey"),
+        // unless the word is a name the text, the CV or the edit uses elsewhere.
+        if (!inTitleSubject(start) || namedOutside.has(wordKey(term))) take('proper-noun', start, term, wordKey(term));
+      } else take('tool', start, term, wordKey(term));
     }
   }
 
@@ -950,10 +976,17 @@ export function checkEdit(edit: Edit, context: EditContext): EditCheck {
   const sources = poolOf(sourcesText(context.C), context);
   const invented = added.filter((f) => !states(original, f) && !states(sources, f));
   if (invented.length > 0) return { status: 'reverted', reason: 'invented', facts: invented, message: `adds ${listOf(invented)}, found in neither the text nor the CV` };
-  if (lost.length > 0 && edit.drop !== true) return { status: 'reverted', reason: 'lost', facts: lost, message: `loses ${listOf(lost)} without drop` };
   if (lost.length > 0) {
     const elsewhere = poolOf(context.sentences.filter((_, i) => i !== edit.sentenceId).join('\n'), context);
     const gone = lost.filter((f) => !states(elsewhere, f));
+    // A fact another sentence still states is not lost, whether or not the model set drop: the
+    // cut stands as a drop, and recheckDrops() reverts it if that other sentence goes too (live run
+    // of 2026-11-21: a cut of "Pebble & Pine's" was reverted though two sentences still named it).
+    // Without drop, "still stated" means read there as the same kind of fact, never a word inside a
+    // URL or an address ("ana@contoso.example" does not keep "Contoso").
+    const restated = new Set(extract(context.sentences.filter((_, i) => i !== edit.sentenceId).join('\n'), context).map((f) => `${f.kind}:${f.key}`));
+    const unkept = lost.filter((f) => !restated.has(`${f.kind}:${f.key}`));
+    if (unkept.length > 0 && edit.drop !== true) return { status: 'reverted', reason: 'lost', facts: unkept, message: `loses ${listOf(unkept)} without drop` };
     if (gone.length > 0) return { status: 'reverted', reason: 'drop-not-elsewhere', facts: gone, message: `drops ${listOf(gone)}, which no other sentence states` };
   }
   return { status: 'accepted', fromCv: added.filter((f) => !states(original, f)), dropped: lost };

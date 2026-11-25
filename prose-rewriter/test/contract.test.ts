@@ -67,8 +67,9 @@ describe('RewriteResult', () => {
 });
 
 describe('defaults and lists', () => {
-  it('uses the smallest edit on WhatsApp and a polish elsewhere', () => {
-    expect(GENRES.map((g) => `${g}:${defaultMode(g)}`)).toEqual(['cover-letter:pulido', 'email:pulido', 'follow-up:pulido', 'whatsapp:minimo']);
+  it('writes for the reader by default in mails, follow-ups and WhatsApp, and polishes cover letters', () => {
+    // Decision of 21/11/2026: the reader-oriented mode is the default for mails, follow-ups and WhatsApp.
+    expect(GENRES.map((g) => `${g}:${defaultMode(g)}`)).toEqual(['cover-letter:pulido', 'email:redaccion', 'follow-up:redaccion', 'whatsapp:redaccion']);
   });
 
   it('names the stages S0 to S7 of the design in order', () => {

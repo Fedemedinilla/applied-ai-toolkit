@@ -28,7 +28,7 @@ const MAIL = 'Hola Marta,\nEspero que estés bien. Quería comentarte que me apa
 const SINERGIAS = 'Quería comentarte que me apasiona potenciar sinergias.';
 const FIXED = 'Quería contarte que el sitio está listo.';
 
-const mail = (text: string): RewriteInput => ({ text, genre: 'email', lang: 'es', variety: 'rioplatense', profile: { cvMarkdown: CV_ES } });
+const mail = (text: string): RewriteInput => ({ text, genre: 'email', lang: 'es', variety: 'rioplatense', mode: 'pulido', profile: { cvMarkdown: CV_ES } });
 const plan = (...sentenceIds: number[]) => ({ data: { items: sentenceIds.map((sentenceId) => ({ sentenceId, action: 'remove-formula', reason: 'set phrase', ruleId: 'LEX-01' })) } });
 const edits = (...list: Array<{ sentenceId: number; before: string; after: string; principleId?: string }>) => ({
   data: { edits: list.map((e) => ({ reason: 'fix', ...e })) },
@@ -93,7 +93,7 @@ describe('the single-call baseline (design 4.10)', () => {
     const content = String(p.messages[0]?.content);
     expect(content).toMatch(/stock formula[^\n]*cut it/i);
     expect(content).toMatch(/do not write another formula or a new closing/i);
-    expect(SINGLE_PROMPT_VERSION).toBe('4');
+    expect(SINGLE_PROMPT_VERSION).toBe('5');
   });
 
   it('makes exactly one call and applies the edits it can place', async () => {
@@ -116,7 +116,7 @@ describe('the single-call baseline (design 4.10)', () => {
 
   it('takes the same early exit as rewrite(): no call', async () => {
     const scripted = scriptedGateway({});
-    const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp' }, { gateway: scripted.gateway, refs: REFS });
+    const result = await singleCall({ ...mail(CLEAN_CHAT), genre: 'whatsapp', mode: 'minimo' }, { gateway: scripted.gateway, refs: REFS });
     expect(scripted.calls).toEqual([]);
     expect(result).toMatchObject({ rewritten: CLEAN_CHAT, applied: 0, refused: 0, usage: { calls: 0, costUsd: 0 } });
   });
@@ -283,7 +283,7 @@ describe('runPipelines', () => {
   it('writes the records with evals appendJsonl, one line per piece', async () => {
     const path = join(mkdtempSync(join(tmpdir(), 'rewriter-evals-')), 'run.jsonl');
     const scripted = scriptedGateway({});
-    const clean: EvalCase = { id: 'es-whatsapp-clean', input: { ...mail(CLEAN_CHAT), genre: 'whatsapp' } };
+    const clean: EvalCase = { id: 'es-whatsapp-clean', input: { ...mail(CLEAN_CHAT), genre: 'whatsapp', mode: 'minimo' } };
     await runPipelines([clean], [byId('full'), byId('single-call')], { gateway: scripted.gateway, refs: REFS, record: (r) => appendJsonl(path, r) });
     const lines = readJsonl<PieceRecord>(path);
     expect(lines.map((r) => [r.case, r.variant, r.status, r.usage.calls, r.usage.costUsd])).toEqual([
@@ -313,7 +313,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   const noFactDiffers = { text: JSON.stringify({ lost: [], changed: [], added: [], note: '' }) };
 
   it('lists the four judge rubrics of design 5, pairwise twice, and the fact check', () => {
-    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination', 'fact-check']);
+    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination', 'reader-value', 'fact-check']);
   });
 
   it('derives the A/B order from the case id alone: the same on every run', () => {
@@ -325,7 +325,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   it('judges blind through rewrite.judge, maps the choice back through the order, and feeds gate() and decide()', async () => {
     // Every pairwise judge answers "A": whether that is the candidate depends on the order of the case.
     const scripted = scriptedGateway({
-      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true), noFactDiffers, noFactDiffers],
+      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true), yes('gives', true), yes('gives', false), noFactDiffers, noFactDiffers],
     });
     const seen: JudgeRecord[] = [];
     const records = await judgePieces(CASES, [piece('full', pipelined), piece('single-call', single)], { gateway: scripted.gateway, now: NOW, record: (r) => seen.push(r) });
@@ -365,7 +365,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   });
 
   it('does not pay to compare a text with itself, and carries a failed piece to every rubric', async () => {
-    const scripted = scriptedGateway({ 'rewrite.judge': [yes('fits', true), yes('contaminated', false)] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [yes('fits', true), yes('contaminated', false), yes('gives', true)] });
     const failed: PieceRecord = { ...piece('no-style', ''), status: 'failed', error: 'ResponseError: x' } as PieceRecord;
     const records = await judgePieces(CASES, [piece('full', MAIL), failed], { gateway: scripted.gateway, now: NOW });
     scripted.assertDone();
@@ -375,6 +375,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'no-output', null],
       ['register-fit', 'scored', true],
       ['literary-contamination', 'scored', true],
+      ['reader-value', 'scored', true],
       ['fact-check', 'no-output', null],
     ]);
     expect(records.filter((r) => r.variant === 'no-style').map((r) => [r.rubric, r.status])).toEqual([
@@ -382,12 +383,13 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'failed'],
       ['register-fit', 'failed'],
       ['literary-contamination', 'failed'],
+      ['reader-value', 'failed'],
       ['fact-check', 'failed'],
     ]);
   });
 
   it('records a judge reply it cannot read as failed and goes on', async () => {
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false), noFactDiffers] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false), yes('gives', true), noFactDiffers] });
     const records = await judgePieces(CASES, [piece('full', pipelined)], { gateway: scripted.gateway, now: NOW });
     scripted.assertDone();
     expect(records.map((r) => [r.rubric, r.status])).toEqual([
@@ -395,6 +397,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'scored'],
       ['register-fit', 'scored'],
       ['literary-contamination', 'scored'],
+      ['reader-value', 'scored'],
       ['fact-check', 'scored'],
     ]);
     expect(records[0]?.error).toMatch(/^JudgeError/);

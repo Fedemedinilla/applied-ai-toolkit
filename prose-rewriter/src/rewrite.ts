@@ -64,7 +64,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   const userId = options.userId ?? null;
   const jobId = options.jobId ?? null;
   const m: ModelStages = { gateway, prompt: { input: a.input, register: a.register, refs: options.refs ?? EMPTY_REFS }, userId, jobId };
-  const units = a.mode === 'reescritura' ? paragraphUnits(a.text, a.sentences) : a.sentences;
+  const units = a.mode === 'reescritura' || a.mode === 'redaccion' ? paragraphUnits(a.text, a.sentences) : a.sentences;
 
   const proposals: Proposal[] = [];
   const propose = (edits: readonly Edit[], stage: Proposal['stage'], round: Proposal['round']): Proposal[] => {

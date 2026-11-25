@@ -8,7 +8,7 @@ export const LANGS = ['es', 'en'] as const;
 /** Spanish only: prose-rewriter refuses a variety with English. */
 export const VARIETIES = ['rioplatense', 'neutral'] as const;
 export const REGISTERS = ['formal', 'neutral', 'casual'] as const;
-export const MODES = ['minimo', 'pulido', 'reescritura'] as const;
+export const MODES = ['minimo', 'pulido', 'reescritura', 'redaccion'] as const;
 
 export type Genre = (typeof GENRES)[number];
 export type Lang = (typeof LANGS)[number];
@@ -58,4 +58,5 @@ export const MODE_LABEL: Readonly<Record<Mode, string>> = {
   minimo: 'Smallest fix',
   pulido: 'Polish',
   reescritura: 'Reword by paragraph',
+  redaccion: 'Write for the reader',
 };
