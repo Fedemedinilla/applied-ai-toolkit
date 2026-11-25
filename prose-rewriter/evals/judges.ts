@@ -11,6 +11,10 @@
  * - register-fit: is the rewrite's register right for the genre, language and variety;
  * - literary-contamination: archaism, ornament or a storyteller's tone in the rewrite; passes
  *   when there is none;
+ * - cohesion: does each sentence lead to the next, so the message reads as one thread; added on
+ *   2026-11-25 with the cohesion plan; gated as not worse than the baseline;
+ * - channel-fit: would it read naturally as its channel to its reader, judged against the channel
+ *   guide (style-refs/channels/) when there is one; added and gated with cohesion;
  * - reader-value: does the rewrite give the reader what the CV it goes with cannot (why this reader,
  *   the writer's intention, results tied to the reader's need), or is it the CV in fewer words;
  *   soft, added on 2026-11-21 after the human review of 2026-11-20;
@@ -40,6 +44,7 @@ import { wrapData } from '../src/injection.ts';
 import { gatewayModelClient } from '../src/model-client.ts';
 import { factSheet, jsonJudgeClient } from '../src/rubric.ts';
 import { callSettings } from '../src/tasks.ts';
+import { channelFor, type Channel } from '../../style-refs/src/index.ts';
 import { defaultRegister, type RewriteInput } from '../src/types.ts';
 import { measuredGateway, newMeter, type EvalCase, type Meter, type PieceRecord } from './pipeline.ts';
 import type { CodeRecord } from './rubrics.ts';
@@ -129,6 +134,56 @@ const LITERARY = binary(
   ],
   (v) => !v.contaminated,
 );
+
+const Coheres = z.strictObject({ coheres: z.boolean(), note: z.string() });
+
+/** cohesion (cohesion plan, 25/11/2026): the thread between the sentences, which the edit-based strategies could not join. */
+export const COHESION = binary(
+  'cohesion',
+  Coheres,
+  'coheres',
+  [
+    'You read one message a person wrote while looking for work. You do not know who or what wrote it, and it does not matter.',
+    'Does each sentence lead to the next, so the message reads as one thread: why the person writes, what they could do for this reader, what happens next? A list of facts with nothing joining them does not cohere, nor a jump from one idea to another with nothing between.',
+    'Do not reward length or connectives used as filler: a short message can cohere, and "furthermore" between two unrelated sentences does not join them.',
+    'In the note, quote the place where the thread breaks, or say that it does not.',
+  ],
+  (v) => v.coheres,
+);
+
+const ChannelFits = z.strictObject({ fits: z.boolean(), note: z.string() });
+
+/** channel-fit (cohesion plan, 25/11/2026): read against the channel guide, which goes in as the reference. */
+export const CHANNEL_FIT: JudgeRubric<z.infer<typeof ChannelFits>> = {
+  kind: 'judge',
+  name: 'channel-fit',
+  version: '1',
+  instructions: [
+    'You read one message a person wrote while looking for work, and the GUIDE of the channel it goes through (a mail, a follow-up, a WhatsApp message). You do not know who or what wrote the message, and it does not matter.',
+    'Would it read naturally as that channel to that reader: its length, its paragraphs, how it opens and how it closes, how close it sounds? A mail that reads like a form, or a WhatsApp message that reads like a mail, does not fit. Without a guide, judge by the genre in the brief.',
+    'In the note, name what decides it.',
+    `${JSON_ONLY} Shape: {"fits": true or false, "note": string}.`,
+  ].join('\n'),
+  call: CALL,
+  verdict: ChannelFits,
+  // `reference` is the channel guide as text, or a line saying there is none.
+  prompt: (piece, reference) => ['BRIEF', piece.brief, '', 'GUIDE', reference, '', piece.text].join('\n'),
+  reduce: (v) => ({ pass: v.fits, metrics: {} }),
+};
+
+/** The channel guide as the channel-fit judge reads it. */
+export function guideText(guide: Channel | undefined): string {
+  if (guide === undefined) return 'No guide for this channel.';
+  const s = guide.shape;
+  return [
+    `persona: ${guide.persona}`,
+    `reader: ${guide.reader}`,
+    `length: ${s.words.min} to ${s.words.max} words; at most ${s.paragraphs.max} paragraphs of ${s.paragraphs.maxSentences} sentences`,
+    `opening: ${s.opening}`,
+    `closing: ${s.closing}`,
+    `sounds like: ${guide.canonical}`,
+  ].join('\n');
+}
 
 const Gives = z.strictObject({ gives: z.boolean(), note: z.string() });
 
@@ -227,6 +282,8 @@ export const JUDGE_RUBRICS: readonly JudgeRubric<object>[] = [
   SAME_VOICE,
   REGISTER_FIT,
   LITERARY,
+  COHESION,
+  CHANNEL_FIT,
   READER_VALUE,
   FACT_CHECK,
 ];
@@ -279,6 +336,8 @@ export interface JudgeOptions {
    * recorded pieces with a new prompt runs only that rubric. A name that is not a rubric is refused.
    */
   readonly rubrics?: readonly string[];
+  /** The channel guides channel-fit reads (style-refs/channels/); without them it judges by the genre. */
+  readonly channels?: readonly Channel[];
 }
 
 interface Item {
@@ -316,7 +375,7 @@ function selectRubrics(names: readonly string[] | undefined): readonly JudgeRubr
   return JUDGE_RUBRICS.filter((r) => names.includes(r.name));
 }
 
-function items(cases: readonly EvalCase[], pieces: readonly PieceRecord[], rubrics: readonly JudgeRubric<object>[]): Item[] {
+function items(cases: readonly EvalCase[], pieces: readonly PieceRecord[], rubrics: readonly JudgeRubric<object>[], channels: readonly Channel[] = []): Item[] {
   const byCase = new Map(cases.map((c) => [c.id, c.input]));
   const out: Item[] = [];
   for (const rubric of rubrics) {
@@ -324,7 +383,9 @@ function items(cases: readonly EvalCase[], pieces: readonly PieceRecord[], rubri
       const input = byCase.get(p.case);
       if (input === undefined) throw new Error(`piece of case ${p.case}, which is not among the cases`);
       const sheet = rubric.name === FACT_CHECK.name || rubric.name === READER_VALUE.name ? { reference: factSheet({ ...input.profile, ...(input.recipient === undefined ? {} : { recipient: input.recipient }) }) } : {};
-      const base = { rubric, case: p.case, variant: p.variant, lang: p.lang, brief: brief(input), ...sheet };
+      const guide = () => guideText(channelFor(channels, { genre: input.genre, lang: input.lang, register: input.register ?? defaultRegister(input.genre), ...(input.variety === undefined ? {} : { variety: input.variety }) }));
+      const sheetOrGuide = rubric.name === CHANNEL_FIT.name ? { reference: guide() } : sheet;
+      const base = { rubric, case: p.case, variant: p.variant, lang: p.lang, brief: brief(input), ...sheetOrGuide };
       let reference = input.text;
       if (rubric.name === 'pairwise-baseline') {
         if (p.variant === BASELINE) continue;
@@ -365,7 +426,7 @@ function candidatePass(item: Item, verdict: object): boolean {
  */
 export async function judgePieces(cases: readonly EvalCase[], pieces: readonly PieceRecord[], options: JudgeOptions): Promise<JudgeRecord[]> {
   const rubrics = selectRubrics(options.rubrics);
-  const all = items(cases, pieces, rubrics);
+  const all = items(cases, pieces, rubrics, options.channels);
   const seed = options.seed ?? hash(cases.map((c) => c.id).join('\0'));
   const records: JudgeRecord[] = [];
   const emit = (r: JudgeRecord): void => {

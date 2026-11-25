@@ -13,6 +13,8 @@
  * - single-guarded: rewrite() with strategy 'single', the same one call followed by the same S5,
  *   judge, S6 and S7 as the pipeline (decided 16/11/2026 after run 3, where single-call matched the
  *   pipeline in the blind judge but lost a real name);
+ * - drafted: rewrite() with strategy 'drafted' (cohesion plan, 25/11/2026): diagnosis, outline
+ *   and a whole-body draft in redaccion, checked as one edit, with 'single' as its fallback;
  * - edit-sonnet-5-5: rewrite.edit on another model, sent as the gateway request's own `config`
  *   (the gateway's way to try a model "without touching production", gateway/src/config.ts), so
  *   every variant shares one gateway, one ledger and one set of caps.
@@ -98,6 +100,7 @@ export const VARIANTS: readonly PipelineVariant[] = (
     { id: 'no-examples', kind: 'pipeline', withoutExamples: true },
     { id: 'single-call', kind: 'single-call' },
     { id: 'single-guarded', kind: 'pipeline', strategy: 'single' },
+    { id: 'drafted', kind: 'pipeline', strategy: 'drafted' },
     { id: 'edit-sonnet-5-5', kind: 'pipeline', tasks: { 'rewrite.edit': { model: 'claude-sonnet-5-5', effort: 'medium' } } },
   ] satisfies PipelineVariant[]
 ).map(pipelineVariant);

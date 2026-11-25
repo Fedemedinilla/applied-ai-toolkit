@@ -40,9 +40,11 @@ export function taskConfig(task: RewriteTask): TaskConfig {
  * (README, "Measured"). The export keeps its F5a name so the callers that seed a gateway with it
  * do not change; the values are no longer placeholders.
  *
- * - perJobUsd 0.25: above the highest p90 measured, US$0.1412 for the staged strategy on a
- *   follow-up, with room for the retry of a stage reply that cannot be read. The default strategy,
- *   'single', had a p90 of at most US$0.0652.
+ * - perJobUsd 0.5: 0.25 from 16/11/2026, above the highest p90 measured then, US$0.1412 for the
+ *   staged strategy on a follow-up; the default strategy, 'single', had a p90 of at most US$0.0652.
+ *   Raised on 25/11/2026 (Federico's decision): the drafted strategy spent US$0.2971 before its
+ *   judge on its first live case, and 0.25 stopped it before it could be measured. 0.5 covers that,
+ *   the judge and the fallback to 'single'; drafted's cost is cut once it proves better.
  * - dailyPerUserUsd 2: at the measured medians, 58 to 153 rewrites a day with 'single'
  *   (US$0.0341 cover letter to US$0.0130 follow-up) or 19 to 47 with 'staged' (US$0.1012
  *   follow-up to US$0.0424 WhatsApp).
@@ -52,7 +54,7 @@ export function taskConfig(task: RewriteTask): TaskConfig {
  * 33 cases is a small sample (D3 is open): the caps are revised when the case set grows.
  */
 export const REWRITE_CAPS: GlobalCaps = {
-  perJobUsd: 0.25,
+  perJobUsd: 0.5,
   dailyPerUserUsd: 2,
   monthlyUsd: 10,
 };
