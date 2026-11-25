@@ -1,7 +1,7 @@
 // The voice profile of design 4.5: measured by code, written into the prompt as data, and checked
 // after a rewrite so it does not add what the writer never uses.
 import { describe, expect, it } from 'vitest';
-import { voicePromptLines, voiceProfile, voiceViolations } from '../src/voice.ts';
+import { voiceKeepLines, voicePromptLines, voiceProfile, voiceViolations } from '../src/voice.ts';
 
 // Fictional messages: Valeria Sosa Pereyra is the fictional CV of evals/cases/cv/es-rioplatense.md.
 const WHATSAPP = 'hola Marta, te paso el presupuesto del sitio. si podés mirarlo esta semana avisame y lo vemos\ngracias!';
@@ -64,18 +64,19 @@ describe('voicePromptLines', () => {
 });
 
 describe('voiceViolations', () => {
+  // Decision of 25/11/2026 (Federico): of the writer's voice only the variety and the treatment are
+  // kept. A rioplatense text never comes back with tú, an usted it did not use or Spain's Spanish;
+  // the rest (emoji, ¿¡, accents, "che", capitals, contractions) is the channel's call.
   const kinds = (original: string, rewritten: string, genre: 'whatsapp' | 'email' = 'whatsapp', lang: 'es' | 'en' = 'es') =>
     voiceViolations(original, rewritten, { genre, lang }).map((v) => v.kind);
 
-  it('keeps a rioplatense WhatsApp without ¿¡ as it is', () => {
-    const tidy = 'hola Marta, te paso el presupuesto del sitio. si podés mirarlo esta semana, avisame y lo vemos\ngracias!';
-    expect(kinds(WHATSAPP, tidy)).toEqual([]);
-    expect(kinds(WHATSAPP, 'hola Marta, te paso el presupuesto. ¿podés mirarlo esta semana? avisame\n¡gracias!')).toEqual(['inverted-marks']);
-  });
-
-  it('flags a rewrite that adds emoji or "che"', () => {
-    expect(kinds(WHATSAPP, `${WHATSAPP} 🙌`)).toEqual(['emoji']);
-    expect(kinds(WHATSAPP, WHATSAPP.replace('hola Marta', 'che Marta'))).toEqual(['che']);
+  it('lets the channel decide emoji, ¿¡, accents, "che", capitals and contractions', () => {
+    expect(kinds(WHATSAPP, 'hola Marta, te paso el presupuesto. ¿podés mirarlo esta semana? avisame\n¡gracias!')).toEqual([]);
+    expect(kinds(WHATSAPP, `${WHATSAPP} 🙌`)).toEqual([]);
+    expect(kinds(WHATSAPP, WHATSAPP.replace('hola Marta', 'che Marta'))).toEqual([]);
+    expect(kinds('hola, te paso el link. avisame si lo podes ver', 'Hola, te paso el link. Avisame si lo podés ver')).toEqual([]);
+    expect(kinds('hi Ana, sending the quote today', 'Hi Ana, sending the quote today', 'whatsapp', 'en')).toEqual([]);
+    expect(kinds('I am sending the quote today.', "I'm sending the quote today.", 'email', 'en')).toEqual([]);
   });
 
   it('flags a tuteo rewrite of a voseo text', () => {
@@ -84,18 +85,37 @@ describe('voiceViolations', () => {
     expect(voiceViolations(WHATSAPP, tuteo, { genre: 'whatsapp', lang: 'es' })[0]?.message).toMatch(/tuteo/);
   });
 
-  it('flags an initial capital or accents added to a WhatsApp, and lets the email genre ask for them', () => {
-    const plain = 'hola, te paso el link. avisame si lo podes ver';
-    const tidy = 'Hola, te paso el link. Avisame si lo podés ver';
-    expect(kinds(plain, tidy)).toEqual(['accents', 'initial-capital']);
-    expect(kinds(plain, tidy, 'email')).toEqual([]);
-    expect(kinds('hi Ana, sending the quote today', 'Hi Ana, sending the quote today', 'email', 'en')).toEqual([]);
-    expect(kinds('hi Ana, sending the quote today', 'Hi Ana, sending the quote today', 'whatsapp', 'en')).toEqual(['initial-capital']);
+  it('flags an usted the voseo text did not use', () => {
+    expect(kinds('Hola Marta, si podés mirá el presupuesto.', 'Hola Marta, si puede mire el presupuesto. Quedo a su disposición.', 'email')).toEqual(['treatment']);
   });
 
-  it('flags contractions added to an English text that used none, and ignores Spanish traits there', () => {
-    expect(kinds('I am sending the quote today.', "I'm sending the quote today.", 'email', 'en')).toEqual(['contractions']);
-    expect(kinds('I am sending the quote today.', 'I am sending the quote today, ¿ok?', 'email', 'en')).toEqual([]);
+  it('lets a rioplatense text that addressed no one start using voseo, never tú or usted', () => {
+    const rio = { genre: 'email', lang: 'es', variety: 'rioplatense' } as const;
+    expect(voiceViolations('Mañana mando el informe.', 'Mañana te mando el informe, si querés.', rio)).toEqual([]);
+    expect(voiceViolations('Mañana mando el informe.', 'Si quieres, mañana te mando el informe.', rio).map((v) => v.kind)).toEqual(['treatment']);
+    expect(voiceViolations('Mañana mando el informe.', 'Si gusta, le mando el informe. Quedo a su disposición.', rio).map((v) => v.kind)).toEqual(['treatment']);
+    // With no variety, or a neutral one, a treatment added to a text with none is still flagged.
+    expect(voiceViolations('Mañana mando el informe.', 'Mañana te mando el informe, si querés.', { genre: 'email', lang: 'es', variety: 'neutral' }).map((v) => v.kind)).toEqual(['treatment']);
+  });
+
+  it("flags Spain's Spanish added to a text that did not use it: vosotros, its verbs and its words", () => {
+    const original = 'Hola, ¿cómo andan? Les paso el presupuesto del sitio.';
+    expect(kinds(original, 'Hola, ¿cómo estáis? Os paso el presupuesto del sitio.', 'email')).toEqual(['variety']);
+    expect(kinds(original, 'Hola a vosotros, les paso el presupuesto del sitio.', 'email')).toEqual(['variety']);
+    expect(kinds(original, 'Hola, les paso el presupuesto para verlo en el ordenador.', 'email')).toEqual(['variety']);
+    expect(kinds(original, 'Hola, si queréis cogemos un rato y lo vemos.', 'email')).toEqual(['variety']);
+    expect(voiceViolations(original, 'Hola, ¿cómo estáis?', { genre: 'email', lang: 'es' })[0]?.message).toMatch(/Spain/);
+  });
+
+  it("leaves a text that already used Spain's Spanish, and English, alone", () => {
+    expect(kinds('¿Cómo estáis? Os paso el presupuesto.', '¿Qué tal estáis? Os mando el presupuesto.', 'email')).toEqual([]);
+    expect(kinds('I am sending the quote.', 'I am sending the quote, vale.', 'email', 'en')).toEqual([]);
+  });
+
+  it('does not read voseo or rioplatense words as Spain: -ás, -és and -ís, "vale" and "celular"', () => {
+    const original = 'Hola, si podés mirá el link.';
+    expect(kinds(original, 'Hola, si querés miralo desde el celular y me decís qué te parece.', 'email')).toEqual([]);
+    expect(kinds(original, 'Hola, si podés mirá el link. ¿Cuánto vale el dominio?', 'email')).toEqual([]);
   });
 });
 
@@ -131,27 +151,25 @@ describe('treatment, read as people write it', () => {
   });
 });
 
-describe('what each genre requires', () => {
-  const plain = 'hola, te paso el link. avisame si lo podes ver';
-  const tidy = 'Hola, te paso el link. Avisame si lo podés ver';
-  it.each(['cover-letter', 'email', 'follow-up'] as const)('lets %s add the initial capital and the accents', (genre) => {
-    expect(voiceViolations(plain, tidy, { genre, lang: 'es' })).toEqual([]);
-  });
-});
-
-describe('emoji and the marks of standard spelling', () => {
+describe('emoji', () => {
   it('counts one emoji per character the reader sees, flags included, and leaves typographic symbols out', () => {
     expect(voiceProfile('↔ ✔ ▪ 🇦🇷', 'es').counts.emoji).toBe(1);
     expect(voiceProfile('Listo ✔️ y 👍🏽 y 1️⃣ y 👨‍👩‍👧', 'es').counts.emoji).toBe(4);
-    const whatsapp = { genre: 'whatsapp', lang: 'es' } as const;
-    expect(voiceViolations('Hola, nos vemos el lunes.', 'Hola, nos vemos el lunes 🇦🇷', whatsapp).map((v) => v.kind)).toEqual(['emoji']);
-    expect(voiceViolations('Hola, nos vemos el lunes.', 'Hola, nos vemos el lunes ✔', whatsapp)).toEqual([]);
   });
+});
 
-  it('lets a formal genre add the ¿ and ¡ of standard spelling, and keeps a WhatsApp without them', () => {
-    for (const genre of ['email', 'follow-up', 'cover-letter'] as const) {
-      expect(voiceViolations('hola, podés mandarlo?', 'Hola, ¿podés mandarlo?', { genre, lang: 'es' })).toEqual([]);
-    }
-    expect(voiceViolations('hola, podés mandarlo?', 'hola, ¿podés mandarlo?', { genre: 'whatsapp', lang: 'es' }).map((v) => v.kind)).toEqual(['inverted-marks']);
+describe('voiceKeepLines', () => {
+  it('says only the treatment and the variety to keep, in the language of the text', () => {
+    expect(voiceKeepLines(voiceProfile('Si podés, mirá el link y avisame.', 'es'), 'rioplatense')).toEqual([
+      'tratamiento: voseo. No lo cambies a tú ni a usted.',
+      'variedad: rioplatense. Nada de vosotros, os, verbos en -áis o -éis ni palabras de España (ordenador, coger).',
+    ]);
+    expect(voiceKeepLines(voiceProfile('Mañana mando el informe.', 'es'), 'rioplatense')[0]).toBe('tratamiento: ninguno. Si le hablás al lector, usá voseo; nunca tú ni usted.');
+    expect(voiceKeepLines(voiceProfile('Mañana mando el informe.', 'es'), 'neutral')[0]).toBe('tratamiento: ninguno. No agregues tú, vos ni usted.');
+    expect(voiceKeepLines(voiceProfile('Le escribo por el puesto. Quedo a su disposición.', 'es'), undefined)).toEqual([
+      'tratamiento: usted. No lo cambies a tú ni a vos.',
+      'variedad: no indicada. Nada de vosotros, os, verbos en -áis o -éis ni palabras de España (ordenador, coger).',
+    ]);
+    expect(voiceKeepLines(voiceProfile('I am sending the quote.', 'en'), undefined)).toEqual(['English: no treatment or variety to keep.']);
   });
 });

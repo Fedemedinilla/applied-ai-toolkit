@@ -50,7 +50,7 @@ export const PUBLIC_SURFACE: Readonly<Record<string, readonly string[]>> = {
   // The package entries of @fedemedinilla/slop-lint: '.' is src/lint.ts, './types' is src/types.ts.
   'slop-lint': ['slop-lint/src/lint.ts', 'slop-lint/src/types.ts'],
   // The data files are what a caller loads and checks with the entry's schemas (style-refs has no I/O).
-  'style-refs': ['style-refs/src/index.ts', 'style-refs/sources.json', 'style-refs/principles/*.json', 'style-refs/examples/*.json'],
+  'style-refs': ['style-refs/src/index.ts', 'style-refs/sources.json', 'style-refs/principles/*.json', 'style-refs/examples/*.json', 'style-refs/channels/*.json'],
 };
 
 /**
@@ -76,6 +76,7 @@ export const APP_USES: Readonly<Record<string, readonly string[]>> = {
     'style-refs/sources.json',
     'style-refs/principles/*.json',
     'style-refs/examples/*.json',
+    'style-refs/channels/*.json',
   ],
   'salon-assistant': ['gateway/src/index.ts', 'grounded-assistant/src/index.ts', 'safe-markdown/src/index.ts'],
   writer: ['evals/src/index.ts', 'gateway/src/index.ts'],

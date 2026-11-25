@@ -7,7 +7,7 @@
  *
  * Pure: no I/O, no model, no gateway.
  */
-import type { Genre, Lang } from './types.ts';
+import type { Genre, Lang, Variety } from './types.ts';
 
 /**
  * Word boundaries that know accented letters, as slop-lint/src/regex.ts defines them. JavaScript's
@@ -229,7 +229,7 @@ export function voicePromptLines(p: VoiceProfile): string[] {
   ].filter((line) => line !== null);
 }
 
-export type VoiceTrait = 'treatment' | 'inverted-marks' | 'accents' | 'emoji' | 'che' | 'contractions' | 'initial-capital';
+export type VoiceTrait = 'treatment' | 'variety' | 'inverted-marks' | 'accents' | 'emoji' | 'che' | 'contractions' | 'initial-capital';
 
 export interface VoiceViolation {
   readonly kind: VoiceTrait;
@@ -252,32 +252,71 @@ export const GENRE_REQUIRES: Readonly<Record<Genre, readonly VoiceTrait[]>> = {
 export interface VoiceContext {
   readonly genre: Genre;
   readonly lang: Lang;
+  /** The Spanish variety the input names. A rioplatense text that addressed no one may start using voseo. */
+  readonly variety?: Variety;
 }
 
-/** The traits the rewrite added that the original lacked, minus what the genre requires. */
+/**
+ * Marks of Spain's Spanish that a rioplatense or neutral American text does not use: vosotros and
+ * os, the vosotros verb endings -áis and -éis (voseo ends in -ás, -és and -ís, never in these), sois
+ * and vais, and a few words with an everyday American equivalent. "vale" stays out: "¿cuánto vale?"
+ * is everyday rioplatense.
+ */
+const SPAIN = [
+  /(?<!\p{L})vosotr[oa]s(?!\p{L})/giu,
+  /(?<!\p{L})[Oo]s(?!\p{L})/gu,
+  /(?<!\p{L})\p{L}{2,}(?:áis|éis)(?!\p{L})/giu,
+  /(?<!\p{L})(?:sois|vais)(?!\p{L})/giu,
+  /(?<!\p{L})(?:ordenador(?:es)?|guay|chaval(?:es)?|curro|currar|mola(?:n)?|coger|cojo|coges|coge|cogemos|cogí)(?!\p{L})/giu,
+];
+
+/** How many marks of Spain's Spanish a text has (SPAIN). */
+export function spainMarks(text: string): number {
+  const t = text.normalize('NFC');
+  return SPAIN.reduce((n, re) => n + [...t.matchAll(re)].length, 0);
+}
+
+/**
+ * What the rewrite changed of the writer's voice that must not change. Decision of 25/11/2026
+ * (Federico): only the treatment and the variety are kept. A treatment the original does not use
+ * (tú in a voseo text, an usted it did not use) and Spain's Spanish in a text that did not use it
+ * are flagged; emoji, ¿¡, accents, "che", capitals and contractions follow the channel's guide.
+ */
 export function voiceViolations(original: string, rewritten: string, context: VoiceContext): VoiceViolation[] {
+  if (context.lang !== 'es') return [];
   const o = voiceProfile(original, context.lang);
   const r = voiceProfile(rewritten, context.lang);
   const found: VoiceViolation[] = [];
-  const added = (kind: VoiceTrait, before: number, after: number, message: string): void => {
-    if (before === 0 && after > 0) found.push({ kind, message });
-  };
-  if (context.lang === 'es') {
-    // A treatment the original does not use is added voice, also in a text that addressed no one.
-    for (const t of ['voseo', 'tuteo', 'usted'] as const) {
-      if (o.counts[t] === 0 && r.counts[t] > 0) {
-        const before = o.treatment === 'none' ? 'The original addresses no one directly' : `The original uses ${o.treatment}`;
-        found.push({ kind: 'treatment', message: `${before}; the rewrite adds ${t}.` });
-        break;
-      }
+  // A treatment the original does not use is added voice, also in a text that addressed no one.
+  for (const t of ['voseo', 'tuteo', 'usted'] as const) {
+    // Speaking to the reader is what a message to them does; in rioplatense that is voseo.
+    if (t === 'voseo' && o.treatment === 'none' && context.variety === 'rioplatense') continue;
+    if (o.counts[t] === 0 && r.counts[t] > 0) {
+      const before = o.treatment === 'none' ? 'The original addresses no one directly' : `The original uses ${o.treatment}`;
+      found.push({ kind: 'treatment', message: `${before}; the rewrite adds ${t}.` });
+      break;
     }
-    added('inverted-marks', o.counts.invertedMarks, r.counts.invertedMarks, 'The original does not use ¿ or ¡; the rewrite adds them.');
-    added('accents', o.counts.accents, r.counts.accents, 'The original is written without accents; the rewrite adds them.');
   }
-  added('emoji', o.counts.emoji, r.counts.emoji, 'The original has no emoji; the rewrite adds them.');
-  if (context.lang === 'es') added('che', o.counts.che, r.counts.che, 'The original does not say "che"; the rewrite adds it.');
-  if (context.lang === 'en') added('contractions', o.counts.contractions, r.counts.contractions, 'The original uses no contractions; the rewrite adds them.');
-  if (!o.initialCapital && r.initialCapital) found.push({ kind: 'initial-capital', message: 'The original starts in lower case; the rewrite capitalizes it.' });
-  const allowed = GENRE_REQUIRES[context.genre];
-  return found.filter((v) => !allowed.includes(v.kind));
+  if (spainMarks(original) === 0 && spainMarks(rewritten) > 0) found.push({ kind: 'variety', message: "The original does not write Spain's Spanish; the rewrite adds vosotros, its verbs or its words." });
+  return found;
+}
+
+const SPAIN_LINE = 'Nada de vosotros, os, verbos en -áis o -éis ni palabras de España (ordenador, coger).';
+
+/**
+ * What the prompt asks the model to keep of the writer's voice (decision of 25/11/2026): the
+ * treatment and the variety, nothing else. The lines are data, in the language of the text.
+ */
+export function voiceKeepLines(p: VoiceProfile, variety: Variety | undefined): string[] {
+  if (p.lang !== 'es') return ['English: no treatment or variety to keep.'];
+  const c = p.counts;
+  const treatment: Record<Treatment, string> = {
+    voseo: 'tratamiento: voseo. No lo cambies a tú ni a usted.',
+    tuteo: 'tratamiento: tuteo. No lo cambies a vos ni a usted.',
+    usted: 'tratamiento: usted. No lo cambies a tú ni a vos.',
+    mixed: `tratamiento: mezcla (voseo ${c.voseo}, tuteo ${c.tuteo}, usted ${c.usted}). No sumes uno que no esté.`,
+    none: variety === 'rioplatense' ? 'tratamiento: ninguno. Si le hablás al lector, usá voseo; nunca tú ni usted.' : 'tratamiento: ninguno. No agregues tú, vos ni usted.',
+  };
+  const name = variety === undefined ? 'no indicada' : variety === 'rioplatense' ? 'rioplatense' : 'neutra';
+  return [treatment[p.treatment], `variedad: ${name}. ${SPAIN_LINE}`];
 }

@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { GatewayError, type Gateway } from '../../gateway/src/index.ts';
-import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
+import { Channel, Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import type { PromptRefs } from './prompt.ts';
 import { rewrite } from './rewrite.ts';
 import { analyse, earlyExit, prepare } from './stages/analyse.ts';
@@ -129,6 +129,7 @@ export function loadRefs(root: URL, readFile: (path: string) => string = (path) 
     sources: json('style-refs/sources.json').map((s) => Source.parse(s)),
     principles: LANGS.flatMap((lang) => json(`style-refs/principles/${lang}.json`).map((p) => Principle.parse(p))),
     examples: LANGS.flatMap((lang) => json(`style-refs/examples/${lang}.json`).map((e) => Example.parse(e))),
+    channels: LANGS.flatMap((lang) => json(`style-refs/channels/${lang}.json`).map((c) => Channel.parse(c))),
   };
 }
 

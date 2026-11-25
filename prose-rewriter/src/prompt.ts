@@ -5,7 +5,7 @@
  *
  * 1. the hard rules, the genre's principles and its conventions: fixed per genre, language,
  *    variety and register;
- * 2. style-refs' examples for the same genre and register;
+ * 2. the channel guide and style-refs' examples for the same genre, register and variety, in XML;
  * 3. the profile (the CV and the extra facts), fixed per person;
  * 4. the voice of the text and the recipient, with the goal and the mode: fixed per text.
  *
@@ -19,29 +19,31 @@
  *
  * The user's text, the CV, the recipient, the goal, the keep phrases, the lint findings (which
  * quote the text) and the plan S2 wrote (model output that read the text) are data: each goes
- * inside a <texto> or <perfil> block built by wrapData(), which the data cannot close. The voice goes as data lines (voicePromptLines()), never adjectives.
+ * inside a <texto> or <perfil> block built by wrapData(), which the data cannot close. The voice goes as data lines (voiceKeepLines()): the treatment and the variety, never adjectives (decision of 25/11/2026).
  *
  * Pure: the caller loads style-refs' JSON and passes it in.
  */
 import type { Conversation } from '../../gateway/src/index.ts';
 import type { Finding } from '../../slop-lint/src/types.ts';
-import { principlesFor, type Example, type Principle, type Source } from '../../style-refs/src/index.ts';
+import { channelFor, principlesFor, type Channel, type Example, type Principle, type Source } from '../../style-refs/src/index.ts';
 import { splitSentences, type Sentence } from './edits.ts';
 import { wrapData } from './injection.ts';
 import { EditOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.ts';
 import { factSheet } from './rubric.ts';
 import type { RewriteTask } from './tasks.ts';
 import { defaultMode, type Mode, type Register, type RewriteInput } from './types.ts';
-import { GENRE_REQUIRES, voicePromptLines, voiceProfile } from './voice.ts';
+import { GENRE_REQUIRES, voiceKeepLines, voiceProfile } from './voice.ts';
 
 /** Bumped whenever the rules, the layout or a stage's task change. */
-export const PROMPT_VERSION = '4';
+export const PROMPT_VERSION = '5';
 
 /** style-refs' data as the caller loaded and parsed it. */
 export interface PromptRefs {
   readonly principles: readonly Principle[];
   readonly sources: readonly Source[];
   readonly examples: readonly Example[];
+  /** The channel guides (style-refs/channels/); without them block 2 says the channel has no guide. */
+  readonly channels?: readonly Channel[];
 }
 
 export interface PromptContext {
@@ -118,15 +120,39 @@ function examples(c: PromptContext): Example[] {
   return c.refs.examples.filter((e) => e.genre === genre && e.lang === lang && e.register === registerOf(c) && e.variety === variety);
 }
 
-function exampleLines(e: Example): string[] {
+const tag = (name: string, body: string): string => `<${name}>\n${body}\n</${name}>`;
+
+/** One pair: what it rewrites, the rewrite, and why the rewrite joins its ideas as it does. */
+function exampleXml(e: Example): string {
   return [
-    `Example ${e.id}: ${e.notes}`,
-    ...(e.previousMessage === undefined ? [] : ['PREVIOUS MESSAGE', e.previousMessage]),
-    'BEFORE',
-    e.before,
-    'AFTER',
-    e.after,
-  ];
+    `<example id="${e.id}">`,
+    ...(e.previousMessage === undefined ? [] : [tag('previous_message', e.previousMessage)]),
+    tag('before', e.before),
+    tag('after', e.after),
+    tag('why', e.notes),
+    '</example>',
+  ].join('\n');
+}
+
+/** The guide of the text's channel, said as what to do: who reads, the shape, and a sample to match. */
+function channelXml(c: PromptContext): string {
+  const { genre, lang, variety } = c.input;
+  const g = channelFor(c.refs.channels ?? [], { genre, lang, register: registerOf(c), ...(variety === undefined ? {} : { variety }) });
+  if (g === undefined) return '<channel>No guide for this channel.</channel>';
+  const attrs = `genre="${g.genre}" lang="${g.lang}" register="${g.register}"${g.variety === undefined ? '' : ` variety="${g.variety}"`}`;
+  return [
+    `<channel ${attrs}>`,
+    tag('persona', g.persona),
+    tag('reader', `${g.reader}\nThis is why the shape below matters.`),
+    '<shape>',
+    `<words min="${g.shape.words.min}" max="${g.shape.words.max}"/>`,
+    `<paragraphs max="${g.shape.paragraphs.max}" sentences_each="${g.shape.paragraphs.maxSentences}"/>`,
+    tag('opening', g.shape.opening),
+    tag('closing', g.shape.closing),
+    '</shape>',
+    tag('canonical', `${g.canonical}\nMatch its cadence, its density and how close it sounds, never its content: it states no fact of the writer.`),
+    '</channel>',
+  ].join('\n');
 }
 
 function recipientLines(input: RewriteInput): string {
@@ -158,8 +184,11 @@ export function systemBlocks(c: PromptContext): string[] {
 
   const shown = examples(c);
   const examplesBlock = [
-    'EXAMPLES (fictional people; before and after pairs of this genre and register)',
-    ...(shown.length === 0 ? ['None for this genre and register.'] : shown.flatMap((e) => ['', ...exampleLines(e)])),
+    'CHANNEL (how a text of this channel reads; our own guide, never data)',
+    channelXml(c),
+    '',
+    'EXAMPLES (fictional people; before and after pairs of this genre and register, each with why the after joins its ideas as it does)',
+    shown.length === 0 ? 'None for this genre and register.' : ['<examples>', ...shown.map(exampleXml), '</examples>'].join('\n'),
   ].join('\n');
 
   // The CV and the extra facts; the recipient goes in the last block, which changes per text.
@@ -167,8 +196,8 @@ export function systemBlocks(c: PromptContext): string[] {
 
   const mode = input.mode ?? defaultMode(input.genre);
   const voice = [
-    'VOICE (measured by code on the writer\'s text; keep these traits and add none the writer does not use, unless the genre conventions allow it)',
-    ...bullets(voicePromptLines(voiceProfile(input.text, input.lang))),
+    'VOICE (measured by code on the writer\'s text; keep only these two, everything else (length, emoji, accents, ¿¡, capitals, greeting and sign-off) follows the channel guide)',
+    ...bullets(voiceKeepLines(voiceProfile(input.text, input.lang), input.variety)),
     '',
     recipientLines(input),
     '',
@@ -258,8 +287,8 @@ export function editPrompt(c: PromptContext, plan: PlanOutput): StagePrompt<type
   };
 }
 
-/** S4's own version: its TEXT became the text S3 left (F6b), a change of its task alone. */
-const STYLE_PROMPT_VERSION = '4';
+/** S4's own version: its TEXT became the text S3 left (F6b), a change of its task alone; 5 with the channel guide (25/11). */
+const STYLE_PROMPT_VERSION = '5';
 
 /**
  * S4: style edits, each citing a principle shown in block 1. `principleIds` are the ones it may cite.
@@ -287,8 +316,8 @@ export function stylePrompt(
   };
 }
 
-/** The single call's own version: its task changed on 18/11 (cut stock formulas); 4 when the hard rules changed (keep unbacked claims); 5 with redaccion (21/11). */
-export const SINGLE_PROMPT_VERSION = '5';
+/** The single call's own version: its task changed on 18/11 (cut stock formulas); 4 when the hard rules changed (keep unbacked claims); 5 with redaccion (21/11); 6 with the channel guide in block 2 (25/11). */
+export const SINGLE_PROMPT_VERSION = '6';
 
 /**
  * What redaccion adds to a task (decision of 21/11/2026). The human review of 20/11 found the

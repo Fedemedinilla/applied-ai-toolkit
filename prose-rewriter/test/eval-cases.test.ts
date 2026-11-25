@@ -270,15 +270,19 @@ describe('the code rubrics', () => {
     expect(score(byId('es-email-good'), 'Hola.')['keep-intact']!.status).toBe('no-output');
   });
 
-  it('voice-kept: fails added ¿¡ and accents in a WhatsApp that has none, and a removed emoji', () => {
+  it('voice-kept: fails a changed treatment or added Spanish of Spain, and lets the channel add ¿¡, accents or drop an emoji', () => {
+    // Decision of 25/11/2026: of the voice only the treatment and the variety are kept.
     const wa = byId('es-trap-whatsapp-voice');
-    const added = score(wa, wa.input.text.replace('como andas?', '¿cómo andás?'))['voice-kept']!;
-    expect(added.pass).toBe(false);
-    expect(added.detail).toMatch(/inverted-marks/);
+    expect(score(wa, wa.input.text.replace('como andas?', '¿cómo andás?'))['voice-kept']!.pass).toBe(true);
     const emoji = byId('es-trap-legit-emoji');
-    const removed = score(emoji, emoji.input.text.replace(' 🙌', '.'))['voice-kept']!;
-    expect(removed.pass).toBe(false);
-    expect(removed.detail).toMatch(/emoji/);
+    expect(score(emoji, emoji.input.text.replace(' 🙌', '.'))['voice-kept']!.pass).toBe(true);
+    const email = byId('es-email-good');
+    const tuteo = score(email, `${email.input.text}\nSi puedes, avísame.`)['voice-kept']!;
+    expect(tuteo.pass).toBe(false);
+    expect(tuteo.detail).toMatch(/treatment/);
+    const spain = score(email, `${email.input.text}\nSi queréis, lo vemos.`)['voice-kept']!;
+    expect(spain.pass).toBe(false);
+    expect(spain.detail).toMatch(/variety/);
   });
 
   it('over-editing: reports the share of changed words on good texts only, with no threshold yet', () => {

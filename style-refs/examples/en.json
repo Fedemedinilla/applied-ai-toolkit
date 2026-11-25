@@ -39,5 +39,67 @@
     "after": "Hi Sam, quick one: is Larkspur Freight still hiring support engineers? I'd like to apply, and I wanted to ask you first what their on-call is like. No rush, whenever you get a minute",
     "notes": "The before wraps its question in a journey and a network. The after asks the same question in the writer's casual register, says why he is asking, and gives the friend an easy, unhurried way to answer, with no emoji added.",
     "fictional": true
+  },
+  {
+    "id": "en-email-offer-to-a-bike-shop",
+    "genre": "email",
+    "lang": "en",
+    "register": "neutral",
+    "before": "Dear Hannah,\n\nI hope this email finds you well! My name is Daniel and I'm a passionate, results-driven support professional. I recently stumbled upon Fenwick Bikes and noticed your help center only has a handful of articles. I'd love to leverage my expertise to help you take your customer experience to the next level. Would you be open to a quick chat sometime next week?\n\nWarm regards,\nDaniel",
+    "after": "Hi Hannah,\n\nI'm writing because I noticed the Fenwick Bikes help center only has a handful of articles, and that's the part of support I most like to build.\n\nAt Brightwell Parcels I wrote 60 help articles, and over six months the searches that ended in a ticket fell from 31% to 22%. Fewer tickets for the same questions would free your team for the harder ones.\n\nIf that sounds useful, I can send you a short outline of where I'd start.\n\nDaniel Okoro",
+    "notes": "The before leads with the writer and buries the one observation that matters. The after opens on that observation, says why he cares about it, gives the one CV result that answers it and then says what it would mean for the reader's team. The next step is something he does, not a meeting she has to book.",
+    "fictional": true
+  },
+  {
+    "id": "en-email-application-with-reasons",
+    "genre": "email",
+    "lang": "en",
+    "register": "neutral",
+    "before": "Hello Marcus,\n\nI am writing to express my keen interest in the Support Engineer position at Tallow Systems. As a highly motivated team player with a proven track record, I am confident that I would be a valuable asset to your dynamic organization. Please find my CV attached. I look forward to the opportunity to discuss how I can contribute.\n\nSincerely,\nDaniel",
+    "after": "Hi Marcus,\n\nI'm applying for the Support Engineer position at Tallow Systems, and I've attached my CV.\n\nTwo things in it matter most for a support role. I'm on call one week in five for the tracking API at Brightwell Parcels, so I know how to work through an incident. And I cut our median first reply time from 9 hours to 3 hours with a set of 14 macros, which is the kind of work I'd like to keep doing for your customers.\n\nIf it helps, I'm happy to talk it through whenever suits you.\n\nDaniel Okoro",
+    "notes": "The before claims a track record and shows none. The after picks two CV facts and says why each matters for the role, joined by a plain transition, so the reader gets reasons and not a list.",
+    "fictional": true
+  },
+  {
+    "id": "en-follow-up-after-a-call",
+    "genre": "follow-up",
+    "lang": "en",
+    "register": "neutral",
+    "previousMessage": "Hi Hannah,\n\nThanks for the call on Tuesday. As promised, here is the outline for the help center: start with the 20 questions that reach your inbox most often.\n\nDaniel Okoro",
+    "before": "Hi Hannah,\n\nI just wanted to circle back and see if you had a chance to review the outline I sent. I'm super excited about this opportunity and would love to hear your thoughts at your earliest convenience!\n\nBest,\nDaniel",
+    "after": "Hi Hannah,\n\nI'm writing about the help center outline I sent after our call on Tuesday. Does starting with the questions that reach your inbox most often fit what you have in mind?\n\nIf it's not a priority right now, just tell me and I'll check back in a few months. If it is, I can draft the first articles so you can see how they'd read.\n\nDaniel Okoro",
+    "notes": "The before asks for thoughts on an outline it does not describe. The after recalls the call and the outline's main idea, asks one question about it, and offers an easy answer for each case.",
+    "fictional": true
+  },
+  {
+    "id": "en-follow-up-no-answer",
+    "genre": "follow-up",
+    "lang": "en",
+    "register": "neutral",
+    "previousMessage": "Hi Marcus,\n\nI'm applying for the Support Engineer position at Tallow Systems, and I've attached my CV.\n\nDaniel Okoro",
+    "before": "Hi Marcus,\n\nSorry to bother you again! I'm just following up to make sure my application didn't get lost in the shuffle. I'm still incredibly passionate about joining Tallow Systems and would be thrilled to hear back!\n\nBest regards,\nDaniel",
+    "after": "Hi Marcus,\n\nI'm following up on my application for the Support Engineer position at Tallow Systems. Is the role still open?\n\nIf the shortlist is already done, a short note is enough and I won't write again. If it isn't, I'm glad to send anything else that would help you decide.\n\nDaniel Okoro",
+    "notes": "The before apologises and repeats its excitement. The after names the application, asks one question, and spares the reader a long reply either way.",
+    "fictional": true
+  },
+  {
+    "id": "en-whatsapp-old-colleague",
+    "genre": "whatsapp",
+    "lang": "en",
+    "register": "casual",
+    "before": "Hey Jo!!! 👋 Long time no see!! I hope this message finds you well!! I'm currently exploring exciting new opportunities in the support space and was wondering if you know of any openings?? Would mean the world!! 🙏🙏",
+    "after": "Hey Jo, long time! I'm looking for a new support role and thought of you. Do you know of any openings where you are now? No rush, and thanks either way",
+    "notes": "The before wraps the question in excitement. The after says what he is looking for, why he writes to Jo in particular, and asks one question that takes a line to answer.",
+    "fictional": true
+  },
+  {
+    "id": "en-whatsapp-referred-contact",
+    "genre": "whatsapp",
+    "lang": "en",
+    "register": "casual",
+    "before": "Hi Ravi! 😊 Sam gave me your number. I'm Daniel, a passionate support engineer always looking to add value. I'd love to pick your brain about the support team at your company and explore any potential synergies! Let me know when works for a quick call!! 🚀",
+    "after": "Hi Ravi, I'm Daniel, Sam gave me your number. I'd like to ask you a couple of questions about the support team at your company before I apply there. Would a short call work for you, or is a message easier?",
+    "notes": "The before asks to pick a brain and explore synergies. The after says who sent him, what he wants to ask and why, and lets the reader pick how to answer.",
+    "fictional": true
   }
 ]

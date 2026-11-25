@@ -93,7 +93,7 @@ describe('the single-call baseline (design 4.10)', () => {
     const content = String(p.messages[0]?.content);
     expect(content).toMatch(/stock formula[^\n]*cut it/i);
     expect(content).toMatch(/do not write another formula or a new closing/i);
-    expect(SINGLE_PROMPT_VERSION).toBe('5');
+    expect(SINGLE_PROMPT_VERSION).toBe('6');
   });
 
   it('makes exactly one call and applies the edits it can place', async () => {
@@ -189,8 +189,12 @@ describe('the pipeline variants (design 5, "F6 suma")', () => {
     await runPipelines(CASES, [byId('full')], { gateway: full.gateway, refs: REFS });
     await runPipelines(CASES, [byId('no-examples')], { gateway: bare.gateway, refs: REFS });
     const [f, b] = [full.calls[0]?.request.system ?? [], bare.calls[0]?.request.system ?? []];
-    expect(f[1]).toMatch(/^EXAMPLES[^\n]*\n\nExample /);
-    expect(b[1]).toBe('EXAMPLES (fictional people; before and after pairs of this genre and register)\nNone for this genre and register.');
+    const [fChannel, fExamples] = (f[1] ?? '').split('\n\nEXAMPLES');
+    const [bChannel, bExamples] = (b[1] ?? '').split('\n\nEXAMPLES');
+    // The channel guide stays; only the pairs go.
+    expect(bChannel).toBe(fChannel);
+    expect(fExamples).toMatch(/^[^\n]*\n<examples>\n<example id="/);
+    expect(bExamples).toMatch(/^[^\n]*\nNone for this genre and register\.$/);
     expect([b[0], b[2], b[3]]).toEqual([f[0], f[2], f[3]]);
   });
 });

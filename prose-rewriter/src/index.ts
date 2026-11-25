@@ -38,6 +38,7 @@ export {
   type Treatment,
   type VoiceContext,
   type VoiceProfile,
+  voiceKeepLines,
   voicePromptLines,
   voiceProfile,
   type VoiceTrait,

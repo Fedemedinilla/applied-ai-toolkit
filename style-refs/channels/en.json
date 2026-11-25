@@ -1,0 +1,50 @@
+[
+  {
+    "id": "en-email-neutral",
+    "genre": "email",
+    "lang": "en",
+    "register": "neutral",
+    "persona": "You write as a professional talking to a peer: direct, friendly and confident about what you can do for them.",
+    "reader": "A busy person reads it on a phone and decides from the first two lines whether to keep reading, so each sentence has to earn the next one.",
+    "shape": {
+      "words": { "min": 60, "max": 160 },
+      "paragraphs": { "max": 4, "maxSentences": 3 },
+      "opening": "The first sentence says why you are writing to this person, from something they or their company said or do.",
+      "closing": "End on one easy next step, with no fixed date unless the reader proposed one."
+    },
+    "canonical": "I'm writing because your team is hiring for support, and that's the work I like most. The part I enjoy is finding the questions that keep coming back and answering them once, well. If that's useful to you, I'm happy to show you how I'd start.",
+    "fictional": true
+  },
+  {
+    "id": "en-follow-up-neutral",
+    "genre": "follow-up",
+    "lang": "en",
+    "register": "neutral",
+    "persona": "You write as someone picking a conversation back up, with respect for the reader's time and no apology for writing again.",
+    "reader": "The reader got your earlier message and did not answer, maybe because it slipped; they need a one-line reminder of what it was about and an easy way to answer either way.",
+    "shape": {
+      "words": { "min": 40, "max": 110 },
+      "paragraphs": { "max": 3, "maxSentences": 3 },
+      "opening": "The first sentence recalls, concretely, what the earlier message asked or offered.",
+      "closing": "Give an easy way out for either answer, and sign as in the earlier message."
+    },
+    "canonical": "I'm writing again about the question I sent you a few days ago, on the support role. If it isn't the right time, just say so and I'll check back later. And if it is, I can send whatever would help you decide.",
+    "fictional": true
+  },
+  {
+    "id": "en-whatsapp-casual",
+    "genre": "whatsapp",
+    "lang": "en",
+    "register": "casual",
+    "persona": "You write the way you'd text an acquaintance: short, warm and to the point.",
+    "reader": "It's read on a phone among other chats; a long message gets left for later, so the question goes first and can be answered in one line.",
+    "shape": {
+      "words": { "min": 12, "max": 60 },
+      "paragraphs": { "max": 2, "maxSentences": 4 },
+      "opening": "A short hello and the reason in the same line or the next.",
+      "closing": "Make it easy to answer, with no formal sign-off and no signature."
+    },
+    "canonical": "Hi, quick one: do you know if your team is still hiring for support? No pressure at all. If you hear of anything, let me know and I'll reach out myself.",
+    "fictional": true
+  }
+]

@@ -196,12 +196,60 @@ export const Example = z.strictObject({
 });
 export type Example = z.infer<typeof Example>;
 
+/** The channels that get a guide. A cover letter keeps its principles and examples only (decision of 21/11/2026). */
+export const CHANNEL_GENRES = ['email', 'follow-up', 'whatsapp'] as const satisfies readonly Genre[];
+
+const Count = z.number().int().positive();
+
+/**
+ * How one channel reads, said as what to do (design: "plan-cohesion-y-canal", step 1). The persona is
+ * one sentence; the reader is why the shape matters; the shape is the target length, the paragraphs,
+ * the opening and the closing; the canonical sample is a short passage in the sound the channel
+ * wants, which a prompt shows with "match its cadence, density and closeness". Written by us, over
+ * fictional people, like the examples.
+ */
+export const Channel = z.strictObject({
+  id: Id,
+  genre: z.enum(CHANNEL_GENRES),
+  lang: z.enum(LANGS),
+  /** Required on a Spanish guide: the treatment (voseo, tuteo, usted) it shows is part of the variety. */
+  variety: z.enum(VARIETIES).optional(),
+  register: z.enum(REGISTERS),
+  persona: z.string().min(1),
+  reader: z.string().min(1),
+  shape: z.strictObject({
+    words: z.strictObject({ min: Count, max: Count }),
+    paragraphs: z.strictObject({ max: Count, maxSentences: Count }),
+    opening: z.string().min(1),
+    closing: z.string().min(1),
+  }),
+  canonical: z.string().min(1),
+  /** Always true: a guide never carries a real person's data. */
+  fictional: z.literal(true),
+});
+export type Channel = z.infer<typeof Channel>;
+
+export interface ChannelQuery {
+  readonly genre: Genre;
+  readonly lang: Lang;
+  readonly register: Register;
+  /** Absent means a text of no particular variety, which only a guide with no variety matches. */
+  readonly variety?: Variety;
+}
+
+/** The guide for one text, or undefined: never a guide of another register or variety. */
+export function channelFor(channels: readonly Channel[], q: ChannelQuery): Channel | undefined {
+  return channels.find((c) => c.genre === q.genre && c.lang === q.lang && c.register === q.register && c.variety === q.variety);
+}
+
 /** The data files, as the caller loaded them, each one keyed by its path inside style-refs/. */
 export interface RefsData {
   readonly sources: unknown;
   readonly principles: Readonly<Record<string, unknown>>;
   readonly excerpts: Readonly<Record<string, unknown>>;
   readonly examples: Readonly<Record<string, unknown>>;
+  /** channels/<es|en>.json; optional so a caller that predates the guides still validates. */
+  readonly channels?: Readonly<Record<string, unknown>>;
 }
 
 export interface RefsProblem {
@@ -213,7 +261,7 @@ export interface RefsProblem {
 }
 
 /** One file per layer and language; an example names its genre itself. */
-const LANG_FILE = /^(principles|excerpts|examples)\/(es|en)\.json$/;
+const LANG_FILE = /^(principles|excerpts|examples|channels)\/(es|en)\.json$/;
 
 /**
  * Checks every data file against its shape, then the links between them: unique ids, each
@@ -301,6 +349,30 @@ export function validateRefs(data: RefsData): RefsProblem[] {
       if (e.lang !== 'es' && e.variety !== undefined) problems.push({ file, path: `${i}.variety`, message: `a variety of Spanish on an ${e.lang} example` });
       if (e.genre === 'follow-up' && e.previousMessage === undefined) problems.push({ file, path: `${i}.previousMessage`, message: 'a follow-up example carries the message it follows' });
       if (e.genre !== 'follow-up' && e.previousMessage !== undefined) problems.push({ file, path: `${i}.previousMessage`, message: 'only a follow-up example carries a previous message' });
+    });
+  }
+  const guided = new Set<string>();
+  for (const [file, value] of Object.entries(data.channels ?? {})) {
+    const lang = LANG_FILE.exec(file)?.[2];
+    if (!file.startsWith('channels/') || lang === undefined) {
+      problems.push({ file, path: '', message: 'a channels file is channels/<es|en>.json' });
+      continue;
+    }
+    const entries = parse(Channel, file, value);
+    unique(file, entries);
+    entries.forEach((c, i) => {
+      const at = (path: string, message: string) => problems.push({ file, path: `${i}.${path}`, message });
+      if (c.lang !== lang) at('lang', `lang ${c.lang} in the ${lang} file`);
+      if (c.lang === 'es' && c.variety === undefined) at('variety', 'a Spanish channel guide names its variety, so the treatment it shows is the one asked for');
+      if (c.lang !== 'es' && c.variety !== undefined) at('variety', `a variety of Spanish on an ${c.lang} guide`);
+      const persona = countSentences(c.persona);
+      if (persona !== 1) at('persona', `${persona} sentences; a persona is one sentence`);
+      if (c.shape.words.min > c.shape.words.max) at('shape.words', `min ${c.shape.words.min} is above max ${c.shape.words.max}`);
+      const canonical = countSentences(c.canonical);
+      if (canonical < 2 || canonical > 5) at('canonical', `${canonical} sentences; a canonical sample has 2 to 5`);
+      const key = [c.genre, c.lang, c.register, c.variety ?? ''].join('|');
+      if (guided.has(key)) at('id', `${c.id} is a second guide for ${[c.genre, c.lang, c.register, c.variety].filter((x) => x !== undefined).join(', ')}`);
+      guided.add(key);
     });
   }
   return problems;

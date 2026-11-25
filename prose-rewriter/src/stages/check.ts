@@ -222,7 +222,7 @@ function surplus(before: readonly string[], after: readonly string[]): string[] 
  * the same finding or voice trait cannot excuse each other.
  */
 export function relintAndVoice(a: Analysis, units: readonly Sentence[], proposals: readonly Proposal[], fresh: readonly Proposal[]): void {
-  const context = { genre: a.input.genre, lang: a.input.lang };
+  const context = { genre: a.input.genre, lang: a.input.lang, ...(a.input.variety === undefined ? {} : { variety: a.input.variety }) };
   const pending = new Set(fresh);
   for (const p of [...fresh].reverse()) {
     pending.delete(p);
