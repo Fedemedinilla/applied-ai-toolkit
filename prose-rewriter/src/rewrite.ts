@@ -40,7 +40,9 @@
  * - 'ok' otherwise.
  */
 import { ResponseError } from '../../gateway/src/index.ts';
-import { diffHunks, renderEdits, tidyDeletions } from './edits.ts';
+import { diffHunks, renderEdits, splitSentences, tidyDeletions, type Sentence } from './edits.ts';
+import { guideOf, readMessage, squash } from './diagnose.ts';
+import type { OutlineOutput } from './outputs.ts';
 import { factInvariant, factReport, type Fact } from './facts.ts';
 import { restoreData } from './injection.ts';
 import { gatewayModelClient } from './model-client.ts';
@@ -49,7 +51,7 @@ import { judgeRuns, REWRITE_JUDGE_PROMPT_VERSION } from './rubric.ts';
 import { analyse, earlyExit, lintAs, prepare, type Analysis } from './stages/analyse.ts';
 import { composeStyle, currentText, restoreMerged } from './stages/compose.ts';
 import { checkFacts, judgeStage, liveEdits, paragraphUnits, place, recheckDrops, relintAndVoice, rendered, type Proposal } from './stages/check.ts';
-import { editStage, extraEditStage, metered, planStage, sentenceAt, singleStage, STAGE_ATTEMPTS, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
+import { draftStage, editStage, extraEditStage, metered, outlineStage, planStage, sentenceAt, singleStage, STAGE_ATTEMPTS, styleStage, type ModelStages, type Remaining, type Usage } from './stages/model.ts';
 import { Change, DEFAULT_STRATEGY, RewriteInput, RewriteResult, type Edit, type Flag, type RewriteOptions } from './types.ts';
 
 const EMPTY_REFS = { principles: [], sources: [], examples: [] } as const;
@@ -64,6 +66,13 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   const userId = options.userId ?? null;
   const jobId = options.jobId ?? null;
   const m: ModelStages = { gateway, prompt: { input: a.input, register: a.register, refs: options.refs ?? EMPTY_REFS }, userId, jobId };
+  const strategy = options.strategy ?? DEFAULT_STRATEGY;
+  let draftNote: Change | undefined;
+  if (strategy === 'drafted' && a.mode === 'redaccion' && (a.input.keep ?? []).length === 0) {
+    const drafting = await drafted(a, m, usage);
+    if (drafting.result !== undefined) return drafting.result;
+    draftNote = drafting.note;
+  }
   const units = a.mode === 'reescritura' || a.mode === 'redaccion' ? paragraphUnits(a.text, a.sentences) : a.sentences;
 
   const proposals: Proposal[] = [];
@@ -176,7 +185,7 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
   };
 
   let extraInvented = false;
-  if ((options.strategy ?? DEFAULT_STRATEGY) === 'single') {
+  if (strategy === 'single' || strategy === 'drafted') {
     // S2 and S3 in one call; its edits go through the same placement, S5 in code and S6. No S4 and
     // no extra round: the strategy is one call (two with the retry of an unreadable reply) plus the judge's.
     check(propose((await readable(() => singleStage(m, a.lint.findings))) ?? [], 'edit', 1));
@@ -199,7 +208,112 @@ export async function rewrite(raw: RewriteInput, options: RewriteOptions): Promi
     delete p.mergedInto;
   }
 
-  return assemble(a, units, proposals, { usage, extraInvented, judged, unread });
+  const result = assemble(a, units, proposals, { usage, extraInvented, judged, unread });
+  return draftNote === undefined ? result : RewriteResult.parse({ ...result, changes: [draftNote, ...result.changes] });
+}
+
+/** A stage's reply, asked for once more when it cannot be read; null when the retry cannot be read either. */
+async function twice<T>(stage: () => Promise<T>): Promise<T | null> {
+  for (let attempt = 1; attempt <= STAGE_ATTEMPTS; attempt++) {
+    try {
+      return await stage();
+    } catch (error) {
+      if (!(error instanceof ResponseError && error.code === 'invalid_output')) throw error;
+    }
+  }
+  return null;
+}
+
+/** The outline with only the facts whose quote is in the source it names. */
+function checkedOutline(a: Analysis, o: OutlineOutput): OutlineOutput {
+  const r = a.input.recipient;
+  const source = {
+    text: squash(a.text),
+    cv: squash([a.input.profile.cvMarkdown, ...(a.input.profile.extraFacts ?? [])].join('\n')),
+    recipient: squash([r?.name, r?.org, r?.role, r?.previousMessage].filter((x): x is string => x !== undefined).join('\n')),
+  };
+  return { ...o, parts: o.parts.map((p) => ({ ...p, facts: p.facts.filter((f) => source[f.from].includes(squash(f.quote))) })) };
+}
+
+/** Blank runs and stray spaces a removed sentence leaves behind. */
+const tidyBody = (body: string): string =>
+  body
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+
+/**
+ * The draft without the sentences that state a fact neither the text nor the CV states (factInvariant's
+ * extra), found twice at most: a draft is a whole body, so code cuts the inventing sentence before the
+ * checks would revert the whole draft for it.
+ */
+function repairDraft(a: Analysis, unit: Sentence, draft: string): { body: string; removed: number } {
+  let body = draft;
+  let removed = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    const rewritten = a.text.slice(0, unit.start) + body + a.text.slice(unit.end);
+    const extra = factInvariant(a.text, rewritten, a.sources, [], a.extractOptions).extra.map((f) => f.start - unit.start);
+    const bad = splitSentences(body, a.input.lang).filter((s) => extra.some((at) => at >= s.start && at < s.end));
+    if (bad.length === 0) break;
+    for (const s of [...bad].reverse()) body = body.slice(0, s.start) + body.slice(s.end);
+    removed += bad.length;
+    body = tidyBody(body);
+  }
+  return { body, removed };
+}
+
+const DRAFT_ID = 'd1';
+
+/**
+ * The 'drafted' strategy (cohesion plan, steps 2 to 4): the diagnosis, the outline and a draft of
+ * the body, checked as one edit over the whole body by the same placement, S5, S6 and judge as any
+ * edit. A result when the draft stands; otherwise the draft as a reverted change, or nothing when a
+ * stage could not be read, and rewrite() goes on with 'single'.
+ */
+async function drafted(a: Analysis, m: ModelStages, usage: Usage): Promise<{ readonly result?: RewriteResult; readonly note?: Change }> {
+  const read = await readMessage(a, m);
+  const reading = read.reading;
+  const ids = read.shape.bodySentenceIds;
+  const first = a.sentences.find((s) => s.id === ids[0]);
+  const last = a.sentences.find((s) => s.id === ids.at(-1));
+  if (reading === null || first === undefined || last === undefined) return {};
+  const unit: Sentence = { id: first.id, part: 'body', start: first.start, end: last.end, text: a.text.slice(first.start, last.end) };
+  const outline = await twice(() => outlineStage(m, reading, read.shape));
+  if (outline === null) return {};
+  const guide = guideOf(a, m.prompt.refs);
+  const shapeGuide = guide === undefined ? null : { words: guide.shape.words, maxSentences: guide.shape.paragraphs.maxSentences };
+  const draft = await twice(() => draftStage(m, reading, checkedOutline(a, outline), read.shape, shapeGuide));
+  if (draft === null) return {};
+  const repaired = repairDraft(a, unit, tidyBody(restoreData(draft.body).normalize('NFC')));
+  if (repaired.body === '') return {};
+  const reason = `the body written again from the diagnosis and an outline of ${outline.parts.length} parts${repaired.removed === 0 ? '' : `; ${repaired.removed} sentence(s) of the draft taken out for stating a fact neither the text nor the CV states`}`;
+  const proposal: Proposal = { id: DRAFT_ID, edit: { sentenceId: unit.id, before: unit.text, after: repaired.body, reason }, stage: 'edit', round: 1, status: 'live' };
+  const units = [unit];
+  const proposals = [proposal];
+  place(a, units, proposals, proposals);
+  checkFacts(a, units, proposals, proposals);
+  relintAndVoice(a, units, proposals, proposals);
+  recheckDrops(a, units, proposals);
+  let judged = { fellBack: false, reverted: 0, unread: false, flags: [] as Flag[] };
+  if (proposal.status === 'live' && judgeRuns(a.input)) {
+    const client = gatewayModelClient(m.gateway, { task: 'rewrite.judge', userId: m.userId, jobId: m.jobId, promptVersion: REWRITE_JUDGE_PROMPT_VERSION });
+    judged = await judgeStage(a, units, proposals, client);
+  }
+  if (proposal.status === 'live' && !judged.fellBack && !judged.unread) return { result: assemble(a, units, proposals, { usage, extraInvented: false, judged, unread: false }) };
+  return {
+    note: Change.parse({
+      id: DRAFT_ID,
+      span: { start: unit.start, end: unit.end },
+      before: unit.text,
+      after: repaired.body,
+      reason,
+      stage: 'edit',
+      status: 'reverted',
+      revertReason: `${proposal.status === 'live' ? 'the judge could not clear it' : (proposal.reason ?? 'not applied')}; the single strategy rewrote the text instead`,
+    }),
+  };
 }
 
 /** The level 1 findings of the rewrite, each with the sentence of the original it sits in. */

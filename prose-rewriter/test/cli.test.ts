@@ -91,7 +91,7 @@ describe('parseArgs', () => {
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--keep', '', 'draft.txt'], /--keep needs a value/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--json=1', 'draft.txt'], /--json takes no value/],
     [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--mode', 'minimo', '--mode', 'pulido', 'draft.txt'], /--mode is given twice/],
-    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--strategy', 'fast', 'draft.txt'], /--strategy must be staged or single/],
+    [['--genre', 'whatsapp', '--lang', 'es', '--cv', 'cv.md', '--strategy', 'fast', 'draft.txt'], /--strategy must be staged, single or drafted/],
   ])('refuses %j', (argv, message) => {
     const args = parseArgs(argv);
     expect(typeof args).toBe('string');
@@ -107,7 +107,7 @@ describe('parseArgs: --strategy', () => {
   });
 
   it('names the flag in the usage line', () => {
-    expect(USAGE).toContain('[--strategy staged|single]');
+    expect(USAGE).toContain('[--strategy staged|single|drafted]');
   });
 });
 

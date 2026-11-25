@@ -187,11 +187,15 @@ export interface RewriteOptions {
    * no S4 and no extra round. One call, two when its reply cannot be read and is asked for again,
    * plus the judge's.
    * 'staged': S2 plan and S3 edit, S4 style and at most one extra S3 round.
+   * 'drafted' (cohesion plan, step 4): in `redaccion` with no keep phrase, the diagnosis, an
+   * outline of the whole message and a draft of its body, which goes through the same checks and
+   * judge as one edit; if it does not stand, 'single' rewrites the text and the draft is reported
+   * as a reverted change. In any other mode, or with keep phrases, it is 'single'.
    */
   readonly strategy?: Strategy;
 }
 
-export const STRATEGIES = ['staged', 'single'] as const;
+export const STRATEGIES = ['staged', 'single', 'drafted'] as const;
 export type Strategy = (typeof STRATEGIES)[number];
 
 /**
