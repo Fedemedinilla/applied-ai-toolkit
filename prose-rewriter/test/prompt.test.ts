@@ -11,7 +11,7 @@ import { injectionFlags, restoreData, unwrapData, wrapData } from '../src/inject
 import { EditOutput, PlanOutput } from '../src/outputs.ts';
 import { editPrompt, HARD_RULES, planPrompt, type PromptContext, type PromptRefs, singleCallPrompt, stylePrompt, systemBlocks } from '../src/prompt.ts';
 import { RewriteInput, type Register } from '../src/types.ts';
-import { voicePromptLines, voiceProfile } from '../src/voice.ts';
+import { voiceKeepLines, voicePromptLines, voiceProfile } from '../src/voice.ts';
 import { scriptedGateway, USER } from './scripted-gateway.ts';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -92,7 +92,8 @@ describe('the system blocks', () => {
     expect(blocks[3]).toContain('RECIPIENT');
 
     // The genre blocks do not change with the person or the text; the CV block not with the text.
-    const otherText = systemBlocks(ctx({ text: 'Hola, ¿siguen buscando desarrolladora? Ya trabajé con Astro.' }));
+    // Block 4 follows the text through its treatment, the one trait of the voice it keeps (25/11/2026).
+    const otherText = systemBlocks(ctx({ text: 'Hola, ¿siguen buscando desarrolladora? Si querés, te paso lo que hice con Astro.' }));
     const otherCv = systemBlocks(ctx({ profile: { cvMarkdown: CV_EN } }));
     expect(otherCv.slice(0, 2)).toEqual(blocks.slice(0, 2));
     expect(otherText.slice(0, 3)).toEqual(blocks.slice(0, 3));
@@ -280,9 +281,12 @@ describe('the data blocks', () => {
 });
 
 describe('the voice and the recipient', () => {
-  it('go together in the last block, the voice as data lines', () => {
-    const block = systemBlocks(ctx())[3];
-    for (const line of voicePromptLines(voiceProfile(TEXT, 'es'))) expect(block).toContain(`- ${line}`);
+  it('go together in the last block, the voice as the treatment and the variety to keep, and nothing else', () => {
+    const block = systemBlocks(ctx())[3] ?? '';
+    for (const line of voiceKeepLines(voiceProfile(TEXT, 'es'), 'rioplatense')) expect(block).toContain(`- ${line}`);
+    expect(block).toContain('everything else (length, emoji, accents, ¿¡, capitals, greeting and sign-off) follows the channel guide');
+    // Decision of 25/11/2026: the measured traits other than treatment are not asked for.
+    for (const line of voicePromptLines(voiceProfile(TEXT, 'es')).filter((l) => !/voseo|tuteo|usted|tratamientos/.test(l))) expect(block).not.toContain(`- ${line}`);
     expect(block).toMatch(/<perfil>\n[\s\S]*Talleres Cardo[\s\S]*\n<\/perfil>/);
   });
 

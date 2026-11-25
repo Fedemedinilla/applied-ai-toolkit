@@ -369,7 +369,7 @@ describe('S6 relint and the extra round', () => {
       'rewrite.edit': [
         edits(
           { sentenceId: 1, before: SINERGIAS, after: FIXED },
-          { sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' },
+          { sentenceId: 2, before: 'ya carga', after: 'ya carga en el ordenador' },
           { sentenceId: 3, before: '¿Lo vemos el jueves?', after: '¿Lo vemos el jueves? Me apasiona.' },
         ),
       ],
@@ -378,7 +378,7 @@ describe('S6 relint and the extra round', () => {
     const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
     expect(result.rewritten).toBe(CHAT.replace(SINERGIAS, FIXED));
-    expect(result.changes.filter((c) => c.status === 'reverted').map((c) => c.revertReason)).toEqual([expect.stringMatching(/che/), expect.stringMatching(/LEX-01/)]);
+    expect(result.changes.filter((c) => c.status === 'reverted').map((c) => c.revertReason)).toEqual([expect.stringMatching(/^voice: .*Spain/), expect.stringMatching(/LEX-01/)]);
     expectSound(input, result);
   });
 
@@ -696,7 +696,7 @@ describe('S5, S6, S7 and S1b: the branches the stages take', () => {
   it('S6 reverts only the edit that adds a voice trait, not a clean edit made after it', async () => {
     const scripted = scriptedGateway({
       'rewrite.plan': [plan(1, 2)],
-      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, si puedes mirarlo,' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
     });
     const result = await rewrite(whatsapp(CHAT), { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
     scripted.assertDone();
@@ -782,7 +782,7 @@ describe('S6 against the edits it already kept', () => {
   it('reverts each of two edits that add the same voice trait, instead of letting each excuse the other', async () => {
     const scripted = scriptedGateway({
       'rewrite.plan': [plan(1, 2, 3)],
-      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 3, before: '¿Lo vemos', after: 'Che, ¿lo vemos' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
+      'rewrite.edit': [edits({ sentenceId: 2, before: 'ya carga', after: 'ya carga, si puedes mirarlo,' }, { sentenceId: 3, before: '¿Lo vemos', after: 'Si puedes, ¿lo vemos' }, { sentenceId: 1, before: SINERGIAS, after: FIXED })],
     });
     const input = whatsapp(CHAT);
     const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'staged' });
@@ -951,7 +951,7 @@ describe("strategy 'single': one call, the same guards", () => {
 
   it('makes one call on a WhatsApp in minimo, where D10 skips the judge, and keeps S6 and keep', async () => {
     const scripted = scriptedGateway({
-      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'ya carga', after: 'ya carga, che,' }, { sentenceId: 3, before: 'el jueves', after: 'el viernes' })],
+      'rewrite.edit': [edits({ sentenceId: 1, before: SINERGIAS, after: FIXED }, { sentenceId: 2, before: 'ya carga', after: 'ya carga, si puedes mirarlo,' }, { sentenceId: 3, before: 'el jueves', after: 'el viernes' })],
     });
     const input = whatsapp(CHAT, { keep: ['¿Lo vemos el jueves?'] });
     const result = await rewrite(input, { gateway: scripted.gateway, refs: REFS, strategy: 'single' });
@@ -966,11 +966,11 @@ describe("strategy 'single': one call, the same guards", () => {
 describe('S5 drops against what S6 leaves', () => {
   // F6b review: with no judge (D10 on a WhatsApp in minimo), only check() rechecks a drop after S6
   // reverts the edit that kept its fact. Fictional chat: the first edit names Marta in sentence 1
-  // with a "che" the writer does not use; the second deletes the greeting, with drop, since Marta
+  // with Spain's "ordenador", which the writer does not use; the second deletes the greeting, with drop, since Marta
   // is then named elsewhere.
   const GREETING = 'Hola Marta, espero que estés bien.';
   it('reverts an accepted drop once S6 reverts the edit that kept its fact', async () => {
-    const keeper = { sentenceId: 1, before: SINERGIAS, after: 'Marta, quería contarte que el sitio está listo, che.', reason: 'fix' };
+    const keeper = { sentenceId: 1, before: SINERGIAS, after: 'Marta, quería contarte que el sitio está listo para verlo en el ordenador.', reason: 'fix' };
     const deletion = { sentenceId: 0, before: GREETING, after: '', reason: 'Marta is named in sentence 1', drop: true };
     const scripted = scriptedGateway({ 'rewrite.edit': [{ data: { edits: [keeper, deletion] } }] });
     const input = whatsapp(CHAT);

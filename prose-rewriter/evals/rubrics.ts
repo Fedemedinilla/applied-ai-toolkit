@@ -18,9 +18,8 @@
  * - keep-intact: every keep phrase as often as in the original.
  *
  * Soft (pass rates for gate()):
- * - voice-kept: the traits of design 4.5 neither added (voice.ts' voiceViolations, which allows
- *   what the genre requires) nor removed (treatment, ¿¡, accents, emoji, "che", contractions,
- *   initial capital);
+ * - voice-kept: no treatment the original does not use and no Spanish of Spain it did not write
+ *   (voice.ts' voiceViolations; decision of 25/11/2026, the rest of the voice is the channel's);
  * - over-editing: the share of changed words on the already good texts, reported only:
  *   OVER_EDITING_THRESHOLD stays null until the first real run (F6b) shows the spread;
  * - placeholders-honest: no [COMPLETAR: ...] unless the case says a fact is missing.
@@ -167,17 +166,12 @@ const KEEP_INTACT = listRubric(
   (c) => (c.input.keep ?? []).length > 0,
 );
 
-const VOICE_KEPT = listRubric('voice-kept', false, ['added', 'removed'], (output, c) => {
-  const { genre, lang } = c.input;
-  const o = voiceProfile(c.input.text, lang);
-  const r = voiceProfile(output, lang);
-  const removed: string[] = [];
-  for (const t of ['voseo', 'tuteo', 'usted'] as const) if (o.counts[t] > 0 && r.counts[t] === 0) removed.push(`treatment (${t})`);
-  for (const [kind, key] of [['inverted-marks', 'invertedMarks'], ['accents', 'accents'], ['emoji', 'emoji'], ['che', 'che'], ['contractions', 'contractions']] as const) {
-    if (o.counts[key] > 0 && r.counts[key] === 0) removed.push(kind);
-  }
-  if (o.initialCapital && !r.initialCapital) removed.push('initial-capital');
-  return { added: voiceViolations(c.input.text, output, { genre, lang }).map((v) => v.kind), removed };
+// Decision of 25/11/2026 (Federico): of the writer's voice only the treatment and the variety are
+// kept, so this fails only what voiceViolations flags: a treatment the original does not use, or
+// Spain's Spanish in a text that did not write it.
+const VOICE_KEPT = listRubric('voice-kept', false, ['added'], (output, c) => {
+  const { genre, lang, variety } = c.input;
+  return { added: voiceViolations(c.input.text, output, { genre, lang, ...(variety === undefined ? {} : { variety }) }).map((v) => v.kind) };
 });
 
 const WORD = /[\p{L}\p{N}]+/gu;

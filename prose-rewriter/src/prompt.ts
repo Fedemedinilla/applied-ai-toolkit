@@ -19,7 +19,7 @@
  *
  * The user's text, the CV, the recipient, the goal, the keep phrases, the lint findings (which
  * quote the text) and the plan S2 wrote (model output that read the text) are data: each goes
- * inside a <texto> or <perfil> block built by wrapData(), which the data cannot close. The voice goes as data lines (voicePromptLines()), never adjectives.
+ * inside a <texto> or <perfil> block built by wrapData(), which the data cannot close. The voice goes as data lines (voiceKeepLines()): the treatment and the variety, never adjectives (decision of 25/11/2026).
  *
  * Pure: the caller loads style-refs' JSON and passes it in.
  */
@@ -32,7 +32,7 @@ import { EditOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.
 import { factSheet } from './rubric.ts';
 import type { RewriteTask } from './tasks.ts';
 import { defaultMode, type Mode, type Register, type RewriteInput } from './types.ts';
-import { GENRE_REQUIRES, voicePromptLines, voiceProfile } from './voice.ts';
+import { GENRE_REQUIRES, voiceKeepLines, voiceProfile } from './voice.ts';
 
 /** Bumped whenever the rules, the layout or a stage's task change. */
 export const PROMPT_VERSION = '5';
@@ -196,8 +196,8 @@ export function systemBlocks(c: PromptContext): string[] {
 
   const mode = input.mode ?? defaultMode(input.genre);
   const voice = [
-    'VOICE (measured by code on the writer\'s text; keep these traits and add none the writer does not use, unless the genre conventions allow it)',
-    ...bullets(voicePromptLines(voiceProfile(input.text, input.lang))),
+    'VOICE (measured by code on the writer\'s text; keep only these two, everything else (length, emoji, accents, ¿¡, capitals, greeting and sign-off) follows the channel guide)',
+    ...bullets(voiceKeepLines(voiceProfile(input.text, input.lang), input.variety)),
     '',
     recipientLines(input),
     '',
