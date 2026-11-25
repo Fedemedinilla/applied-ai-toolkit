@@ -18,10 +18,12 @@ import type { CallSettings } from '../../evals/src/index.ts';
 import type { GlobalCaps, TaskConfig } from '../../gateway/src/index.ts';
 
 /** Fixed names: a task reaches the ledger, the logs and the spans, so it is never built from the input. */
-export const REWRITE_TASKS = ['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge'] as const;
+export const REWRITE_TASKS = ['rewrite.diagnose', 'rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge'] as const;
 export type RewriteTask = (typeof REWRITE_TASKS)[number];
 
 export const TASK_CONFIGS: Readonly<Record<RewriteTask, TaskConfig>> = {
+  // The diagnosis of the cohesion plan (step 2, 25/11/2026): the plan's model and effort, unmeasured.
+  'rewrite.diagnose': { task: 'rewrite.diagnose', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
   'rewrite.plan': { task: 'rewrite.plan', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
   'rewrite.edit': { task: 'rewrite.edit', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },
   'rewrite.style': { task: 'rewrite.style', model: 'claude-fable-5-2', effort: 'medium', hardCaseEffort: null },

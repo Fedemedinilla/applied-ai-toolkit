@@ -28,8 +28,9 @@ import type { Finding } from '../../slop-lint/src/types.ts';
 import { channelFor, principlesFor, type Channel, type Example, type Principle, type Source } from '../../style-refs/src/index.ts';
 import { splitSentences, type Sentence } from './edits.ts';
 import { wrapData } from './injection.ts';
-import { EditOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.ts';
+import { DiagnoseOutput, EditOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.ts';
 import { factSheet } from './rubric.ts';
+import { shapeLines, type Shape } from './shape.ts';
 import type { RewriteTask } from './tasks.ts';
 import { defaultMode, type Mode, type Register, type RewriteInput } from './types.ts';
 import { GENRE_REQUIRES, voiceKeepLines, voiceProfile } from './voice.ts';
@@ -236,6 +237,33 @@ function findingLines(sentences: readonly Sentence[], findings: readonly Finding
 
 function conversation(task: string, body: readonly string[]): Conversation {
   return [{ role: 'user', content: [task, '', ...body].join('\n') }];
+}
+
+/** The diagnosis's own version (cohesion plan, step 2). */
+export const DIAGNOSE_PROMPT_VERSION = 'rewrite-diagnose@1';
+
+const DIAGNOSE_TASK = [
+  'TASK: diagnose',
+  'Read the whole message the way its reader will, before anyone rewrites it. Write no text for the message: this step only says what the rewrite must fix.',
+  '- purpose: why the writer writes to this reader. Quote, exactly, the words of <texto>, the recipient or the GOAL that say it; if none says it, set found false and quote "". Never guess it.',
+  '- readerNeed: what this reader needs that the writer could give, quoted the same way, exactly; found false when the text and the recipient do not say it.',
+  '- gaps: each pair of body sentences where the second does not follow from the first; afterSentenceId is the first of the pair, and why says what is missing between them.',
+  '- opening and closing: whether they do what the CHANNEL guide\'s <opening> and <closing> ask, and why.',
+  '- artificial: sentences that read as generated (a stock formula, hype, filler), with the exact words. The FINDINGS below are hints from a linter, not the list: add what they miss and leave out what reads fine.',
+  'The SHAPE was measured by code: use it, do not count again.',
+].join('\n');
+
+/** The diagnosis: one reading of the whole text, with the shape code measured and the lint findings as hints. */
+export function diagnosePrompt(c: PromptContext, findings: readonly Finding[], shape: Shape): StagePrompt<typeof DiagnoseOutput> {
+  const sentences = splitSentences(c.input.text, c.input.lang);
+  const head = shape.guide === null ? 'SHAPE (measured by code; this channel has no guide)' : `SHAPE (measured by code against the channel guide ${shape.guide})`;
+  return {
+    task: 'rewrite.diagnose',
+    promptVersion: DIAGNOSE_PROMPT_VERSION,
+    system: systemBlocks(c),
+    messages: conversation(DIAGNOSE_TASK, [textBlock(sentences), '', head, ...bullets(shapeLines(shape)), '', findingLines(sentences, findings)]),
+    schema: DiagnoseOutput,
+  };
 }
 
 const PLAN_TASK = [
