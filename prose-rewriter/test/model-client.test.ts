@@ -46,9 +46,11 @@ describe('the rewrite tasks', () => {
 
   it('has the caps measured in F6, which the gateway accepts', () => {
     expect(GlobalCaps.parse(REWRITE_CAPS)).toEqual(REWRITE_CAPS);
-    expect(REWRITE_CAPS).toEqual({ perJobUsd: 0.25, dailyPerUserUsd: 2, monthlyUsd: 10 });
-    // Above the highest p90 per rewrite measured in run 4 (US$0.1412, staged follow-up).
+    expect(REWRITE_CAPS).toEqual({ perJobUsd: 0.5, dailyPerUserUsd: 2, monthlyUsd: 10 });
+    // Above the highest p90 per rewrite measured in run 4 (US$0.1412, staged follow-up), and above
+    // what drafted spent before its judge on 25/11/2026 (US$0.2971 on es-email-light), where 0.25 stopped it.
     expect(REWRITE_CAPS.perJobUsd).toBeGreaterThan(0.1412);
+    expect(REWRITE_CAPS.perJobUsd).toBeGreaterThan(0.2971);
   });
 
   it('builds the evals call settings from the task config, with no output format', () => {
