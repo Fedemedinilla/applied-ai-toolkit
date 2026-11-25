@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lint } from '../../slop-lint/src/lint.ts';
-import { Channel, Example, GENRES, LANGS } from '../../style-refs/src/index.ts';
+import { CHANNEL_GENRES, Channel, Example, GENRES, LANGS } from '../../style-refs/src/index.ts';
 import { checkFictional } from './fictional.ts';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -38,12 +38,13 @@ const mentions = (text: string, name: string): boolean => new RegExp(`(?<!\\p{L}
 const signature = (text: string): string | undefined => text.trim().split('\n').at(-1)?.trim();
 
 describe('the examples on disk', () => {
-  it('cover every genre in both languages, one or two pairs each', () => {
+  it('cover every genre in both languages: three to five pairs for each channel with a guide, one or two for a cover letter', () => {
     for (const lang of LANGS) {
       for (const genre of GENRES) {
         const n = examples.filter((e) => e.lang === lang && e.genre === genre).length;
-        expect(n, `${genre} ${lang}`).toBeGreaterThanOrEqual(1);
-        expect(n, `${genre} ${lang}`).toBeLessThanOrEqual(2);
+        const [min, max] = (CHANNEL_GENRES as readonly string[]).includes(genre) ? [3, 5] : [1, 2];
+        expect(n, `${genre} ${lang}`).toBeGreaterThanOrEqual(min);
+        expect(n, `${genre} ${lang}`).toBeLessThanOrEqual(max);
       }
     }
   });

@@ -43,5 +43,73 @@
     "after": "Hola Lu, ¿cómo andás? Te hago una consulta: ¿conocés a alguien que necesite rehacer o mantener un sitio? Estoy tomando trabajos nuevos, sobre todo en Astro y WordPress, y me vendría bárbaro algún contacto. Si se te ocurre alguien, avisame y le escribo yo",
     "notes": "The before talks about challenges and digital presence and slips into tuteo. The after keeps the chat register and the voseo, asks the question plainly, names the two CV tools the friend can pass on, and makes the favour easy: she will do the writing.",
     "fictional": true
+  },
+  {
+    "id": "es-email-oferta-a-una-dietetica",
+    "genre": "email",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "before": "Estimada Inés: Espero que este mail te encuentre muy bien. Mi nombre es Valeria y soy una apasionada del desarrollo web. Navegando por internet encontré el sitio de Dietética Girasol y noté que tarda bastante en cargar desde el celular. Ofrezco soluciones integrales y de vanguardia para potenciar tu presencia digital. ¿Tienes un momento para una llamada? Quedo atenta a tu respuesta.\n\nSaludos cordiales,\nValeria",
+    "after": "Hola, Inés:\n\nTe escribo porque entré al sitio de Dietética Girasol desde el celular y tarda bastante en cargar. Es lo que más arreglo en mi trabajo, y me gustaría ayudarlos con eso.\n\nTe cuento un caso parecido. Rehice el sitio de la Panadería Los Álamos en Astro, y la página principal pasó de 4,1 s a 1,6 s de carga en un celular de gama baja. Para un negocio que la gente busca desde el teléfono, esa diferencia se nota.\n\nSi te interesa, te mando cómo lo encararía con el de ustedes, sin compromiso.\n\nValeria Sosa",
+    "notes": "The before opens on the writer and hides the one useful thing it noticed, the slow site, behind an offer of integral solutions; it also slips into tuteo. The after opens on that observation, says she would like to fix it, and brings the bakery result as a similar case, then ties it back to the reader with one clause about a business people look up from the phone. The next step is small and has no date.",
+    "fictional": true
+  },
+  {
+    "id": "es-email-postulacion-a-un-estudio",
+    "genre": "email",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "before": "Hola Julián, ¿cómo estás? Vi la búsqueda de Estudio Nodo para mantenimiento de WordPress y quería postularme. Soy una persona proactiva, resiliente y orientada a resultados, con muchísimas ganas de aprender y crecer junto a un equipo dinámico. Adjunto mi CV para tu consideración. Desde ya, muchas gracias por tu tiempo.\n\nSaludos,\nValeria",
+    "after": "Hola, Julián:\n\nVi la búsqueda de Estudio Nodo para mantenimiento de WordPress y quiero postularme, porque es lo que hago todas las semanas.\n\nHoy mantengo tres sitios WordPress con copias semanales y actualizaciones mensuales. Antes, en soporte técnico, escribí las guías internas para cargar comprobantes, que el estudio sigue usando, así que también sé dejar las cosas explicadas para quien venga después. Las dos cosas me parecen útiles para un puesto de mantenimiento.\n\nTe adjunto el CV. Si querés, lo charlamos cuando te quede cómodo.\n\nValeria Sosa",
+    "notes": "The before answers a posting with traits nobody can check. The after says why she applies in the first sentence, then picks the two CV facts that matter for maintenance work and says why each one does: the routine she keeps today, and the guides that show she leaves work explained for the next person.",
+    "fictional": true
+  },
+  {
+    "id": "es-follow-up-propuesta-a-una-libreria",
+    "genre": "follow-up",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "previousMessage": "Hola, Carla:\n\nTe mando lo que charlamos: un formulario de pedidos como el que armé para la Ferretería Quintana con Supabase, que recibe unos 40 pedidos por semana. Lo adaptaría al catálogo de la Librería Del Sur.\n\nValeria Sosa",
+    "before": "Hola Carla, ¿cómo estás? Te escribo nuevamente para hacer un seguimiento de la propuesta que te envié. Entiendo que debes estar muy ocupada, pero me encantaría saber tus comentarios. ¡Cualquier duda estoy a tu entera disposición!\n\nSaludos,\nValeria",
+    "after": "Hola, Carla:\n\nTe escribo por el formulario de pedidos para la Librería Del Sur que te mandé hace unos días. Si te quedó alguna duda sobre cómo se adaptaría al catálogo, te la contesto por acá o en una llamada corta.\n\nY si por ahora no es prioridad, decímelo sin problema y lo retomamos más adelante.\n\nValeria Sosa",
+    "notes": "The before asks for comments on a proposal it never names and slips into tuteo. The after names the proposal in the first line, offers to answer the one doubt the reader is likely to have, about the catalogue, and gives an easy answer for a no. It signs as the earlier message did.",
+    "fictional": true
+  },
+  {
+    "id": "es-follow-up-postulacion-sin-respuesta",
+    "genre": "follow-up",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "previousMessage": "Hola, Julián:\n\nVi la búsqueda de Estudio Nodo para mantenimiento de WordPress y quiero postularme. Hoy mantengo tres sitios WordPress con copias semanales y actualizaciones mensuales. Te adjunto el CV.\n\nValeria Sosa",
+    "before": "Hola Julián! Perdón por insistir, solo quería saber si tuviste oportunidad de revisar mi postulación. Sigo súper interesada en la posición y quedo a tu disposición para lo que necesites. ¡Mil gracias!\n\nSaludos,\nValeria",
+    "after": "Hola, Julián:\n\nTe escribo por la búsqueda de mantenimiento de WordPress de Estudio Nodo, a la que me postulé hace unos días. ¿Sigue abierta?\n\nSi les sirve ver cómo trabajo, te cuento cómo organizo las copias semanales y las actualizaciones mensuales de los tres sitios que mantengo. Y si ya eligieron a alguien, avisame igual, así no te vuelvo a escribir.\n\nValeria Sosa",
+    "notes": "The before apologises and asks for news. The after recalls the posting, asks one question with a short answer, offers to show the routine her earlier message mentioned, and makes a no easy to send.",
+    "fictional": true
+  },
+  {
+    "id": "es-whatsapp-ex-companera",
+    "genre": "whatsapp",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "casual",
+    "before": "Holaaa Gabi!!! 🙌 Tanto tiempo!!! Espero que estés súper bien. Te cuento que estoy emprendiendo un nuevo camino profesional como desarrolladora freelance y quería saber si en el estudio necesitarían potenciar su presencia online o algo así. ¡Avisame! 🚀",
+    "after": "Hola Gabi, ¡tanto tiempo! Te cuento que ahora trabajo por mi cuenta haciendo sitios. ¿Sabés si en el estudio necesitan algo con el sitio o con los mails? Como ya conozco cómo trabajan, me resultaría fácil darles una mano. Avisame y lo vemos",
+    "notes": "The before talks about a new professional path and an online presence. The after says plainly what she does now, asks about the two things she knows the office uses, and gives the reason she is the easy choice: she already knows how they work.",
+    "fictional": true
+  },
+  {
+    "id": "es-whatsapp-contacto-recomendado",
+    "genre": "whatsapp",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "casual",
+    "before": "Hola Nico!! Espero que te encuentres muy bien. Mi nombre es Valeria Sosa Pereyra y soy desarrolladora web. Me pasó tu contacto Lu. Me comentó que estás buscando renovar la web de tu emprendimiento. Me encantaría poder ayudarte a llevar tu negocio al siguiente nivel con un sitio moderno y profesional. ¿Podemos agendar una reunión para conversarlo? Quedo atenta!! 😊",
+    "after": "Hola Nico, soy Valeria, me pasó tu número Lu. Me dijo que querés renovar la web de tu emprendimiento, y es justo lo que hago. Rehice el sitio de una panadería y ahora carga mucho más rápido desde el celular. Si querés, te cuento cómo lo encararía con el tuyo, por acá o en una llamada corta",
+    "notes": "The before introduces itself in full and promises the next level. The after says who sent her in the first line, links the reader's plan to her work, gives one result in plain words a chat can carry, and lets the reader choose between a message and a call.",
+    "fictional": true
   }
 ]
