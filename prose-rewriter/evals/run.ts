@@ -217,13 +217,13 @@ export async function estimateRun(cases: readonly LoadedCase[], variants: readon
     const base = first ?? estimateInputTokens({ messages: [{ role: 'user', content: JSON.stringify(c.input) }] });
     const early = first === null;
     first = null;
-    const model = (task: 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style'): string => v.tasks?.[task]?.model ?? TASK_CONFIGS[task].model;
+    const model = (task: 'rewrite.diagnose' | 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style'): string => (task === 'rewrite.diagnose' ? undefined : v.tasks?.[task]?.model) ?? TASK_CONFIGS[task].model;
     const seq: Array<{ model: string; maxTokens: number; extra?: number }> = [];
     const times = (n: number, call: { model: string; maxTokens: number }): void => {
       for (let i = 0; i < n; i++) seq.push(call);
     };
     // rewrite() asks a stage once more when its reply cannot be read; the extra round is not retried.
-    const stage = (task: 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style', attempts = STAGE_ATTEMPTS): void => times(attempts, { model: model(task), maxTokens: STAGE_MAX_TOKENS[task] });
+    const stage = (task: 'rewrite.diagnose' | 'rewrite.plan' | 'rewrite.edit' | 'rewrite.style', attempts = STAGE_ATTEMPTS): void => times(attempts, { model: model(task), maxTokens: STAGE_MAX_TOKENS[task] });
     // The fact judge's two verdicts, each asked for once more when it cannot be read.
     const factJudge = (): void => {
       if (factJudgeRuns(c.input)) times(MAX_VERDICTS * VERDICT_ATTEMPTS, { model: TASK_CONFIGS['rewrite.judge'].model, maxTokens: rewriteRubric.call.max_tokens });
@@ -232,6 +232,17 @@ export async function estimateRun(cases: readonly LoadedCase[], variants: readon
     if (!early && v.kind === 'single-call') stage('rewrite.edit', 1);
     if (!early && v.kind === 'pipeline' && v.strategy === 'single') {
       // One call that plans and edits, then the fact judge: no S4, no extra round.
+      stage('rewrite.edit');
+      factJudge();
+    } else if (!early && v.kind === 'pipeline' && v.strategy === 'drafted') {
+      // Diagnosis, outline and draft, each retried once, then the judge; at worst the draft does not
+      // stand and 'single' runs with its own judge (rewrite.ts drafted()).
+      if ((c.input.mode ?? defaultMode(c.input.genre)) === 'redaccion' && (c.input.keep ?? []).length === 0) {
+        stage('rewrite.diagnose');
+        stage('rewrite.plan');
+        stage('rewrite.edit');
+        factJudge();
+      }
       stage('rewrite.edit');
       factJudge();
     } else if (!early && v.kind === 'pipeline') {
@@ -310,6 +321,13 @@ function beatsBaseline(run: StoredRun, variant: string): { state: Exclude<GateVe
   };
 }
 
+/**
+ * The judge rubrics a variant must not lose on against the baseline. same-voice was one until
+ * 25/11/2026, when Federico decided that only the treatment and the variety of his voice are kept;
+ * voice-kept, a hard code rubric, checks those, and cohesion and channel-fit took its place here.
+ */
+export const NOT_WORSE = ['cohesion', 'channel-fit'] as const;
+
 /** The smallest margin, rounded up to three decimals, at which n of n against n of n passes decide(). */
 const smallestMargin = (n: number): string => (Math.ceil(-differenceInterval(n, n, n, n).lower * 1000) / 1000).toFixed(3);
 
@@ -334,7 +352,7 @@ function notWorse(baseline: StoredRun | undefined, candidate: StoredRun | undefi
 /**
  * The gate of design 5, per pipeline variant against the single-call baseline: hard failures on
  * any of its rows block it; else it must beat the baseline on pairwise-baseline and not lose on
- * same-voice. Each other pipeline variant is also gated against full on pairwise-original, which
+ * cohesion or channel-fit (NOT_WORSE). same-voice is reported, not gated (decision of 25/11/2026). Each other pipeline variant is also gated against full on pairwise-original, which
  * tells whether the stage it leaves out contributes. The run's state is full's when full ran,
  * else the worst of the variants'.
  */
@@ -354,11 +372,15 @@ export function gateReport(
     if (v.id === BASELINE) continue;
     const blocking = hard.filter((r) => r.variant === v.id).length;
     const beats = beatsBaseline(runs.get(`pairwise-baseline/${v.id}`) ?? { format: RUN_FORMAT, rubric: { name: 'pairwise-baseline', version: '1' }, label: v.id, results: [], tables: [] }, v.id);
-    const voice = notWorse(runs.get(`same-voice/${BASELINE}`), runs.get(`same-voice/${v.id}`), margin);
-    const state: GateVerdict = blocking > 0 ? 'blocked' : worstOf([beats.state, voice.state]);
+    const kept = NOT_WORSE.map((rubric) => ({ rubric, ...notWorse(runs.get(`${rubric}/${BASELINE}`), runs.get(`${rubric}/${v.id}`), margin) }));
+    const state: GateVerdict = blocking > 0 ? 'blocked' : worstOf([beats.state, ...kept.map((k) => k.state)]);
     states.set(v.id, state);
     const head = blocking > 0 ? `blocked by ${blocking} hard failure${blocking === 1 ? '' : 's'} (listed below)` : state;
-    sections.push(`## ${v.id} against ${BASELINE}: ${head}`, `#### pairwise-baseline: ${v.id} against ${BASELINE}\n\n${beats.markdown}`, `#### same-voice: ${v.id} against ${BASELINE}\n\n${voice.markdown}`);
+    sections.push(
+      `## ${v.id} against ${BASELINE}: ${head}`,
+      `#### pairwise-baseline: ${v.id} against ${BASELINE}\n\n${beats.markdown}`,
+      ...kept.map((k) => `#### ${k.rubric}: ${v.id} against ${BASELINE}\n\n${k.markdown}`),
+    );
   }
   if (variants.some((v) => v.id === SHIPPED)) {
     for (const v of variants) {
@@ -449,6 +471,7 @@ export async function runEvalCli(argv: readonly string[], deps: EvalCliDeps): Pr
     await judgePieces(cases, pieces, {
       gateway: budget.gateway,
       now: deps.clock.now(),
+      channels: deps.refs().channels ?? [],
       record: (r) => {
         judges.push(r);
         appendJsonl(paths.judges, r);

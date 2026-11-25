@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { appendJsonl, decide, gate, parseRun, readJsonl } from '../../evals/src/index.ts';
-import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
+import { Channel, Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import { caseOrder, JUDGE_RUBRICS, judgePieces, judgeRuns, type JudgeRecord } from '../evals/judges.ts';
 import { pipelineVariant, runPipelines, singleCall, VARIANTS, type EvalCase, type PieceRecord } from '../evals/pipeline.ts';
 import { SINGLE_PROMPT_VERSION, singleCallPrompt, systemBlocks, type PromptRefs } from '../src/prompt.ts';
@@ -130,8 +130,8 @@ const byId = (id: string) => {
 };
 
 describe('the pipeline variants (design 5, "F6 suma")', () => {
-  it('lists the full pipeline, the ablations, the single-call baseline, the guarded single call and another model on rewrite.edit', () => {
-    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'single-guarded', 'edit-sonnet-5-5']);
+  it('lists the full pipeline, the ablations, the single-call baseline, the guarded single call, the drafted strategy and another model on rewrite.edit', () => {
+    expect(VARIANTS.map((v) => v.id)).toEqual(['full', 'no-style', 'no-examples', 'single-call', 'single-guarded', 'drafted', 'edit-sonnet-5-5']);
   });
 
   it('runs single-guarded as rewrite() with one call: the edit the unguarded baseline ships is reverted', async () => {
@@ -316,8 +316,8 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   const yes = (key: string, value: boolean) => ({ text: JSON.stringify({ [key]: value, note: '' }) });
   const noFactDiffers = { text: JSON.stringify({ lost: [], changed: [], added: [], note: '' }) };
 
-  it('lists the four judge rubrics of design 5, pairwise twice, and the fact check', () => {
-    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination', 'reader-value', 'fact-check']);
+  it('lists the four judge rubrics of design 5, pairwise twice, cohesion and channel-fit (25/11/2026), reader-value and the fact check', () => {
+    expect(JUDGE_RUBRICS.map((r) => r.name)).toEqual(['pairwise-original', 'pairwise-baseline', 'same-voice', 'register-fit', 'literary-contamination', 'cohesion', 'channel-fit', 'reader-value', 'fact-check']);
   });
 
   it('derives the A/B order from the case id alone: the same on every run', () => {
@@ -329,7 +329,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   it('judges blind through rewrite.judge, maps the choice back through the order, and feeds gate() and decide()', async () => {
     // Every pairwise judge answers "A": whether that is the candidate depends on the order of the case.
     const scripted = scriptedGateway({
-      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true), yes('gives', true), yes('gives', false), noFactDiffers, noFactDiffers],
+      'rewrite.judge': [choice('A'), choice('A'), choice('A'), yes('same', true), yes('same', false), yes('fits', true), yes('fits', true), yes('contaminated', false), yes('contaminated', true), yes('coheres', true), yes('coheres', false), yes('fits', true), yes('fits', false), yes('gives', true), yes('gives', false), noFactDiffers, noFactDiffers],
     });
     const seen: JudgeRecord[] = [];
     const records = await judgePieces(CASES, [piece('full', pipelined), piece('single-call', single)], { gateway: scripted.gateway, now: NOW, record: (r) => seen.push(r) });
@@ -351,7 +351,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
     expect(pass('pairwise-baseline', 'full')).toBe(aWins(caseOrder('es-email-slop', 'pairwise-baseline')));
     expect(records.filter((r) => r.rubric === 'pairwise-baseline').map((r) => r.variant)).toEqual(['full']);
     // The judging order is shuffled, so the yes/no verdicts land on either variant; each count holds.
-    for (const rubric of ['same-voice', 'literary-contamination']) expect(records.filter((r) => r.rubric === rubric).map((r) => r.pass).sort()).toEqual([false, true]);
+    for (const rubric of ['same-voice', 'literary-contamination', 'cohesion', 'channel-fit']) expect(records.filter((r) => r.rubric === rubric).map((r) => r.pass).sort()).toEqual([false, true]);
     expect(records.filter((r) => r.rubric === 'register-fit').map((r) => r.pass)).toEqual([true, true]);
     expect(records.every((r) => r.usage.calls === 1)).toBe(true);
 
@@ -369,7 +369,7 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
   });
 
   it('does not pay to compare a text with itself, and carries a failed piece to every rubric', async () => {
-    const scripted = scriptedGateway({ 'rewrite.judge': [yes('fits', true), yes('contaminated', false), yes('gives', true)] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [yes('fits', true), yes('contaminated', false), yes('coheres', true), yes('fits', true), yes('gives', true)] });
     const failed: PieceRecord = { ...piece('no-style', ''), status: 'failed', error: 'ResponseError: x' } as PieceRecord;
     const records = await judgePieces(CASES, [piece('full', MAIL), failed], { gateway: scripted.gateway, now: NOW });
     scripted.assertDone();
@@ -379,6 +379,8 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'no-output', null],
       ['register-fit', 'scored', true],
       ['literary-contamination', 'scored', true],
+      ['cohesion', 'scored', true],
+      ['channel-fit', 'scored', true],
       ['reader-value', 'scored', true],
       ['fact-check', 'no-output', null],
     ]);
@@ -387,13 +389,37 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'failed'],
       ['register-fit', 'failed'],
       ['literary-contamination', 'failed'],
+      ['cohesion', 'failed'],
+      ['channel-fit', 'failed'],
       ['reader-value', 'failed'],
       ['fact-check', 'failed'],
     ]);
   });
 
+  it('gives channel-fit the guide of the case\'s channel, and says so when there is none', async () => {
+    const channels = LANGS.flatMap((lang) => (JSON.parse(readFileSync(new URL(`style-refs/channels/${lang}.json`, ROOT), 'utf8')) as unknown[]).map((c) => Channel.parse(c)));
+    const guided = scriptedGateway({ 'rewrite.judge': [yes('fits', true)] });
+    await judgePieces(CASES, [piece('full', pipelined)], { gateway: guided.gateway, now: NOW, rubrics: ['channel-fit'], channels });
+    guided.assertDone();
+    const asked = String(guided.calls[0]?.request.messages[0]?.content);
+    expect(asked).toMatch(/GUIDE\npersona: Escribís como una profesional/);
+    expect(asked).toContain('length: 70 to 170 words');
+    const bare = scriptedGateway({ 'rewrite.judge': [yes('fits', true)] });
+    await judgePieces(CASES, [piece('full', pipelined)], { gateway: bare.gateway, now: NOW, rubrics: ['channel-fit'] });
+    expect(String(bare.calls[0]?.request.messages[0]?.content)).toContain('GUIDE\nNo guide for this channel.');
+  });
+
+  it('asks cohesion whether each sentence leads to the next, and does not reward filler connectives', async () => {
+    const scripted = scriptedGateway({ 'rewrite.judge': [yes('coheres', false)] });
+    const records = await judgePieces(CASES, [piece('full', pipelined)], { gateway: scripted.gateway, now: NOW, rubrics: ['cohesion'] });
+    expect(records.map((r) => [r.rubric, r.status, r.pass])).toEqual([['cohesion', 'scored', false]]);
+    const system = scripted.calls[0]?.request.system.join('\n') ?? '';
+    expect(system).toMatch(/Does each sentence lead to the next/);
+    expect(system).toMatch(/"furthermore" between two unrelated sentences does not join them/);
+  });
+
   it('records a judge reply it cannot read as failed and goes on', async () => {
-    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false), yes('gives', true), noFactDiffers] });
+    const scripted = scriptedGateway({ 'rewrite.judge': [{ text: 'I prefer A.' }, yes('same', true), yes('fits', true), yes('contaminated', false), yes('coheres', true), yes('fits', true), yes('gives', true), noFactDiffers] });
     const records = await judgePieces(CASES, [piece('full', pipelined)], { gateway: scripted.gateway, now: NOW });
     scripted.assertDone();
     expect(records.map((r) => [r.rubric, r.status])).toEqual([
@@ -401,6 +427,8 @@ describe('the blind judges as a per-piece pass (design 5)', () => {
       ['same-voice', 'scored'],
       ['register-fit', 'scored'],
       ['literary-contamination', 'scored'],
+      ['cohesion', 'scored'],
+      ['channel-fit', 'scored'],
       ['reader-value', 'scored'],
       ['fact-check', 'scored'],
     ]);

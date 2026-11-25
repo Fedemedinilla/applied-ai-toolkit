@@ -26,7 +26,7 @@ import {
 } from '../evals/spend.ts';
 import { Example, LANGS, Principle, Source } from '../../style-refs/src/index.ts';
 import type { LoadedCase } from '../evals/cases.ts';
-import { EVAL_EXIT, estimateRun, gateReport, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
+import { EVAL_EXIT, estimateRun, gateReport, NOT_WORSE, parseEvalArgs, runEvalCli, type EvalCliDeps } from '../evals/run.ts';
 import type { JudgeRecord } from '../evals/judges.ts';
 import type { CodeRecord } from '../evals/rubrics.ts';
 import { JUDGE_MAX_TOKENS, JUDGE_RUBRICS } from '../evals/judges.ts';
@@ -511,6 +511,18 @@ describe('the dry run estimate', () => {
     expect(est.calls).toBe(JUDGE_RUBRICS.length + (JUDGE_RUBRICS.length - 1));
   });
 
+  it('counts drafted at its worst: diagnosis, outline and draft with their retries and the judge, then single and its judge', async () => {
+    const drafting = { ...SLOP, input: { ...SLOP.input, mode: 'redaccion' as const } };
+    const drafted = await estimateRun([drafting], variant('drafted'), REFS, PRICES);
+    const single = await estimateRun([drafting], variant('single-guarded'), REFS, PRICES);
+    // diagnose, plan (outline) and edit (draft) twice each, the fact judge's four calls, then single's own.
+    expect(drafted.calls - single.calls).toBe(2 + 2 + 2 + 4);
+    expect(drafted.worstUsd).toBeGreaterThan(single.worstUsd);
+    // Outside redaccion, drafted is single.
+    const pulido = { ...SLOP, input: { ...SLOP.input, mode: 'pulido' as const } };
+    expect((await estimateRun([pulido], variant('drafted'), REFS, PRICES)).calls).toBe((await estimateRun([pulido], variant('single-guarded'), REFS, PRICES)).calls);
+  });
+
   it('counts every call a piece may make: each stage and its retry, the extra round, and both fact verdicts with their retries', async () => {
     const est = await estimateRun([SLOP], variant('full'), REFS, PRICES);
     // S2, S3 and S4 twice each (a reply that cannot be read is asked for once more), the extra
@@ -566,13 +578,17 @@ describe('the gate report (design 5, "Puerta")', () => {
   ];
   /** The baseline's side of pairwise-baseline: the pipeline's losses, as judgeRuns derives it. */
   const versus = (variant: string, n: number, wins: number, none = 0) => judged('pairwise-baseline', variant, n, wins, none);
-  const sameVoice = (n: number, none = 0) => [...judged('same-voice', 'single-call', n, n, none), ...judged('same-voice', 'full', n, n, none)];
+  /** The not-worse rubrics (NOT_WORSE: cohesion and channel-fit) on both sides, all passing; same-voice until 25/11/2026. */
+  const notWorseSides = (n: number, none = 0, variant = 'full') => NOT_WORSE.flatMap((r) => [...judged(r, 'single-call', n, n, none), ...judged(r, variant, n, n, none)]);
+  const sameVoice = notWorseSides;
+  /** The not-worse rubrics on one variant alone. */
+  const notWorseOf = (variant: string, n: number, passes = n) => NOT_WORSE.flatMap((r) => judged(r, variant, n, passes));
   const hard = (variant: string): CodeRecord => ({ case: 'c0', variant, rubric: 'no-new-facts', version: '1', hard: true, status: 'scored', pass: false, metrics: {}, detail: 'extra: 40%' });
 
   it('gates the cases that have something to judge: a rewrite equal to its reference is left out, not a refusal', () => {
     const r = gateReport([...versus('full', 60, 50, 2), ...sameVoice(60, 2)], [], variants('full', 'single-call'));
     expect(r.markdown).not.toMatch(/Not gated/);
-    expect(r.markdown).toMatch(/same-voice: full against single-call[\s\S]*### Eval gate: pass/);
+    expect(r.markdown).toMatch(/cohesion: full against single-call[\s\S]*### Eval gate: pass[\s\S]*channel-fit: full against single-call[\s\S]*### Eval gate: pass/);
     expect(r.state).toBe('pass');
   });
 
@@ -592,7 +608,7 @@ describe('the gate report (design 5, "Puerta")', () => {
   });
 
   it('gates each ablation against the full pipeline, so a stage shows whether it contributes', () => {
-    const judges = [...judged('pairwise-original', 'full', 60, 55), ...judged('pairwise-original', 'no-style', 60, 20), ...versus('full', 60, 50), ...versus('no-style', 60, 50), ...sameVoice(60), ...judged('same-voice', 'no-style', 60, 60)];
+    const judges = [...judged('pairwise-original', 'full', 60, 55), ...judged('pairwise-original', 'no-style', 60, 20), ...versus('full', 60, 50), ...versus('no-style', 60, 50), ...sameVoice(60), ...notWorseOf('no-style', 60)];
     const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'));
     expect(r.markdown).toMatch(/### Ablation: no-style against full/);
     expect(r.markdown).toMatch(/the stage no-style leaves out contributes/);
@@ -600,7 +616,7 @@ describe('the gate report (design 5, "Puerta")', () => {
     expect(r.state).toBe('pass');
   });
 
-  it('warns when the case set is too small for same-voice to pass at the margin, even at 100% on both sides', () => {
+  it('warns when the case set is too small for a not-worse rubric to pass at the margin, even at 100% on both sides', () => {
     const r = gateReport([...versus('full', 33, 30), ...sameVoice(33)], [], variants('full', 'single-call'));
     expect(r.markdown).toMatch(/cannot pass with 33 scored cases/);
     // The report names the smallest margin that could pass with these cases.
@@ -608,8 +624,8 @@ describe('the gate report (design 5, "Puerta")', () => {
     expect(r.state).toBe('inconclusive');
   });
 
-  it('passes same-voice on 33 cases at a margin given to gate(), and applies it to the ablations too', () => {
-    const judges = [...versus('full', 33, 30), ...sameVoice(33), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 33, 30), ...judged('same-voice', 'no-style', 33, 33)];
+  it('passes the not-worse rubrics on 33 cases at a margin given to gate(), and applies it to the ablations too', () => {
+    const judges = [...versus('full', 33, 30), ...sameVoice(33), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 33, 30), ...notWorseOf('no-style', 33)];
     const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'), { margin: 0.11 });
     expect(r.state).toBe('pass');
     expect(r.markdown).not.toMatch(/cannot pass/);
@@ -617,13 +633,29 @@ describe('the gate report (design 5, "Puerta")', () => {
     expect(r.markdown).toMatch(/Margin: 11\.0 points/);
   });
 
+  it('gates on cohesion and channel-fit, not on same-voice (decision of 25/11/2026)', () => {
+    // same-voice fails everywhere on the candidate; it is still reported by the judges, never gated.
+    const r = gateReport([...versus('full', 800, 480), ...notWorseSides(60), ...judged('same-voice', 'single-call', 60, 60), ...judged('same-voice', 'full', 60, 0)], [], variants('full', 'single-call'));
+    expect(r.state).toBe('pass');
+    expect(r.markdown).not.toMatch(/same-voice: full against/);
+    expect(NOT_WORSE).toEqual(['cohesion', 'channel-fit']);
+    const worse = gateReport([...versus('full', 800, 480), ...judged('cohesion', 'single-call', 60, 60), ...judged('cohesion', 'full', 60, 20), ...judged('channel-fit', 'single-call', 60, 60), ...judged('channel-fit', 'full', 60, 60)], [], variants('full', 'single-call'));
+    expect(worse.state).toBe('fail');
+    expect(worse.markdown).toMatch(/cohesion: full against single-call\n\n### Eval gate: fail/);
+  });
+
+  it('blocks a variant whose rewrite changes the treatment or adds Spanish of Spain: voice-kept is hard', () => {
+    const voice: CodeRecord = { case: 'c0', variant: 'full', rubric: 'voice-kept', version: '1', hard: true, status: 'scored', pass: false, metrics: {}, detail: 'added: treatment' };
+    expect(gateReport([...versus('full', 800, 480), ...notWorseSides(60)], [voice], variants('full', 'single-call')).state).toBe('blocked');
+  });
+
   it('is inconclusive with no baseline among the variants', () => {
     expect(gateReport([], [], variants('full')).state).toBe('inconclusive');
   });
 
-  it('is inconclusive, not passing, when one side has no same-voice records', () => {
-    const r = gateReport([...versus('full', 800, 480), ...judged('same-voice', 'single-call', 60, 60)], [], variants('full', 'single-call'));
-    expect(r.markdown).toMatch(/same-voice: full against single-call\n\nNot gated: no judged pieces on one side/);
+  it('is inconclusive, not passing, when one side has no records of a not-worse rubric', () => {
+    const r = gateReport([...versus('full', 800, 480), ...NOT_WORSE.flatMap((x) => judged(x, 'single-call', 60, 60))], [], variants('full', 'single-call'));
+    expect(r.markdown).toMatch(/cohesion: full against single-call\n\nNot gated: no judged pieces on one side/);
     expect(r.state).toBe('inconclusive');
   });
 
@@ -643,30 +675,30 @@ describe('the gate report (design 5, "Puerta")', () => {
   });
 
   it('takes the worse of the two sub-gates: a fail beats an inconclusive', () => {
-    // pairwise-baseline fails; same-voice on 33 cases is inconclusive at the default margin.
+    // pairwise-baseline fails; cohesion on 33 cases is inconclusive at the default margin.
     const r = gateReport([...versus('full', 800, 300), ...sameVoice(33)], [], variants('full', 'single-call'));
     expect(r.markdown).toMatch(/pairwise-baseline: full against single-call\n\n### Eval gate: fail/);
-    expect(r.markdown).toMatch(/same-voice: full against single-call\n\n### Eval gate: inconclusive/);
+    expect(r.markdown).toMatch(/cohesion: full against single-call\n\n### Eval gate: inconclusive/);
     expect(r.state).toBe('fail');
   });
 
   it('without full among the variants, takes the worst of the variants', () => {
-    const judges = [...versus('no-style', 800, 480), ...judged('same-voice', 'single-call', 60, 60), ...judged('same-voice', 'no-style', 60, 60)];
+    const judges = [...versus('no-style', 800, 480), ...notWorseSides(60, 0, 'no-style')];
     expect(gateReport(judges, [], variants('no-style', 'single-call')).state).toBe('pass');
     expect(gateReport(judges, [hard('no-style')], variants('no-style', 'single-call')).state).toBe('blocked');
-    const close = [...versus('no-style', 800, 400), ...judged('same-voice', 'single-call', 60, 60), ...judged('same-voice', 'no-style', 60, 60)];
+    const close = [...versus('no-style', 800, 400), ...notWorseSides(60, 0, 'no-style')];
     expect(gateReport(close, [], variants('no-style', 'single-call')).state).toBe('inconclusive');
   });
 
   it('with full among the variants, follows full even when an ablation is blocked', () => {
-    const judges = [...versus('full', 800, 480), ...versus('no-style', 800, 480), ...sameVoice(60), ...judged('same-voice', 'no-style', 60, 60)];
+    const judges = [...versus('full', 800, 480), ...versus('no-style', 800, 480), ...sameVoice(60), ...notWorseOf('no-style', 60)];
     const r = gateReport(judges, [hard('no-style')], variants('full', 'no-style', 'single-call'));
     expect(r.markdown).toMatch(/no-style against single-call: blocked by 1 hard failure/);
     expect(r.state).toBe('pass');
   });
 
   it('reads an inconclusive ablation as no evidence, not as a stage that contributes', () => {
-    const judges = [...versus('full', 60, 50), ...sameVoice(60), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 60, 50), ...judged('same-voice', 'no-style', 60, 60)];
+    const judges = [...versus('full', 60, 50), ...sameVoice(60), ...judged('pairwise-original', 'full', 33, 33), ...judged('pairwise-original', 'no-style', 33, 33), ...versus('no-style', 60, 50), ...notWorseOf('no-style', 60)];
     const r = gateReport(judges, [], variants('full', 'no-style', 'single-call'));
     expect(r.markdown).toMatch(/Ablation: no-style against full\n\nNo evidence that the stage no-style leaves out contributes \(inconclusive\)/);
     expect(r.markdown).not.toMatch(/the stage no-style leaves out contributes\./);
@@ -674,7 +706,7 @@ describe('the gate report (design 5, "Puerta")', () => {
 
   it('names the smaller scored count in the small-set warning when the sides differ', () => {
     // Baseline 40 scored; full 33 scored and 7 with nothing to judge, over the same 40 cases.
-    const judges = [...versus('full', 60, 50), ...judged('same-voice', 'single-call', 40, 40), ...judged('same-voice', 'full', 33, 33, 7)];
+    const judges = [...versus('full', 60, 50), ...NOT_WORSE.flatMap((x) => [...judged(x, 'single-call', 40, 40), ...judged(x, 'full', 33, 33, 7)])];
     const r = gateReport(judges, [], variants('full', 'single-call'));
     expect(r.markdown).toMatch(/cannot pass with 33 scored cases/);
   });
@@ -783,7 +815,9 @@ describe('the eval CLI', () => {
 
   it('--live runs, records, judges and reports the gate, the cost table and the month spend', async () => {
     const judge = (text: string) => ({ text, usage: { input: 1000, output: 100 } });
-    const scripted = scriptedGateway({ 'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}'), judge('{"gives": true, "note": ""}')] });
+    const scripted = scriptedGateway({
+      'rewrite.judge': [judge('{"fits": true, "note": ""}'), judge('{"contaminated": false, "note": ""}'), judge('{"coheres": true, "note": ""}'), judge('{"fits": true, "note": ""}'), judge('{"gives": true, "note": ""}')],
+    });
     const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [CLEAN] });
     const outDir = join(h.dir, 'run');
     // No baseline among the variants: the run finished, the gate could not run.
@@ -798,11 +832,11 @@ describe('the eval CLI', () => {
     // The fact check is reported next to the code rubrics; the rewrite equal to the original was not paid for.
     expect(text).toContain('### Fact check (judge, soft)');
     expect(text).toContain('| full | 1 | 0 | 0 | n/a | 1 | 0 |');
-    // Three judge calls at US$0.0030 each: register-fit, literary-contamination and reader-value.
-    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0090 of US\$20/);
-    expect(text).toMatch(/This run: US\$0\.0090 over 3 calls/);
+    // Five judge calls at US$0.0030 each: register-fit, literary-contamination, cohesion, channel-fit and reader-value.
+    expect(text).toMatch(/Spend this month \(2026-11\): US\$0\.0150 of US\$20/);
+    expect(text).toMatch(/This run: US\$0\.0150 over 5 calls/);
     expect(readFileSync(join(outDir, 'report.md'), 'utf8')).toContain('### Cost per rewrite');
-    expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.009);
+    expect(openLedger({ path: h.ledgerPath, monthlyCapUsd: 20, clock: fixed }).month().spentUsd).toBe(0.015);
     expect(h.out.join('') + h.err.join('')).not.toContain(SECRET);
   });
 
@@ -823,12 +857,14 @@ describe('the eval CLI', () => {
         ...Array.from({ length: 2 }, () => verdict({ same: true })),
         ...Array.from({ length: 2 }, () => verdict({ fits: true })),
         ...Array.from({ length: 2 }, () => verdict({ contaminated: false })),
+        ...Array.from({ length: 2 }, () => verdict({ coheres: true })),
+        ...Array.from({ length: 2 }, () => verdict({ fits: true })),
       ],
     });
     const h = harness(() => scripted.gateway as Gateway<string>, { cases: () => [SLOP] });
     expect(await runEvalCli(['--live', '--variants', 'full,single-call', '--out', join(h.dir, 'run'), '--margin', '0.5'], h.deps)).not.toBe(EVAL_EXIT.usage);
     scripted.assertDone();
-    expect(h.out.join('')).toMatch(/same-voice: full against single-call\n\n### Eval gate: \w+[\s\S]*?Margin: 50\.0 points/);
+    expect(h.out.join('')).toMatch(/cohesion: full against single-call\n\n### Eval gate: \w+[\s\S]*?Margin: 50\.0 points/);
   });
 
   it('--live stops on the budget and says so, with what it recorded', async () => {

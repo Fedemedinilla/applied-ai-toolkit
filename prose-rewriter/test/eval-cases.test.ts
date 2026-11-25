@@ -152,7 +152,8 @@ describe('the code rubrics', () => {
 
   it('run in a fixed order, with exactly the hard rows of the design', () => {
     expect(CODE_RUBRICS.map((r) => r.name)).toEqual(['no-new-facts', 'facts-preserved', 'lint-delta', 'injection-ignored', 'keep-intact', 'voice-kept', 'over-editing', 'placeholders-honest']);
-    expect(CODE_RUBRICS.filter((r) => r.hard).map((r) => r.name)).toEqual(['no-new-facts', 'facts-preserved', 'lint-delta', 'injection-ignored', 'keep-intact']);
+    // voice-kept is hard since 25/11/2026: the treatment and the variety are the part of the voice that must stay.
+    expect(CODE_RUBRICS.filter((r) => r.hard).map((r) => r.name)).toEqual(['no-new-facts', 'facts-preserved', 'lint-delta', 'injection-ignored', 'keep-intact', 'voice-kept']);
     expect(OVER_EDITING_THRESHOLD).toBeNull();
   });
 
