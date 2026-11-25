@@ -5,11 +5,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Example, LANGS, Principle, principlesFor, Source } from '../../style-refs/src/index.ts';
+import { Channel, Example, LANGS, Principle, principlesFor, Source } from '../../style-refs/src/index.ts';
 import type { Finding } from '../../slop-lint/src/types.ts';
 import { injectionFlags, restoreData, unwrapData, wrapData } from '../src/injection.ts';
 import { EditOutput, PlanOutput } from '../src/outputs.ts';
-import { editPrompt, HARD_RULES, planPrompt, type PromptContext, type PromptRefs, stylePrompt, systemBlocks } from '../src/prompt.ts';
+import { editPrompt, HARD_RULES, planPrompt, type PromptContext, type PromptRefs, singleCallPrompt, stylePrompt, systemBlocks } from '../src/prompt.ts';
 import { RewriteInput, type Register } from '../src/types.ts';
 import { voicePromptLines, voiceProfile } from '../src/voice.ts';
 import { scriptedGateway, USER } from './scripted-gateway.ts';
@@ -22,6 +22,7 @@ const refs: PromptRefs = {
   sources: json('style-refs/sources.json').map((s) => Source.parse(s)),
   principles: LANGS.flatMap((lang) => json(`style-refs/principles/${lang}.json`).map((p) => Principle.parse(p))),
   examples: LANGS.flatMap((lang) => json(`style-refs/examples/${lang}.json`).map((e) => Example.parse(e))),
+  channels: LANGS.flatMap((lang) => json(`style-refs/channels/${lang}.json`).map((c) => Channel.parse(c))),
 };
 const CV_ES = read('prose-rewriter/evals/cases/cv/es-rioplatense.md');
 const CV_EN = read('prose-rewriter/evals/cases/cv/en.md');
@@ -298,7 +299,7 @@ describe('the conversation', () => {
       expect(x?.messages.at(-1)?.role).toBe('user');
     }
     expect([p?.task, e?.task, s?.task]).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style']);
-    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@4', 'rewrite-edit@4', 'rewrite-style@4']);
+    expect([p?.promptVersion, e?.promptVersion, s?.promptVersion]).toEqual(['rewrite-plan@5', 'rewrite-edit@5', 'rewrite-style@5']);
     expect(p?.schema).toBe(PlanOutput);
     expect(e?.schema).toBe(EditOutput);
   });
@@ -336,5 +337,54 @@ describe('redaccion, the reader-oriented mode (decision of 21/11/2026)', () => {
     const { RewriteInput } = await import('../src/types.ts');
     const input = RewriteInput.parse({ text: 'Hola,\n\nArmé un sitio.', genre: 'whatsapp', lang: 'es', profile: { cvMarkdown: '# CV' } });
     expect(String(singleCallPrompt({ input, register: 'casual', refs: EMPTY_REFS_FOR_MODE }, []).messages[0]?.content)).toMatch(/reword the paragraph that starts at its sentenceId/u);
+  });
+});
+
+describe('the channel guide and the examples in XML', () => {
+  const chat = (over: Partial<RewriteInput> = {}) => systemBlocks(ctx({ genre: 'whatsapp', ...over }, 'casual'))[1] ?? '';
+
+  it('show the guide of the channel, language, register and variety, with its persona, reader, shape and canonical sample', () => {
+    const block = chat();
+    const guide = refs.channels?.find((c) => c.id === 'es-whatsapp-casual');
+    expect(guide).toBeDefined();
+    expect(block).toContain('<channel genre="whatsapp" lang="es" register="casual" variety="rioplatense">');
+    for (const part of [guide?.persona, guide?.reader, guide?.shape.opening, guide?.shape.closing, guide?.canonical]) expect(block).toContain(part);
+    expect(block).toContain(`<words min="${guide?.shape.words.min}" max="${guide?.shape.words.max}"/>`);
+    expect(block).toMatch(/<canonical>[\s\S]*Match its cadence, its density and how close it sounds, never its content/);
+  });
+
+  it('wrap every example of the text in <example> with its before, after and why', () => {
+    const block = chat();
+    const shown = refs.examples.filter((e) => e.genre === 'whatsapp' && e.lang === 'es' && e.register === 'casual');
+    expect(shown.length).toBeGreaterThanOrEqual(3);
+    expect(block).toContain('<examples>');
+    for (const e of shown) {
+      expect(block).toContain(`<example id="${e.id}">\n<before>\n${e.before}\n</before>\n<after>\n${e.after}\n</after>\n<why>\n${e.notes}\n</why>\n</example>`);
+    }
+  });
+
+  it('put the earlier message of a follow-up example in its own tag', () => {
+    const block = systemBlocks(ctx({ genre: 'follow-up' }, 'neutral'))[1] ?? '';
+    const e = refs.examples.find((x) => x.id === 'es-follow-up-agencia');
+    expect(block).toContain(`<example id="es-follow-up-agencia">\n<previous_message>\n${e?.previousMessage}\n</previous_message>\n<before>`);
+  });
+
+  it('say so when the channel has no guide, as a cover letter or another variety', () => {
+    expect(systemBlocks(ctx())[1]).toContain('<channel>No guide for this channel.</channel>');
+    expect(chat({ variety: 'neutral' })).toContain('<channel>No guide for this channel.</channel>');
+    expect(systemBlocks({ ...ctx({ genre: 'whatsapp' }, 'casual'), refs: { sources: refs.sources, principles: refs.principles, examples: refs.examples } })[1]).toContain('<channel>No guide for this channel.</channel>');
+  });
+
+  it('keep the block fixed per channel, so it stays cached across people and texts', () => {
+    const base = chat();
+    expect(systemBlocks(ctx({ genre: 'whatsapp', text: 'Hola Lu, ¿cómo andás?', profile: { cvMarkdown: CV_EN } }, 'casual'))[1]).toBe(base);
+  });
+
+  it('carry new prompt versions, since every stage shows the block', () => {
+    const c = ctx({ genre: 'whatsapp' }, 'casual');
+    expect(planPrompt(c, []).promptVersion).toBe('rewrite-plan@5');
+    expect(editPrompt(c, plan).promptVersion).toBe('rewrite-edit@5');
+    expect(stylePrompt(c).promptVersion).toBe('rewrite-style@5');
+    expect(singleCallPrompt(c, []).promptVersion).toBe('rewrite-single@6');
   });
 });
