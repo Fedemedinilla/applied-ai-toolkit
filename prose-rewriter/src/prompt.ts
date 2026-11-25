@@ -28,7 +28,7 @@ import type { Finding } from '../../slop-lint/src/types.ts';
 import { channelFor, principlesFor, type Channel, type Example, type Principle, type Source } from '../../style-refs/src/index.ts';
 import { splitSentences, type Sentence } from './edits.ts';
 import { wrapData } from './injection.ts';
-import { DiagnoseOutput, EditOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.ts';
+import { DiagnoseOutput, DraftOutput, EditOutput, OutlineOutput, PlanOutput, STYLE_MAX_EDITS, styleOutput } from './outputs.ts';
 import { factSheet } from './rubric.ts';
 import { shapeLines, type Shape } from './shape.ts';
 import type { RewriteTask } from './tasks.ts';
@@ -263,6 +263,80 @@ export function diagnosePrompt(c: PromptContext, findings: readonly Finding[], s
     system: systemBlocks(c),
     messages: conversation(DIAGNOSE_TASK, [textBlock(sentences), '', head, ...bullets(shapeLines(shape)), '', findingLines(sentences, findings)]),
     schema: DiagnoseOutput,
+  };
+}
+
+/** The outline's and the draft's own versions (cohesion plan, steps 3 and 4). */
+export const OUTLINE_PROMPT_VERSION = 'rewrite-outline@1';
+export const DRAFT_PROMPT_VERSION = 'rewrite-draft@1';
+
+/** The diagnosis as data lines: it quotes the text, so it travels inside a <texto> block. */
+function diagnosisBlock(d: DiagnoseOutput, shape: Shape): string {
+  const said = (q: DiagnoseOutput['purpose']) => (q.found ? `«${q.quote}»: ${q.note}` : `not stated: ${q.note}`);
+  const lines = [
+    `purpose: ${said(d.purpose)}`,
+    `reader's need: ${said(d.readerNeed)}`,
+    ...d.gaps.map((g) => `gap after [${g.afterSentenceId}]: ${g.why}`),
+    `opening ${d.opening.works ? 'works' : 'does not work'}: ${d.opening.why}`,
+    `closing ${d.closing.works ? 'works' : 'does not work'}: ${d.closing.why}`,
+    ...d.artificial.map((x) => `reads as generated in [${x.sentenceId}]: «${x.quote}»: ${x.why}`),
+    ...shapeLines(shape).map((l) => `shape: ${l}`),
+  ];
+  return ['DIAGNOSIS (from the diagnosis step and code)', wrapData('texto', lines.join('\n'))].join('\n');
+}
+
+const OUTLINE_TASK = [
+  'TASK: outline',
+  'Plan the whole message before it is written, from the DIAGNOSIS. Write no sentence of it.',
+  '- parts, in reading order: an opening that says why the writer writes to this reader; a bridge to what the reader needs; one to three results, each tied to that need; a next step. Leave out a part the text gives nothing for.',
+  '- each part says its intent and lists the facts it uses, each quoted exactly from where it comes: "text" for <texto>, "cv" for <perfil>, "recipient" for the recipient. A fact you cannot quote does not exist.',
+  '- every fact of the TEXT stays somewhere in the message: the checks revert a draft that loses one.',
+  '- drop: the sentenceIds whose words the message no longer needs (a stock formula, hype, filler). Their facts, if any, move to a part.',
+].join('\n');
+
+/** The outline (cohesion plan, step 3), on the plan's task. */
+export function outlinePrompt(c: PromptContext, diagnosis: DiagnoseOutput, shape: Shape): StagePrompt<typeof OutlineOutput> {
+  const sentences = splitSentences(c.input.text, c.input.lang);
+  return {
+    task: 'rewrite.plan',
+    promptVersion: OUTLINE_PROMPT_VERSION,
+    system: systemBlocks(c),
+    messages: conversation(OUTLINE_TASK, [textBlock(sentences), '', diagnosisBlock(diagnosis, shape)]),
+    schema: OutlineOutput,
+  };
+}
+
+/** The outline as data lines for the draft. */
+function outlineBlock(o: OutlineOutput): string {
+  const lines = o.parts.map((p, i) => `${i + 1}. ${p.role}: ${p.intent}${p.facts.length === 0 ? '' : ` | facts: ${p.facts.map((f) => `«${f.quote}» (${f.from})`).join('; ')}`}`);
+  if (o.drop.length > 0) lines.push(`drop the words of: ${o.drop.map((id) => `[${id}]`).join(', ')}`);
+  return ['OUTLINE (from the outline step)', wrapData('texto', lines.join('\n'))].join('\n');
+}
+
+/** The draft's task: what to write, then the closing constraint and the check before answering. */
+function draftTask(shape: Shape, guideWords: { min: number; max: number } | null, maxSentences: number | null): string {
+  return [
+    'TASK: draft',
+    'Write the BODY of the message, following the OUTLINE part by part: no greeting and no sign-off or signature, since the writer\'s own are kept around it.',
+    `- Length: ${guideWords === null ? 'about as long as the original body' : `${guideWords.min} to ${guideWords.max} words`}. Paragraphs of ${maxSentences === null ? 'two to four' : `at most ${maxSentences}`} sentences, separated by a blank line.`,
+    '- Each sentence leads to the next: join cause and consequence, and tie each result to what the reader needs. Vary the length of the sentences, and prefer a verb to an adjective.',
+    '- Match the channel\'s canonical sample in cadence, density and closeness, never in content. Keep the treatment and the variety of the VOICE.',
+    '- Use only the facts the OUTLINE lists, each as stated, and keep every fact of the TEXT.',
+    'Do not add an introduction, a generic closing or self-praising adjectives. End on the next step.',
+    'Before answering, check: the first sentence says why the writer writes to this reader; each result is tied to what the reader needs; the length fits the channel; no fact is outside <perfil> and <texto>.',
+    `The original body measured ${shape.words} words.`,
+  ].join('\n');
+}
+
+/** The draft (cohesion plan, step 4), on the edit's task. */
+export function draftPrompt(c: PromptContext, diagnosis: DiagnoseOutput, outline: OutlineOutput, shape: Shape, guide: { words: { min: number; max: number }; maxSentences: number } | null): StagePrompt<typeof DraftOutput> {
+  const sentences = splitSentences(c.input.text, c.input.lang);
+  return {
+    task: 'rewrite.edit',
+    promptVersion: DRAFT_PROMPT_VERSION,
+    system: systemBlocks(c),
+    messages: conversation(draftTask(shape, guide?.words ?? null, guide?.maxSentences ?? null), [textBlock(sentences), '', diagnosisBlock(diagnosis, shape), '', outlineBlock(outline)]),
+    schema: DraftOutput,
   };
 }
 
