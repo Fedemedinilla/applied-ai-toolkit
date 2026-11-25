@@ -12,13 +12,14 @@ describe('the public entry', () => {
     'injectionFlags', 'wrapData', 'unwrapData', 'restoreData',
     'taskConfig', 'callSettings', 'gatewayModelClient',
     'systemBlocks', 'planPrompt', 'editPrompt', 'stylePrompt', 'styleOutput',
+    'diagnose', 'diagnosePrompt', 'measureShape', 'shapeLines', 'voiceKeepLines', 'spainMarks',
     'rewrite',
   ])('exports %s', (name) => {
     expect(typeof (entry as Record<string, unknown>)[name]).toBe('function');
   });
 
-  it('exports the four gateway tasks and their measured caps', () => {
-    expect(entry.REWRITE_TASKS).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
+  it('exports the gateway tasks and their measured caps', () => {
+    expect(entry.REWRITE_TASKS).toEqual(['rewrite.diagnose', 'rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
     expect(Object.keys(entry.TASK_CONFIGS)).toEqual([...entry.REWRITE_TASKS]);
     expect(entry.REWRITE_CAPS).toHaveProperty('monthlyUsd');
   });

@@ -172,3 +172,22 @@ export function editProblem(e: z.infer<typeof EditShape>): string | null {
   if (!parsed.success) return parsed.error.issues[0]?.message ?? 'the edit does not satisfy the schema';
   return modelEditProblem(e);
 }
+
+/** A reason the text states, quoted from it, the recipient or the goal; found false and an empty quote when none does. */
+const Quoted = z.strictObject({ found: z.boolean(), quote: z.string(), note: z.string().min(1) });
+const Verdict = z.strictObject({ works: z.boolean(), why: z.string().min(1) });
+
+/**
+ * The diagnosis (cohesion plan, step 2): a reading of the whole message, with no text written for
+ * it. diagnose.ts keeps only what the model can back (diagnosisProblems): a quote that is in the
+ * sources, and gaps and sentences that exist.
+ */
+export const DiagnoseOutput = z.strictObject({
+  purpose: Quoted,
+  readerNeed: Quoted,
+  gaps: z.array(z.strictObject({ afterSentenceId: z.number().int().nonnegative(), why: z.string().min(1) })),
+  opening: Verdict,
+  closing: Verdict,
+  artificial: z.array(z.strictObject({ sentenceId: z.number().int().nonnegative(), quote: z.string().min(1), why: z.string().min(1) })),
+});
+export type DiagnoseOutput = z.infer<typeof DiagnoseOutput>;

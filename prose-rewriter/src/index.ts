@@ -11,6 +11,8 @@
  * entry does not export.
  */
 export { rewrite } from './rewrite.ts';
+export { diagnose, DIAGNOSE_PROMPT_VERSION, type DiagnoseOptions, type Diagnosis } from './diagnose.ts';
+export { measureShape, shapeLines, type Shape, type ShapeProblem, type ShapeProblemKind } from './shape.ts';
 export {
   Change,
   defaultMode,
@@ -38,6 +40,7 @@ export {
   type Treatment,
   type VoiceContext,
   type VoiceProfile,
+  spainMarks,
   voiceKeepLines,
   voicePromptLines,
   voiceProfile,
@@ -110,6 +113,7 @@ export {
   type UserClaim,
 } from './rubric.ts';
 export {
+  DiagnoseOutput,
   EDIT_EXTRA_SENTENCES,
   EditOutput,
   PLAN_ACTIONS,
@@ -121,6 +125,7 @@ export {
   type StyleOutput,
 } from './outputs.ts';
 export {
+  diagnosePrompt,
   editPrompt,
   HARD_RULES,
   planPrompt,

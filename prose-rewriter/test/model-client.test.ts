@@ -14,8 +14,8 @@ const JOB_B = '00000000-0000-4000-8000-00000000b001';
 const conversation = { system: [{ type: 'text' as const, text: 'Judge each line.' }], messages: [{ role: 'user' as const, content: '1. Hola.' }] };
 
 describe('the rewrite tasks', () => {
-  it('names the four tasks of the design, each with a config the gateway accepts', () => {
-    expect(REWRITE_TASKS).toEqual(['rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
+  it('names the tasks of the design and the diagnosis (cohesion plan, step 2), each with a config the gateway accepts', () => {
+    expect(REWRITE_TASKS).toEqual(['rewrite.diagnose', 'rewrite.plan', 'rewrite.edit', 'rewrite.style', 'rewrite.judge']);
     for (const task of REWRITE_TASKS) {
       const config = TaskConfig.parse(TASK_CONFIGS[task]);
       expect(config.task).toBe(task);
@@ -25,6 +25,7 @@ describe('the rewrite tasks', () => {
   });
 
   it('edits with claude-fable-5-2 and judges with claude-sonnet-5-5 (D2)', () => {
+    expect(taskConfig('rewrite.diagnose').model).toBe('claude-fable-5-2');
     expect(taskConfig('rewrite.plan').model).toBe('claude-fable-5-2');
     expect(taskConfig('rewrite.edit').model).toBe('claude-fable-5-2');
     expect(taskConfig('rewrite.style').model).toBe('claude-fable-5-2');
@@ -35,6 +36,7 @@ describe('the rewrite tasks', () => {
   it('runs every task at effort medium, the level measured in the fourth F6b run (D2)', () => {
     // medium is what Agency-Seeker's Fable 5.2 writer runs at (WRITER_EFFORT) and what evals' judge uses.
     expect(REWRITE_TASKS.map((task) => [task, taskConfig(task).effort])).toEqual([
+      ['rewrite.diagnose', 'medium'],
       ['rewrite.plan', 'medium'],
       ['rewrite.edit', 'medium'],
       ['rewrite.style', 'medium'],

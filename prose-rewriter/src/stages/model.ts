@@ -22,15 +22,16 @@ import { ResponseError, type CallMeta, type Conversation, type Gateway } from '.
 import type { Finding } from '../../../slop-lint/src/types.ts';
 import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
-import { EditReply, planFromReply, PlanReply, styleReply, type EditOutput, type PlanOutput } from '../outputs.ts';
-import { editPrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
+import { EditReply, planFromReply, PlanReply, styleReply, type DiagnoseOutput, type EditOutput, type PlanOutput } from '../outputs.ts';
+import { diagnosePrompt, editPrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
+import type { Shape } from '../shape.ts';
 import type { Edit } from '../types.ts';
 
 /**
  * PROVISIONAL output budgets per stage, in tokens, thinking included: starting values under the
  * gateway's limit without streaming (16 000), not measurements. F6 measures the real replies.
  */
-export const STAGE_MAX_TOKENS = { 'rewrite.plan': 4000, 'rewrite.edit': 6000, 'rewrite.style': 4000 } as const;
+export const STAGE_MAX_TOKENS = { 'rewrite.diagnose': 4000, 'rewrite.plan': 4000, 'rewrite.edit': 6000, 'rewrite.style': 4000 } as const;
 
 /** How many times rewrite() makes a stage's call: once, and once more when the reply cannot be read. */
 export const STAGE_ATTEMPTS = 2;
@@ -88,6 +89,11 @@ async function call<S extends z.ZodType>(m: ModelStages, p: StagePrompt<S>, mess
     messages,
   });
   return result.data;
+}
+
+/** The diagnosis (cohesion plan, step 2): the reading as parsed; diagnose.ts checks it. */
+export async function diagnoseStage(m: ModelStages, findings: readonly Finding[], shape: Shape): Promise<DiagnoseOutput> {
+  return call(m, diagnosePrompt(m.prompt, findings, shape));
 }
 
 /** S2. */
