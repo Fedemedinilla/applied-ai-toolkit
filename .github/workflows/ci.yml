@@ -93,8 +93,15 @@ jobs:
           python3 --version
           python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "site-check needs Python 3.11 or newer")'
 
+      # The packaging test builds the sdist with setuptools 77 or newer (SPDX license metadata).
+      # Installed here and required, so that test cannot skip in CI.
+      - name: setuptools for the site-check build test
+        run: python3 -m pip install --disable-pip-version-check 'setuptools>=77'
+
       - name: site-check tests
         run: npm run test:python
+        env:
+          SITECHECK_REQUIRE_BUILD: '1'
 
       # The docs must pass their own linter: no tier 1 finding in any README or the case study.
       - name: Lint the docs

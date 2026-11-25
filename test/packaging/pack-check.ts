@@ -31,7 +31,8 @@
  *    module's, through the TypeScript compiler API. A JSON entry is imported with
  *    `{ type: 'json' }` and must be byte for byte its source file.
  * 5. Typechecks a small consumer against the installed package with the repository's strict
- *    options and `skipLibCheck: false`. A `@ts-expect-error` line in it fails if the types
+ *    options and `skipLibCheck: false`, emitting its declarations, so every type a public
+ *    function returns can be named from the package entry. A `@ts-expect-error` line in it fails if the types
  *    collapse to `any`.
  * 6. For a package with a bin, runs the installed bin and the source CLI (`node <folder>/cli.ts`)
  *    on the same inputs and compares stdout, stderr and the exit code. A run may state the exit
@@ -148,11 +149,23 @@ lint('text', { lang: 'fr' });
     name: '@fedemedinilla/claude-gateway',
     entries: [{ subpath: '.', source: 'src/index.ts' }],
     linkDependencies: ['@anthropic-ai/sdk', 'zod'],
-    consumer: `import { createGateway, structuredFormat, type Gateway, type GatewayDeps, type GatewayRequest } from '@fedemedinilla/claude-gateway';
+    consumer: `import { ApiError, checkCaps, costUsd, createGateway, ResponseError, responseText, structuredFormat, type Gateway, type GatewayDeps, type GatewayRequest } from '@fedemedinilla/claude-gateway';
 import { z } from 'zod';
 
 const Summary = z.object({ title: z.string(), points: z.array(z.string()) });
+// Values inferred from the package's functions, exported so their types must be nameable.
 export const format = structuredFormat(Summary);
+export const validation = format.validate('{}');
+declare const capInput: Parameters<typeof checkCaps>[0];
+export const unpriced = checkCaps(capInput);
+export const window = [unpriced.userDay];
+export const cost = costUsd([], new Map());
+declare const apiFailure: ConstructorParameters<typeof ApiError>[0];
+export const failures = [apiFailure];
+declare const responseFailure: ConstructorParameters<typeof ResponseError>[2];
+export const responses = [responseFailure];
+declare const text: Parameters<typeof responseText>[0];
+export const blocks = [...text];
 declare const deps: GatewayDeps;
 declare const request: GatewayRequest;
 const gateway: Gateway = createGateway(deps);
@@ -172,12 +185,17 @@ export async function wrong(): Promise<string> {
     name: '@fedemedinilla/import-fences',
     entries: [{ subpath: '.', source: 'src/index.ts' }],
     linkDependencies: ['typescript', 'zod'],
-    consumer: `import { check, defineConfig, memorySource, parseConfig, toSarif, type CheckResult, type FencesConfigInput, type SarifLog } from '@fedemedinilla/import-fences';
+    consumer: `import { check, defineConfig, memorySource, parseConfig, stringsContaining, toSarif, type CheckResult, type FencesConfigInput, type SarifLog, type SarifResult } from '@fedemedinilla/import-fences';
 
 const input: FencesConfigInput = defineConfig({ groups: { all: { include: ['src/**'] } }, rules: [{ rule: 'dynamic-import', group: 'all' }] });
 const result: CheckResult = check(parseConfig(input), memorySource({ 'src/a.ts': '' }));
 export const count: number = result.violations.length;
 export const log: SarifLog = toSarif(result, { root: '.', configPath: 'fences.config.json' });
+// Values inferred from the package's functions, exported so their types must be nameable.
+declare const sarifResult: SarifResult;
+export const regions = sarifResult.locations.map((location) => location.physicalLocation.region);
+declare const file: Parameters<typeof stringsContaining>[0];
+export const found = stringsContaining(file, 'secret');
 // @ts-expect-error nope is not a rule; this line fails if the types collapse to any.
 defineConfig({ groups: {}, rules: [{ rule: 'nope', group: 'all' }] });
 `,
@@ -505,7 +523,9 @@ console.log(JSON.stringify({ parsed: m.default, text: readFileSync(file, 'utf8')
     say(`entry ${entry.subpath}: imports as JSON by package name, byte for byte ${entry.source}`);
   }
 
-  // 5. A strict consumer typechecks against the installed declarations.
+  // 5. A strict consumer typechecks against the installed declarations, and emits its own: a
+  // consumer that exports a value inferred from the package (a structured format, a config) must
+  // be able to name its type, or tsc stops with TS2742 in any project that publishes .d.ts files.
   writeFileSync(join(consumer, 'consumer.ts'), spec.consumer);
   writeFileSync(
     join(consumer, 'tsconfig.json'),
@@ -520,7 +540,9 @@ console.log(JSON.stringify({ parsed: m.default, text: readFileSync(file, 'utf8')
           noUncheckedIndexedAccess: true,
           exactOptionalPropertyTypes: true,
           verbatimModuleSyntax: true,
-          noEmit: true,
+          declaration: true,
+          emitDeclarationOnly: true,
+          outDir: 'types-out',
           skipLibCheck: false,
           types: ['node'],
         },

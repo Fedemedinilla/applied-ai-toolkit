@@ -16,7 +16,7 @@ import { diskSource } from './src/files.ts';
 import { formatText } from './src/report.ts';
 import { toSarif } from './src/sarif.ts';
 
-const USAGE = 'usage: node import-fences/cli.ts [--config <import-fences.config.ts|.json>] [--json | --sarif [--sarif-base <dir>]]';
+const USAGE = 'usage: import-fences [--config <import-fences.config.ts|.json>] [--json | --sarif [--sarif-base <dir>]]';
 const DEFAULT_CONFIGS = ['import-fences.config.ts', 'import-fences.config.json'] as const;
 
 async function main(): Promise<number> {

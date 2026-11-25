@@ -1,7 +1,7 @@
-export { capWindows, checkCaps, type CapWindows } from './caps.ts';
+export { capWindows, checkCaps, type CapCheck, type CapWindows, type Unpriced, type UnpricedWindow } from './caps.ts';
 export { CLAUDE_API_URL, createClaudeClient, type ClaudeClientOptions } from './client.ts';
 export { AccountCaps, CallConfig, GlobalCaps, TaskConfig, UsageTotals } from './config.ts';
-export { costUsd, estimateInputTokens, PriceRow, pricesInForce, splitUsage, type AttemptUsage, type InputParts, type Price, type TokenTotals } from './cost.ts';
+export { costUsd, estimateInputTokens, PriceRow, pricesInForce, splitUsage, type AttemptKind, type AttemptUsage, type Cost, type InputParts, type Price, type TokenTotals } from './cost.ts';
 export {
   ApiError,
   CapError,
@@ -14,8 +14,10 @@ export {
   ResponseError,
   SetupError,
   type ApiErrorCode,
+  type ApiFailure,
   type CapCode,
   type ConfigErrorCode,
+  type FailedResponse,
   type GatewayErrorCode,
   type OutputProblem,
   type ResponseErrorCode,
@@ -25,6 +27,7 @@ export {
   MAX_TOKENS_WITHOUT_STREAMING,
   responseText,
   type CallMeta,
+  type ContentBlock,
   type Conversation,
   type FailureEvent,
   type Gateway,
@@ -62,5 +65,5 @@ export {
 } from './models.ts';
 export { otelAttributes, otelObserver, type CallObserver, type CallOperation, type CallSpan, type OtelSpan, type OtelTracer } from './observe.ts';
 export { createPostgresStores, type PgQueryable, type PostgresStores } from './postgres-store.ts';
-export { jsonLinesLog, systemClock, type Clock, type ConfigStore, type EventLog, type PriceStore, type UsageRow, type UsageStore, type UsageWindows } from './ports.ts';
-export { structuredFormat, toApiJsonSchema } from './schema.ts';
+export { jsonLinesLog, systemClock, type Clock, type ConfigStore, type EventLog, type LogData, type LogValue, type PriceStore, type UsageRow, type UsageStore, type UsageWindows } from './ports.ts';
+export { structuredFormat, toApiJsonSchema, type StructuredFormat, type Validation } from './schema.ts';

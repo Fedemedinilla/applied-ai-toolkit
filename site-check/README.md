@@ -285,7 +285,7 @@ What the tests cover:
 - the evidence gate, the colour table and its exceptions, the text control;
 - the full CLI against the fake site: the report, the annex, `run.json`, exit codes, the exclusion list, `--rerender`, no personal data and no key in any output file;
 - the stored-run format: the old example migrates to exactly the new one and back, no old name is left in a written file, every trace resolves in the file it is written in, and an old run still rerenders and compares;
-- the two catalogs key by key, the English report against the stored run, the schema, the SARIF structure and level mapping, and the packaging (the sdist is built offline from a copy of the sources);
+- the two catalogs key by key, the English report against the stored run, the schema, the SARIF structure and level mapping, and the packaging (the sdist is built offline from a copy of the folder with setuptools 77 or newer, ships no tests, examples or `site_check.py`, and raises no deprecation warning);
 - determinism: byte-identical output for the same observations and clock, every printed number traced to its measurement on the fake-school run, and `examples/` equal to a fresh build;
 - `--compare` on the fake school before and after its fixes: the rows, counts and colour changes typed by hand, every stored value resolved through its trace (also with the mail rows reordered), each refusal case including one, two and four valid runs and missing keys, a lab-only run that must not reach the field rows, origin-level field data, both rounding cases of the change column, a control that failed on one date, the 28-day overlap note, the text control, and `examples/after/` equal to a fresh build.
 

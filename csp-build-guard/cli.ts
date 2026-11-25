@@ -15,7 +15,7 @@ import { toSarif } from './src/sarif.ts';
 import { InputError } from './src/site.ts';
 
 const USAGE =
-  'usage: node csp-build-guard/cli.ts --dir <build folder> [--config <csp-guard.config.json|.ts>] [--json | --sarif [--sarif-base <dir>]]';
+  'usage: csp-build-guard --dir <build folder> [--config <csp-guard.config.json|.ts>] [--json | --sarif [--sarif-base <dir>]]';
 
 async function main(): Promise<number> {
   let values: { dir?: string; config?: string; json?: boolean; sarif?: boolean; 'sarif-base'?: string; help?: boolean };
