@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lint } from '../../slop-lint/src/lint.ts';
-import { Example, GENRES, LANGS } from '../../style-refs/src/index.ts';
+import { Channel, Example, GENRES, LANGS } from '../../style-refs/src/index.ts';
 import { checkFictional } from './fictional.ts';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -92,6 +92,31 @@ describe('the examples on disk', () => {
     for (const e of examples) {
       const text = [e.before, e.after, e.previousMessage ?? '', e.notes].join('\n');
       expect(checkFictional(`style-refs/examples/${e.lang}.json#${e.id}`, text), e.id).toEqual([]);
+    }
+  });
+});
+
+const channels = LANGS.flatMap((lang) => (JSON.parse(read(`style-refs/channels/${lang}.json`)) as unknown[]).map((c) => Channel.parse(c)));
+
+describe('the channel guides on disk', () => {
+  it('have a canonical sample with no level 1 finding of slop-lint for its channel and variety', () => {
+    for (const c of channels) {
+      const result = lint(c.canonical, { lang: c.lang, genre: c.genre, ...(c.variety === undefined ? {} : { variety: c.variety }) });
+      expect(result.findings.filter((f) => f.level === 1).map((f) => `${f.ruleId} ${f.match}`), c.id).toEqual([]);
+    }
+  });
+
+  it('name no number, person, company or tool in the canonical sample, so a prompt cannot lift a fact from it', () => {
+    for (const c of channels) {
+      expect(numbers(c.canonical), c.id).toEqual([]);
+      expect(names(c.canonical), c.id).toEqual([]);
+    }
+  });
+
+  it('carry no real address, phone, host or owner identifier', () => {
+    for (const c of channels) {
+      const text = [c.persona, c.reader, c.shape.opening, c.shape.closing, c.canonical].join('\n');
+      expect(checkFictional(`style-refs/channels/${c.lang}.json#${c.id}`, text), c.id).toEqual([]);
     }
   });
 });

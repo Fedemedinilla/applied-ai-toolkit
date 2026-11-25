@@ -4,13 +4,23 @@ style-refs holds the writing references of the prose rewriter (`prose-rewriter/`
 
 This folder is at phase F3 of its design. `sources.json` lists every author and register guide of the design, excluded ones included, and `validateRefs()` checks the licensing rules. `principlesFor()` picks the principles a prompt for one text may show. All three layers hold data.
 
-## Three layers
+## Three layers and the channel guides
 
 The design keeps literature away from the register of a mail in 2026, so the references come in three layers, each with its own use in the prompt:
 
 1. **Principles** (`principles/`) are sentences we wrote, each with its genres, registers, check and sources. They are the main way a source reaches a prompt.
 2. **Annotated excerpts** (`excerpts/`) are one or two sentences of a public-domain work, each with what it teaches and what not to imitate. They are not few-shot examples, and they reach a prompt only once the eval shows they help (design section 5).
 3. **Examples** (`examples/`) are before and after pairs we wrote over the fictional CVs of `prose-rewriter/evals/cases/cv/`. They are the only few-shot examples, so the rewriter imitates our own text and never a story.
+
+Next to the layers, **channel guides** (`channels/`) say how a mail, a follow-up or a WhatsApp message reads, as things to do. Each guide has five parts:
+
+- a persona in one sentence;
+- who reads it and how, which is why the shape matters;
+- the shape, which is a word range, the paragraphs and their sentences, how it opens and how it closes;
+- a canonical sample of two to five sentences in the sound the channel wants;
+- `fictional: true`.
+
+A cover letter has no guide (decision of 21/11/2026). `validateRefs` checks the guides and `channelFor` picks the one for a text, never one of another register or variety. `prose-rewriter/test/examples.test.ts` lints each canonical sample for its channel and checks that it names no number, person, company or tool, so a prompt cannot lift a fact from it.
 
 ## Run it
 

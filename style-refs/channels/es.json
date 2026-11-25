@@ -1,0 +1,53 @@
+[
+  {
+    "id": "es-email-neutral",
+    "genre": "email",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "persona": "Escribís como una profesional que le habla a un par: directa, cordial y sin pedir permiso para ofrecer lo que sabe hacer.",
+    "reader": "Lo lee alguien con poco tiempo, muchas veces en el celular, que decide en las primeras dos líneas si sigue leyendo; por eso cada oración tiene que preparar la siguiente.",
+    "shape": {
+      "words": { "min": 70, "max": 170 },
+      "paragraphs": { "max": 4, "maxSentences": 3 },
+      "opening": "La primera oración dice por qué le escribís a esta persona, con algo que ella o su negocio dijo o hace.",
+      "closing": "Termina en un próximo paso fácil de aceptar, sin fecha fija salvo que el lector la haya propuesto."
+    },
+    "canonical": "Te escribo porque vi que están renovando el sitio, y es justo el tipo de trabajo que más disfruto. Lo primero que hago en estos casos es medir qué tarda en cargar y por qué, antes de tocar nada. Si te sirve, te cuento cómo lo encararía con el de ustedes.",
+    "fictional": true
+  },
+  {
+    "id": "es-follow-up-neutral",
+    "genre": "follow-up",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "neutral",
+    "persona": "Escribís como alguien que retoma una conversación con respeto por el tiempo del otro, sin disculparse por volver a escribir.",
+    "reader": "Lo lee alguien que ya recibió tu mensaje anterior y no lo contestó, quizás porque se le pasó; necesita recordar en una línea de qué se trataba y tener una forma fácil de responder, sea que sí o que no.",
+    "shape": {
+      "words": { "min": 40, "max": 120 },
+      "paragraphs": { "max": 3, "maxSentences": 3 },
+      "opening": "La primera oración recuerda en concreto qué preguntaba o proponía el mensaje anterior.",
+      "closing": "Dejá una salida fácil para las dos respuestas posibles y firmá igual que en el mensaje anterior."
+    },
+    "canonical": "Te vuelvo a escribir por lo que te pregunté hace unos días sobre el mantenimiento del sitio. Si ahora no es el momento, decímelo sin problema y lo retomamos más adelante. Y si sí, te paso lo que necesites para decidir.",
+    "fictional": true
+  },
+  {
+    "id": "es-whatsapp-casual",
+    "genre": "whatsapp",
+    "lang": "es",
+    "variety": "rioplatense",
+    "register": "casual",
+    "persona": "Escribís como le escribirías por chat a un conocido: corto, cálido y al grano.",
+    "reader": "Se lee en el celular, entre otros chats; un mensaje largo se deja para después y a veces no se contesta nunca, así que la pregunta o el pedido van adelante y se pueden responder en una línea.",
+    "shape": {
+      "words": { "min": 15, "max": 70 },
+      "paragraphs": { "max": 2, "maxSentences": 4 },
+      "opening": "Un saludo corto y el motivo en la misma línea o en la siguiente.",
+      "closing": "Cerrá dejando fácil la respuesta, sin despedida formal ni firma."
+    },
+    "canonical": "Hola, ¿cómo andás? Te hago una consulta rápida: ¿sabés si en tu trabajo están buscando a alguien para el sitio? Si no, no pasa nada, y si se te ocurre alguien, avisame y le escribo yo.",
+    "fictional": true
+  }
+]
