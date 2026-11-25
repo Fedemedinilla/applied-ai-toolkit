@@ -15,11 +15,11 @@
  * back, with no reading.
  */
 import { ResponseError } from '../../gateway/src/index.ts';
-import { channelFor } from '../../style-refs/src/index.ts';
+import { channelFor, type Channel } from '../../style-refs/src/index.ts';
 import type { DiagnoseOutput } from './outputs.ts';
 import type { PromptRefs } from './prompt.ts';
 import { measureShape, type Shape } from './shape.ts';
-import { analyse, prepare } from './stages/analyse.ts';
+import { analyse, prepare, type Analysis } from './stages/analyse.ts';
 import { diagnoseStage, metered, STAGE_ATTEMPTS, type ModelStages, type Usage } from './stages/model.ts';
 import { RewriteInput, type RewriteOptions } from './types.ts';
 
@@ -39,15 +39,11 @@ export type DiagnoseOptions = Pick<RewriteOptions, 'gateway' | 'refs' | 'userId'
 
 const EMPTY_REFS: PromptRefs = { principles: [], sources: [], examples: [] };
 
-const squash = (s: string): string => s.normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim();
+export const squash = (s: string): string => s.normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim();
 
 export async function diagnose(raw: RewriteInput, options: DiagnoseOptions): Promise<Diagnosis> {
   const a = analyse(prepare(RewriteInput.parse(raw)));
-  const { genre, lang, variety } = a.input;
   const refs = options.refs ?? EMPTY_REFS;
-  const guide = channelFor(refs.channels ?? [], { genre, lang, register: a.register, ...(variety === undefined ? {} : { variety }) });
-  const shape = measureShape(a.text, lang, guide);
-
   const usage: Usage = { calls: 0, costUsd: 0 };
   const m: ModelStages = {
     gateway: metered(options.gateway, usage),
@@ -55,6 +51,18 @@ export async function diagnose(raw: RewriteInput, options: DiagnoseOptions): Pro
     userId: options.userId ?? null,
     jobId: options.jobId ?? null,
   };
+  return { ...(await readMessage(a, m)), usage };
+}
+
+/** The guide of the analysed text's channel, or undefined. */
+export function guideOf(a: Analysis, refs: PromptRefs): Channel | undefined {
+  const { genre, lang, variety } = a.input;
+  return channelFor(refs.channels ?? [], { genre, lang, register: a.register, ...(variety === undefined ? {} : { variety }) });
+}
+
+/** The diagnosis over an analysis and stages rewrite() already built; diagnose() and the drafted strategy share it. */
+export async function readMessage(a: Analysis, m: ModelStages): Promise<Omit<Diagnosis, 'usage'>> {
+  const shape = measureShape(a.text, a.input.lang, guideOf(a, m.prompt.refs));
   let reply: DiagnoseOutput | null = null;
   for (let attempt = 1; attempt <= STAGE_ATTEMPTS && reply === null; attempt++) {
     try {
@@ -63,7 +71,7 @@ export async function diagnose(raw: RewriteInput, options: DiagnoseOptions): Pro
       if (!(error instanceof ResponseError && error.code === 'invalid_output')) throw error;
     }
   }
-  if (reply === null) return { shape, reading: null, dropped: [], unread: true, usage };
+  if (reply === null) return { shape, reading: null, dropped: [], unread: true };
 
   const r = a.input.recipient;
   const sources = [a.text, a.input.goal, r?.name, r?.org, r?.role, r?.previousMessage].filter((x): x is string => x !== undefined).map(squash);
@@ -88,5 +96,5 @@ export async function diagnose(raw: RewriteInput, options: DiagnoseOptions): Pro
     if (!ok) dropped.push(`artificial in sentence ${x.sentenceId}: «${x.quote}» is not in that sentence`);
     return ok;
   });
-  return { shape, reading: { ...reply, purpose: quoted('purpose'), readerNeed: quoted('readerNeed'), gaps, artificial }, dropped, unread: false, usage };
+  return { shape, reading: { ...reply, purpose: quoted('purpose'), readerNeed: quoted('readerNeed'), gaps, artificial }, dropped, unread: false };
 }

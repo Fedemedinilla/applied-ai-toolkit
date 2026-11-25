@@ -22,8 +22,8 @@ import { ResponseError, type CallMeta, type Conversation, type Gateway } from '.
 import type { Finding } from '../../../slop-lint/src/types.ts';
 import type { Sentence } from '../edits.ts';
 import { wrapData } from '../injection.ts';
-import { EditReply, planFromReply, PlanReply, styleReply, type DiagnoseOutput, type EditOutput, type PlanOutput } from '../outputs.ts';
-import { diagnosePrompt, editPrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
+import { EditReply, planFromReply, PlanReply, styleReply, type DiagnoseOutput, type DraftOutput, type EditOutput, type OutlineOutput, type PlanOutput } from '../outputs.ts';
+import { diagnosePrompt, draftPrompt, editPrompt, outlinePrompt, planPrompt, singleCallPrompt, stylePrompt, type PromptContext, type StagePrompt } from '../prompt.ts';
 import type { Shape } from '../shape.ts';
 import type { Edit } from '../types.ts';
 
@@ -94,6 +94,16 @@ async function call<S extends z.ZodType>(m: ModelStages, p: StagePrompt<S>, mess
 /** The diagnosis (cohesion plan, step 2): the reading as parsed; diagnose.ts checks it. */
 export async function diagnoseStage(m: ModelStages, findings: readonly Finding[], shape: Shape): Promise<DiagnoseOutput> {
   return call(m, diagnosePrompt(m.prompt, findings, shape));
+}
+
+/** The outline (cohesion plan, step 3), on rewrite.plan. */
+export async function outlineStage(m: ModelStages, diagnosis: DiagnoseOutput, shape: Shape): Promise<OutlineOutput> {
+  return call(m, outlinePrompt(m.prompt, diagnosis, shape));
+}
+
+/** The draft (cohesion plan, step 4), on rewrite.edit. */
+export async function draftStage(m: ModelStages, diagnosis: DiagnoseOutput, outline: OutlineOutput, shape: Shape, guide: Parameters<typeof draftPrompt>[4]): Promise<DraftOutput> {
+  return call(m, draftPrompt(m.prompt, diagnosis, outline, shape, guide));
 }
 
 /** S2. */

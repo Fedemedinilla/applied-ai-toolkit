@@ -191,3 +191,30 @@ export const DiagnoseOutput = z.strictObject({
   artificial: z.array(z.strictObject({ sentenceId: z.number().int().nonnegative(), quote: z.string().min(1), why: z.string().min(1) })),
 });
 export type DiagnoseOutput = z.infer<typeof DiagnoseOutput>;
+
+/** The parts of a message's outline, in reading order (cohesion plan, step 3). */
+export const OUTLINE_ROLES = ['opening', 'bridge', 'result', 'next-step'] as const;
+export const FACT_SOURCES = ['text', 'cv', 'recipient'] as const;
+
+/**
+ * The outline of the whole message: its parts, each with its intent and the facts it uses, quoted
+ * from where they come from, and the sentences of the original it no longer needs. rewrite.ts keeps
+ * a fact only when its quote is in its source (outlineProblems).
+ */
+export const OutlineOutput = z.strictObject({
+  parts: z
+    .array(
+      z.strictObject({
+        role: z.enum(OUTLINE_ROLES),
+        intent: z.string().min(1),
+        facts: z.array(z.strictObject({ from: z.enum(FACT_SOURCES), quote: z.string().min(1) })),
+      }),
+    )
+    .min(1),
+  drop: z.array(z.number().int().nonnegative()),
+});
+export type OutlineOutput = z.infer<typeof OutlineOutput>;
+
+/** The draft: the body of the message only; code puts back the writer's greeting and signature. */
+export const DraftOutput = z.strictObject({ body: z.string().min(1) });
+export type DraftOutput = z.infer<typeof DraftOutput>;
