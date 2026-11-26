@@ -439,7 +439,7 @@ first deliverable: a written proposal (docs/roadmap/cited-answers-proposal.md) w
 | Component | Spec |
 |---|---|
 | Corpus | Fictional (R11), e.g. the invented bicycle workshop used by evals; Markdown/plain text documents |
-| Retrieval | In-memory BM25, deterministic; baseline = naive keyword match; report recall@k for both |
+| Retrieval | In-memory BM25, deterministic; baseline = naive keyword match; report `recall@k` for both |
 | Generation | Claude Citations: `document` blocks with `citations: { enabled: true }` (all or none); response text blocks carry `citations[]` with `cited_text`, `document_index`, `start_char_index`/`end_char_index` [S23] |
 | Gateway | New mode "text with citations": no `output_config.format` (C4). Public API change → changeset + ADR. Caps/ledger semantics identical |
 | Verification (code) | For each citation: `docs[i].slice(start, end) === cited_text`; each answer sentence containing a factual claim has ≥1 citation; otherwise ABSTAIN |
@@ -492,28 +492,28 @@ Acción tuya: <U-xx si aplica>
 
 | ID | Source | URL |
 |---|---|---|
-| S1 | OWASP Top 10 for LLM Applications 2025 | https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/ |
-| S2 | GitHub Docs — Code scanning setup types | https://docs.github.com/en/code-security/concepts/code-scanning/setup-types |
-| S3 | GitHub Changelog — Default setup for all CodeQL languages | https://github.blog/changelog/2023-06-28-code-scanning-default-setup-is-now-available-for-all-codeql-supported-languages-excluding-swift/ |
-| S4 | CodeQL supported languages and frameworks | https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/ |
-| S5 | GitHub Blog — Job summaries | https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/ |
-| S6 | OpenSSF Scorecard Action / checks | https://github.com/marketplace/actions/ossf-scorecard-action · https://github.com/ossf/scorecard |
-| S7 | npm trusted publishers / GA changelog | https://docs.npmjs.com/trusted-publishers · https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/ |
-| S8 | MADR / ADR templates | https://adr.github.io/madr · https://adr.github.io/adr-templates |
-| S9 | GitHub Docs — Create a composite action | https://docs.github.com/en/actions/tutorials/create-actions/create-a-composite-action |
-| S10 | Git list — `--follow` works on a single file | https://lore.kernel.ime.usp.br/git/20080129022141.GF24004@spearce.org/t/ |
-| S11 | What hiring managers look for on GitHub | https://underdog.io/blog/what-hiring-managers-look-for-on-github |
-| S12 | What hiring managers look for in a GitHub portfolio | https://soltech.net/what-do-hiring-managers-actually-look-for-in-a-github-portfolio/ |
-| S13 | 1,000+ AI Engineer job descriptions (2026) | https://alexeyondata.substack.com/p/what-1000-job-descriptions-reveal |
-| S14 | AI Engineer skills, 3,449 postings | https://dev.to/gnana_6392e836fd500a957dc/ai-engineer-skills-companies-want-in-2026-3449-posting-analysis-5f9l |
-| S15 | GitHub Docs — Social media preview | https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview |
-| S16 | GitHub Docs — Creating diagrams (Mermaid) | https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams |
-| S17 | OWASP GenAI LLM Top 10 2026 | https://genai.owasp.org/home/resources/owasp-genai-llm-top-10-2026/ |
-| S18 | Help Net Security — OWASP 2026 LLM Top 10 | https://www.helpnetsecurity.com/2026/08/06/owasp-2026-llm-top-10-released/ |
-| S19 | Vitest — Reporters (github-actions, job summary) | https://vitest.dev/guide/reporters |
-| S20 | Martin Fowler — Architecture Decision Record | https://www.martinfowler.com/bliki/ArchitectureDecisionRecord.html |
-| S21 | GitHub Docs — Managing your profile README | https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme |
-| S22 | UAEval4RAG — Unanswerability Evaluation for RAG (ACL 2025) | https://arxiv.org/abs/2412.12300 |
-| S23 | Claude API — Citations | https://platform.claude.com/docs/en/build-with-claude/citations |
+| S1 | OWASP Top 10 for LLM Applications 2025 | [https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/) |
+| S2 | GitHub Docs — Code scanning setup types | [https://docs.github.com/en/code-security/concepts/code-scanning/setup-types](https://docs.github.com/en/code-security/concepts/code-scanning/setup-types) |
+| S3 | GitHub Changelog — Default setup for all CodeQL languages | [https://github.blog/changelog/2023-06-28-code-scanning-default-setup-is-now-available-for-all-codeql-supported-languages-excluding-swift/](https://github.blog/changelog/2023-06-28-code-scanning-default-setup-is-now-available-for-all-codeql-supported-languages-excluding-swift/) |
+| S4 | CodeQL supported languages and frameworks | [https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/](https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/) |
+| S5 | GitHub Blog — Job summaries | [https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/](https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/) |
+| S6 | OpenSSF Scorecard Action / checks | [https://github.com/marketplace/actions/ossf-scorecard-action](https://github.com/marketplace/actions/ossf-scorecard-action) · [https://github.com/ossf/scorecard](https://github.com/ossf/scorecard) |
+| S7 | npm trusted publishers / GA changelog | [https://docs.npmjs.com/trusted-publishers](https://docs.npmjs.com/trusted-publishers) · [https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/](https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/) |
+| S8 | MADR / ADR templates | [https://adr.github.io/madr](https://adr.github.io/madr) · [https://adr.github.io/adr-templates](https://adr.github.io/adr-templates) |
+| S9 | GitHub Docs — Create a composite action | [https://docs.github.com/en/actions/tutorials/create-actions/create-a-composite-action](https://docs.github.com/en/actions/tutorials/create-actions/create-a-composite-action) |
+| S10 | Git list — `--follow` works on a single file | [https://lore.kernel.ime.usp.br/git/20080129022141.GF24004@spearce.org/t/](https://lore.kernel.ime.usp.br/git/20080129022141.GF24004@spearce.org/t/) |
+| S11 | What hiring managers look for on GitHub | [https://underdog.io/blog/what-hiring-managers-look-for-on-github](https://underdog.io/blog/what-hiring-managers-look-for-on-github) |
+| S12 | What hiring managers look for in a GitHub portfolio | [https://soltech.net/what-do-hiring-managers-actually-look-for-in-a-github-portfolio/](https://soltech.net/what-do-hiring-managers-actually-look-for-in-a-github-portfolio/) |
+| S13 | 1,000+ AI Engineer job descriptions (2026) | [https://alexeyondata.substack.com/p/what-1000-job-descriptions-reveal](https://alexeyondata.substack.com/p/what-1000-job-descriptions-reveal) |
+| S14 | AI Engineer skills, 3,449 postings | [https://dev.to/gnana_6392e836fd500a957dc/ai-engineer-skills-companies-want-in-2026-3449-posting-analysis-5f9l](https://dev.to/gnana_6392e836fd500a957dc/ai-engineer-skills-companies-want-in-2026-3449-posting-analysis-5f9l) |
+| S15 | GitHub Docs — Social media preview | [https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview) |
+| S16 | GitHub Docs — Creating diagrams (Mermaid) | [https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams) |
+| S17 | OWASP GenAI LLM Top 10 2026 | [https://genai.owasp.org/home/resources/owasp-genai-llm-top-10-2026/](https://genai.owasp.org/home/resources/owasp-genai-llm-top-10-2026/) |
+| S18 | Help Net Security — OWASP 2026 LLM Top 10 | [https://www.helpnetsecurity.com/2026/08/06/owasp-2026-llm-top-10-released/](https://www.helpnetsecurity.com/2026/08/06/owasp-2026-llm-top-10-released/) |
+| S19 | Vitest — Reporters (github-actions, job summary) | [https://vitest.dev/guide/reporters](https://vitest.dev/guide/reporters) |
+| S20 | Martin Fowler — Architecture Decision Record | [https://www.martinfowler.com/bliki/ArchitectureDecisionRecord.html](https://www.martinfowler.com/bliki/ArchitectureDecisionRecord.html) |
+| S21 | GitHub Docs — Managing your profile README | [https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme](https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme) |
+| S22 | UAEval4RAG — Unanswerability Evaluation for RAG (ACL 2025) | [https://arxiv.org/abs/2412.12300](https://arxiv.org/abs/2412.12300) |
+| S23 | Claude API — Citations | [https://platform.claude.com/docs/en/build-with-claude/citations](https://platform.claude.com/docs/en/build-with-claude/citations) |
 
-Source reliability note for agents: S11–S14 are blogs/job-board analyses (indicative, not rigorous). S1–S9, S15–S16, S19, S21, S23 are primary documentation; re-fetch them before relying on exact parameters, since they change.
+Source reliability note for agents: S11–S14 are blogs/job-board analyses (indicative, not rigorous). S1–S9, S15–S16, S19, S21, S23 are primary documentation; re-fetch them before relying on exact parameters, since they change. Link check on 2026-11-26: all URLs resolved with HTTP 200 except S12 (Cloudflare blocks automated clients; opens in a browser) and S6 on github.com (cloud sessions scoped to other repositories get 403 from their proxy; use the `web-fetch` agent or a browser).
