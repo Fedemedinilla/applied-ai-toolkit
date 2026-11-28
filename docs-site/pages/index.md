@@ -4,6 +4,8 @@ The Applied AI Toolkit is the open source toolbox behind the client work of [Fed
 
 Each page of this site is generated from a file in the [repository](https://github.com/Fedemedinilla/applied-ai-toolkit), and its "Edit page" link opens that file. New here? [Start here](start-here.md) has a two-minute path and a ten-minute path.
 
+How these pieces show up in client work is on [How I build](https://federicomedinilla.com/how-i-build/), and what it costs to have one built, on [Services](https://federicomedinilla.com/services/).
+
 ## Three tools to read first
 
 ### gateway

@@ -10,13 +10,13 @@ This repository is the toolbox behind that work. When a client project needed so
 
 - **Try it in your browser:** [live demos](https://fedemedinilla.github.io/applied-ai-toolkit/). Five apps, no account, and nothing you type leaves your device.
 - **Read the docs** on the [documentation site](https://fedemedinilla.github.io/applied-ai-toolkit/docs/), which has one page per folder, generated from the READMEs.
-- **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, and [kyndredai.com](https://kyndredai.com) is my studio.
-- **Get in touch:** [LinkedIn](https://www.linkedin.com/in/federico-medinilla), or the contact form on [federicomedinilla.com](https://federicomedinilla.com).
+- **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, [what I automate and what it costs](https://federicomedinilla.com/services/), and [How I build](https://federicomedinilla.com/how-i-build/), which links each technique to its folder here. [kyndredai.com](https://kyndredai.com) is my studio.
+- **Get in touch:** [LinkedIn](https://www.linkedin.com/in/federico-medinilla), or the contact form on [federicomedinilla.com](https://federicomedinilla.com). For a technical question, the form at the end of [How I build](https://federicomedinilla.com/how-i-build/#contacto) arrives with that subject. I also take work inside teams and for agencies.
 - **Check the security model:** [SECURITY.md](SECURITY.md#threat-model) maps each threat to the folder that mitigates it and the test that shows it.
 
 ## Client work
 
-These are production projects I built for clients and for my own sites. Their repositories are private; each line links the public case study and names the folder here that shows the same engineering. The figures come from the case studies, where each one is told in full.
+These are production projects I built for clients and for my own sites. Their repositories are private; each line links the public case study and names the folder here that shows the same engineering. The figures come from the case studies, where each one is told in full. For clients who read Spanish, [Cómo construyo](https://federicomedinilla.com/es/como-construyo/) explains the same techniques on my site.
 
 - **B2B wholesale ordering app for Teia Bakery** ([case study](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/)). Forty shops order from their phone in about ten seconds, and the delivery note files itself ([the result](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/#b-resultado)). The same engineering is in [`idempotent-orders/`](idempotent-orders/) and [`pdf-receipt/`](pdf-receipt/).
 - **Bayard Writer for Colegio Bayard** ([case study](https://federicomedinilla.com/work/ai-writing-assistant-school/), [Kyndred AI case study](https://kyndredai.com/resources/bayard-writer-case-study/)). A family announcement used to take close to an hour to write, and now takes under five minutes ([the result](https://federicomedinilla.com/work/ai-writing-assistant-school/#b-resultado)). The same engineering is in [`apps/writer/`](apps/writer/). The eval method in [`evals/`](evals/) comes from my own site's demos, not from this project.
