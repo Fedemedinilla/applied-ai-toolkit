@@ -77,3 +77,21 @@ Each row names a threat, the folder that mitigates it and the test that shows th
 | Password guessing on a WordPress login | `wp-hardening`'s login limiter locks the client address after the limit, even for a correct password | [wp-hardening/tests/Unit/LoginLimiterTest.php:46](wp-hardening/tests/Unit/LoginLimiterTest.php#L46) |
 | `site-check` requests pages it was not given | A scope guard in the network layer refuses unlinked and denied paths ([site-check/sitecheck/scope.py:267](site-check/sitecheck/scope.py#L267)) | [site-check/tests/test_net_scope.py:37](site-check/tests/test_net_scope.py#L37), [:49](site-check/tests/test_net_scope.py#L49) |
 | The contact form is used to send mail to third parties | `safe-contact-form` takes the owner's destination from its config only. The acknowledgment goes to the address the visitor typed, and a link in their name does not reach it ([safe-contact-form/src/handler.ts:158](safe-contact-form/src/handler.ts#L158)) | [safe-contact-form/test/handler.test.ts:95](safe-contact-form/test/handler.test.ts#L95), [:174](safe-contact-form/test/handler.test.ts#L174) |
+
+## Trust boundaries
+
+Input from these sources is untrusted, and each is checked at one place before the code acts on it:
+
+- **Model output.** The gateway validates structured output with zod before returning it ([gateway/src/gateway.ts:591](gateway/src/gateway.ts#L591)). A proposed booking goes through `decide()` and the money guard (above). Text for a page goes through `renderMarkdown()`.
+- **The chat history a browser sends back.** Its signatures are verified before the model sees it ([grounded-assistant/src/history.ts:52](grounded-assistant/src/history.ts#L52)).
+- **Visitor input to a server.** The handlers check method, content type and declared size before reading the body, and refuse a body over the limit ([grounded-assistant/src/handler.ts:152](grounded-assistant/src/handler.ts#L152), [safe-contact-form/src/handler.ts:158](safe-contact-form/src/handler.ts#L158)).
+- **Text a user types as an amount.** `parseAmount()` returns `ambiguous: true` instead of guessing ([amount-parser/src/money.ts:777](amount-parser/src/money.ts#L777)).
+- **Imported files.** Replay Lab caps a run file's size, replays it and compares the hashes it states ([apps/replay-lab/src/run-file.ts:39](apps/replay-lab/src/run-file.ts#L39), [deterministic-sim/src/tournament/replay.ts:118](deterministic-sim/src/tournament/replay.ts#L118)), and the site checklist validates an imported site-check run ([apps/checklist/src/sitecheck-import.ts:144](apps/checklist/src/sitecheck-import.ts#L144)).
+
+## Known gaps
+
+- **LLM05:2026 Data and Model Poisoning and LLM09:2026 Vector and Embedding Weaknesses** are out of scope: nothing here trains a model or keeps a retrieval index.
+- **LLM02:2026 Sensitive Information Disclosure** has no row. The fixtures hold no personal data, and no test checks what a model reply discloses.
+- **The prompt leak check (LLM08) runs only in the red-team runner.** No production code filters a reply for the rules' text.
+- **No code scanning is configured.** CI writes SARIF files and checks that they parse, but does not upload them (root README, "Run everything").
+- **The live demos on GitHub Pages run without the Content-Security-Policy header**, since Pages cannot send response headers (root README, "Live demos").
