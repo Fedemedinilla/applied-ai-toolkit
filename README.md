@@ -1,5 +1,9 @@
 # Applied AI Toolkit
 
+[![CI](https://github.com/Fedemedinilla/applied-ai-toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Fedemedinilla/applied-ai-toolkit/actions/workflows/ci.yml)
+[![Pages](https://github.com/Fedemedinilla/applied-ai-toolkit/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/Fedemedinilla/applied-ai-toolkit/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/github/license/Fedemedinilla/applied-ai-toolkit)](LICENSE)
+
 Hi, I'm Federico Medinilla, a software developer in Buenos Aires, Argentina. I spent six years building websites and front ends. Since 2024 I have run KyndredAI, a small studio where I build AI assistants, n8n automations and web apps for schools, shops and small businesses.
 
 This repository is the toolbox behind that work. When a client project needed something I knew I would need again, I pulled it out, wrote tests for it and put it here. You will find the code that keeps Claude API spending under a cap and the runner I use to measure a prompt change before it ships. Next to them are the security checks I run on the sites I build, and nine small apps that show the pieces working together. It is open source under the [MIT license](LICENSE), so you can download any part and use it in your own projects.
@@ -8,6 +12,28 @@ This repository is the toolbox behind that work. When a client project needed so
 - **Read the docs** on the [documentation site](https://fedemedinilla.github.io/applied-ai-toolkit/docs/), which has one page per folder, generated from the READMEs.
 - **See my client work:** [federicomedinilla.com](https://federicomedinilla.com) has my portfolio and case studies, and [kyndredai.com](https://kyndredai.com) is my studio.
 - **Get in touch:** [LinkedIn](https://www.linkedin.com/in/federico-medinilla), or the contact form on [federicomedinilla.com](https://federicomedinilla.com).
+- **Check the security model:** [SECURITY.md](SECURITY.md#threat-model) maps each threat to the folder that mitigates it and the test that shows it.
+
+## Client work
+
+These are production projects I built for clients and for my own sites. Their repositories are private; each line links the public case study and names the folder here that shows the same engineering. The figures come from the case studies, where each one is told in full.
+
+- **B2B wholesale ordering app for Teia Bakery** ([case study](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/)). Forty shops order from their phone in about ten seconds, and the delivery note files itself ([the result](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/#b-resultado)). The same engineering is in [`idempotent-orders/`](idempotent-orders/) and [`pdf-receipt/`](pdf-receipt/).
+- **Bayard Writer for Colegio Bayard** ([case study](https://federicomedinilla.com/work/ai-writing-assistant-school/), [Kyndred AI case study](https://kyndredai.com/resources/bayard-writer-case-study/)). A family announcement used to take close to an hour to write, and now takes under five minutes ([the result](https://federicomedinilla.com/work/ai-writing-assistant-school/#b-resultado)). The same engineering is in [`apps/writer/`](apps/writer/). The eval method in [`evals/`](evals/) comes from my own site's demos, not from this project.
+- **The Kyn assistant and the multi-tenant chatbot platform** at [kyndredai.com](https://kyndredai.com). The same engineering is in [`apps/chat-widget/`](apps/chat-widget/), [`gateway/`](gateway/) and [`safe-markdown/`](safe-markdown/).
+- **[federicomedinilla.com](https://federicomedinilla.com) and [kyndredai.com](https://kyndredai.com)**, the two sites. The same engineering is in [`csp-build-guard/`](csp-build-guard/), [`safe-contact-form/`](safe-contact-form/) and [`grounded-assistant/`](grounded-assistant/).
+
+### The demos on federicomedinilla.com
+
+The demos on my site run their own code and import nothing from this repository. Where a folder here does the same job, it is the same pattern, reimplemented:
+
+| Demo on the site | Folder here | What they share |
+|---|---|---|
+| [Smart assistant](https://federicomedinilla.com/demos/#assistant) | [`grounded-assistant/`](grounded-assistant/), extracted from this demo | The same pattern, reimplemented: the model proposes a booking and code decides whether it can happen |
+| [Brand voice writer](https://federicomedinilla.com/demos/#writer) | [`apps/writer/`](apps/writer/) and [`evals/CASE-STUDY.md`](evals/CASE-STUDY.md) | The same pattern, reimplemented. The case study measured a prompt change on this demo |
+| [Registro de ingresos y pagos](https://federicomedinilla.com/es/demos/#registro), in Spanish | [`amount-parser/`](amount-parser/) and [`apps/caja/`](apps/caja/) | The same pattern, reimplemented: a deterministic parser reads the amount and asks when it has two readings |
+
+The site's shop demo has no folder here.
 
 ## How this repository is organized
 
@@ -94,15 +120,6 @@ Each folder has its own README, tests and public entry.
 | [`style-refs/`](style-refs/) | The writing references of `prose-rewriter`: sources, principles, annotated excerpts and before and after examples per genre, as data. A private workspace, not published. | `validateRefs()` (`style-refs/src/index.ts:224`) checks the licensing of every source; `principlesFor()` (`:324`) picks the principles a prompt may show | `npx vitest run style-refs` |
 | [`n8n-templates/`](n8n-templates/) | Thirteen n8n workflows for small businesses, the English versions of the ones I publish at [kyndredai.com/templates](https://kyndredai.com/templates). | Payment signature checks and idempotency where a repeat costs money; a test file per workflow that runs its nodes in an offline harness, which found six bugs; tables and Mermaid diagrams generated from the JSON files | `npx vitest run n8n-templates` |
 | [`agent-playbook/`](agent-playbook/) | How coding agents work in a repository without real credentials: session hook, test environment isolation, a CI-has-no-secrets check, edit hooks, a read-only reviewer, a CLAUDE.md template. | A pinned Node verified by SHA-256; a test that fails if a workflow reads a secret or can write beyond its policy; protected paths the agent cannot edit with the file tools | `npx vitest run agent-playbook` |
-
-## Client work
-
-These are production projects I built for clients and for my own sites. Their repositories are private; each line links the public case study and names the folder here that shows the same engineering.
-
-- **B2B wholesale ordering app for Teia Bakery** ([case study](https://federicomedinilla.com/work/b2b-wholesale-ordering-app/)). The same engineering is in [`idempotent-orders/`](idempotent-orders/) and [`pdf-receipt/`](pdf-receipt/).
-- **Bayard Writer for Colegio Bayard** ([case study](https://federicomedinilla.com/work/ai-writing-assistant-school/), [Kyndred AI case study](https://kyndredai.com/resources/bayard-writer-case-study/)). The same engineering is in [`apps/writer/`](apps/writer/). The eval method in [`evals/`](evals/) comes from my own site's demos, not from this project.
-- **The Kyn assistant and the multi-tenant chatbot platform** at [kyndredai.com](https://kyndredai.com). The same engineering is in [`apps/chat-widget/`](apps/chat-widget/), [`gateway/`](gateway/) and [`safe-markdown/`](safe-markdown/).
-- **[federicomedinilla.com](https://federicomedinilla.com) and [kyndredai.com](https://kyndredai.com)**, the two sites. The same engineering is in [`csp-build-guard/`](csp-build-guard/), [`safe-contact-form/`](safe-contact-form/) and [`grounded-assistant/`](grounded-assistant/).
 
 ## How I work
 
